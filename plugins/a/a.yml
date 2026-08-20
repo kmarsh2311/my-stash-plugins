@@ -1,7 +1,6 @@
-id: a
 name: A Plugin
-version: 1.0.0
 description: My first custom Stash plugin
-exec:
-  - node
-  - a.js
+version: 1.0.0
+ui:
+  javascript:
+    - a.js
