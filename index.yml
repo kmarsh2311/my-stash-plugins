@@ -1,0 +1,6 @@
+- id: stash-scene-manager
+  name: Stash Scene Manager Context Menu
+  version: 1.9.51
+  description: Adds a right-click context menu and card shortcuts to Stash scenes.
+  url: https://github.com/kmarsh2311/my-stash-plugins/archive/refs/heads/main.zip
+  path: plugins/a/a.yml
