@@ -1,28 +1,50 @@
-# Tagger for scenes and performers directly from title card
+<p align="center">
+  <img width="138" height="44" alt="image" src="https://github.com/user-attachments/assets/c6642c0e-c5fb-4569-8cff-b502a712ad74" />
+  <br><br>
+  <img width="350" height="432" alt="image" src="https://github.com/user-attachments/assets/469cbb1b-4f7a-4446-a23f-05b65814d464" />
+  &nbsp;&nbsp;
+  <img width="345" height="429" alt="image" src="https://github.com/user-attachments/assets/478eb6c6-0748-4cf4-8d4b-d30376979982" />
+</p>
 
-<img width="138" height="44" alt="image" src="https://github.com/user-attachments/assets/c6642c0e-c5fb-4569-8cff-b502a712ad74" />
+# My Stash Plugins
 
-<img width="350" height="432" alt="image" src="https://github.com/user-attachments/assets/469cbb1b-4f7a-4446-a23f-05b65814d464" />
+A collection of custom scripts and plugins designed to enhance the [Stash](https://github.com/stashapp/stash) experience. This repository focuses on improving library management, scene editing, and workflow efficiency.
 
-<img width="345" height="429" alt="image" src="https://github.com/user-attachments/assets/478eb6c6-0748-4cf4-8d4b-d30376979982" />
+---
 
+## 🛠 Featured Scripts
 
+### Stash Scene Manager Context Menu
+A powerful userscript that adds a right-click context menu directly to your Stash scene cards. 
 
-Key Features & Architecture
-Context Menu Integration: Provides a dedicated custom right-click menu on scene cards with quick-access links to edit tags, performers, and galleries, jump straight to the scene edit page, or access external support links.
+**Key Features:**
+*   **Quick Access:** Edit Tags, Performers, and Galleries without leaving the current page.
+*   **Draggable Popups:** Floating, draggable interface for seamless multi-tasking.
+*   **Optimized Performance:** Features local caching for tags/performers to ensure snappy search results.
+*   **Persistence:** Remembers your column widths and layout settings across sessions.
+*   **State Awareness:** Automatically restores your scroll position after page reloads or navigation.
 
-Interactive Popup Modals: Uses Tabulator tables inside draggable, floating popups to let you search, select, create, and assign tags and performers fluidly.
+---
 
-Smart UI & Persistence:
+## 🚀 Installation
 
-Features column persistence (localStorage) so your customized table widths and layouts stay remembered across sessions.
+1.  **Clone the Repository:**  
+    Navigate to your Stash plugins folder and run:
+    ```bash
+    git clone [https://github.com/kmarsh2311/my-stash-plugins.git](https://github.com/kmarsh2311/my-stash-plugins.git)
+    ```
+2.  **Refresh Stash:**  
+    Restart Stash or click the "Refresh" button in the Plugins interface to load the new scripts.
 
-Includes local caching (CACHE_TTL mechanisms) for tags, performers, and galleries to make searches fast and responsive.
+---
 
-Advanced State Management:
+## 💡 How to Use
+*   **Right-Click:** Use the context menu on any scene card to access the "Edit" suite.
+*   **Search & Select:** Use the integrated search bars to quickly filter and assign metadata.
+*   **Save:** Changes are committed back to your Stash database instantly upon saving.
 
-Automatically saves and restores your scroll position across page reloads (using sessionStorage and SPA tracking).
+---
 
-Automatically handles visibility changes (visibilitychange listeners) and debounced search inputs to prevent lag when filtering large libraries.
-
-Notification System: Integrates Toastify notifications to provide real-time, clean visual feedback when scenes are updated or when operations succeed/fail
+## 🤝 Support & Contributing
+*   **Support:** If you find these plugins helpful, you can support further development [here](https://www.patreon.com/serechops/membership).
+*   **Issues:** Found a bug? Please open an issue in this repository.
