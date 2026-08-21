@@ -40,6 +40,7 @@ A powerful userscript that adds a right-click context menu directly to your Stas
 
 ## 💡 How to Use
 *   **Right-Click:** Use the context menu on any scene card to access the "Edit" suite.
+*   **Simply Click:** Simply click the tag icon or performer icon on the scene card
 *   **Search & Select:** Use the integrated search bars to quickly filter and assign metadata.
 *   **Save:** Changes are committed back to your Stash database instantly upon saving.
 
