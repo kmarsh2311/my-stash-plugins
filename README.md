@@ -1,24 +1,21 @@
-# Template for creating Stash plugins source index
+# Tagger for for scenes and performers directly from Title card
 
-This template allows you to create a new repository with a few clicks with preconfigured GitHub action to publish your plugins source index. 
-_This assumes you already know how to create plugins for Stash. If you don't, first read [this](https://docs.stashapp.cc/in-app-manual/plugins/#creating-plugins)._
 
-## How to use it?
+Key Features & Architecture
+Context Menu Integration: Provides a dedicated custom right-click menu on scene cards with quick-access links to edit tags, performers, and galleries, jump straight to the scene edit page, or access external support links.
 
-1. Click **Use this template** > **Create a new repository**. 
-1. Choose a repository name and click **Create repository**.
-1. Open **Settings** and head to **Pages**.
-1. Under Build and deployment select the Source as GitHub Actions.
+Interactive Popup Modals: Uses Tabulator tables inside draggable, floating popups to let you search, select, create, and assign tags and performers fluidly.
 
-Now add your plugins to [plugins](/plugins) directory and they will be automatically published to the source index.
+Smart UI & Persistence:
 
-Source index URL: [`https://<your-username>.github.io/<repository-name>/main/index.yml`](https://<your-username>.github.io/<repository-name>/main/index.yml)
+Features column persistence (localStorage) so your customized table widths and layouts stay remembered across sessions.
 
-## Share your plugins
+Includes local caching (CACHE_TTL mechanisms) for tags, performers, and galleries to make searches fast and responsive.
 
-- [Create a new topic](https://discourse.stashapp.cc/t/-/33) for your plugin on the community forum.
-- [Add your source index to the list](https://discourse.stashapp.cc/t/-/122) on the Stash community forum.
+Advanced State Management:
 
-## License
+Automatically saves and restores your scroll position across page reloads (using sessionStorage and SPA tracking).
 
-The default license is set to [AGPL-3.0](/LICENCE). Before publishing any plugins you can change it.
+Automatically handles visibility changes (visibilitychange listeners) and debounced search inputs to prevent lag when filtering large libraries.
+
+Notification System: Integrates Toastify notifications to provide real-time, clean visual feedback when scenes are updated or when operations succeed/fail
