@@ -7,6 +7,7 @@
 <img width="345" height="429" alt="image" src="https://github.com/user-attachments/assets/478eb6c6-0748-4cf4-8d4b-d30376979982" />
 
 
+
 Key Features & Architecture
 Context Menu Integration: Provides a dedicated custom right-click menu on scene cards with quick-access links to edit tags, performers, and galleries, jump straight to the scene edit page, or access external support links.
 
