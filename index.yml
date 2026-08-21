@@ -2,6 +2,6 @@
   name: A Plugin
   version: 1.0.1
   description: My first custom Stash plugin
-  url: https://github.com/kmarsh2311/my-stash-plugins/releases/download/v1.0.0/plugin-a.zip
+  url: https://github.com/kmarsh2311/my-stash-plugins/releases/download/v1.0.0/plugin-a.zip?v=1.0.1
   sha256: 5d4e9bdeb50a5ecdbce3a2a245047f47b415c345fa7afbdf91993827d1e631a9
   path: a.yml
