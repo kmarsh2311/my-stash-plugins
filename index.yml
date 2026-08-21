@@ -3,4 +3,4 @@
   version: 1.0.0
   description: My first custom Stash plugin
   url: https://github.com/kmarsh2311/my-stash-plugins/archive/refs/heads/main.zip
-  path: plugins/a/a.yml
+  path: a.yml
