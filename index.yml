@@ -3,5 +3,5 @@
   version: 1.0.0
   description: My first custom Stash plugin
   url: https://github.com/kmarsh2311/my-stash-plugins/releases/download/v1.0.0/Archive.zip
-  sha256: 8ae12a4818851e1f11b99024b49a8924b1b974da049bac014623e46eb4ef24a2
+  sha256: ce330ab2981198df76c42101425eefa29d6162854ba1f8bf580ec2158672563d
   path: a.yml
