@@ -1,4 +1,4 @@
-- id: my-plugin
+- id: mypluginrc
   name: A Plugin
   version: 1.0.1
   description: My first custom Stash plugin
