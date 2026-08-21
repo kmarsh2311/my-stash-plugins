@@ -1,4 +1,7 @@
-# Tagger for for scenes and performers directly from Title card
+# Tagger for scenes and performers directly from title card
+
+<img width="350" height="432" alt="image" src="https://github.com/user-attachments/assets/469cbb1b-4f7a-4446-a23f-05b65814d464" />
+
 
 
 Key Features & Architecture
