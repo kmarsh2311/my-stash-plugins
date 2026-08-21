@@ -2,6 +2,7 @@
 
 <img width="350" height="432" alt="image" src="https://github.com/user-attachments/assets/469cbb1b-4f7a-4446-a23f-05b65814d464" />
 
+<img width="345" height="429" alt="image" src="https://github.com/user-attachments/assets/478eb6c6-0748-4cf4-8d4b-d30376979982" />
 
 
 Key Features & Architecture
