@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash Scene Manager Context Menu
 // @namespace    http://tampermonkey.net/
-// @version      1.9.52
+// @version      2.0
 // @description  Fast scene tagging workflow for Stash: edit tags, performers, and galleries from scene cards with quick search and popups
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
