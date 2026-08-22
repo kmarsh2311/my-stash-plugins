@@ -286,6 +286,154 @@
         };
     }
 
+    const recentStorageKeys = {
+        tags: 'stash_fast_tag_recent_tags',
+        performers: 'stash_fast_tag_recent_performers',
+        galleries: 'stash_fast_tag_recent_galleries'
+    };
+
+    function readRecentEntries(type) {
+        try {
+            const raw = localStorage.getItem(recentStorageKeys[type]);
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function writeRecentEntries(type, value) {
+        try {
+            localStorage.setItem(recentStorageKeys[type], JSON.stringify((Array.isArray(value) ? value : []).slice(0, 8)));
+        } catch (e) {}
+    }
+
+    function addRecentEntry(type, item) {
+        if (!item || !item.name) return;
+        const list = readRecentEntries(type).filter(entry => entry && entry.name && entry.name !== item.name);
+        list.unshift({ id: item.id, name: item.name });
+        writeRecentEntries(type, list);
+    }
+
+    function addRecentEntriesFromSelection(type, selectedItems) {
+        if (!Array.isArray(selectedItems)) return;
+        selectedItems.filter(Boolean).forEach(item => addRecentEntry(type, item));
+    }
+
+    function getSmartSortComparator(type, term, selectedIds) {
+        return (a, b) => {
+            const aSel = selectedIds.has(String(a.id));
+            const bSel = selectedIds.has(String(b.id));
+            if (aSel && !bSel) return -1;
+            if (!aSel && bSel) return 1;
+
+            const aName = String(a.name || a.title || '').trim().toLowerCase();
+            const bName = String(b.name || b.title || '').trim().toLowerCase();
+            if (!term) {
+                return aName.localeCompare(bName);
+            }
+
+            const aExact = aName === term ? 1 : 0;
+            const bExact = bName === term ? 1 : 0;
+            if (aExact !== bExact) return bExact - aExact;
+
+            const aStarts = aName.startsWith(term) ? 1 : 0;
+            const bStarts = bName.startsWith(term) ? 1 : 0;
+            if (aStarts !== bStarts) return bStarts - aStarts;
+
+            const aIncludes = aName.includes(term) ? 1 : 0;
+            const bIncludes = bName.includes(term) ? 1 : 0;
+            if (aIncludes !== bIncludes) return bIncludes - aIncludes;
+
+            return aName.localeCompare(bName);
+        };
+    }
+
+    function trySelectRecentChip(type, item, selectedIds, input, onSelected) {
+        const table = activeTableInstance;
+        const itemName = String(item && item.name ? item.name : '').trim().toLowerCase();
+
+        if (!table) {
+            if (input) {
+                input.value = itemName;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.focus();
+            }
+            return false;
+        }
+
+        const data = Array.isArray(table.getData()) ? table.getData() : [];
+        const normalized = (value) => String(value || '').trim().toLowerCase();
+
+        let match = data.find(row => normalized(row.name || row.title) === itemName);
+        if (!match) {
+            match = data.find(row => normalized(row.name || row.title).includes(itemName));
+        }
+
+        if (match && match.id != null) {
+            const rowId = String(match.id);
+            selectedIds.add(rowId);
+            try {
+                table.deselectRow();
+                table.selectRow(rowId);
+                const row = table.getRow(rowId);
+                if (row) {
+                    table.scrollToRow(row, 'top', false);
+                }
+            } catch (e) {}
+
+            if (typeof onSelected === 'function') {
+                onSelected();
+            }
+
+            if (input) {
+                input.value = '';
+                input.focus();
+            }
+            return true;
+        }
+
+        if (input) {
+            input.value = item && item.name ? item.name : '';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.focus();
+        }
+        return false;
+    }
+
+    function renderQuickActions(form, type, input, selectedIds, sourceItems, labelField, onRecentChipSelect) {
+        const target = form.querySelector(`#${type}-quick-actions`);
+        if (!target) return;
+
+        const recent = readRecentEntries(type)
+            .slice(0, 6)
+            .filter(item => item && item.name)
+            .map(item => ({ id: item.id, name: item.name }));
+
+        if (!recent.length) {
+            target.innerHTML = '';
+            target.style.display = 'none';
+            return;
+        }
+
+        target.innerHTML = '';
+        target.style.display = 'flex';
+        target.style.flexWrap = 'wrap';
+        target.style.gap = '6px';
+        target.style.marginBottom = '10px';
+
+        recent.forEach(item => {
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.textContent = item.name;
+            chip.style.cssText = 'padding: 5px 8px; border: 1px solid #dfe3ea; border-radius: 999px; background: #f8fafc; color: #243447; font-size: 11px; cursor: pointer;';
+            chip.addEventListener('click', () => {
+                trySelectRecentChip(type, item, selectedIds, input, onRecentChipSelect);
+            });
+            target.appendChild(chip);
+        });
+    }
+
     function createCustomMenu(clickEvent, sceneId, cardElement) {
         const menu = document.createElement('div');
         menu.id = 'scenes-custom-menu';
@@ -437,10 +585,11 @@
                 <button type="button" id="tags-create-btn" style="padding: 7px 8px; cursor: pointer; font-size: 12px; font-weight: 500; background: #10b981; color: white; border: none; border-radius: 6px; white-space: nowrap; display: none;">Create</button>
                 <button type="button" id="tags-refresh-btn" style="padding: 7px 8px; cursor: pointer; font-size: 12px; font-weight: 500; background: #64748b; color: white; border: none; border-radius: 6px; white-space: nowrap;">Refresh</button>
             </div>
+            <div id="tags-quick-actions" style="display: none; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;"></div>
             <div id="tags-tabulator-table" style="margin-bottom: 10px; width: 100%; box-sizing: border-box;"></div>
             <div style="display: flex; gap: 8px;">
                 <button type="button" id="tags-save-btn" style="flex: 1; padding: 7px; cursor: pointer; font-size: 12px; font-weight: 500; background: #6366f1; color: white; border: none; border-radius: 6px;">Save Tags</button>
-                <button type="button" id="tags-cancel-btn" style="flex: 1; padding: 7px; cursor: pointer; font-size: 12px; font-weight: 500; background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px;">Cancel</button>
+                <button type="button" id="tags-cancel-btn" style="flex: 1; padding: 7px; cursor: pointer; font-size: 12px; font-weight: 500; background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px;">Close</button>
             </div>
         `;
         document.body.appendChild(form);
@@ -520,13 +669,7 @@
                 data = cachedData.filter(item => tokens.every(t => (item.name || '').toLowerCase().includes(t)));
             }
 
-            data.sort((a, b) => {
-                const aSel = selectedIds.has(String(a.id));
-                const bSel = selectedIds.has(String(b.id));
-                if (aSel && !bSel) return -1;
-                if (!aSel && bSel) return 1;
-                return (a.name || '').localeCompare(b.name || '');
-            });
+            data.sort(getSmartSortComparator('tags', term, selectedIds));
 
             isRestoringSelections = true;
             try {
@@ -534,6 +677,12 @@
                 selectedIds.forEach(id => {
                     const r = table.getRow(id);
                     if (r) table.selectRow(r);
+                });
+                renderQuickActions(form, 'tags', filterInput, selectedIds, data, 'name', () => {
+                    filterInput.value = '';
+                    updateVisibility();
+                    fetchData('', false);
+                    saveTagsWithoutReload(sceneId, selectedIds);
                 });
                 if (resetScroll && data.length > 0) table.scrollToRow(table.getRows()[0], "top", false);
             } finally {
@@ -579,6 +728,17 @@
         await fetchData("", true);
 
         form.querySelector('#tags-save-btn').addEventListener('click', async () => {
+            const selectedItems = Array.from(selectedIds).map(id => {
+                const item = getCachedOrNull('tags') || [];
+                return item.find(entry => String(entry.id) === String(id));
+            }).filter(Boolean);
+            addRecentEntriesFromSelection('tags', selectedItems);
+            renderQuickActions(form, 'tags', filterInput, selectedIds, selectedItems, 'name', () => {
+                filterInput.value = '';
+                updateVisibility();
+                fetchData('', false);
+                saveTagsWithoutReload(sceneId, selectedIds);
+            });
             if (!isTabActive) await new Promise(r => setTimeout(r, 200));
             await saveAndReloadTags(sceneId, selectedIds);
         });
@@ -587,13 +747,22 @@
         positionPopupNearCard(form, cardElement);
     }
 
+    async function saveTagsWithoutReload(sceneId, selectedIds) {
+        sessionStorage.setItem(scrollKey, window.scrollY);
+        const success = await updateSceneWithTags(sceneId, Array.from(selectedIds));
+        if (success) {
+            toastSuccess('Tag saved');
+        }
+        return success;
+    }
+
     async function saveAndReloadTags(sceneId, selectedIds) {
         sessionStorage.setItem(scrollKey, window.scrollY);
         const success = await updateSceneWithTags(sceneId, Array.from(selectedIds));
         if (success) {
             closePopup();
             toastSuccess(`Scene updated! Reloading...`);
-            setTimeout(() => { window.location.reload(); }, 400);
+            setTimeout(() => { window.location.reload(); }, 0);
         }
     }
 
@@ -634,10 +803,11 @@
                 <button type="button" id="performers-create-btn" style="padding: 7px 8px; cursor: pointer; font-size: 12px; font-weight: 500; background: #10b981; color: white; border: none; border-radius: 6px; white-space: nowrap; display: none;">Create</button>
                 <button type="button" id="performers-refresh-btn" style="padding: 7px 8px; cursor: pointer; font-size: 12px; font-weight: 500; background: #64748b; color: white; border: none; border-radius: 6px; white-space: nowrap;">Refresh</button>
             </div>
+            <div id="performers-quick-actions" style="display: none; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;"></div>
             <div id="performers-tabulator-table" style="margin-bottom: 10px; width: 100%; box-sizing: border-box;"></div>
             <div style="display: flex; gap: 8px;">
                 <button type="button" id="performers-save-btn" style="flex: 1; padding: 7px; cursor: pointer; font-size: 12px; font-weight: 500; background: #6366f1; color: white; border: none; border-radius: 6px;">Save Performers</button>
-                <button type="button" id="performers-cancel-btn" style="flex: 1; padding: 7px; cursor: pointer; font-size: 12px; font-weight: 500; background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px;">Cancel</button>
+                <button type="button" id="performers-cancel-btn" style="flex: 1; padding: 7px; cursor: pointer; font-size: 12px; font-weight: 500; background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px;">Close</button>
             </div>
         `;
         document.body.appendChild(form);
@@ -722,27 +892,7 @@
                 data = cachedData.filter(item => tokens.every(t => (item.name || '').toLowerCase().includes(t)));
             }
 
-            data.sort((a, b) => {
-                const aSel = selectedIds.has(String(a.id));
-                const bSel = selectedIds.has(String(b.id));
-                if (aSel && !bSel) return -1;
-                if (!aSel && bSel) return 1;
-
-                if (term.length > 0) {
-                    const aName = (a.name || '').toLowerCase();
-                    const bName = (b.name || '').toLowerCase();
-                    const getScore = (name) => {
-                        if (name === term) return 100;
-                        if (name.startsWith(term)) return 80;
-                        if (name.includes(term)) return 50;
-                        return 10;
-                    };
-                    const scoreA = getScore(aName);
-                    const scoreB = getScore(bName);
-                    if (scoreA !== scoreB) return scoreB - scoreA;
-                }
-                return (a.name || '').localeCompare(b.name || '');
-            });
+            data.sort(getSmartSortComparator('performers', term, selectedIds));
 
             isRestoringSelections = true;
             try {
@@ -750,6 +900,12 @@
                 selectedIds.forEach(id => {
                     const r = table.getRow(id);
                     if (r) table.selectRow(r);
+                });
+                renderQuickActions(form, 'performers', filterInput, selectedIds, data, 'name', () => {
+                    filterInput.value = '';
+                    updateVisibility();
+                    fetchData('', false);
+                    savePerformersWithoutReload(sceneId, selectedIds);
                 });
                 if (resetScroll && data.length > 0) table.scrollToRow(table.getRows()[0], "top", false);
             } finally {
@@ -795,6 +951,17 @@
         await fetchData("", true);
 
         form.querySelector('#performers-save-btn').addEventListener('click', async () => {
+            const selectedItems = Array.from(selectedIds).map(id => {
+                const item = getCachedOrNull('performers') || [];
+                return item.find(entry => String(entry.id) === String(id));
+            }).filter(Boolean);
+            addRecentEntriesFromSelection('performers', selectedItems);
+            renderQuickActions(form, 'performers', filterInput, selectedIds, selectedItems, 'name', () => {
+                filterInput.value = '';
+                updateVisibility();
+                fetchData('', false);
+                savePerformersWithoutReload(sceneId, selectedIds);
+            });
             if (!isTabActive) await new Promise(r => setTimeout(r, 200));
             await saveAndReloadPerformers(sceneId, selectedIds);
         });
@@ -803,13 +970,22 @@
         positionPopupNearCard(form, cardElement);
     }
 
+    async function savePerformersWithoutReload(sceneId, selectedIds) {
+        sessionStorage.setItem(scrollKey, window.scrollY);
+        const success = await updateSceneWithPerformers(sceneId, Array.from(selectedIds));
+        if (success) {
+            toastSuccess('Performer saved');
+        }
+        return success;
+    }
+
     async function saveAndReloadPerformers(sceneId, selectedIds) {
         sessionStorage.setItem(scrollKey, window.scrollY);
         const success = await updateSceneWithPerformers(sceneId, Array.from(selectedIds));
         if (success) {
             closePopup();
             toastSuccess(`Scene updated! Reloading...`);
-            setTimeout(() => { window.location.reload(); }, 400);
+            setTimeout(() => { window.location.reload(); }, 0);
         }
     }
 
@@ -850,10 +1026,11 @@
                 <button type="button" id="galleries-create-btn" style="padding: 7px 8px; cursor: pointer; font-size: 12px; font-weight: 500; background: #10b981; color: white; border: none; border-radius: 6px; white-space: nowrap; display: none;">Create</button>
                 <button type="button" id="galleries-refresh-btn" style="padding: 7px 8px; cursor: pointer; font-size: 12px; font-weight: 500; background: #64748b; color: white; border: none; border-radius: 6px; white-space: nowrap;">Refresh</button>
             </div>
+            <div id="galleries-quick-actions" style="display: none; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;"></div>
             <div id="galleries-tabulator-table" style="margin-bottom: 10px; width: 100%; box-sizing: border-box;"></div>
             <div style="display: flex; gap: 8px;">
                 <button type="button" id="galleries-save-btn" style="flex: 1; padding: 7px; cursor: pointer; font-size: 12px; font-weight: 500; background: #6366f1; color: white; border: none; border-radius: 6px;">Save Galleries</button>
-                <button type="button" id="galleries-cancel-btn" style="flex: 1; padding: 7px; cursor: pointer; font-size: 12px; font-weight: 500; background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px;">Cancel</button>
+                <button type="button" id="galleries-cancel-btn" style="flex: 1; padding: 7px; cursor: pointer; font-size: 12px; font-weight: 500; background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px;">Close</button>
             </div>
         `;
         document.body.appendChild(form);
@@ -933,13 +1110,7 @@
                 data = cachedData.filter(item => tokens.every(t => (item.title || '').toLowerCase().includes(t)));
             }
 
-            data.sort((a, b) => {
-                const aSel = selectedIds.has(String(a.id));
-                const bSel = selectedIds.has(String(b.id));
-                if (aSel && !bSel) return -1;
-                if (!aSel && bSel) return 1;
-                return (a.title || '').localeCompare(b.title || '');
-            });
+            data.sort(getSmartSortComparator('galleries', term, selectedIds));
 
             isRestoringSelections = true;
             try {
@@ -947,6 +1118,12 @@
                 selectedIds.forEach(id => {
                     const r = table.getRow(id);
                     if (r) table.selectRow(r);
+                });
+                renderQuickActions(form, 'galleries', filterInput, selectedIds, data, 'title', () => {
+                    filterInput.value = '';
+                    updateVisibility();
+                    fetchData('', false);
+                    saveGalleriesWithoutReload(sceneId, selectedIds);
                 });
                 if (resetScroll && data.length > 0) table.scrollToRow(table.getRows()[0], "top", false);
             } finally {
@@ -992,12 +1169,32 @@
         await fetchData("", true);
 
         form.querySelector('#galleries-save-btn').addEventListener('click', async () => {
+            const selectedItems = Array.from(selectedIds).map(id => {
+                const item = getCachedOrNull('galleries') || [];
+                return item.find(entry => String(entry.id) === String(id));
+            }).filter(Boolean);
+            addRecentEntriesFromSelection('galleries', selectedItems);
+            renderQuickActions(form, 'galleries', filterInput, selectedIds, selectedItems, 'title', () => {
+                filterInput.value = '';
+                updateVisibility();
+                fetchData('', false);
+                saveGalleriesWithoutReload(sceneId, selectedIds);
+            });
             if (!isTabActive) await new Promise(r => setTimeout(r, 200));
             await saveAndReloadGalleries(sceneId, selectedIds);
         });
 
         form.querySelector('#galleries-cancel-btn').addEventListener('click', () => { closePopup(); });
         positionPopupNearCard(form, cardElement);
+    }
+
+    async function saveGalleriesWithoutReload(sceneId, selectedIds) {
+        sessionStorage.setItem(scrollKey, window.scrollY);
+        const success = await updateSceneWithGalleries(sceneId, Array.from(selectedIds));
+        if (success) {
+            toastSuccess('Gallery saved');
+        }
+        return success;
     }
 
     async function saveAndReloadGalleries(sceneId, selectedIds) {

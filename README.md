@@ -24,6 +24,8 @@ A fast tagging workflow for Stash scene cards, designed for video libraries wher
 *   **Optimized Performance:** Features local caching for tags/performers to ensure snappy search results.
 *   **Persistence:** Remembers your column widths and layout settings across sessions.
 *   **State Awareness:** Automatically restores your scroll position after page reloads or navigation.
+*   **Recent Items:** Keeps recently used tags, performers, and galleries available as quick-select buttons.
+*   **Quick Save:** Selecting a recent item saves it without reloading the page; the full Save button refreshes the scene view after saving.
 
 **Best for:** quickly tagging scenes, performers, and galleries in a video collection workflow.
 
@@ -45,7 +47,7 @@ A fast tagging workflow for Stash scene cards, designed for video libraries wher
 *   **Right-Click:** Use the context menu on any scene card to access the quick edit tool.
 *   **Quick Tagging:** Select tags and performers from a searchable popup while reviewing video scenes.
 *   **Bulk Review Workflow:** Keep your tagging flow fast while scanning large collections of scenes.
-*   **Save:** Changes are committed back to your Stash database instantly upon saving.
+*   **Save:** Recent-item selections are saved immediately without a page reload. The full Save button commits the current selection and refreshes the scene view.
 
 ## 🎯 Why This Exists
 This plugin is built for quickly tagging scenes in a video library, especially when you want to assign metadata like performers, tags, and galleries without opening multiple pages or navigating away from the current view.
