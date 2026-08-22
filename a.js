@@ -597,7 +597,7 @@
 
         const table = new Tabulator("#tags-tabulator-table", {
             layout: "fitColumns",
-            height: "200px",
+            height: "300px",
             placeholder: "No Tags Found",
             selectable: true,
             index: "id",
@@ -650,7 +650,9 @@
             if (!isRestoringSelections) {
                 const id = row.getData().id;
                 if (id) selectedIds.delete(String(id));
-                fetchData(filterInput.value.trim(), false);
+                if (filterInput.value.trim().length > 0) {
+                    fetchData(filterInput.value.trim(), false);
+                }
             }
         });
 
@@ -816,7 +818,7 @@
 
         const table = new Tabulator("#performers-tabulator-table", {
             layout: "fitColumns",
-            height: "380px",
+            height: "300px",
             placeholder: "No Performers Found",
             selectable: true,
             index: "id",
@@ -874,7 +876,9 @@
             if (!isRestoringSelections) {
                 const id = row.getData().id;
                 if (id) selectedIds.delete(String(id));
-                fetchData(filterInput.value.trim(), false);
+                if (filterInput.value.trim().length > 0) {
+                    fetchData(filterInput.value.trim(), false);
+                }
             }
         });
 
@@ -1093,7 +1097,9 @@
             if (!isRestoringSelections) {
                 const id = row.getData().id;
                 if (id) selectedIds.delete(String(id));
-                fetchData(filterInput.value.trim(), false);
+                if (filterInput.value.trim().length > 0) {
+                    fetchData(filterInput.value.trim(), false);
+                }
             }
         });
 
