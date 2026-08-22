@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash Scene Manager Context Menu
 // @namespace    http://tampermonkey.net/
-// @version      1.9.51
+// @version      1.9.52
 // @description  Restricted right-click context menu and card-wide left-click badge shortcuts with fully isolated popups and column persistence
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
@@ -9,6 +9,8 @@
 // @run-at       document-end
 // @require      https://unpkg.com/tabulator-tables@5.5.2/dist/js/tabulator.min.js
 // @require      https://cdn.jsdelivr.net/npm/toastify-js
+// @updateURL    https://raw.githubusercontent.com/kmarsh2311/my-stash-plugins/main/a.js
+// @downloadURL  https://raw.githubusercontent.com/kmarsh2311/my-stash-plugins/main/a.js
 // ==/UserScript==
 
 (async function() {
@@ -175,10 +177,20 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ query, variables })
             });
-            return await res.json();
+
+            if (!res.ok) {
+                return { errors: [{ message: `GraphQL request failed: ${res.status} ${res.statusText}` }] };
+            }
+
+            const payload = await res.json();
+            if (!payload || typeof payload !== 'object') {
+                return { errors: [{ message: 'GraphQL response was not valid JSON.' }] };
+            }
+
+            return payload;
         } catch (err) {
             console.error('Stash Scene Manager: Network error', err);
-            return { errors: [{ message: err.message }] };
+            return { errors: [{ message: err.message || 'Unknown network error' }] };
         }
     };
 
@@ -209,8 +221,21 @@
     let currentMenu = null;
     let currentPopup = null;
     let activeTableInstance = null;
+    let menuOutsideClickHandler = null;
+    let popupCleanupFns = [];
+
+    function clearPopupCleanupFns() {
+        while (popupCleanupFns.length) {
+            const cleanup = popupCleanupFns.pop();
+            if (typeof cleanup === 'function') cleanup();
+        }
+    }
 
     function closeMenu() {
+        if (menuOutsideClickHandler) {
+            document.removeEventListener('mousedown', menuOutsideClickHandler);
+            menuOutsideClickHandler = null;
+        }
         if (currentMenu) {
             currentMenu.remove();
             currentMenu = null;
@@ -218,6 +243,7 @@
     }
 
     function closePopup() {
+        clearPopupCleanupFns();
         if (activeTableInstance) {
             try { activeTableInstance.destroy(); } catch (e) {}
             activeTableInstance = null;
@@ -226,7 +252,11 @@
             currentPopup.remove();
             currentPopup = null;
         }
-        document.querySelectorAll('#scenes-popup').forEach(el => el.remove());
+        document.querySelectorAll('#scenes-popup').forEach(el => {
+            if (!currentPopup || el !== currentPopup) {
+                el.remove();
+            }
+        });
     }
 
     let cacheStore = {
@@ -355,9 +385,9 @@
         const handleOutsideClick = (e) => {
             if (!menu.contains(e.target)) {
                 closeMenu();
-                document.removeEventListener('mousedown', handleOutsideClick);
             }
         };
+        menuOutsideClickHandler = handleOutsideClick;
         document.addEventListener('mousedown', handleOutsideClick);
     }
 
@@ -987,18 +1017,15 @@
         const handleOutsideClick = (e) => {
             if (!form.contains(e.target)) {
                 closePopup();
-                document.removeEventListener('mousedown', handleOutsideClick);
             }
         };
-        setTimeout(() => { document.addEventListener('mousedown', handleOutsideClick); }, 0);
-
         const handleKeyDown = (e) => {
             if (e.key === 'Escape') {
                 e.preventDefault();
                 closePopup();
             } else if (e.key === 'Enter') {
                 const isSearchFocused = document.activeElement && document.activeElement.tagName === 'INPUT';
-                
+
                 // Prevent Enter from doing anything when typing in the search box
                 if (isSearchFocused) {
                     e.preventDefault();
@@ -1013,7 +1040,16 @@
                 }
             }
         };
-        form.addEventListener('keydown', handleKeyDown);
+
+        popupCleanupFns.push(() => document.removeEventListener('mousedown', handleOutsideClick));
+        popupCleanupFns.push(() => document.removeEventListener('keydown', handleKeyDown));
+        popupCleanupFns.push(() => {
+            document.onmousemove = null;
+            document.onmouseup = null;
+        });
+
+        setTimeout(() => { document.addEventListener('mousedown', handleOutsideClick); }, 0);
+        document.addEventListener('keydown', handleKeyDown);
 
         let isDragging = false;
         let dragOffsetX, dragOffsetY;
@@ -1156,6 +1192,8 @@
     }
 
     document.addEventListener('contextmenu', async function(event) {
+        if (currentPopup || currentMenu) return;
+
         const sceneCard = event.target.closest('.scene-card, .card, [class*="scene-card"], [class*="SceneCard"]');
         if (!sceneCard) return;
 
@@ -1166,6 +1204,8 @@
     }, true);
 
     document.addEventListener('click', function(event) {
+        if (currentPopup) return;
+
         const sceneCard = event.target.closest('.scene-card, .card, [class*="scene-card"], [class*="SceneCard"]');
         if (!sceneCard) return;
 
