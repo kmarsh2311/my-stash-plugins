@@ -2,7 +2,7 @@
 // @name         Stash Scene Manager Context Menu
 // @namespace    http://tampermonkey.net/
 // @version      1.9.52
-// @description  Restricted right-click context menu and card-wide left-click badge shortcuts with fully isolated popups and column persistence
+// @description  Fast scene tagging workflow for Stash: edit tags, performers, and galleries from scene cards with quick search and popups
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
 // @grant        none

@@ -8,21 +8,24 @@
 
 # My Stash Plugins
 
-A collection of custom scripts and plugins designed to enhance the [Stash](https://github.com/stashapp/stash) experience. This repository focuses on improving library management, scene editing, and workflow efficiency.
+A collection of custom scripts and plugins designed to speed up the [Stash](https://github.com/stashapp/stash) workflow for video scene tagging and metadata cleanup. This repository is focused on fast tagging of scenes, performers, galleries, and related metadata without leaving the library view.
 
 ---
 
 ## 🛠 Featured Scripts
 
 ### Stash Scene Manager Context Menu
-A powerful userscript that adds a right-click context menu directly to your Stash scene cards. 
+A fast tagging workflow for Stash scene cards, designed for video libraries where you want to assign tags and performers quickly without leaving the page. 
 
 **Key Features:**
-*   **Quick Access:** Edit Tags, Performers, and Galleries without leaving the current page.
+*   **Fast Metadata Editing:** Edit Tags, Performers, and Galleries directly from the scene card.
+*   **Video Library Workflow:** Built for rapid cleanup and tagging during bulk reviewing of scenes.
 *   **Draggable Popups:** Floating, draggable interface for seamless multi-tasking.
 *   **Optimized Performance:** Features local caching for tags/performers to ensure snappy search results.
 *   **Persistence:** Remembers your column widths and layout settings across sessions.
 *   **State Awareness:** Automatically restores your scroll position after page reloads or navigation.
+
+**Best for:** quickly tagging scenes, performers, and galleries in a video collection workflow.
 
 ---
 
@@ -39,10 +42,13 @@ A powerful userscript that adds a right-click context menu directly to your Stas
 ---
 
 ## 💡 How to Use
-*   **Right-Click:** Use the context menu on any scene card to access the "Edit" suite.
-*   **Simply Click:** Simply click the tag icon or performer icon on the scene card.
-*   **Search & Select:** Use the integrated search bars to quickly filter and assign metadata.
+*   **Right-Click:** Use the context menu on any scene card to access the quick edit tool.
+*   **Quick Tagging:** Select tags and performers from a searchable popup while reviewing video scenes.
+*   **Bulk Review Workflow:** Keep your tagging flow fast while scanning large collections of scenes.
 *   **Save:** Changes are committed back to your Stash database instantly upon saving.
+
+## 🎯 Why This Exists
+This plugin is built for quickly tagging scenes in a video library, especially when you want to assign metadata like performers, tags, and galleries without opening multiple pages or navigating away from the current view.
 
 ---
 
