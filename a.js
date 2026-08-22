@@ -610,7 +610,7 @@
 
         setupPopupDragAndClose(form, async () => {
             if (!isTabActive) await new Promise(r => setTimeout(r, 200));
-            await saveAndReloadTags(sceneId, selectedIds);
+            await saveAndRefreshTags(sceneId, selectedIds);
         });
 
         const existingIds = await fetchExistingTagIds(sceneId);
@@ -740,7 +740,7 @@
                 saveTagsWithoutReload(sceneId, selectedIds);
             });
             if (!isTabActive) await new Promise(r => setTimeout(r, 200));
-            await saveAndReloadTags(sceneId, selectedIds);
+            await saveAndRefreshTags(sceneId, selectedIds);
         });
 
         form.querySelector('#tags-cancel-btn').addEventListener('click', () => { closePopup(); });
@@ -751,19 +751,20 @@
         sessionStorage.setItem(scrollKey, window.scrollY);
         const success = await updateSceneWithTags(sceneId, Array.from(selectedIds));
         if (success) {
+            await refreshSceneCards();
             toastSuccess('Tag saved');
         }
         return success;
     }
 
-    async function saveAndReloadTags(sceneId, selectedIds) {
-        sessionStorage.setItem(scrollKey, window.scrollY);
+    async function saveAndRefreshTags(sceneId, selectedIds) {
         const success = await updateSceneWithTags(sceneId, Array.from(selectedIds));
         if (success) {
+            await refreshSceneCards();
             closePopup();
-            toastSuccess(`Scene updated! Reloading...`);
-            setTimeout(() => { window.location.reload(); }, 0);
+            toastSuccess('Scene updated');
         }
+        return success;
     }
 
     // ==========================================
@@ -833,7 +834,7 @@
 
         setupPopupDragAndClose(form, async () => {
             if (!isTabActive) await new Promise(r => setTimeout(r, 200));
-            await saveAndReloadPerformers(sceneId, selectedIds);
+            await saveAndRefreshPerformers(sceneId, selectedIds);
         });
 
         const existingIds = await fetchExistingPerformerIds(sceneId);
@@ -963,7 +964,7 @@
                 savePerformersWithoutReload(sceneId, selectedIds);
             });
             if (!isTabActive) await new Promise(r => setTimeout(r, 200));
-            await saveAndReloadPerformers(sceneId, selectedIds);
+            await saveAndRefreshPerformers(sceneId, selectedIds);
         });
 
         form.querySelector('#performers-cancel-btn').addEventListener('click', () => { closePopup(); });
@@ -974,19 +975,20 @@
         sessionStorage.setItem(scrollKey, window.scrollY);
         const success = await updateSceneWithPerformers(sceneId, Array.from(selectedIds));
         if (success) {
+            await refreshSceneCards();
             toastSuccess('Performer saved');
         }
         return success;
     }
 
-    async function saveAndReloadPerformers(sceneId, selectedIds) {
-        sessionStorage.setItem(scrollKey, window.scrollY);
+    async function saveAndRefreshPerformers(sceneId, selectedIds) {
         const success = await updateSceneWithPerformers(sceneId, Array.from(selectedIds));
         if (success) {
+            await refreshSceneCards();
             closePopup();
-            toastSuccess(`Scene updated! Reloading...`);
-            setTimeout(() => { window.location.reload(); }, 0);
+            toastSuccess('Scene updated');
         }
+        return success;
     }
 
     // ==========================================
@@ -1210,6 +1212,20 @@
     // ==========================================
     // SHARED HELPER FUNCTIONS
     // ==========================================
+    async function refreshSceneCards() {
+        const apollo = window.__APOLLO_CLIENT__;
+        if (!apollo || typeof apollo.getObservableQueries !== 'function') return false;
+
+        const sceneQueries = [...apollo.getObservableQueries().values()].filter(query => {
+            const queryText = query.options?.query?.loc?.source?.body || '';
+            return queryText.includes('FindScenes') && typeof query.refetch === 'function';
+        });
+
+        if (!sceneQueries.length) return false;
+        await Promise.all(sceneQueries.map(query => query.refetch()));
+        return true;
+    }
+
     function setupPopupDragAndClose(form, onSaveCallback) {
         const handleOutsideClick = (e) => {
             if (!form.contains(e.target)) {
