@@ -1,7 +1,7 @@
 - id: mypluginrc
   name: A Plugin
-  version: 1.0.1
+  version: 2.0
   description: My first custom Stash plugin
-  date: 2026-08-21 16:00:00
+  date: 2026-08-22 18:00:00
   path: plugin-a.zip
-  sha256: 5d4e9bdeb50a5ecdbce3a2a245047f47b415c345fa7afbdf91993827d1e631a9
+  sha256: 09eebf9eb3168e643fa4d0912e241aadb639a9706162e12bac99a4496bec3860
