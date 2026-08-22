@@ -16,61 +16,16 @@
 (async function() {
     'use strict';
 
-    // Scroll position persistence for full saves and delayed Stash rendering.
+    // Robust auto-restore scroll position after reload (handles SPA async rendering)
     const scrollKey = 'stash_scroll_pos_' + window.location.pathname + window.location.search;
-    let activeScrollContainer = null;
-
-    function getElementPath(element) {
-        if (element.id) return `#${CSS.escape(element.id)}`;
-        const path = [];
-        let current = element;
-        while (current && current !== document.body) {
-            let index = 1;
-            let sibling = current;
-            while ((sibling = sibling.previousElementSibling)) index++;
-            path.unshift(`${current.tagName.toLowerCase()}:nth-child(${index})`);
-            current = current.parentElement;
-        }
-        return path.join(' > ');
-    }
-
-    function findScrollContainer(path) {
-        if (!path) return null;
-        try {
-            return document.querySelector(path);
-        } catch (e) {
-            return null;
-        }
-    }
-
     const savedScroll = sessionStorage.getItem(scrollKey);
     if (savedScroll !== null) {
         sessionStorage.removeItem(scrollKey);
-        let targetScroll;
-        try {
-            const parsed = JSON.parse(savedScroll);
-            targetScroll = typeof parsed === 'number'
-                ? { windowX: 0, windowY: parsed, containerTop: 0, containerLeft: 0, containerPath: '' }
-                : {
-                    windowX: Number(parsed.windowX ?? parsed.x) || 0,
-                    windowY: Number(parsed.windowY ?? parsed.y) || 0,
-                    containerTop: Number(parsed.containerTop) || 0,
-                    containerLeft: Number(parsed.containerLeft) || 0,
-                    containerPath: parsed.containerPath || ''
-                };
-        } catch (e) {
-            targetScroll = { windowX: 0, windowY: parseInt(savedScroll, 10) || 0, containerTop: 0, containerLeft: 0, containerPath: '' };
-        }
+        const targetScroll = parseInt(savedScroll, 10);
         let attempts = 0;
         const restoreScroll = () => {
-            const container = findScrollContainer(targetScroll.containerPath);
-            window.scrollTo(targetScroll.windowX, targetScroll.windowY);
-            if (container) {
-                container.scrollLeft = targetScroll.containerLeft;
-                container.scrollTop = targetScroll.containerTop;
-            }
-            const containerRestored = !container || (container.scrollLeft === targetScroll.containerLeft && container.scrollTop === targetScroll.containerTop);
-            if ((window.scrollX !== targetScroll.windowX || window.scrollY !== targetScroll.windowY || !containerRestored) && attempts < 100) {
+            window.scrollTo(0, targetScroll);
+            if (window.scrollY !== targetScroll && attempts < 30) {
                 attempts++;
                 setTimeout(restoreScroll, 100);
             }
@@ -78,28 +33,12 @@
         setTimeout(restoreScroll, 50);
     }
 
-    const saveScrollPosition = () => {
-        const container = activeScrollContainer && document.contains(activeScrollContainer)
-            ? activeScrollContainer
-            : null;
-        sessionStorage.setItem(scrollKey, JSON.stringify({
-            windowX: window.scrollX,
-            windowY: window.scrollY,
-            containerTop: container ? container.scrollTop : 0,
-            containerLeft: container ? container.scrollLeft : 0,
-            containerPath: container ? getElementPath(container) : ''
-        }));
-    };
-
-    // Track window and nested scrolling surfaces so detail pages restore correctly.
-    document.addEventListener('scroll', (event) => {
-        if (event.target instanceof HTMLElement && !event.target.closest('#scenes-popup')) {
-            activeScrollContainer = event.target;
+    // Continuously track scroll position so it's always fresh in sessionStorage
+    window.addEventListener('scroll', () => {
+        if (window.scrollY > 0) {
+            sessionStorage.setItem(scrollKey, window.scrollY);
         }
-        if (window.scrollY > 0 || activeScrollContainer) {
-            saveScrollPosition();
-        }
-    }, { capture: true, passive: true });
+    }, { passive: true });
 
     let isTabActive = true;
     document.addEventListener('visibilitychange', () => {
@@ -809,7 +748,7 @@
     }
 
     async function saveTagsWithoutReload(sceneId, selectedIds) {
-        saveScrollPosition();
+        sessionStorage.setItem(scrollKey, window.scrollY);
         const success = await updateSceneWithTags(sceneId, Array.from(selectedIds));
         if (success) {
             toastSuccess('Tag saved');
@@ -818,7 +757,7 @@
     }
 
     async function saveAndReloadTags(sceneId, selectedIds) {
-        saveScrollPosition();
+        sessionStorage.setItem(scrollKey, window.scrollY);
         const success = await updateSceneWithTags(sceneId, Array.from(selectedIds));
         if (success) {
             closePopup();
@@ -1032,7 +971,7 @@
     }
 
     async function savePerformersWithoutReload(sceneId, selectedIds) {
-        saveScrollPosition();
+        sessionStorage.setItem(scrollKey, window.scrollY);
         const success = await updateSceneWithPerformers(sceneId, Array.from(selectedIds));
         if (success) {
             toastSuccess('Performer saved');
@@ -1041,7 +980,7 @@
     }
 
     async function saveAndReloadPerformers(sceneId, selectedIds) {
-        saveScrollPosition();
+        sessionStorage.setItem(scrollKey, window.scrollY);
         const success = await updateSceneWithPerformers(sceneId, Array.from(selectedIds));
         if (success) {
             closePopup();
@@ -1250,7 +1189,7 @@
     }
 
     async function saveGalleriesWithoutReload(sceneId, selectedIds) {
-        saveScrollPosition();
+        sessionStorage.setItem(scrollKey, window.scrollY);
         const success = await updateSceneWithGalleries(sceneId, Array.from(selectedIds));
         if (success) {
             toastSuccess('Gallery saved');
@@ -1259,7 +1198,7 @@
     }
 
     async function saveAndReloadGalleries(sceneId, selectedIds) {
-        saveScrollPosition();
+        sessionStorage.setItem(scrollKey, window.scrollY);
         const success = await updateSceneWithGalleries(sceneId, Array.from(selectedIds));
         if (success) {
             closePopup();
