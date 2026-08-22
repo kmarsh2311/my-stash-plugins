@@ -49,6 +49,13 @@ A fast tagging workflow for Stash scene cards, designed for video libraries wher
 *   **Bulk Review Workflow:** Keep your tagging flow fast while scanning large collections of scenes.
 *   **Save:** Recent-item selections are saved immediately without a page reload. The full Save button commits the current selection and refreshes the scene view.
 
+## Known Issues
+*   On a performer or group scenes page, the first full save after opening the page may return to the top instead of restoring the previous position.
+*   The second and subsequent edits restore the page position correctly.
+*   The issue does not affect the metadata save itself; only the first post-save scroll restoration may be incorrect.
+
+Suggestions and fixes are welcome through [GitHub Issues](https://github.com/kmarsh2311/my-stash-plugins/issues).
+
 ## 🎯 Why This Exists
 This plugin is built for quickly tagging scenes in a video library, especially when you want to assign metadata like performers, tags, and galleries without opening multiple pages or navigating away from the current view.
 
