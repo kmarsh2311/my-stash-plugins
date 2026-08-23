@@ -3,7 +3,10 @@ name: Deploy repository to Github Pages
 on:
   push:
       paths:
-      - 'plugins/**'
+      - 'a.js'
+      - 'a.yml'
+      - 'index.yml'
+      - 'plugin-a.zip'
       branches:
       - main
   # Allows you to run this workflow manually from the Actions tab
@@ -24,14 +27,14 @@ jobs:
       with:
         fetch-depth: '0'
     - run: |
-        chmod +x build_site.sh
-        ./build_site.sh _site/${{ github.ref_name }}
+        mkdir -p _site/${{ github.ref_name }}
+        cp index.yml plugin-a.zip _site/${{ github.ref_name }}/
     - uses: actions/upload-pages-artifact@v5
 
   deploy:
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}main/index.yml
+      url: '${{ steps.deployment.outputs.page_url }}main/index.yml'
     runs-on: ubuntu-latest
     needs: build
     steps:
