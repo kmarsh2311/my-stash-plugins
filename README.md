@@ -21,6 +21,7 @@ A fast tagging workflow for Stash scene cards, designed for video libraries wher
 *   **Fast Metadata Editing:** Edit Tags, Performers, and Galleries directly from the scene card.
 *   **Video Library Workflow:** Built for rapid cleanup and tagging during bulk reviewing of scenes.
 *   **Draggable Popups:** Floating, draggable interface for seamless multi-tasking.
+*   **Animated Scene Preview:** Shows a looping video preview above the popup to help identify scenes while adding tags, performers, or galleries.
 *   **Optimized Performance:** Features local caching for tags/performers to ensure snappy search results.
 *   **Persistence:** Remembers your column widths and layout settings across sessions.
 *   **State Awareness:** Automatically restores your scroll position after page reloads or navigation.
@@ -47,6 +48,7 @@ A fast tagging workflow for Stash scene cards, designed for video libraries wher
 ## 💡 How to Use
 *   **Right-Click:** Use the context menu on any scene card to access the quick edit tool.
 *   **Quick Tagging:** Select tags and performers from a searchable popup while reviewing video scenes.
+*   **Scene Preview:** The popup displays the scene's animated preview above the title bar while you work.
 *   **Bulk Review Workflow:** Keep your tagging flow fast while scanning large collections of scenes.
 *   **Save:** Recent tag and performer selections are committed immediately and update the scene card in place. The popup stays open so you can continue choosing recent items, while the full Save button commits the current selection and refreshes the scene view without reloading the page.
 

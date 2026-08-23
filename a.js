@@ -208,6 +208,132 @@
         }).showToast();
     }
 
+    function extractPreviewUrlFromCard(cardElement) {
+        if (!cardElement) return null;
+
+        const candidates = [
+            cardElement.querySelector('video'),
+            cardElement.querySelector('img'),
+            cardElement.querySelector('source[src]'),
+            cardElement.querySelector('[src]'),
+            cardElement.querySelector('[poster]')
+        ];
+
+        for (const node of candidates) {
+            if (!node) continue;
+            const src = node.currentSrc || node.src || node.getAttribute('src') || node.getAttribute('poster');
+            if (src && /(preview|thumb|screenshot|\.webp|\.mp4|\.webm|\.m4v|\.mov|\.gif)/i.test(src)) {
+                return src;
+            }
+        }
+
+        return null;
+    }
+
+    function buildScenePreviewUrl(sceneId) {
+        if (!sceneId) return null;
+        const base = window.location.origin || 'http://localhost:9999';
+        return `${base}/scene/${encodeURIComponent(sceneId)}/preview`;
+    }
+
+    async function fetchScenePreviewUrl(sceneId, cardElement) {
+        const fromCard = extractPreviewUrlFromCard(cardElement);
+        if (fromCard) return fromCard;
+
+        const directUrl = buildScenePreviewUrl(sceneId);
+        if (directUrl) return directUrl;
+
+        if (!sceneId) return null;
+
+        const queries = [
+            `query ($id: ID!) { findScene(id: $id) { preview screenshot } }`,
+            `query ($id: ID!) { findScene(id: $id) { paths { preview screenshot } } }`
+        ];
+
+        for (const query of queries) {
+            try {
+                const res = await fetchGQL(query, { id: sceneId });
+                if (res.errors) continue;
+
+                const scene = res.data?.findScene;
+                if (!scene) continue;
+
+                const preview = scene.preview || scene.screenshot || scene.paths?.preview || scene.paths?.screenshot;
+                if (preview) return preview;
+            } catch (error) {
+                console.error('Stash Scene Manager: preview fetch failed', error);
+            }
+        }
+
+        return null;
+    }
+
+    async function attachScenePreview(form, sceneId, cardElement) {
+        const host = document.createElement('div');
+        host.id = 'scene-preview-host';
+        host.style.display = 'block';
+        host.style.position = 'relative';
+        host.style.width = '100%';
+        host.style.minHeight = '150px';
+        host.style.margin = '0 0 10px 0';
+        host.style.borderRadius = '8px';
+        host.style.overflow = 'hidden';
+        host.style.border = '1px solid #e2e8f0';
+        host.style.background = '#0f172a';
+        host.style.boxShadow = 'inset 0 0 0 1px rgba(255,255,255,0.05)';
+
+        const header = form.querySelector('.popup-header, h2');
+        const insertBeforeNode = header ? header.nextSibling : form.firstChild;
+        if (insertBeforeNode) {
+            form.insertBefore(host, insertBeforeNode);
+        } else {
+            form.appendChild(host);
+        }
+
+        const previewUrl = await fetchScenePreviewUrl(sceneId, cardElement);
+        if (!previewUrl) {
+            console.warn('Stash Scene Manager: no preview URL found for scene', sceneId);
+            host.remove();
+            return;
+        }
+
+        console.log('Stash Scene Manager: preview URL', previewUrl);
+
+        const isVideoPreview = /\/preview(?:[?#]|$)|\.(mp4|webm|mov|m4v|ogg)(\?.*)?$/i.test(previewUrl);
+        const media = isVideoPreview ? document.createElement('video') : document.createElement('img');
+
+        media.style.display = 'block';
+        media.style.width = '100%';
+        media.style.height = '150px';
+        media.style.objectFit = 'cover';
+        media.style.background = '#0f172a';
+        media.style.pointerEvents = 'none';
+
+        media.onerror = () => {
+            console.warn('Stash Scene Manager: preview failed to load', previewUrl);
+            host.remove();
+        };
+
+        if (isVideoPreview) {
+            media.src = previewUrl;
+            media.muted = true;
+            media.autoplay = true;
+            media.loop = true;
+            media.playsInline = true;
+            media.preload = 'auto';
+            media.setAttribute('playsinline', 'true');
+            media.setAttribute('webkit-playsinline', 'true');
+            media.load();
+            media.play().catch(() => {});
+        } else {
+            media.src = previewUrl;
+            media.alt = 'Scene preview';
+            media.loading = 'eager';
+        }
+
+        host.appendChild(media);
+    }
+
     const toastSuccess = (message, debug) => {
         showToast(message, 'success');
         if (debug) console.log(debug);
@@ -406,7 +532,7 @@
         if (!target) return;
 
         const recent = readRecentEntries(type)
-            .slice(0, 6)
+            .slice(0, 8)
             .filter(item => item && item.name)
             .map(item => ({ id: item.id, name: item.name }));
 
@@ -426,7 +552,7 @@
             const chip = document.createElement('button');
             chip.type = 'button';
             chip.textContent = item.name;
-            chip.style.cssText = 'padding: 5px 8px; border: 1px solid #dfe3ea; border-radius: 999px; background: #f8fafc; color: #243447; font-size: 11px; cursor: pointer;';
+            chip.style.cssText = 'padding: 4px 6px; border: 1px solid #dfe3ea; border-radius: 999px; background: #f8fafc; color: #243447; font-size: 10px; cursor: pointer;';
             chip.addEventListener('click', () => {
                 trySelectRecentChip(type, item, selectedIds, input, onRecentChipSelect);
             });
@@ -573,9 +699,9 @@
         form.style.boxSizing = 'border-box';
         form.style.fontFamily = 'system-ui, -apple-system, sans-serif';
         form.innerHTML = `
-            <h2 style="margin: 0 0 12px 0; font-size: 13px; font-weight: 600; cursor: move; user-select: none; color: #0f172a; display: flex; align-items: center; justify-content: space-between;">
+            <h2 style="margin: 0 0 12px 0; font-size: 13px; font-weight: 600; user-select: none; color: #0f172a; display: flex; align-items: center; justify-content: space-between;">
                 <span>Edit Tags for Scene</span>
-                <span style="font-size: 11px; color: #64748b; font-weight: normal;">Draggable</span>
+                <span class="popup-drag-handle" style="font-size: 11px; color: #64748b; font-weight: normal; cursor: grab; user-select: none; padding: 2px 4px; border-radius: 4px;">Draggable</span>
             </h2>
             <div style="display: flex; gap: 6px; margin-bottom: 10px; align-items: center;">
                 <div style="position: relative; flex: 1;">
@@ -594,6 +720,7 @@
         `;
         document.body.appendChild(form);
         currentPopup = form;
+        attachScenePreview(form, sceneId, cardElement);
 
         const table = new Tabulator("#tags-tabulator-table", {
             layout: "fitColumns",
@@ -815,6 +942,7 @@
         `;
         document.body.appendChild(form);
         currentPopup = form;
+        attachScenePreview(form, sceneId, cardElement);
 
         const table = new Tabulator("#performers-tabulator-table", {
             layout: "fitColumns",
@@ -1041,6 +1169,7 @@
         `;
         document.body.appendChild(form);
         currentPopup = form;
+        attachScenePreview(form, sceneId, cardElement);
 
         const table = new Tabulator("#galleries-tabulator-table", {
             layout: "fitColumns",
@@ -1272,23 +1401,25 @@
 
         let isDragging = false;
         let dragOffsetX, dragOffsetY;
-        const header = form.querySelector('h2');
-        header.onmousedown = function(e) {
-            isDragging = true;
-            dragOffsetX = e.clientX - form.offsetLeft;
-            dragOffsetY = e.clientY - form.offsetTop;
-            document.onmousemove = function(e) {
-                if (isDragging) {
-                    form.style.left = `${e.clientX - dragOffsetX}px`;
-                    form.style.top = `${e.clientY - dragOffsetY}px`;
-                }
+        const dragHandle = form.querySelector('h2') || form.querySelector('.popup-drag-handle');
+        if (dragHandle) {
+            dragHandle.onmousedown = function(e) {
+                isDragging = true;
+                dragOffsetX = e.clientX - form.offsetLeft;
+                dragOffsetY = e.clientY - form.offsetTop;
+                document.onmousemove = function(e) {
+                    if (isDragging) {
+                        form.style.left = `${e.clientX - dragOffsetX}px`;
+                        form.style.top = `${e.clientY - dragOffsetY}px`;
+                    }
+                };
+                document.onmouseup = function() {
+                    isDragging = false;
+                    document.onmousemove = null;
+                    document.onmouseup = null;
+                };
             };
-            document.onmouseup = function() {
-                isDragging = false;
-                document.onmousemove = null;
-                document.onmouseup = null;
-            };
-        };
+        }
     }
 
     function positionPopupNearCard(form, cardElement) {
