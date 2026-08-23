@@ -37,7 +37,9 @@ Install via the YML file in Stash Settings and Plugins: https://kmarsh2311.githu
 
 <p></p>
 
-Never tried this method I would use the yml and install via Stash
+Never tried this method I would use the yml and install via Stash.
+
+<p></p>
    **Clone the Repository:**  
     Navigate to your Stash plugins folder and run:
     ```bash
