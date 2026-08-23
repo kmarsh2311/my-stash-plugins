@@ -33,7 +33,10 @@ A fast tagging workflow for Stash scene cards, designed for video libraries wher
 
 ## 🚀 Installation
 
-1.  **Clone the Repository:**  
+Install via the YML file in Stash Settings and Plugins: https://kmarsh2311.github.io/my-stash-plugins/index.yml
+
+Never tried this method I would use the yml and install via Stash
+   **Clone the Repository:**  
     Navigate to your Stash plugins folder and run:
     ```bash
     git clone [https://github.com/kmarsh2311/my-stash-plugins.git](https://github.com/kmarsh2311/my-stash-plugins.git)
