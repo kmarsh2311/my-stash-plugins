@@ -599,6 +599,20 @@
 
             // Only save and show popup if data has changed
             if (hasChanged) {
+                const tableData = (activeTableInstance && typeof activeTableInstance.getData === 'function') ? activeTableInstance.getData() : [];
+                const cachedData = getCachedOrNull(type) || [];
+                const allData = Array.isArray(tableData) && tableData.length > 0 ? tableData : cachedData;
+
+                const newlyAddedIds = currentSelectedIds.filter(id => !initialSet.has(String(id)));
+                const targetIds = newlyAddedIds.length > 0 ? newlyAddedIds : currentSelectedIds;
+                const itemsToAdd = targetIds.map(id => {
+                    return allData.find(entry => String(entry.id) === String(id));
+                }).filter(Boolean);
+
+                if (itemsToAdd.length > 0) {
+                    addRecentEntriesFromSelection(type, itemsToAdd);
+                }
+
                 let success = false;
                 if (type === 'tags') {
                     success = await updateSceneWithTags(currentSceneId, currentSelectedIds);
@@ -793,9 +807,11 @@
     }
 
     function addRecentEntry(type, item) {
-        if (!item || !item.name) return;
-        const list = readRecentEntries(type).filter(entry => entry && entry.name && entry.name !== item.name);
-        list.unshift({ id: item.id, name: item.name });
+        if (!item) return;
+        const name = item.name || item.title;
+        if (!name) return;
+        const list = readRecentEntries(type).filter(entry => entry && (entry.name || entry.title) && (entry.name || entry.title) !== name);
+        list.unshift({ id: item.id, name: name });
         writeRecentEntries(type, list);
     }
 

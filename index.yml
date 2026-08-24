@@ -2,6 +2,6 @@
   name: A Plugin
   version: 2.4
   description: My first custom Stash plugin
-  date: 2026-08-25 00:16:00
+  date: 2026-08-25 00:43:00
   path: plugin-a.zip
-  sha256: 6167f3eab07a8968a1e294ddd1cab6c83eb9cefe91a932d96785395fb01e2357
+  sha256: 604e183fca2fa22886d042f7616f83942b0a630039ecd23f8ccfe9e245061a09
