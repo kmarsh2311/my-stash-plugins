@@ -1,6 +1,6 @@
 name: A Plugin
 description: My first custom Stash plugin
-version: 2.1
+version: 2.4
 ui:
   javascript:
     - a.js
