@@ -1,8 +1,8 @@
 - id: mypluginrc
-  name: A Plugin
-  version: "2.5"
-  description: My first custom Stash plugin
-  date: 2026-08-25 02:00:00
+  name: FastTag
+  version: "3.0"
+  description: Fast scene tagging workflow for Stash: edit tags, performers, and galleries from scene cards with quick search, popups, and sequential navigation
+  date: 2026-08-25 04:05:00
   path: plugin-a.zip
-  sha256: f002d2ab01f275fd66ff169899106d63f3d100727fa1213473237d320e87c4d1
+  sha256: d9d72dcd246c3aec6dd2c8f4db1aef1bf0ec35ca2c1b6216443ea4ecf374f7e5
 

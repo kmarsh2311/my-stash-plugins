@@ -1,20 +1,19 @@
 # Release Notes
 
-## 1.9.52 - Fix popup cleanup and GraphQL handling
+## 3.0.0 - FastTag Major Refactor & Disambiguation Search
 
-This update fixes several regressions in the Stash Scene Manager userscript that were causing stale popup behavior and unreliable GraphQL operations.
-
-### Fixed
-- Prevented duplicate outside-click listeners from accumulating
-- Ensured popup/menu cleanup removes the correct listeners and drag handlers
-- Prevented multiple popup states from overlapping
-- Hardened GraphQL fetch handling for non-OK HTTP responses and invalid JSON payloads
-- Prevented broad removal of unrelated popup elements
-- Kept popup drag cleanup tied to the active popup lifecycle
+### Highlights & New Features
+- **Rebranded to FastTag**: Cleaner identity and streamlined configuration.
+- **Polymorphic Entity Architecture**: Unified Tag, Performer, and Gallery operations under a single schema registry, shedding ~700 lines of redundant code.
+- **Performer Disambiguation Search**: Search queries now match across performer names and disambiguation tags simultaneously (e.g. searching "Alex Studio" correctly resolves performers).
+- **ID-First Recent Selection**: Quick-select recent chips now resolve by unique ID first to prevent collisions between performers sharing the same name.
+- **Enhanced Lifecycle Safety**: Integrated `AbortController` and `AbortSignal` for clean event and timer disposal when popups or previews transition.
+- **Sequential Navigation**: Refined multi-scene workflow with smart save detection and keyboard shortcuts (`Alt + →`, `Alt + ←`, `Ctrl + Enter`).
 
 ### Compatibility
-- No Stash schema changes required
-- Safe to install over the previous version with the provided update URL
+- Fully compatible with Stash v0.26+ and v0.27+.
+- Safe to install or update in-place from previous versions.
 
 ### Install / Update
-- Raw script URL: https://raw.githubusercontent.com/kmarsh2311/my-stash-plugins/main/a.js
+- Repository index: `https://kmarsh2311.github.io/my-stash-plugins/index.yml`
+- Raw script URL: `https://raw.githubusercontent.com/kmarsh2311/my-stash-plugins/main/fasttag.js` (or `a.js`)

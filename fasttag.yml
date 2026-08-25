@@ -3,5 +3,4 @@ description: Fast scene tagging workflow for Stash: edit tags, performers, and g
 version: "3.0"
 ui:
   javascript:
-    - a.js
-
+    - fasttag.js

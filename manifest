@@ -1,0 +1,10 @@
+id: mypluginrc
+name: A Plugin
+metadata: {}
+version: "2.1"
+date: "2026-08-22 18:00:00"
+requires: []
+source_repository: https://kmarsh2311.github.io/my-stash-plugins/index.yml
+files:
+- a.js
+- a.yml

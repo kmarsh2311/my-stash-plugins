@@ -1,0 +1,8 @@
+.DS_Store
+.vscode/
+*.backup.js
+*.before-*
+*bu.js
+a copy*.js
+b.js
+c.js

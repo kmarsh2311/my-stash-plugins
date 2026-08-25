@@ -12,7 +12,7 @@ A collection of custom scripts and plugins designed to speed up the [Stash](http
 
 ## 🛠 Featured Scripts
 
-### Stash Scene Manager Context Menu
+### FastTag - Scene Manager Context Menu
 A fast tagging workflow for Stash scene cards, designed for video libraries where you want to assign tags and performers quickly without leaving the page. 
 
 **Key Features:**
