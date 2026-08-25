@@ -66,6 +66,7 @@
         const style = document.createElement('style');
         style.id = styleId;
         style.textContent = `
+        /* Base Transitions */
         #scenes-popup {
             opacity: 0;
             visibility: hidden;
@@ -78,12 +79,10 @@
             visibility: visible;
             transform: translateY(0);
         }
+
         #scenes-custom-menu {
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
             border-radius: 8px;
             padding: 6px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-size: 13px;
             min-width: 150px;
@@ -92,74 +91,176 @@
         #scenes-custom-menu a {
             display: block;
             padding: 8px 12px;
-            color: #1e293b;
             text-decoration: none;
             border-radius: 4px;
             transition: background 0.15s, color 0.15s;
-        }
-        #scenes-custom-menu a:hover {
-            background: #f1f5f9;
-            color: #0f172a;
         }
         @keyframes menuFadeIn {
             from { opacity: 0; transform: translateY(-4px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        #scenes-popup .tabulator {
+        /* Dark Theme - Menu */
+        #scenes-custom-menu.theme-dark {
+            background: #1e293b;
+            border: 1px solid #334155;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+        }
+        #scenes-custom-menu.theme-dark a { color: #e2e8f0; }
+        #scenes-custom-menu.theme-dark a:hover { background: #334155; color: #ffffff; }
+
+        /* Light Theme - Menu */
+        #scenes-custom-menu.theme-light {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+        }
+        #scenes-custom-menu.theme-light a { color: #1e293b; }
+        #scenes-custom-menu.theme-light a:hover { background: #f1f5f9; color: #0f172a; }
+
+        /* Dark Theme - Popup Shell */
+        #scenes-popup.theme-dark {
+            background: #1e293b !important;
+            border: 1px solid #334155 !important;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4) !important;
+            color: #f8fafc !important;
+        }
+        #scenes-popup.theme-dark .popup-title { color: #f1f5f9 !important; }
+        #scenes-popup.theme-dark .popup-seq-label { color: #94a3b8 !important; }
+        #scenes-popup.theme-dark .popup-nav-btn { background: #334155 !important; color: #e2e8f0 !important; border: 1px solid #475569 !important; }
+        #scenes-popup.theme-dark .popup-drag-handle { border: 1px solid #334155 !important; background: #0f172a !important; color: #94a3b8 !important; }
+        #scenes-popup.theme-dark .popup-search-input { border: 1px solid #334155 !important; background: #0f172a !important; color: #f8fafc !important; }
+        #scenes-popup.theme-dark .popup-search-clear { color: #64748b !important; }
+        #scenes-popup.theme-dark .popup-refresh-btn { border: 1px solid #334155 !important; background: #0f172a !important; color: #94a3b8 !important; }
+        #scenes-popup.theme-dark .popup-cancel-btn { background: #334155 !important; border: 1px solid #475569 !important; color: #e2e8f0 !important; }
+
+        /* Light Theme - Popup Shell */
+        #scenes-popup.theme-light {
+            background: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1) !important;
+            color: #0f172a !important;
+        }
+        #scenes-popup.theme-light .popup-title { color: #0f172a !important; }
+        #scenes-popup.theme-light .popup-seq-label { color: #64748b !important; }
+        #scenes-popup.theme-light .popup-nav-btn { background: #64748b !important; color: white !important; border: none !important; }
+        #scenes-popup.theme-light .popup-drag-handle { border: 1px solid #e2e8f0 !important; background: #f8fafc !important; color: #94a3b8 !important; }
+        #scenes-popup.theme-light .popup-search-input { border: 1px solid #cbd5e1 !important; background: #ffffff !important; color: #1e293b !important; }
+        #scenes-popup.theme-light .popup-search-clear { color: #94a3b8 !important; }
+        #scenes-popup.theme-light .popup-refresh-btn { border: 1px solid #cbd5e1 !important; background: #f8fafc !important; color: #475569 !important; }
+        #scenes-popup.theme-light .popup-cancel-btn { background: #f1f5f9 !important; border: 1px solid #cbd5e1 !important; color: #334155 !important; }
+
+        /* Dark Tabulator */
+        #scenes-popup.theme-dark .tabulator {
+            background-color: #0f172a !important;
+            border: 1px solid #334155 !important;
+            border-radius: 6px !important;
+            font-family: system-ui, -apple-system, sans-serif !important;
+            font-size: 12px !important;
+            color: #e2e8f0 !important;
+        }
+        #scenes-popup.theme-dark .tabulator .tabulator-header {
+            background-color: #1e293b !important;
+            border-bottom: 1px solid #334155 !important;
+            color: #94a3b8 !important;
+        }
+        #scenes-popup.theme-dark .tabulator .tabulator-header .tabulator-col {
+            background-color: transparent !important;
+            border-right: none !important;
+        }
+        #scenes-popup.theme-dark .tabulator .tabulator-header .tabulator-col-title {
+            color: #94a3b8 !important;
+            font-weight: 600 !important;
+        }
+        #scenes-popup.theme-dark .tabulator .tabulator-row {
+            background-color: #0f172a !important;
+            color: #e2e8f0 !important;
+            border-bottom: 1px solid #1e293b !important;
+        }
+        #scenes-popup.theme-dark .tabulator .tabulator-row:hover {
+            background-color: #1e293b !important;
+            color: #ffffff !important;
+        }
+        #scenes-popup.theme-dark .tabulator .tabulator-row.tabulator-selected,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.tabulator-selected:hover {
+            background-color: #312e81 !important;
+            color: #ffffff !important;
+            border-bottom: 1px solid #4338ca !important;
+        }
+        #scenes-popup.theme-dark .tabulator .tabulator-placeholder {
+            color: #64748b !important;
+        }
+        #scenes-popup.theme-dark .tabulator-tableholder::-webkit-scrollbar-track {
+            background: #0f172a;
+            border-radius: 0 6px 6px 0;
+            border-left: 1px solid #334155;
+        }
+        #scenes-popup.theme-dark .tabulator-tableholder::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 6px;
+            border: 2px solid #0f172a;
+        }
+        #scenes-popup.theme-dark .tabulator-tableholder::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        /* Light Tabulator */
+        #scenes-popup.theme-light .tabulator {
             background-color: #ffffff !important;
             border: 1px solid #e2e8f0 !important;
             border-radius: 6px !important;
             font-family: system-ui, -apple-system, sans-serif !important;
             font-size: 12px !important;
+            color: #1e293b !important;
         }
-        #scenes-popup .tabulator .tabulator-header {
+        #scenes-popup.theme-light .tabulator .tabulator-header {
             background-color: #f8fafc !important;
             border-bottom: 1px solid #e2e8f0 !important;
             color: #64748b !important;
         }
-        #scenes-popup .tabulator .tabulator-header .tabulator-col {
+        #scenes-popup.theme-light .tabulator .tabulator-header .tabulator-col {
             background-color: transparent !important;
             border-right: none !important;
         }
-        #scenes-popup .tabulator .tabulator-header .tabulator-col-title {
+        #scenes-popup.theme-light .tabulator .tabulator-header .tabulator-col-title {
             color: #475569 !important;
             font-weight: 600 !important;
         }
-        #scenes-popup .tabulator .tabulator-row {
+        #scenes-popup.theme-light .tabulator .tabulator-row {
             background-color: #ffffff !important;
             color: #1e293b !important;
             border-bottom: 1px solid #f1f5f9 !important;
         }
-        #scenes-popup .tabulator .tabulator-row:hover {
+        #scenes-popup.theme-light .tabulator .tabulator-row:hover {
             background-color: #f1f5f9 !important;
         }
-        #scenes-popup .tabulator .tabulator-row.tabulator-selected,
-        #scenes-popup .tabulator .tabulator-row.tabulator-selected:hover {
+        #scenes-popup.theme-light .tabulator .tabulator-row.tabulator-selected,
+        #scenes-popup.theme-light .tabulator .tabulator-row.tabulator-selected:hover {
             background-color: #e0e7ff !important;
             color: #1e293b !important;
         }
-        #scenes-popup .tabulator .tabulator-placeholder {
+        #scenes-popup.theme-light .tabulator .tabulator-placeholder {
             color: #94a3b8 !important;
         }
+        #scenes-popup.theme-light .tabulator-tableholder::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 0 6px 6px 0;
+            border-left: 1px solid #e2e8f0;
+        }
+        #scenes-popup.theme-light .tabulator-tableholder::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 6px;
+            border: 2px solid #f1f5f9;
+        }
+        #scenes-popup.theme-light .tabulator-tableholder::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
         #scenes-popup .tabulator-tableholder {
             overflow-x: hidden !important;
         }
         #scenes-popup .tabulator-tableholder::-webkit-scrollbar {
             width: 14px;
-        }
-        #scenes-popup .tabulator-tableholder::-webkit-scrollbar-track {
-            background: #f1f5f9;
-            border-radius: 0 6px 6px 0;
-            border-left: 1px solid #e2e8f0;
-        }
-        #scenes-popup .tabulator-tableholder::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 6px;
-            border: 2px solid #f1f5f9;
-        }
-        #scenes-popup .tabulator-tableholder::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
         }
         `;
         document.head.appendChild(style);
@@ -529,50 +630,82 @@
         };
     }
     
-    function updateSequentialEditUI(form, type) {
+    function hasSelectionChanged(selectedIds) {
+        if (!selectedIds) {
+            if (typeof sequentialEditState.getSelectedIdsFn === 'function') {
+                selectedIds = sequentialEditState.getSelectedIdsFn();
+            } else {
+                return false;
+            }
+        }
+        const currentSet = new Set(Array.from(selectedIds).map(String));
+        const initialSet = sequentialEditState.initialSelectedIds || new Set();
+        if (currentSet.size !== initialSet.size) return true;
+        for (let id of currentSet) {
+            if (!initialSet.has(id)) return true;
+        }
+        return false;
+    }
+
+    function updateSequentialEditUI(form, type, selectedIds) {
         const prevBtn = form.querySelector(`#${type}-prev-btn`);
         const nextBtn = form.querySelector(`#${type}-next-btn`);
         const title = form.querySelector(`#${type}-popup-title`);
         const modeCheckbox = form.querySelector(`#${type}-sequential-mode`);
         const saveBtn = form.querySelector(`#${type}-save-btn`);
+        const typeName = type.charAt(0).toUpperCase() + type.slice(1);
         
         if (!sequentialEditState.enabled) {
             if (prevBtn) prevBtn.style.display = 'none';
             if (nextBtn) nextBtn.style.display = 'none';
             if (modeCheckbox) modeCheckbox.checked = false;
-            if (title) title.textContent = `Edit ${type.charAt(0).toUpperCase() + type.slice(1)} for Scene`;
+            if (title) title.textContent = `Edit ${typeName}`;
             if (saveBtn) {
-                saveBtn.textContent = `Save ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+                saveBtn.textContent = `Save ${typeName}`;
                 saveBtn.disabled = false;
                 saveBtn.style.opacity = '1';
                 saveBtn.style.cursor = 'pointer';
+                saveBtn.style.background = '#6366f1';
             }
             return;
         }
         
-        if (prevBtn) prevBtn.style.display = 'block';
-        if (nextBtn) nextBtn.style.display = 'block';
+        if (prevBtn) prevBtn.style.display = 'inline-flex';
+        if (nextBtn) nextBtn.style.display = 'inline-flex';
         if (modeCheckbox) modeCheckbox.checked = true;
-        
-        if (saveBtn) {
-            saveBtn.textContent = "Auto Save On";
-            saveBtn.disabled = true;
-            saveBtn.style.opacity = '0.7';
-            saveBtn.style.cursor = 'not-allowed';
-        }
         
         const currentNum = sequentialEditState.currentIndex + 1;
         const totalNum = sequentialEditState.allSceneCards.length;
-        if (title) title.textContent = `Edit ${type.charAt(0).toUpperCase() + type.slice(1)} for Scene [${currentNum}/${totalNum}]`;
+        if (title) title.textContent = `Edit ${typeName} [${currentNum}/${totalNum}]`;
+        
+        const isLast = currentNum >= totalNum;
+        const isChanged = hasSelectionChanged(selectedIds);
+        
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.style.opacity = '1';
+            saveBtn.style.cursor = 'pointer';
+            
+            if (isChanged) {
+                saveBtn.textContent = isLast ? 'Save & Close' : 'Save & Next Scene ►';
+                saveBtn.style.background = '#10b981'; // vibrant green when changes exist
+            } else {
+                saveBtn.textContent = isLast ? 'Close' : 'Next Scene ►';
+                saveBtn.style.background = '#6366f1'; // standard indigo when just browsing
+            }
+        }
         
         if (prevBtn) {
-            prevBtn.disabled = sequentialEditState.currentIndex === 0;
-            prevBtn.style.opacity = sequentialEditState.currentIndex === 0 ? '0.5' : '1';
+            const isFirst = sequentialEditState.currentIndex === 0;
+            prevBtn.disabled = isFirst;
+            prevBtn.style.opacity = isFirst ? '0.4' : '1';
+            prevBtn.style.cursor = isFirst ? 'not-allowed' : 'pointer';
         }
         
         if (nextBtn) {
-            nextBtn.disabled = sequentialEditState.currentIndex >= sequentialEditState.allSceneCards.length - 1;
-            nextBtn.style.opacity = sequentialEditState.currentIndex >= sequentialEditState.allSceneCards.length - 1 ? '0.5' : '1';
+            nextBtn.disabled = isLast;
+            nextBtn.style.opacity = isLast ? '0.4' : '1';
+            nextBtn.style.cursor = isLast ? 'not-allowed' : 'pointer';
         }
     }
     
@@ -671,6 +804,7 @@
     }
     
     function setupSequentialEditHandlers(form, type, sceneId, cardElement, getSelectedIdsFn) {
+        sequentialEditState.getSelectedIdsFn = getSelectedIdsFn;
         const modeCheckbox = form.querySelector(`#${type}-sequential-mode`);
         const prevBtn = form.querySelector(`#${type}-prev-btn`);
         const nextBtn = form.querySelector(`#${type}-next-btn`);
@@ -790,6 +924,29 @@
         galleries: 'stash_fast_tag_recent_galleries'
     };
 
+    const THEME_STORAGE_KEY = 'stash_fast_tag_theme';
+
+    function getThemePreference() {
+        return localStorage.getItem(THEME_STORAGE_KEY) || 'dark';
+    }
+
+    function getEffectiveTheme() {
+        const pref = getThemePreference();
+        if (pref === 'light') return 'light';
+        if (pref === 'dark') return 'dark';
+        
+        // Auto: detect Stash theme
+        const htmlTheme = document.documentElement.getAttribute('data-bs-theme') || document.documentElement.getAttribute('data-theme');
+        if (htmlTheme === 'light') return 'light';
+        if (htmlTheme === 'dark') return 'dark';
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
+        return 'dark';
+    }
+
+    function setThemePreference(theme) {
+        localStorage.setItem(THEME_STORAGE_KEY, theme);
+    }
+
     function readRecentEntries(type) {
         try {
             const raw = localStorage.getItem(recentStorageKeys[type]);
@@ -872,15 +1029,21 @@
 
         if (match && match.id != null) {
             const rowId = String(match.id);
-            selectedIds.add(rowId);
-            try {
-                table.deselectRow();
-                table.selectRow(rowId);
-                const row = table.getRow(rowId);
-                if (row) {
-                    table.scrollToRow(row, 'top', false);
-                }
-            } catch (e) {}
+            if (selectedIds.has(rowId)) {
+                selectedIds.delete(rowId);
+                try {
+                    table.deselectRow(rowId);
+                } catch (e) {}
+            } else {
+                selectedIds.add(rowId);
+                try {
+                    table.selectRow(rowId);
+                    const row = table.getRow(rowId);
+                    if (row) {
+                        table.scrollToRow(row, 'top', false);
+                    }
+                } catch (e) {}
+            }
 
             if (typeof onSelected === 'function') {
                 onSelected();
@@ -907,8 +1070,8 @@
 
         const recent = readRecentEntries(type)
             .slice(0, 8)
-            .filter(item => item && item.name)
-            .map(item => ({ id: item.id, name: item.name }));
+            .filter(item => item && (item.name || item.title))
+            .map(item => ({ id: item.id, name: item.name || item.title }));
 
         if (!recent.length) {
             target.innerHTML = '';
@@ -918,15 +1081,51 @@
 
         target.innerHTML = '';
         target.style.display = 'flex';
+        target.style.alignItems = 'center';
         target.style.flexWrap = 'wrap';
-        target.style.gap = '6px';
+        target.style.gap = '5px';
         target.style.marginBottom = '10px';
 
+        const theme = getEffectiveTheme();
+        const isDark = theme === 'dark';
+
+        const label = document.createElement('span');
+        label.textContent = 'Recent:';
+        label.className = 'popup-recent-label';
+        label.style.cssText = `font-size: 10px; font-weight: 600; text-transform: uppercase; margin-right: 2px; user-select: none;`;
+        target.appendChild(label);
+
         recent.forEach(item => {
+            const isSelected = selectedIds && selectedIds.has(String(item.id));
             const chip = document.createElement('button');
             chip.type = 'button';
-            chip.textContent = item.name;
-            chip.style.cssText = 'padding: 4px 6px; border: 1px solid #dfe3ea; border-radius: 999px; background: #f8fafc; color: #243447; font-size: 10px; cursor: pointer;';
+            chip.textContent = isSelected ? `✓ ${item.name}` : item.name;
+            chip.title = isSelected ? `Currently selected (${item.name})` : `Click to select ${item.name}`;
+            
+            if (isDark) {
+                chip.style.cssText = isSelected
+                    ? 'padding: 3px 8px; border: 1px solid #6366f1; border-radius: 999px; background: #312e81; color: #c7d2fe; font-size: 10px; font-weight: 600; cursor: pointer; transition: all 0.15s ease;'
+                    : 'padding: 3px 8px; border: 1px solid #334155; border-radius: 999px; background: #0f172a; color: #cbd5e1; font-size: 10px; cursor: pointer; transition: all 0.15s ease;';
+                chip.addEventListener('mouseenter', () => {
+                    chip.style.background = isSelected ? '#3730a3' : '#334155';
+                    if (!isSelected) chip.style.color = '#ffffff';
+                });
+                chip.addEventListener('mouseleave', () => {
+                    chip.style.background = isSelected ? '#312e81' : '#0f172a';
+                    if (!isSelected) chip.style.color = '#cbd5e1';
+                });
+            } else {
+                chip.style.cssText = isSelected
+                    ? 'padding: 3px 8px; border: 1px solid #818cf8; border-radius: 999px; background: #eef2ff; color: #4338ca; font-size: 10px; font-weight: 600; cursor: pointer; transition: all 0.15s ease;'
+                    : 'padding: 3px 8px; border: 1px solid #dfe3ea; border-radius: 999px; background: #f8fafc; color: #334155; font-size: 10px; cursor: pointer; transition: all 0.15s ease;';
+                chip.addEventListener('mouseenter', () => {
+                    if (!isSelected) chip.style.background = '#f1f5f9';
+                });
+                chip.addEventListener('mouseleave', () => {
+                    if (!isSelected) chip.style.background = '#f8fafc';
+                });
+            }
+
             chip.addEventListener('click', () => {
                 trySelectRecentChip(type, item, selectedIds, input, onRecentChipSelect);
             });
@@ -935,8 +1134,10 @@
     }
 
     function createCustomMenu(clickEvent, sceneId, cardElement) {
+        const theme = getEffectiveTheme();
         const menu = document.createElement('div');
         menu.id = 'scenes-custom-menu';
+        menu.className = `theme-${theme}`;
         menu.style.position = 'absolute';
         menu.style.zIndex = '999999';
 
@@ -1052,52 +1253,49 @@
     // POPUP SHELL CREATION BUILDERS
     // ==========================================
     function createPopupShell(type) {
+        const theme = getEffectiveTheme();
         const form = document.createElement('form');
         form.id = 'scenes-popup';
+        form.className = `theme-${theme}`;
         form.setAttribute('autocomplete', 'off');
         form.style.position = 'absolute';
         form.style.zIndex = '1000000';
         form.style.padding = '14px';
-        form.style.background = '#ffffff';
-        form.style.border = '1px solid #e2e8f0';
         form.style.borderRadius = '10px';
-        form.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.1)';
         form.style.width = '340px';
         form.style.boxSizing = 'border-box';
         form.style.fontFamily = 'system-ui, -apple-system, sans-serif';
         
-        const titleText = `Edit ${type.charAt(0).toUpperCase() + type.slice(1)} for Scene`;
+        const titleText = `Edit ${type.charAt(0).toUpperCase() + type.slice(1)}`;
         const buttonText = `Save ${type.charAt(0).toUpperCase() + type.slice(1)}`;
 
         form.innerHTML = `
-            <h2 style="margin: 0 0 12px 0; font-size: 13px; font-weight: 600; user-select: none; color: #0f172a; display: flex; align-items: center; justify-content: space-between;">
-                <span id="${type}-popup-title">${titleText}</span>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <button type="button" id="${type}-prev-btn" style="padding: 2px 6px; cursor: pointer; font-size: 11px; background: #64748b; color: white; border: none; border-radius: 4px; display: none;">◄ Prev</button>
-                    <button type="button" id="${type}-next-btn" style="padding: 2px 6px; cursor: pointer; font-size: 11px; background: #64748b; color: white; border: none; border-radius: 4px; display: none;">Next ►</button>
-                    <span class="popup-drag-handle" style="font-size: 11px; color: #64748b; font-weight: normal; cursor: grab; user-select: none; padding: 2px 4px; border-radius: 4px;">Draggable</span>
+            <div style="margin: 0 0 10px 0; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                <span id="${type}-popup-title" class="popup-title" style="font-size: 13px; font-weight: 600; user-select: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${titleText}</span>
+                <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
+                    <label class="popup-seq-label" style="font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 3px; user-select: none; padding-right: 2px;">
+                        <input type="checkbox" id="${type}-sequential-mode" style="cursor: pointer; margin: 0; accent-color: #6366f1;">
+                        Sequential
+                    </label>
+                    <button type="button" id="${type}-prev-btn" class="popup-nav-btn" style="padding: 3px 6px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: none; align-items: center;">◄</button>
+                    <button type="button" id="${type}-next-btn" class="popup-nav-btn" style="padding: 3px 6px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: none; align-items: center;">►</button>
+                    <span class="popup-drag-handle" title="Drag popup" style="font-size: 12px; font-weight: bold; cursor: grab; user-select: none; padding: 1px 4px; border-radius: 4px; line-height: 1.2;">⠿</span>
                 </div>
-            </h2>
+            </div>
             <div id="${type}-preview-container"></div>
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
-                <label style="font-size: 11px; color: #64748b; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                    <input type="checkbox" id="${type}-sequential-mode" style="cursor: pointer;">
-                    Sequential Edit Mode
-                </label>
-            </div>
-            <div style="display: flex; gap: 6px; margin-bottom: 10px; align-items: center;">
+            <div style="display: flex; gap: 6px; margin-bottom: 8px; align-items: center;">
                 <div style="position: relative; flex: 1;">
-                    <input type="text" id="${type}-search-input" autocomplete="off" spellcheck="false" placeholder="Search..." style="width: 100%; padding: 7px 28px 7px 10px; box-sizing: border-box; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; font-size: 12px; outline: none;">
-                    <span id="${type}-search-clear" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #94a3b8; font-size: 16px; line-height: 1; display: none; user-select: none;">&times;</span>
+                    <input type="text" id="${type}-search-input" class="popup-search-input" autocomplete="off" spellcheck="false" placeholder="Search ${type}..." style="width: 100%; padding: 7px 28px 7px 10px; box-sizing: border-box; border-radius: 6px; font-size: 12px; outline: none;">
+                    <span id="${type}-search-clear" class="popup-search-clear" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 16px; line-height: 1; display: none; user-select: none;">&times;</span>
                 </div>
-                <button type="button" id="${type}-create-btn" style="padding: 7px 8px; cursor: pointer; font-size: 12px; font-weight: 500; background: #10b981; color: white; border: none; border-radius: 6px; white-space: nowrap; display: none;">Create</button>
-                <button type="button" id="${type}-refresh-btn" style="padding: 7px 8px; cursor: pointer; font-size: 12px; font-weight: 500; background: #64748b; color: white; border: none; border-radius: 6px; white-space: nowrap;">Refresh</button>
+                <button type="button" id="${type}-create-btn" style="padding: 7px 9px; cursor: pointer; font-size: 12px; font-weight: 500; background: #059669; color: white; border: none; border-radius: 6px; white-space: nowrap; display: none;">+ Create</button>
+                <button type="button" id="${type}-refresh-btn" class="popup-refresh-btn" title="Refresh cache" style="padding: 7px 9px; cursor: pointer; font-size: 13px; font-weight: 500; border-radius: 6px; white-space: nowrap; line-height: 1;">↻</button>
             </div>
-            <div id="${type}-quick-actions" style="display: none; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;"></div>
+            <div id="${type}-quick-actions" style="display: none; flex-wrap: wrap; gap: 5px; margin-bottom: 8px;"></div>
             <div id="${type}-tabulator-table" style="margin-bottom: 10px; width: 100%; box-sizing: border-box;"></div>
             <div style="display: flex; gap: 8px;">
-                <button type="button" id="${type}-save-btn" style="flex: 1; padding: 7px; cursor: pointer; font-size: 12px; font-weight: 500; background: #6366f1; color: white; border: none; border-radius: 6px;">${buttonText}</button>
-                <button type="button" id="${type}-cancel-btn" style="flex: 1; padding: 7px; cursor: pointer; font-size: 12px; font-weight: 500; background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px;">Close</button>
+                <button type="button" id="${type}-save-btn" style="flex: 1; padding: 8px; cursor: pointer; font-size: 12px; font-weight: 600; background: #6366f1; color: white; border: none; border-radius: 6px; transition: background 0.15s ease;">${buttonText}</button>
+                <button type="button" id="${type}-cancel-btn" class="popup-cancel-btn" style="padding: 8px 14px; cursor: pointer; font-size: 12px; font-weight: 500; border-radius: 6px;">Close</button>
             </div>
         `;
 
@@ -1174,6 +1372,22 @@
             createBtn.style.display = hasVal ? 'block' : 'none';
         };
 
+        const refreshUI = () => {
+            updateSequentialEditUI(form, 'tags', selectedIds);
+            renderQuickActions(form, 'tags', filterInput, selectedIds, getCachedOrNull('tags') || [], 'name', onRecentChipSelect);
+        };
+
+        const onRecentChipSelect = () => {
+            filterInput.value = '';
+            updateVisibility();
+            fetchData('', false);
+            if (!sequentialEditState.enabled) {
+                saveTagsWithoutReload(sceneId, selectedIds);
+            } else {
+                refreshUI();
+            }
+        };
+
         activeTableInstance.off("rowSelected");
         activeTableInstance.off("rowDeselected");
 
@@ -1181,6 +1395,7 @@
             if (!isRestoringSelections) {
                 const id = row.getData().id;
                 if (id) selectedIds.add(String(id));
+                refreshUI();
                 
                 const hasSearch = filterInput.value.trim().length > 0;
                 if (hasSearch) {
@@ -1199,6 +1414,7 @@
             if (!isRestoringSelections) {
                 const id = row.getData().id;
                 if (id) selectedIds.delete(String(id));
+                refreshUI();
                 if (filterInput.value.trim().length > 0) {
                     fetchData(filterInput.value.trim(), false);
                 }
@@ -1229,12 +1445,8 @@
                     const r = activeTableInstance.getRow(id);
                     if (r) activeTableInstance.selectRow(r);
                 });
-                renderQuickActions(form, 'tags', filterInput, selectedIds, data, 'name', () => {
-                    filterInput.value = '';
-                    updateVisibility();
-                    fetchData('', false);
-                    saveTagsWithoutReload(sceneId, selectedIds);
-                });
+                renderQuickActions(form, 'tags', filterInput, selectedIds, data, 'name', onRecentChipSelect);
+                updateSequentialEditUI(form, 'tags', selectedIds);
                 if (resetScroll && data.length > 0) activeTableInstance.scrollToRow(activeTableInstance.getRows()[0], "top", false);
             } finally {
                 isRestoringSelections = false;
@@ -1269,9 +1481,11 @@
             if (newId) {
                 invalidateCache();
                 selectedIds.add(String(newId));
+                addRecentEntry('tags', { id: newId, name: val });
                 filterInput.value = '';
                 updateVisibility();
                 await fetchData("", true);
+                refreshUI();
                 filterInput.focus({ preventScroll: true });
             }
         };
@@ -1279,7 +1493,15 @@
         await fetchData("", true);
 
         popup.saveBtn.onclick = async () => {
-            if (sequentialEditState.enabled) return;
+            if (sequentialEditState.enabled) {
+                if (sequentialEditState.currentIndex >= sequentialEditState.allSceneCards.length - 1) {
+                    await saveTagsWithoutReload(sceneId, selectedIds);
+                    closePopup();
+                } else {
+                    navigateToNextScene(form, 'tags', 1, () => selectedIds);
+                }
+                return;
+            }
             const selectedItems = Array.from(selectedIds).map(id => {
                 const item = getCachedOrNull('tags') || [];
                 return item.find(entry => String(entry.id) === String(id));
@@ -1378,6 +1600,22 @@
             createBtn.style.display = hasVal ? 'block' : 'none';
         };
 
+        const refreshUI = () => {
+            updateSequentialEditUI(form, 'performers', selectedIds);
+            renderQuickActions(form, 'performers', filterInput, selectedIds, getCachedOrNull('performers') || [], 'name', onRecentChipSelect);
+        };
+
+        const onRecentChipSelect = () => {
+            filterInput.value = '';
+            updateVisibility();
+            fetchData('', false);
+            if (!sequentialEditState.enabled) {
+                savePerformersWithoutReload(sceneId, selectedIds);
+            } else {
+                refreshUI();
+            }
+        };
+
         activeTableInstance.off("rowSelected");
         activeTableInstance.off("rowDeselected");
 
@@ -1385,6 +1623,7 @@
             if (!isRestoringSelections) {
                 const id = row.getData().id;
                 if (id) selectedIds.add(String(id));
+                refreshUI();
                 
                 const hasSearch = filterInput.value.trim().length > 0;
                 if (hasSearch) {
@@ -1403,6 +1642,7 @@
             if (!isRestoringSelections) {
                 const id = row.getData().id;
                 if (id) selectedIds.delete(String(id));
+                refreshUI();
                 if (filterInput.value.trim().length > 0) {
                     fetchData(filterInput.value.trim(), false);
                 }
@@ -1433,12 +1673,8 @@
                     const r = activeTableInstance.getRow(id);
                     if (r) activeTableInstance.selectRow(r);
                 });
-                renderQuickActions(form, 'performers', filterInput, selectedIds, data, 'name', () => {
-                    filterInput.value = '';
-                    updateVisibility();
-                    fetchData('', false);
-                    savePerformersWithoutReload(sceneId, selectedIds);
-                });
+                renderQuickActions(form, 'performers', filterInput, selectedIds, data, 'name', onRecentChipSelect);
+                updateSequentialEditUI(form, 'performers', selectedIds);
                 if (resetScroll && data.length > 0) activeTableInstance.scrollToRow(activeTableInstance.getRows()[0], "top", false);
             } finally {
                 isRestoringSelections = false;
@@ -1473,9 +1709,11 @@
             if (newId) {
                 invalidateCache();
                 selectedIds.add(String(newId));
+                addRecentEntry('performers', { id: newId, name: val });
                 filterInput.value = '';
                 updateVisibility();
                 await fetchData("", true);
+                refreshUI();
                 filterInput.focus({ preventScroll: true });
             }
         };
@@ -1483,7 +1721,15 @@
         await fetchData("", true);
 
         popup.saveBtn.onclick = async () => {
-            if (sequentialEditState.enabled) return;
+            if (sequentialEditState.enabled) {
+                if (sequentialEditState.currentIndex >= sequentialEditState.allSceneCards.length - 1) {
+                    await savePerformersWithoutReload(sceneId, selectedIds);
+                    closePopup();
+                } else {
+                    navigateToNextScene(form, 'performers', 1, () => selectedIds);
+                }
+                return;
+            }
             const selectedItems = Array.from(selectedIds).map(id => {
                 const item = getCachedOrNull('performers') || [];
                 return item.find(entry => String(entry.id) === String(id));
@@ -1581,6 +1827,22 @@
             createBtn.style.display = hasVal ? 'block' : 'none';
         };
 
+        const refreshUI = () => {
+            updateSequentialEditUI(form, 'galleries', selectedIds);
+            renderQuickActions(form, 'galleries', filterInput, selectedIds, getCachedOrNull('galleries') || [], 'title', onRecentChipSelect);
+        };
+
+        const onRecentChipSelect = () => {
+            filterInput.value = '';
+            updateVisibility();
+            fetchData('', false);
+            if (!sequentialEditState.enabled) {
+                saveGalleriesWithoutReload(sceneId, selectedIds);
+            } else {
+                refreshUI();
+            }
+        };
+
         activeTableInstance.off("rowSelected");
         activeTableInstance.off("rowDeselected");
 
@@ -1588,6 +1850,7 @@
             if (!isRestoringSelections) {
                 const id = row.getData().id;
                 if (id) selectedIds.add(String(id));
+                refreshUI();
                 
                 const hasSearch = filterInput.value.trim().length > 0;
                 if (hasSearch) {
@@ -1606,6 +1869,7 @@
             if (!isRestoringSelections) {
                 const id = row.getData().id;
                 if (id) selectedIds.delete(String(id));
+                refreshUI();
                 if (filterInput.value.trim().length > 0) {
                     fetchData(filterInput.value.trim(), false);
                 }
@@ -1636,12 +1900,8 @@
                     const r = activeTableInstance.getRow(id);
                     if (r) activeTableInstance.selectRow(r);
                 });
-                renderQuickActions(form, 'galleries', filterInput, selectedIds, data, 'title', () => {
-                    filterInput.value = '';
-                    updateVisibility();
-                    fetchData('', false);
-                    saveGalleriesWithoutReload(sceneId, selectedIds);
-                });
+                renderQuickActions(form, 'galleries', filterInput, selectedIds, data, 'title', onRecentChipSelect);
+                updateSequentialEditUI(form, 'galleries', selectedIds);
                 if (resetScroll && data.length > 0) activeTableInstance.scrollToRow(activeTableInstance.getRows()[0], "top", false);
             } finally {
                 isRestoringSelections = false;
@@ -1676,9 +1936,11 @@
             if (newId) {
                 invalidateCache();
                 selectedIds.add(String(newId));
+                addRecentEntry('galleries', { id: newId, title: val });
                 filterInput.value = '';
                 updateVisibility();
                 await fetchData("", true);
+                refreshUI();
                 filterInput.focus({ preventScroll: true });
             }
         };
@@ -1686,7 +1948,15 @@
         await fetchData("", true);
 
         popup.saveBtn.onclick = async () => {
-            if (sequentialEditState.enabled) return;
+            if (sequentialEditState.enabled) {
+                if (sequentialEditState.currentIndex >= sequentialEditState.allSceneCards.length - 1) {
+                    await saveGalleriesWithoutReload(sceneId, selectedIds);
+                    closePopup();
+                } else {
+                    navigateToNextScene(form, 'galleries', 1, () => selectedIds);
+                }
+                return;
+            }
             const selectedItems = Array.from(selectedIds).map(id => {
                 const item = getCachedOrNull('galleries') || [];
                 return item.find(entry => String(entry.id) === String(id));
@@ -1754,15 +2024,28 @@
             } else if (e.key === 'Enter') {
                 const isSearchFocused = document.activeElement && document.activeElement.tagName === 'INPUT';
 
-                if (isSearchFocused) {
-                    e.preventDefault();
-                    e.stopPropagation();
+                if (isSearchFocused && !(e.ctrlKey || e.metaKey)) {
                     return;
                 }
 
                 if (!isSearchFocused || e.ctrlKey || e.metaKey) {
                     e.preventDefault();
-                    if (!sequentialEditState.enabled && onSaveCallback) onSaveCallback();
+                    if (sequentialEditState.enabled) {
+                        const saveBtn = form.querySelector(`#${sequentialEditState.currentType}-save-btn`);
+                        if (saveBtn) saveBtn.click();
+                    } else if (onSaveCallback) {
+                        onSaveCallback();
+                    }
+                }
+            } else if (sequentialEditState.enabled && e.altKey) {
+                if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    const nextBtn = form.querySelector(`#${sequentialEditState.currentType}-next-btn`);
+                    if (nextBtn && !nextBtn.disabled) nextBtn.click();
+                } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    const prevBtn = form.querySelector(`#${sequentialEditState.currentType}-prev-btn`);
+                    if (prevBtn && !prevBtn.disabled) prevBtn.click();
                 }
             }
         };
@@ -2023,5 +2306,82 @@
             createTagsPopup(sceneId, sceneCard);
         }
     }, true);
+
+    function initSettingsPageObserver() {
+        const tryInjectSettings = () => {
+            if (!window.location.pathname.startsWith('/settings')) return;
+
+            const cards = document.querySelectorAll('.card, .list-group-item, [class*="plugin"], .setting-group, tr, div');
+            for (let el of cards) {
+                const text = el.innerText || el.textContent || '';
+                if (text.includes('A Plugin') && text.includes('My first custom Stash plugin')) {
+                    if (el.querySelector('#fast-tag-plugin-settings')) return;
+
+                    const hasChildWithSameText = Array.from(el.children).some(child => {
+                        const childText = child.innerText || child.textContent || '';
+                        return childText.includes('A Plugin') && childText.includes('My first custom Stash plugin');
+                    });
+                    if (hasChildWithSameText) continue;
+
+                    const settingsContainer = document.createElement('div');
+                    settingsContainer.id = 'fast-tag-plugin-settings';
+                    settingsContainer.style.cssText = 'margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(128,128,128,0.2); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 13px;';
+
+                    const label = document.createElement('span');
+                    label.textContent = 'Popup Theme:';
+                    label.style.fontWeight = '500';
+
+                    const btnGroup = document.createElement('div');
+                    btnGroup.style.cssText = 'display: flex; gap: 6px; align-items: center;';
+
+                    const updateButtons = (selectedTheme) => {
+                        Array.from(btnGroup.children).forEach(b => {
+                            const bVal = b.getAttribute('data-theme-val');
+                            const isSelected = bVal === selectedTheme;
+                            b.style.border = `1px solid ${isSelected ? '#6366f1' : 'rgba(128,128,128,0.3)'}`;
+                            b.style.background = isSelected ? '#6366f1' : 'transparent';
+                            b.style.color = isSelected ? '#ffffff' : 'inherit';
+                            b.style.fontWeight = isSelected ? '600' : 'normal';
+                        });
+                    };
+
+                    const createThemeBtn = (themeVal, labelText) => {
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.textContent = labelText;
+                        btn.setAttribute('data-theme-val', themeVal);
+                        const isInit = getThemePreference() === themeVal;
+                        btn.style.cssText = `padding: 4px 10px; font-size: 12px; border-radius: 6px; cursor: pointer; border: 1px solid ${isInit ? '#6366f1' : 'rgba(128,128,128,0.3)'}; background: ${isInit ? '#6366f1' : 'transparent'}; color: ${isInit ? '#ffffff' : 'inherit'}; font-weight: ${isInit ? '600' : 'normal'}; transition: all 0.15s ease;`;
+                        
+                        btn.onclick = (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setThemePreference(themeVal);
+                            updateButtons(themeVal);
+                            toastSuccess(`Theme set to ${labelText}`);
+                        };
+                        return btn;
+                    };
+
+                    btnGroup.appendChild(createThemeBtn('dark', '🌙 Dark'));
+                    btnGroup.appendChild(createThemeBtn('light', '☀️ Light'));
+                    btnGroup.appendChild(createThemeBtn('auto', '⚙ Auto'));
+
+                    settingsContainer.appendChild(label);
+                    settingsContainer.appendChild(btnGroup);
+                    el.appendChild(settingsContainer);
+                    break;
+                }
+            }
+        };
+
+        tryInjectSettings();
+        const observer = new MutationObserver(() => {
+            tryInjectSettings();
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
+
+    initSettingsPageObserver();
 
 })();
