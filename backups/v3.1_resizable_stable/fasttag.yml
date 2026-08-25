@@ -1,0 +1,6 @@
+name: FastTag
+description: "Fast scene tagging workflow for Stash: edit tags, performers, and galleries from scene cards with quick search, popups, and sequential navigation"
+version: "3.1"
+ui:
+  javascript:
+    - fasttag.js
