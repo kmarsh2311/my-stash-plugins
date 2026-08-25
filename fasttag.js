@@ -15,6 +15,7 @@
 
 (async function() {
     'use strict';
+    console.log('[FastTag v3.0] Initialized successfully');
 
     // --- Entity Configuration & Schema Registry ---
     const ENTITY_CONFIG = {
@@ -525,6 +526,15 @@
         hostContainer.style.border = '1px solid #e2e8f0';
         hostContainer.style.background = '#0f172a';
         hostContainer.style.boxShadow = 'inset 0 0 0 1px rgba(255,255,255,0.05)';
+        hostContainer.style.cursor = 'pointer';
+
+        hostContainer.onclick = (e) => {
+            if (e.shiftKey) return;
+            const sceneUrl = getSceneUrl(sceneId, cardElement);
+            if (sceneUrl) {
+                window.open(sceneUrl, '_blank');
+            }
+        };
 
         const previewUrl = await fetchScenePreviewUrl(sceneId, cardElement);
         if (signal.aborted) return;
@@ -573,6 +583,21 @@
             let originalLoop = !!media.loop;
             let shiftHeld = false;
             let wheelListenerAttached = false;
+            let isHovered = false;
+
+            hostContainer.onmouseenter = () => {
+                isHovered = true;
+            };
+
+            hostContainer.onmouseleave = () => {
+                isHovered = false;
+                if (shiftHeld) {
+                    shiftHeld = false;
+                    detachWheel();
+                    clearTimeout(resumeTimer);
+                    endScrubbing();
+                }
+            };
 
             const onWheel = (e) => {
                 if (!shiftHeld) return;
@@ -622,7 +647,7 @@
             };
 
             const onKeyDown = (e) => {
-                if (e.key === 'Shift' && !shiftHeld) {
+                if (e.key === 'Shift' && !shiftHeld && isHovered) {
                     shiftHeld = true;
                     if (!scrubbing) {
                         scrubbing = true;
@@ -662,6 +687,30 @@
     }
 
     // --- State & Sequential Utilities ---
+    function getSceneUrl(sceneId, cardElement) {
+        if (cardElement) {
+            const link = cardElement.querySelector('a.scene-card-link') ||
+                         cardElement.querySelector('a[href*="/scenes/"]:not([class*="tag"]):not([class*="performer"]):not([class*="gallery"])') ||
+                         cardElement.querySelector('a[href*="/scenes/"]');
+            if (link) {
+                const href = link.getAttribute('href') || link.href;
+                if (href && href.includes('/scenes/')) {
+                    return href;
+                }
+            }
+        }
+        if (sceneId) {
+            const search = window.location.search || '';
+            if (search) {
+                const hasContinue = search.includes('continue=');
+                const glue = search.includes('?') ? '&' : '?';
+                return `/scenes/${sceneId}${search}${hasContinue ? '' : glue + 'continue=true'}`;
+            }
+            return `/scenes/${sceneId}`;
+        }
+        return null;
+    }
+
     function extractSceneId(cardElement) {
         if (!cardElement) return null;
         const link = cardElement.querySelector('a[href*="/scenes/"]');
@@ -1235,7 +1284,6 @@
                     <span class="popup-drag-handle" title="Drag popup" style="font-size: 12px; font-weight: bold; cursor: grab; user-select: none; padding: 1px 4px; border-radius: 4px; line-height: 1.2;">⠿</span>
                 </div>
             </div>
-            <div id="${type}-preview-container"></div>
             <div style="display: flex; gap: 6px; margin-bottom: 8px; align-items: center;">
                 <div style="position: relative; flex: 1;">
                     <input type="text" id="${type}-search-input" class="popup-search-input" autocomplete="off" spellcheck="false" placeholder="Search ${config.pluralTitle.toLowerCase()}..." style="width: 100%; padding: 7px 28px 7px 10px; box-sizing: border-box; border-radius: 6px; font-size: 12px; outline: none;">
@@ -1359,7 +1407,9 @@
             }, { signal });
 
             document.addEventListener('mouseup', () => {
-                isDragging = false;
+                if (isDragging) {
+                    isDragging = false;
+                }
             }, { signal });
         }
     }
@@ -1654,23 +1704,25 @@
     // --- Settings Injection ---
     function initSettingsPageObserver() {
         const tryInjectSettings = () => {
-            if (!window.location.pathname.startsWith('/settings')) return;
+            if (!window.location.href.includes('setting')) return;
+            if (document.querySelector('#fast-tag-plugin-settings')) return;
 
-            const cards = document.querySelectorAll('.card, .list-group-item, [class*="plugin"], .setting-group, tr, div');
+            const cards = document.querySelectorAll('.card, .list-group-item, .setting-group, tr, .plugin-card, [class*="plugin"]');
             for (let el of cards) {
                 const text = el.innerText || el.textContent || '';
-                if ((text.includes('FastTag') || text.includes('A Plugin')) && (text.includes('Fast scene tagging workflow') || text.includes('My first custom Stash plugin'))) {
-                    if (el.querySelector('#fast-tag-plugin-settings')) return;
+                if (text.includes('FastTag') || text.includes('mypluginrc') || text.includes('A Plugin')) {
+                    const target = el.querySelector('.card-body') || el.querySelector('td:last-child') || el;
+                    if (target.querySelector('#fast-tag-plugin-settings')) return;
 
-                    const hasChildWithSameText = Array.from(el.children).some(child => {
-                        const childText = child.innerText || child.textContent || '';
-                        return (childText.includes('FastTag') || childText.includes('A Plugin')) && (childText.includes('Fast scene tagging workflow') || childText.includes('My first custom Stash plugin'));
+                    const childHasMatch = Array.from(el.children).some(child => {
+                        const cText = child.innerText || child.textContent || '';
+                        return cText.includes('FastTag') || cText.includes('mypluginrc') || cText.includes('A Plugin');
                     });
-                    if (hasChildWithSameText) continue;
+                    if (childHasMatch && el.tagName !== 'TR' && !el.classList.contains('card')) continue;
 
                     const settingsContainer = document.createElement('div');
                     settingsContainer.id = 'fast-tag-plugin-settings';
-                    settingsContainer.style.cssText = 'margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(128,128,128,0.2); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 13px;';
+                    settingsContainer.style.cssText = 'margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(128,128,128,0.2); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 13px; width: 100%;';
 
                     const label = document.createElement('span');
                     label.textContent = 'Popup Theme:';
@@ -1714,7 +1766,7 @@
 
                     settingsContainer.appendChild(label);
                     settingsContainer.appendChild(btnGroup);
-                    el.appendChild(settingsContainer);
+                    target.appendChild(settingsContainer);
                     break;
                 }
             }

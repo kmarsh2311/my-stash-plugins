@@ -2,12 +2,7 @@ name: Deploy repository to Github Pages
 
 on:
   push:
-      paths:
-      - 'a.js'
-      - 'a.yml'
-      - 'index.yml'
-      - 'plugin-a.zip'
-      branches:
+    branches:
       - main
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -28,7 +23,8 @@ jobs:
         fetch-depth: '0'
     - run: |
         mkdir -p _site/${{ github.ref_name }}
-        cp index.yml plugin-a.zip _site/${{ github.ref_name }}/
+        cp index.yml fasttag.zip _site/ 2>/dev/null || true
+        cp index.yml fasttag.zip _site/${{ github.ref_name }}/ 2>/dev/null || true
     - uses: actions/upload-pages-artifact@v5
 
   deploy:

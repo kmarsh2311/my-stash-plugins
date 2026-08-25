@@ -1,8 +1,8 @@
 - id: mypluginrc
   name: FastTag
   version: "3.0"
-  description: Fast scene tagging workflow for Stash: edit tags, performers, and galleries from scene cards with quick search, popups, and sequential navigation
+  description: "Fast scene tagging workflow for Stash: edit tags, performers, and galleries from scene cards with quick search, popups, and sequential navigation"
   date: 2026-08-25 04:10:00
   path: fasttag.zip
-  sha256: e6eda6219fdd58092688dedd58f4602cac453a46723d3c13b1cfceef555175ed
+  sha256: d03efed6f509143080f8a8f9e0bc5c65662d452613306fca80d865bef3eafc5d
 
