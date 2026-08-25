@@ -1273,7 +1273,7 @@
         form.style.fontFamily = 'system-ui, -apple-system, sans-serif';
 
         form.innerHTML = `
-            <div id="${type}-popup-header" class="popup-header" style="margin: 0 0 10px 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: grab; user-select: none;">
+            <div id="${type}-popup-header" class="popup-header" style="margin: 0 0 13px 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: grab; user-select: none;">
                 <span id="${type}-popup-title" class="popup-title" style="font-size: 13px; font-weight: 600; line-height: 1; user-select: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: grab; flex: 1;">Edit ${config.pluralTitle}</span>
                 <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0; cursor: default;">
                     <label class="popup-seq-label" style="font-size: 12px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; user-select: none; margin: 0; line-height: 1;">
