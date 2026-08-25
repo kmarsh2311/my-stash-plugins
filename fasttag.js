@@ -1282,7 +1282,6 @@
                     </label>
                     <button type="button" id="${type}-prev-btn" class="popup-nav-btn" style="padding: 3px 6px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: none; align-items: center;">◄</button>
                     <button type="button" id="${type}-next-btn" class="popup-nav-btn" style="padding: 3px 6px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: none; align-items: center;">►</button>
-                    <span class="popup-drag-handle" title="Drag popup" style="font-size: 12px; font-weight: bold; cursor: grab; user-select: none; padding: 1px 4px; border-radius: 4px; line-height: 1.2;">⠿</span>
                 </div>
             </div>
             <div id="${type}-preview-container"></div>
