@@ -33,23 +33,10 @@ A fast tagging workflow for Stash scene cards, designed for video libraries wher
 ## 🚀 Installation
 
 ### Recommended Method (Stash Plugin Manager):
-1. In Stash, go to **Settings ➔ Plugins ➔ Package Sources** (or **Community Repositories**).
-2. Click **Add Source**, give it a name (e.g. `kam` or `FastTag`), and enter the repository URL:
-   ```
-   https://kmarsh2311.github.io/my-stash-plugins/index.yml
-   ```
-3. Under **Available Plugins**, find **FastTag** and click **Install**.
-4. Click **Reload Plugins** and refresh your browser (<kbd>Cmd/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd>).
-
 ---
 
-### Manual Method:
 1. Download `fasttag.js` and `fasttag.yml`.
 2. Place them into your Stash plugins folder: `.stash/plugins/fasttag/`.
-3. In Stash, go to **Settings ➔ Plugins** and click **Reload Plugins**.
-
----
-
 ## 💡 How to Use
 *   **Right-Click:** Use the context menu on any scene card to access the quick edit tool.
 *   **Quick Tagging:** Select tags and performers from a searchable popup while reviewing video scenes.

@@ -1710,30 +1710,42 @@
     // --- Settings Injection ---
     function initSettingsPageObserver() {
         const tryInjectSettings = () => {
-            if (!window.location.href.includes('setting')) return;
             if (document.querySelector('#fast-tag-plugin-settings')) return;
 
-            const headers = document.querySelectorAll('h1, h2, h3, h4, h5, h6, .card-title, .setting-title, span, strong, div');
-            let targetCard = null;
+            const titleCandidates = document.querySelectorAll('h1, h2, h3, h4, h5, h6, .card-title, .setting-title, .plugin-title, b, strong, span');
+            let fastTagHeader = null;
 
-            for (let el of headers) {
+            for (let el of titleCandidates) {
                 const text = (el.innerText || el.textContent || '').trim();
-                if (text.startsWith('FastTag') || text.startsWith('A Plugin') || text === 'FastTag' || text.includes('FastTag (')) {
-                    targetCard = el.closest('.setting-group, .card, .list-group-item, tr, .plugin-item, [class*="setting"]') || el.parentElement?.parentElement;
-                    if (targetCard) break;
+                if (text.length < 50 && (text.startsWith('FastTag') || text.startsWith('mypluginrc') || text.includes('FastTag ('))) {
+                    fastTagHeader = el;
+                    break;
                 }
             }
 
+            if (!fastTagHeader) return;
+
+            const targetCard = fastTagHeader.closest('.setting-group, .card, .list-group-item, tr, .plugin-card, .row') || fastTagHeader.parentElement?.parentElement;
             if (!targetCard) return;
             if (targetCard.querySelector('#fast-tag-plugin-settings')) return;
 
             const settingsContainer = document.createElement('div');
             settingsContainer.id = 'fast-tag-plugin-settings';
-            settingsContainer.style.cssText = 'margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(128,128,128,0.2); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 13px; width: 100%;';
+            settingsContainer.style.cssText = 'margin-top: 14px; padding: 14px 20px 0 20px; border-top: 1px solid rgba(128,128,128,0.18); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; box-sizing: border-box; width: 100%;';
 
-            const label = document.createElement('span');
-            label.textContent = 'Popup Theme:';
-            label.style.fontWeight = '500';
+            const labelContainer = document.createElement('div');
+            labelContainer.style.cssText = 'display: flex; flex-direction: column; gap: 2px;';
+
+            const title = document.createElement('div');
+            title.textContent = 'Popup Theme';
+            title.style.cssText = 'font-weight: 500; font-size: 14px;';
+
+            const subtitle = document.createElement('div');
+            subtitle.textContent = 'Visual appearance for tagging popups: Dark, Light, or Auto';
+            subtitle.style.cssText = 'font-size: 12px; opacity: 0.75;';
+
+            labelContainer.appendChild(title);
+            labelContainer.appendChild(subtitle);
 
             const btnGroup = document.createElement('div');
             btnGroup.style.cssText = 'display: flex; gap: 6px; align-items: center;';
@@ -1755,7 +1767,7 @@
                 btn.textContent = labelText;
                 btn.setAttribute('data-theme-val', themeVal);
                 const isInit = getThemePreference() === themeVal;
-                btn.style.cssText = `padding: 4px 10px; font-size: 12px; border-radius: 6px; cursor: pointer; border: 1px solid ${isInit ? '#6366f1' : 'rgba(128,128,128,0.3)'}; background: ${isInit ? '#6366f1' : 'transparent'}; color: ${isInit ? '#ffffff' : 'inherit'}; font-weight: ${isInit ? '600' : 'normal'}; transition: all 0.15s ease;`;
+                btn.style.cssText = `padding: 5px 12px; font-size: 12px; border-radius: 6px; cursor: pointer; border: 1px solid ${isInit ? '#6366f1' : 'rgba(128,128,128,0.3)'}; background: ${isInit ? '#6366f1' : 'transparent'}; color: ${isInit ? '#ffffff' : 'inherit'}; font-weight: ${isInit ? '600' : 'normal'}; transition: all 0.15s ease;`;
 
                 btn.onclick = (e) => {
                     e.preventDefault();
@@ -1771,7 +1783,7 @@
             btnGroup.appendChild(createThemeBtn('light', '☀️ Light'));
             btnGroup.appendChild(createThemeBtn('auto', '⚙ Auto'));
 
-            settingsContainer.appendChild(label);
+            settingsContainer.appendChild(labelContainer);
             settingsContainer.appendChild(btnGroup);
             targetCard.appendChild(settingsContainer);
         };
