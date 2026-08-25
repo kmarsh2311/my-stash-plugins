@@ -141,6 +141,48 @@
     });
 
     // --- Style & Dependency Injections ---
+    let dependencyLoadPromise = null;
+    function loadScript(src, id) {
+        return new Promise((resolve, reject) => {
+            if (document.getElementById(id)) {
+                resolve();
+                return;
+            }
+            const script = document.createElement('script');
+            script.id = id;
+            script.src = src;
+            script.async = true;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+            document.head.appendChild(script);
+        });
+    }
+
+    function ensureDependenciesLoaded() {
+        if (typeof Tabulator !== 'undefined' && typeof Toastify !== 'undefined') {
+            return Promise.resolve();
+        }
+        if (dependencyLoadPromise) return dependencyLoadPromise;
+
+        dependencyLoadPromise = (async () => {
+            const promises = [];
+            if (typeof Tabulator === 'undefined') {
+                promises.push(loadScript('https://unpkg.com/tabulator-tables@5.5.2/dist/js/tabulator.min.js', 'tabulator-external-js'));
+            }
+            if (typeof Toastify === 'undefined') {
+                promises.push(loadScript('https://cdn.jsdelivr.net/npm/toastify-js', 'toastify-external-js'));
+            }
+            await Promise.all(promises);
+        })().catch(err => {
+            console.warn('[FastTag] Dependency autoload note:', err.message);
+        });
+
+        return dependencyLoadPromise;
+    }
+
+    // Auto-trigger dependency preload immediately
+    ensureDependenciesLoaded();
+
     if (!document.getElementById('tabulator-external-css')) {
         const link = document.createElement('link');
         link.id = 'tabulator-external-css';
@@ -384,7 +426,11 @@
 
     const toastError = (message, debug) => {
         showToast(message, 'error');
-        console.error(debug);
+        if (debug) {
+            console.error(debug);
+        } else {
+            console.error(`[FastTag Error]: ${message}`);
+        }
     };
 
     // --- Theme & Storage Helpers ---
@@ -1589,8 +1635,14 @@
 
     async function openEntityPopup(type, sceneId, cardElement) {
         const config = ENTITY_CONFIG[type];
-        if (!config || typeof Tabulator === 'undefined') {
-            toastError("Tabulator library failed to load.");
+        if (!config) return;
+
+        if (typeof Tabulator === 'undefined') {
+            await ensureDependenciesLoaded();
+        }
+
+        if (typeof Tabulator === 'undefined') {
+            toastError("Tabulator library failed to load. Please check your internet connection.");
             return;
         }
 
