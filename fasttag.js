@@ -515,6 +515,7 @@
         previewAbortController = new AbortController();
         const { signal } = previewAbortController;
 
+        if (!hostContainer) return;
         hostContainer.innerHTML = '';
         hostContainer.style.display = 'block';
         hostContainer.style.position = 'relative';
@@ -1284,6 +1285,7 @@
                     <span class="popup-drag-handle" title="Drag popup" style="font-size: 12px; font-weight: bold; cursor: grab; user-select: none; padding: 1px 4px; border-radius: 4px; line-height: 1.2;">⠿</span>
                 </div>
             </div>
+            <div id="${type}-preview-container"></div>
             <div style="display: flex; gap: 6px; margin-bottom: 8px; align-items: center;">
                 <div style="position: relative; flex: 1;">
                     <input type="text" id="${type}-search-input" class="popup-search-input" autocomplete="off" spellcheck="false" placeholder="Search ${config.pluralTitle.toLowerCase()}..." style="width: 100%; padding: 7px 28px 7px 10px; box-sizing: border-box; border-radius: 6px; font-size: 12px; outline: none;">
