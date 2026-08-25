@@ -35,7 +35,7 @@ A fast tagging workflow for Stash scene cards, designed for video libraries wher
 1. In Stash, go to **Settings ➔ Plugins ➔ Available Plugins ➔ Add Source**.
 2. Paste the Source URL:
    ```text
-   https://raw.githubusercontent.com/kmarsh2311/my-stash-plugins/refs/heads/main/index.yml
+   https://kmarsh2311.github.io/my-stash-plugins/index.yml
    ```
 3. Find **FastTag** in the list and click **Install**.
 
