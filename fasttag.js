@@ -23,7 +23,7 @@
             title: 'Tag',
             pluralTitle: 'Tags',
             labelKey: 'name',
-            searchFields: ['name'],
+            searchFields: ['name', 'id'],
             columns: [
                 { title: "ID", field: "id", width: 60, hozAlign: "center", headerHozAlign: "center", resizable: true },
                 { title: "Name", field: "name", widthGrow: 2, resizable: true },
@@ -42,7 +42,7 @@
             title: 'Performer',
             pluralTitle: 'Performers',
             labelKey: 'name',
-            searchFields: ['name', 'disambiguation'],
+            searchFields: ['name', 'disambiguation', 'id'],
             columns: [
                 { title: "ID", field: "id", width: 60, hozAlign: "center", headerHozAlign: "center", resizable: true },
                 { title: "Name", field: "name", widthGrow: 2, resizable: true },
@@ -62,7 +62,7 @@
             title: 'Gallery',
             pluralTitle: 'Galleries',
             labelKey: 'title',
-            searchFields: ['title'],
+            searchFields: ['title', 'id'],
             columns: [
                 { title: "ID", field: "id", width: 60, hozAlign: "center", headerHozAlign: "center", resizable: true },
                 { title: "Title", field: "title", widthGrow: 2, resizable: true },
@@ -969,7 +969,17 @@
 
             const aName = String(a[labelKey] || '').trim().toLowerCase();
             const bName = String(b[labelKey] || '').trim().toLowerCase();
+            const aId = String(a.id || '').trim();
+            const bId = String(b.id || '').trim();
             if (!term) return aName.localeCompare(bName);
+
+            const aIdExact = aId === term ? 1 : 0;
+            const bIdExact = bId === term ? 1 : 0;
+            if (aIdExact !== bIdExact) return bIdExact - aIdExact;
+
+            const aIdStarts = aId.startsWith(term) ? 1 : 0;
+            const bIdStarts = bId.startsWith(term) ? 1 : 0;
+            if (aIdStarts !== bIdStarts) return bIdStarts - aIdStarts;
 
             const aExact = aName === term ? 1 : 0;
             const bExact = bName === term ? 1 : 0;
