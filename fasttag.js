@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Stash FastTag
+// @name         Stash FastTag (Test Lab)
 // @namespace    http://tampermonkey.net/
 // @version      3.0
 // @description  Fast scene tagging workflow for Stash: edit tags, performers, and galleries from scene cards with quick search, popups, and sequential navigation
@@ -15,7 +15,7 @@
 
 (async function() {
     'use strict';
-    console.log('[FastTag v3.0] Initialized successfully');
+    console.log('[FastTag Test Lab] Initialized with Studios, Suggestions, Pinned Chips, Bulk Mode, and Hotkeys');
 
     // --- Entity Configuration & Schema Registry ---
     const ENTITY_CONFIG = {
@@ -25,8 +25,8 @@
             labelKey: 'name',
             searchFields: ['name', 'id'],
             columns: [
-                { title: "ID", field: "id", width: 60, hozAlign: "center", headerHozAlign: "center", resizable: true },
-                { title: "Name", field: "name", widthGrow: 2, resizable: true },
+                { title: "ID", field: "id", width: 60, hozAlign: "center", headerHozAlign: "center", resizable: true, headerSort: false },
+                { title: "Name", field: "name", widthGrow: 2, resizable: true, headerSort: false },
             ],
             fetchQuery: `query { findTags(filter: { per_page: -1 }) { tags { id name } } }`,
             extractList: data => data?.findTags?.tags || [],
@@ -44,9 +44,9 @@
             labelKey: 'name',
             searchFields: ['name', 'disambiguation', 'id'],
             columns: [
-                { title: "ID", field: "id", width: 60, hozAlign: "center", headerHozAlign: "center", resizable: true },
-                { title: "Name", field: "name", widthGrow: 2, resizable: true },
-                { title: "Disambiguation", field: "disambiguation", widthGrow: 1, resizable: true },
+                { title: "ID", field: "id", width: 60, hozAlign: "center", headerHozAlign: "center", resizable: true, headerSort: false },
+                { title: "Name", field: "name", widthGrow: 2, resizable: true, headerSort: false },
+                { title: "Disambiguation", field: "disambiguation", widthGrow: 1, resizable: true, headerSort: false },
             ],
             fetchQuery: `query { findPerformers(filter: { per_page: -1 }) { performers { id name disambiguation } } }`,
             extractList: data => data?.findPerformers?.performers || [],
@@ -64,8 +64,8 @@
             labelKey: 'title',
             searchFields: ['title', 'id'],
             columns: [
-                { title: "ID", field: "id", width: 60, hozAlign: "center", headerHozAlign: "center", resizable: true },
-                { title: "Title", field: "title", widthGrow: 2, resizable: true },
+                { title: "ID", field: "id", width: 60, hozAlign: "center", headerHozAlign: "center", resizable: true, headerSort: false },
+                { title: "Title", field: "title", widthGrow: 2, resizable: true, headerSort: false },
             ],
             fetchQuery: `query { findGalleries(filter: { per_page: -1 }) { galleries { id title } } }`,
             extractList: data => data?.findGalleries?.galleries || [],
@@ -76,6 +76,31 @@
             createVariables: val => ({ title: val }),
             updateQuery: `mutation ($scene_id: ID!, $gallery_ids: [ID!]!) { sceneUpdate(input: { id: $scene_id, gallery_ids: $gallery_ids }) { id } }`,
             updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), gallery_ids: ids.map(String) })
+        },
+        studios: {
+            title: 'Studio',
+            pluralTitle: 'Studios',
+            labelKey: 'name',
+            searchFields: ['name', 'parent_name', 'id'],
+            isSingleSelect: true,
+            columns: [
+                { title: "ID", field: "id", width: 60, hozAlign: "center", headerHozAlign: "center", resizable: true, headerSort: false },
+                { title: "Name", field: "name", widthGrow: 2, resizable: true, headerSort: false },
+                { title: "Parent Studio", field: "parent_name", widthGrow: 1, resizable: true, headerSort: false },
+            ],
+            fetchQuery: `query { findStudios(filter: { per_page: -1 }) { studios { id name parent_studio { id name } } } }`,
+            extractList: data => (data?.findStudios?.studios || []).map(s => ({
+                id: s.id,
+                name: s.name,
+                parent_name: s.parent_studio ? s.parent_studio.name : ''
+            })),
+            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { studio { id name } } }`,
+            extractExisting: data => data?.findScene?.studio?.id ? [data.findScene.studio.id] : [],
+            createQuery: `mutation ($name: String!) { studioCreate(input: { name: $name }) { id name } }`,
+            createExtract: data => data?.studioCreate?.id,
+            createVariables: val => ({ name: val }),
+            updateQuery: `mutation ($scene_id: ID!, $studio_id: ID) { sceneUpdate(input: { id: $scene_id, studio_id: $studio_id }) { id } }`,
+            updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), studio_id: ids.length > 0 ? String(ids[0]) : null })
         }
     };
 
@@ -91,7 +116,8 @@
     let cacheStore = {
         tags: { data: null, timestamp: 0 },
         performers: { data: null, timestamp: 0 },
-        galleries: { data: null, timestamp: 0 }
+        galleries: { data: null, timestamp: 0 },
+        studios: { data: null, timestamp: 0 }
     };
     const CACHE_TTL = 5 * 60 * 1000;
 
@@ -110,7 +136,8 @@
     const recentStorageKeys = {
         tags: 'stash_fast_tag_recent_tags',
         performers: 'stash_fast_tag_recent_performers',
-        galleries: 'stash_fast_tag_recent_galleries'
+        galleries: 'stash_fast_tag_recent_galleries',
+        studios: 'stash_fast_tag_recent_studios'
     };
 
     // --- Scroll Restoration ---
@@ -410,12 +437,13 @@
             console.log(`[Toast Fallback - ${type}] ${message}`);
             return;
         }
+        const bg = type === "success" ? "#10b981" : (type === "info" ? "#6366f1" : "#ef4444");
         Toastify({
             text: message,
             duration: 2000,
             gravity: "top",
             position: "center",
-            backgroundColor: type === "success" ? "#10b981" : "#ef4444",
+            style: { background: bg }
         }).showToast();
     }
 
@@ -470,9 +498,42 @@
             cacheStore = {
                 tags: { data: null, timestamp: 0 },
                 performers: { data: null, timestamp: 0 },
-                galleries: { data: null, timestamp: 0 }
+                galleries: { data: null, timestamp: 0 },
+        studios: { data: null, timestamp: 0 }
             };
         }
+    }
+
+    const PINNED_STORAGE_PREFIX = 'stash_fast_tag_pinned_';
+    function readPinnedEntries(type) {
+        try {
+            const raw = localStorage.getItem(PINNED_STORAGE_PREFIX + type);
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function writePinnedEntries(type, value) {
+        try {
+            localStorage.setItem(PINNED_STORAGE_PREFIX + type, JSON.stringify(Array.isArray(value) ? value : []));
+        } catch (e) {}
+    }
+
+    function togglePinnedEntry(type, item) {
+        if (!item || !item.id) return;
+        const name = item.name || item.title;
+        let list = readPinnedEntries(type);
+        const exists = list.some(p => String(p.id) === String(item.id));
+        if (exists) {
+            list = list.filter(p => String(p.id) !== String(item.id));
+            showToast(`Unpinned ${name}`, 'info');
+        } else {
+            list.push({ id: item.id, name: name });
+            showToast(`Pinned ${name} 📌`, 'success');
+        }
+        writePinnedEntries(type, list);
     }
 
     function readRecentEntries(type) {
@@ -503,6 +564,23 @@
     function addRecentEntriesFromSelection(type, selectedItems) {
         if (!Array.isArray(selectedItems)) return;
         selectedItems.filter(Boolean).forEach(item => addRecentEntry(type, item));
+    }
+
+    // --- Bulk Scene Selection Detection ---
+    function getBulkSelectedScenes() {
+        const checkedBoxes = Array.from(document.querySelectorAll('.scene-card input[type="checkbox"]:checked, .scene-card.selected, [class*="scene-card"] input[type="checkbox"]:checked, input[type="checkbox"]:checked'));
+        const scenes = [];
+        const seen = new Set();
+        checkedBoxes.forEach(el => {
+            const card = el.closest('.scene-card, .card, [class*="scene-card"], [class*="SceneCard"]');
+            if (!card) return;
+            const sceneId = extractSceneId(card);
+            if (sceneId && !seen.has(sceneId)) {
+                seen.add(sceneId);
+                scenes.push({ id: sceneId, card: card });
+            }
+        });
+        return scenes;
     }
 
     // --- Preview & Scrubbing ---
@@ -1057,78 +1135,51 @@
     }
 
     function trySelectRecentChip(type, item, selectedIds, input, onSelected) {
-        const table = activeTableInstance;
-        const config = ENTITY_CONFIG[type];
-        const itemName = String(item && (item.name || item.title) ? (item.name || item.title) : '').trim().toLowerCase();
-
-        if (!table) {
-            if (input) {
-                input.value = itemName;
-                input.dispatchEvent(new Event('input', { bubbles: true }));
-                input.focus({ preventScroll: true });
-            }
-            return false;
+        if (item) {
+            addRecentEntry(type, item);
         }
-
-        const data = Array.isArray(table.getData()) ? table.getData() : [];
-        const normalized = (v) => String(v || '').trim().toLowerCase();
-
-        let match = null;
         if (item && item.id != null) {
-            match = data.find(row => String(row.id) === String(item.id));
-        }
-        if (!match) {
-            match = data.find(row => normalized(row[config.labelKey]) === itemName) ||
-                    data.find(row => normalized(row[config.labelKey]).includes(itemName));
-        }
-
-        if (match && match.id != null) {
-            const rowId = String(match.id);
-            if (selectedIds.has(rowId)) {
-                selectedIds.delete(rowId);
-                try { table.deselectRow(rowId); } catch (e) {}
+            const idStr = String(item.id);
+            if (selectedIds.has(idStr)) {
+                selectedIds.delete(idStr);
             } else {
-                selectedIds.add(rowId);
-                try {
-                    table.selectRow(rowId);
-                    const row = table.getRow(rowId);
-                    if (row) table.scrollToRow(row, 'top', false);
-                } catch (e) {}
+                selectedIds.add(idStr);
             }
-
-            if (typeof onSelected === 'function') onSelected();
-
-            if (input) {
-                input.value = '';
-                input.focus({ preventScroll: true });
-            }
-            return true;
         }
-
-        if (input) {
-            input.value = item && (item.name || item.title) ? (item.name || item.title) : '';
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.focus({ preventScroll: true });
+        if (input && input.value) {
+            input.value = '';
         }
-        return false;
+        if (typeof onSelected === 'function') {
+            onSelected();
+        }
+        return true;
     }
+
+    const SUPERSCRIPT_DIGITS = ['', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
 
     function renderQuickActions(form, type, input, selectedIds, onRecentChipSelect) {
         const target = form.querySelector(`#${type}-quick-actions`);
         if (!target) return;
 
-        const recent = readRecentEntries(type)
+        const pinned = readPinnedEntries(type)
             .filter(item => item && (item.name || item.title))
-            .map(item => ({ id: item.id, name: item.name || item.title }));
+            .map(item => ({ id: item.id, name: item.name || item.title, isPinned: true }));
 
-        if (!recent.length) {
+        const pinnedIds = new Set(pinned.map(p => String(p.id)));
+
+        const recent = readRecentEntries(type)
+            .filter(item => item && (item.name || item.title) && !pinnedIds.has(String(item.id)))
+            .map(item => ({ id: item.id, name: item.name || item.title, isPinned: false }));
+
+        const combinedList = [...pinned, ...recent];
+
+        if (!combinedList.length) {
             target.innerHTML = '';
             target.style.display = 'none';
             return;
         }
 
         const formHeight = form ? (form.offsetHeight || parseInt(form.style.height, 10) || 580) : 580;
-        // 1 row on short windows (< 520px), 2 rows on medium/tall windows (520px - 720px), 3 rows on very tall windows (> 720px)
         const maxRows = formHeight > 720 ? 3 : (formHeight > 520 ? 2 : 1);
 
         target.innerHTML = '';
@@ -1144,61 +1195,198 @@
         const label = document.createElement('span');
         label.textContent = 'Recent:';
         label.className = 'popup-recent-label';
-        label.style.cssText = `font-size: 10px; font-weight: 600; text-transform: uppercase; margin-right: 2px; user-select: none; flex-shrink: 0;`;
+        label.style.cssText = `font-size: 11px; font-weight: 700; text-transform: uppercase; margin-right: 3px; user-select: none; flex-shrink: 0; line-height: 24px;`;
         target.appendChild(label);
 
         const rowTops = [];
+        let chipIndex = 0;
 
-        for (const item of recent) {
+        for (const item of combinedList) {
+            chipIndex++;
             const isSelected = selectedIds && selectedIds.has(String(item.id));
             const chip = document.createElement('button');
             chip.type = 'button';
-            chip.textContent = isSelected ? `✓ ${item.name}` : item.name;
-            chip.title = isSelected ? `Currently selected (${item.name})` : `Click to select ${item.name}`;
+            chip.className = 'fasttag-quick-chip';
+            chip.setAttribute('data-index', String(chipIndex));
+            chip.title = `[Hotkey: ${chipIndex <= 9 ? chipIndex : 'None'}] Click to toggle. Right-Click or Alt-Click to ${item.isPinned ? 'unpin' : 'pin'}.`;
+
+            if (item.isPinned) {
+                const pinSpan = document.createElement('span');
+                pinSpan.textContent = '📌 ';
+                chip.appendChild(pinSpan);
+            }
+            if (isSelected) {
+                const checkSpan = document.createElement('span');
+                checkSpan.textContent = '✓ ';
+                checkSpan.style.fontWeight = '700';
+                chip.appendChild(checkSpan);
+            }
+            const textNode = document.createTextNode(item.name);
+            chip.appendChild(textNode);
+
+            if (chipIndex <= 9) {
+                const numSpan = document.createElement('span');
+                numSpan.textContent = ` ${chipIndex}`;
+                numSpan.style.cssText = `font-size: 10px; font-weight: 700; opacity: 0.9; margin-left: 2px; vertical-align: super; line-height: 0;`;
+                chip.appendChild(numSpan);
+            }
 
             if (isDark) {
-                chip.style.cssText = isSelected
-                    ? 'padding: 3px 8px; border: 1px solid #6366f1; border-radius: 999px; background: #312e81; color: #c7d2fe; font-size: 10px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0;'
-                    : 'padding: 3px 8px; border: 1px solid #334155; border-radius: 999px; background: #0f172a; color: #cbd5e1; font-size: 10px; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0;';
+                const bg = item.isPinned ? (isSelected ? '#4338ca' : '#1e1b4b') : (isSelected ? '#4f46e5' : '#1e293b');
+                const border = item.isPinned ? (isSelected ? '#a5b4fc' : '#6366f1') : (isSelected ? '#818cf8' : '#475569');
+                const color = isSelected ? '#ffffff' : (item.isPinned ? '#e0e7ff' : '#f1f5f9');
+
+                chip.style.cssText = `padding: 3px 9px; border: 1px solid ${border}; border-radius: 999px; background: ${bg}; color: ${color}; font-size: 11.5px; font-weight: ${item.isPinned || isSelected ? '600' : '500'}; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0; line-height: 1.3;`;
                 chip.addEventListener('mouseenter', () => {
-                    chip.style.background = isSelected ? '#3730a3' : '#334155';
-                    if (!isSelected) chip.style.color = '#ffffff';
+                    chip.style.background = isSelected ? '#4338ca' : '#334155';
+                    chip.style.borderColor = isSelected ? '#c7d2fe' : '#64748b';
+                    chip.style.color = '#ffffff';
                 });
                 chip.addEventListener('mouseleave', () => {
-                    chip.style.background = isSelected ? '#312e81' : '#0f172a';
-                    if (!isSelected) chip.style.color = '#cbd5e1';
+                    chip.style.background = bg;
+                    chip.style.borderColor = border;
+                    chip.style.color = color;
                 });
             } else {
-                chip.style.cssText = isSelected
-                    ? 'padding: 3px 8px; border: 1px solid #818cf8; border-radius: 999px; background: #eef2ff; color: #4338ca; font-size: 10px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0;'
-                    : 'padding: 3px 8px; border: 1px solid #dfe3ea; border-radius: 999px; background: #f8fafc; color: #334155; font-size: 10px; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0;';
+                const bg = item.isPinned ? (isSelected ? '#c7d2fe' : '#e0e7ff') : (isSelected ? '#e0e7ff' : '#f1f5f9');
+                const border = item.isPinned ? '#6366f1' : (isSelected ? '#6366f1' : '#cbd5e1');
+                const color = isSelected ? '#312e81' : '#1e293b';
+
+                chip.style.cssText = `padding: 3px 9px; border: 1px solid ${border}; border-radius: 999px; background: ${bg}; color: ${color}; font-size: 11.5px; font-weight: ${item.isPinned || isSelected ? '600' : '500'}; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0; line-height: 1.3;`;
                 chip.addEventListener('mouseenter', () => {
-                    if (!isSelected) chip.style.background = '#f1f5f9';
+                    chip.style.background = isSelected ? '#c7d2fe' : '#e2e8f0';
+                    chip.style.color = '#0f172a';
                 });
                 chip.addEventListener('mouseleave', () => {
-                    if (!isSelected) chip.style.background = '#f8fafc';
+                    chip.style.background = bg;
+                    chip.style.borderColor = border;
+                    chip.style.color = color;
                 });
             }
 
-            chip.addEventListener('click', () => {
+            chip.addEventListener('click', (e) => {
+                if (e.altKey) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    togglePinnedEntry(type, item);
+                    renderQuickActions(form, type, input, selectedIds, onRecentChipSelect);
+                    return;
+                }
                 trySelectRecentChip(type, item, selectedIds, input, onRecentChipSelect);
+            });
+
+            chip.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                togglePinnedEntry(type, item);
+                renderQuickActions(form, type, input, selectedIds, onRecentChipSelect);
             });
 
             target.appendChild(chip);
 
-            // Measure row position
             const topPos = chip.offsetTop;
             if (!rowTops.includes(topPos)) {
                 rowTops.push(topPos);
             }
 
-            // Stop if adding this chip created a row beyond the allowed limit
             if (rowTops.length > maxRows) {
                 target.removeChild(chip);
                 break;
             }
         }
     }
+
+    function renderSmartSuggestions(form, type, input, selectedIds, suggestions, onSelectCallback) {
+        const target = form.querySelector(`#${type}-suggestions-container`);
+        if (!target) return;
+
+        if (!suggestions || !suggestions.length) {
+            target.innerHTML = '';
+            target.style.display = 'none';
+            return;
+        }
+
+        const unselectedSuggestions = suggestions.filter(s => !selectedIds.has(String(s.id)));
+        if (!unselectedSuggestions.length) {
+            target.innerHTML = '';
+            target.style.display = 'none';
+            return;
+        }
+
+        const isDark = getEffectiveTheme() === 'dark';
+        target.innerHTML = '';
+        target.style.display = 'flex';
+        target.style.alignItems = 'center';
+        target.style.flexWrap = 'wrap';
+        target.style.gap = '5px';
+        target.style.background = isDark ? 'rgba(245, 158, 11, 0.08)' : 'rgba(245, 158, 11, 0.12)';
+        target.style.border = isDark ? '1px dashed rgba(245, 158, 11, 0.35)' : '1px dashed rgba(217, 119, 6, 0.4)';
+
+        const label = document.createElement('span');
+        label.textContent = '💡 Suggested:';
+        label.style.cssText = `font-size: 11px; font-weight: 700; color: ${isDark ? '#fbbf24' : '#d97706'}; text-transform: uppercase; margin-right: 3px; user-select: none; flex-shrink: 0; line-height: 22px;`;
+        target.appendChild(label);
+
+        unselectedSuggestions.forEach(item => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = `+ ${item.name || item.title}`;
+            btn.title = `Click to add ${item.name || item.title}`;
+            
+            const btnBg = isDark ? 'rgba(245, 158, 11, 0.18)' : '#fef3c7';
+            const btnBorder = isDark ? 'rgba(245, 158, 11, 0.55)' : '#f59e0b';
+            const btnColor = isDark ? '#fde047' : '#92400e';
+
+            btn.style.cssText = `padding: 3px 9px; border: 1px solid ${btnBorder}; border-radius: 999px; background: ${btnBg}; color: ${btnColor}; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; line-height: 1.3;`;
+            btn.addEventListener('mouseenter', () => {
+                btn.style.background = '#f59e0b';
+                btn.style.color = '#ffffff';
+                btn.style.borderColor = '#f59e0b';
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.style.background = btnBg;
+                btn.style.color = btnColor;
+                btn.style.borderColor = btnBorder;
+            });
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                addRecentEntry(type, item);
+                trySelectRecentChip(type, item, selectedIds, input, onSelectCallback);
+                renderSmartSuggestions(form, type, input, selectedIds, suggestions, onSelectCallback);
+            });
+            target.appendChild(btn);
+        });
+
+        if (unselectedSuggestions.length > 1) {
+            const acceptAllBtn = document.createElement('button');
+            acceptAllBtn.type = 'button';
+            acceptAllBtn.textContent = '✓ Accept All';
+            acceptAllBtn.title = 'Add all suggested items';
+            acceptAllBtn.style.cssText = 'padding: 3px 10px; border: 1px solid #10b981; border-radius: 999px; background: #059669; color: #ffffff; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.15s ease; margin-left: 4px; line-height: 1.3;';
+            acceptAllBtn.addEventListener('mouseenter', () => {
+                acceptAllBtn.style.background = '#047857';
+            });
+            acceptAllBtn.addEventListener('mouseleave', () => {
+                acceptAllBtn.style.background = '#059669';
+            });
+            acceptAllBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                for (const item of unselectedSuggestions) {
+                    selectedIds.add(String(item.id));
+                    addRecentEntry(type, item);
+                }
+                if (typeof onSelectCallback === 'function') {
+                    await onSelectCallback();
+                }
+                renderSmartSuggestions(form, type, input, selectedIds, suggestions, onSelectCallback);
+                showToast(`Added ${unselectedSuggestions.length} suggested items`, 'success');
+            });
+            target.appendChild(acceptAllBtn);
+        }
+    }
+
 
     // --- Window and Context Menu Management ---
     function closeMenu() {
@@ -1259,8 +1447,25 @@
 
         createMenuItem('Edit Tags...', () => openEntityPopup('tags', sceneId, cardElement));
         createMenuItem('Edit Performers...', () => openEntityPopup('performers', sceneId, cardElement));
+        createMenuItem('Edit Studio...', () => openEntityPopup('studios', sceneId, cardElement));
         createMenuItem('Edit Galleries...', () => openEntityPopup('galleries', sceneId, cardElement));
         createMenuItem('Edit Scene', () => openEditScenePage(sceneId));
+
+        const bulkScenes = getBulkSelectedScenes();
+        if (bulkScenes.length >= 2) {
+            const separator = document.createElement('div');
+            separator.style.cssText = 'height: 1px; background: rgba(148, 163, 184, 0.2); margin: 4px 0;';
+            menu.appendChild(separator);
+
+            const bulkHeader = document.createElement('div');
+            bulkHeader.textContent = `📦 Bulk (${bulkScenes.length} scenes)`;
+            bulkHeader.style.cssText = 'font-size: 10px; font-weight: 700; color: #818cf8; padding: 4px 8px; text-transform: uppercase; user-select: none;';
+            menu.appendChild(bulkHeader);
+
+            createMenuItem(`🏷️ Bulk Tags (${bulkScenes.length})`, () => openBulkEntityPopup('tags', bulkScenes));
+            createMenuItem(`⭐ Bulk Performers (${bulkScenes.length})`, () => openBulkEntityPopup('performers', bulkScenes));
+            createMenuItem(`🏢 Bulk Studio (${bulkScenes.length})`, () => openBulkEntityPopup('studios', bulkScenes));
+        }
 
         const hr = document.createElement('div');
         hr.style.height = '1px';
@@ -1346,6 +1551,66 @@
         } catch (e) {}
     }
 
+    // --- Smart Suggestions Engine ---
+    async function fetchSceneSmartSuggestions(type, sceneId, allAvailableItems, existingIds, cardElement) {
+        if (!sceneId || !allAvailableItems || !allAvailableItems.length) return [];
+        try {
+            let cardText = '';
+            let title = '';
+            let details = '';
+            let filePath = '';
+            let fileName = '';
+
+            if (cardElement) {
+                cardText = cardElement.innerText || cardElement.textContent || '';
+            }
+
+            try {
+                const query = `query ($id: ID!) { findScene(id: $id) { title details files { path } } }`;
+                const res = await fetchGQL(query, { id: sceneId });
+                const scene = res?.data?.findScene;
+                if (scene) {
+                    if (scene.title) title = scene.title;
+                    if (scene.details) details = scene.details;
+                    if (scene.files && scene.files.length > 0 && scene.files[0]?.path) {
+                        filePath = scene.files[0].path;
+                        const parts = filePath.split(/[/\\]/);
+                        const lastPart = parts.length > 0 ? parts[parts.length - 1] : filePath;
+                        fileName = lastPart.replace(/\.[^/.]+$/, '');
+                    }
+                }
+            } catch (e) {}
+
+            const rawCombined = `${cardText} ${title} ${details} ${fileName} ${filePath}`.toLowerCase();
+            const fullTextSpaced = ' ' + rawCombined.replace(/[^a-z0-9]+/g, ' ') + ' ';
+            if (!rawCombined.trim()) return [];
+
+            const existingSet = new Set(Array.from(existingIds || []).map(String));
+            const suggestions = [];
+
+            for (const item of allAvailableItems) {
+                if (existingSet.has(String(item.id))) continue;
+                const name = (item.name || item.title || '').trim();
+                if (!name || name.length < 2) continue;
+
+                const nameLower = name.toLowerCase();
+                const nameClean = nameLower.replace(/[^a-z0-9]+/g, ' ').trim();
+                if (!nameClean) continue;
+
+                const nameSpaced = ' ' + nameClean + ' ';
+
+                if (fullTextSpaced.includes(nameSpaced)) {
+                    suggestions.push(item);
+                    if (suggestions.length >= 15) break;
+                }
+            }
+            return suggestions;
+        } catch (e) {
+            console.error('[FastTag] Suggestions error:', e);
+            return [];
+        }
+    }
+
     // --- Generic Popup Builder & Life-Cycle ---
     function createPopupShell(type) {
         const config = ENTITY_CONFIG[type];
@@ -1391,6 +1656,7 @@
                 <button type="button" id="${type}-create-btn" style="padding: 7px 9px; cursor: pointer; font-size: 12px; font-weight: 500; background: #059669; color: white; border: none; border-radius: 6px; white-space: nowrap; display: none;">+ Create</button>
                 <button type="button" id="${type}-refresh-btn" class="popup-refresh-btn" title="Refresh cache" style="padding: 7px 9px; cursor: pointer; font-size: 13px; font-weight: 500; border-radius: 6px; white-space: nowrap; line-height: 1;">↻</button>
             </div>
+            <div id="${type}-suggestions-container" style="display: none; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; flex-shrink: 0; background: rgba(245, 158, 11, 0.08); padding: 6px 8px; border-radius: 6px; border: 1px dashed rgba(245, 158, 11, 0.35);"></div>
             <div id="${type}-quick-actions" style="display: none; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; flex-shrink: 0;"></div>
             <div id="${type}-tabulator-table" style="margin-bottom: 10px; width: 100%; flex: 1 1 auto; min-height: 140px; box-sizing: border-box; overflow: hidden;"></div>
             <div style="display: flex; gap: 8px; flex-shrink: 0;">
@@ -1527,6 +1793,29 @@
             }, { signal });
         }
 
+        // --- Number Hotkeys (1-9) & Shortcut Navigation ---
+        document.addEventListener('keydown', (e) => {
+            const isInputFocused = document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+
+            if (!isInputFocused) {
+                if (e.key >= '1' && e.key <= '9') {
+                    const idx = parseInt(e.key, 10);
+                    const chipBtn = form.querySelector(`.fasttag-quick-chip[data-index="${idx}"]`);
+                    if (chipBtn) {
+                        e.preventDefault();
+                        chipBtn.click();
+                    }
+                } else if (e.key === '/' || e.key === 's' || e.key === 'S') {
+                    const searchBox = form.querySelector('input[type="text"]');
+                    if (searchBox) {
+                        e.preventDefault();
+                        searchBox.focus();
+                        searchBox.select();
+                    }
+                }
+            }
+        }, { signal });
+
         // --- 8-Direction Resizing ---
         let isResizing = false;
         let resizeDir = '';
@@ -1633,6 +1922,258 @@
         }, { signal });
     }
 
+    async function openBulkEntityPopup(type, bulkScenes) {
+        const config = ENTITY_CONFIG[type];
+        if (!config || !Array.isArray(bulkScenes) || bulkScenes.length === 0) return;
+
+        if (typeof Tabulator === 'undefined') {
+            await ensureDependenciesLoaded();
+        }
+
+        if (typeof Tabulator === 'undefined') {
+            toastError("Tabulator library failed to load. Please check your internet connection.");
+            return;
+        }
+
+        closeMenu();
+        closePopup(false);
+
+        popupAbortController = new AbortController();
+        const { signal } = popupAbortController;
+
+        activePopup = createPopupShell(type);
+        const form = activePopup.element;
+
+        const titleEl = form.querySelector(`#${type}-popup-title`);
+        if (titleEl) {
+            titleEl.textContent = `📦 Bulk Edit ${config.pluralTitle} (${bulkScenes.length} scenes)`;
+        }
+
+        const seqLabel = form.querySelector('.popup-seq-label');
+        if (seqLabel) seqLabel.style.display = 'none';
+        const prevBtn = form.querySelector(`#${type}-prev-btn`);
+        if (prevBtn) prevBtn.style.display = 'none';
+        const nextBtn = form.querySelector(`#${type}-next-btn`);
+        if (nextBtn) nextBtn.style.display = 'none';
+
+        if (activePopup.previewContainer) {
+            activePopup.previewContainer.innerHTML = `
+                <div style="padding: 8px 12px; background: rgba(99, 102, 241, 0.12); border: 1px dashed #6366f1; border-radius: 6px; margin-bottom: 8px; font-size: 11px; font-weight: 600; color: #818cf8; text-align: center; user-select: none;">
+                    📦 Applying to <strong>${bulkScenes.length}</strong> selected scenes
+                </div>
+            `;
+        }
+
+        const table = new Tabulator(activePopup.tableContainer, {
+            layout: "fitColumns",
+            height: "100%",
+            placeholder: `No ${config.pluralTitle} Found`,
+            selectable: config.isSingleSelect ? 1 : true,
+            index: "id",
+            columnDefaults: {
+                headerSort: false
+            },
+            columns: config.columns,
+        });
+        activeTableInstance = table;
+
+        // Pre-fetch common tags/performers/studios across selected scenes
+        let initialCommonIds = new Set();
+        if (config.fetchExistingQuery) {
+            try {
+                const existingResults = await Promise.all(
+                    bulkScenes.map(s => fetchGQL(config.fetchExistingQuery, { id: s.id }))
+                );
+                const sceneIdSets = existingResults.map(res => 
+                    new Set((config.extractExisting(res?.data) || []).map(String))
+                );
+                if (sceneIdSets.length > 0 && sceneIdSets[0].size > 0) {
+                    for (const id of sceneIdSets[0]) {
+                        if (sceneIdSets.every(s => s.has(id))) {
+                            initialCommonIds.add(id);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('[FastTag Bulk] Failed to pre-fetch common entities:', e);
+            }
+        }
+
+        const selectedIds = new Set(initialCommonIds);
+        let isRestoringSelections = false;
+
+        const filterInput = activePopup.searchInput;
+        const clearBtn = activePopup.searchClear;
+        const createBtn = activePopup.createBtn;
+        const refreshBtn = activePopup.refreshBtn;
+        const saveBtn = activePopup.saveBtn;
+
+        saveBtn.textContent = `Apply to ${bulkScenes.length} Scenes`;
+
+        const updateVisibility = () => {
+            const hasVal = filterInput.value.trim().length > 0;
+            clearBtn.style.display = hasVal ? 'block' : 'none';
+            createBtn.style.display = hasVal ? 'block' : 'none';
+        };
+
+        const onChipSelect = () => {
+            filterInput.value = '';
+            updateVisibility();
+            fetchData('', true);
+            refreshUI();
+        };
+
+        const refreshUI = () => {
+            renderQuickActions(form, type, filterInput, selectedIds, onChipSelect);
+            if (saveBtn) {
+                const count = selectedIds.size;
+                saveBtn.textContent = count > 0 
+                    ? `Apply ${count} ${count === 1 ? config.title : config.pluralTitle} to ${bulkScenes.length} Scenes`
+                    : `Apply to ${bulkScenes.length} Scenes`;
+            }
+        };
+        form._fastTagOnResize = refreshUI;
+
+        activeTableInstance.on("rowSelected", (row) => {
+            if (!isRestoringSelections) {
+                const id = row.getData().id;
+                if (id) selectedIds.add(String(id));
+                refreshUI();
+            }
+        });
+
+        activeTableInstance.on("rowDeselected", (row) => {
+            if (!isRestoringSelections) {
+                const id = row.getData().id;
+                if (id) selectedIds.delete(String(id));
+                refreshUI();
+            }
+        });
+
+        async function fetchData(query, resetScroll = true) {
+            let cachedData = getCachedOrNull(type);
+            if (!cachedData) {
+                const res = await fetchGQL(config.fetchQuery);
+                cachedData = config.extractList(res.data);
+                setCache(type, cachedData);
+            }
+            if (!cachedData) return;
+
+            const term = query.trim().toLowerCase();
+            let data = cachedData;
+            const searchFields = config.searchFields || [config.labelKey];
+            if (term) {
+                const tokens = term.split(/\s+/);
+                data = cachedData.filter(item => {
+                    const itemSearchStr = searchFields
+                        .map(f => String(item[f] || '').trim().toLowerCase())
+                        .filter(Boolean)
+                        .join(' ');
+                    return tokens.every(t => itemSearchStr.includes(t));
+                });
+            }
+
+            data.sort(getSmartSortComparator(term, selectedIds, config.labelKey, searchFields));
+
+            isRestoringSelections = true;
+            try {
+                await activeTableInstance.setData(data);
+                selectedIds.forEach(id => {
+                    const r = activeTableInstance.getRow(id);
+                    if (r) activeTableInstance.selectRow(r);
+                });
+                refreshUI();
+                if (resetScroll && data.length > 0) {
+                    activeTableInstance.scrollToRow(activeTableInstance.getRows()[0], "top", false);
+                }
+            } finally {
+                isRestoringSelections = false;
+            }
+        }
+
+        let debounceTimer = null;
+        filterInput.oninput = (e) => {
+            updateVisibility();
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => fetchData(e.target.value, true), 150);
+        };
+
+        clearBtn.onclick = () => {
+            filterInput.value = '';
+            updateVisibility();
+            fetchData("", true);
+            filterInput.focus({ preventScroll: true });
+        };
+
+        refreshBtn.onclick = async () => {
+            invalidateCache(type);
+            await fetchData(filterInput.value.trim(), false);
+        };
+
+        createBtn.onclick = async () => {
+            const val = filterInput.value.trim();
+            if (!val) return;
+
+            const res = await fetchGQL(config.createQuery, config.createVariables(val));
+            const newId = config.createExtract(res.data);
+
+            if (newId) {
+                toastSuccess(`${config.title} created successfully`);
+                invalidateCache(type);
+                selectedIds.add(String(newId));
+                addRecentEntry(type, { id: newId, [config.labelKey]: val });
+                filterInput.value = '';
+                updateVisibility();
+                await fetchData("", true);
+                refreshUI();
+                filterInput.focus({ preventScroll: true });
+            } else {
+                toastError(`Failed to create ${config.title.toLowerCase()}`, res.errors);
+            }
+        };
+
+        activePopup.cancelBtn.onclick = () => closePopup();
+
+        saveBtn.onclick = async () => {
+            const chosenIds = Array.from(selectedIds);
+            if (chosenIds.length === 0 && initialCommonIds.size === 0) {
+                showToast(`Please select at least one ${config.title.toLowerCase()}`, 'error');
+                return;
+            }
+
+            const removedIds = new Set(Array.from(initialCommonIds).filter(id => !selectedIds.has(id)));
+            const addedIds = Array.from(selectedIds).filter(id => !initialCommonIds.has(id));
+
+            saveBtn.disabled = true;
+            saveBtn.textContent = `Saving (${bulkScenes.length})...`;
+            saveBtn.style.opacity = '0.7';
+
+            let updatedCount = 0;
+            for (const scene of bulkScenes) {
+                let targetIds = chosenIds;
+                if (!config.isSingleSelect && config.fetchExistingQuery) {
+                    try {
+                        const existRes = await fetchGQL(config.fetchExistingQuery, { id: scene.id });
+                        const existIds = (config.extractExisting(existRes?.data) || []).map(String);
+                        const filtered = existIds.filter(id => !removedIds.has(id));
+                        const merged = new Set([...filtered, ...addedIds]);
+                        targetIds = Array.from(merged);
+                    } catch (e) {}
+                }
+                const success = await updateEntityForScene(type, scene.id, targetIds);
+                if (success) updatedCount++;
+            }
+
+            await refreshSceneCards();
+            closePopup();
+            toastSuccess(`Applied ${config.title} to ${updatedCount} scenes`);
+        };
+
+        setupPopupListeners(form, signal, () => {});
+        await fetchData("", true);
+        positionPopupNearCard(form, bulkScenes[0].card || document.body);
+    }
+
     async function openEntityPopup(type, sceneId, cardElement) {
         const config = ENTITY_CONFIG[type];
         if (!config) return;
@@ -1660,6 +2201,9 @@
             placeholder: `No ${config.pluralTitle} Found`,
             selectable: true,
             index: "id",
+            columnDefaults: {
+                headerSort: false
+            },
             columns: config.columns,
         });
         activeTableInstance = table;
@@ -1703,22 +2247,24 @@
             createBtn.style.display = hasVal ? 'block' : 'none';
         };
 
-        const refreshUI = () => {
-            updateSequentialEditUI(form, type, selectedIds);
-            renderQuickActions(form, type, filterInput, selectedIds, onRecentChipSelect);
-        };
-        form._fastTagOnResize = refreshUI;
-
+        let smartSuggestions = [];
         const onRecentChipSelect = async () => {
             filterInput.value = '';
             updateVisibility();
-            await fetchData('', false);
+            await fetchData('', true);
             if (!sequentialEditState.enabled) {
                 await saveWithoutReload(sceneId, selectedIds);
             } else {
                 refreshUI();
             }
         };
+
+        const refreshUI = () => {
+            updateSequentialEditUI(form, type, selectedIds);
+            renderQuickActions(form, type, filterInput, selectedIds, onRecentChipSelect);
+            renderSmartSuggestions(form, type, filterInput, selectedIds, smartSuggestions, onRecentChipSelect);
+        };
+        form._fastTagOnResize = refreshUI;
 
         const saveWithoutReload = async (sId, ids) => {
             sessionStorage.setItem(scrollKey, window.scrollY);
@@ -1729,9 +2275,6 @@
             }
             return success;
         };
-
-        activeTableInstance.off("rowSelected");
-        activeTableInstance.off("rowDeselected");
 
         activeTableInstance.on("rowSelected", (row) => {
             if (!isRestoringSelections) {
@@ -1847,6 +2390,12 @@
 
         await fetchData("", true);
 
+        const allLoadedItems = getCachedOrNull(type) || [];
+        fetchSceneSmartSuggestions(type, sceneId, allLoadedItems, selectedIds, cardElement).then(suggs => {
+            smartSuggestions = suggs;
+            renderSmartSuggestions(form, type, filterInput, selectedIds, smartSuggestions, onRecentChipSelect);
+        });
+
         popup.saveBtn.onclick = async () => {
             if (sequentialEditState.enabled) {
                 if (sequentialEditState.currentIndex >= sequentialEditState.allSceneCards.length - 1) {
@@ -1872,7 +2421,8 @@
 
     // --- Global DOM Triggers ---
     document.addEventListener('contextmenu', function(event) {
-        if (activePopup || currentMenu) return;
+        if (activePopup) return;
+        closeMenu();
         const sceneCard = event.target.closest('.scene-card, .card, [class*="scene-card"], [class*="SceneCard"]');
         if (!sceneCard) return;
 

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.2.0] - 2026-08-25
+
+### Added
+- **Smart Scene Suggestions**: Heuristic engine suggests matching tags, performers, and studios extracted from scene titles, filenames, directory folder paths, and quality badges (`4K`, `1080p`, `NEW`). Includes warm amber theme, single-click `+ tag`, and `✓ Accept All` with instant autosave.
+- **Studio Support (`isSingleSelect`)**: Complete studio management directly from scene cards with parent studio hierarchy search and single-select replacement.
+- **Pinned Tokens & Chips (`📌`)**: Right-Click or `Alt + Click` any recent token to pin it permanently at the front of the quick-action bar for fixed muscle-memory numbers.
+- **Multi-Scene Bulk Tagging**: Select multiple scene checkboxes in Stash to batch-edit Tags, Performers, or Studios. Includes non-destructive tag merging and diff-aware add/remove capabilities.
+- **Multi-Number Keyboard Hotkeys (`1`–`9`)**: Press number keys to rapidly toggle quick chips in sequence without focus stealing. Press `/` or `S` to jump straight to search.
+- **High-Contrast Typography & 10px Bold Numeric Badges**: Enhanced pill legibility with elevated slate surfaces, high-contrast off-white text, and bold dedicated numerical hotkey badges.
+
+---
+
 ## [3.1.0] - 2026-08-25
 
 ### Added
