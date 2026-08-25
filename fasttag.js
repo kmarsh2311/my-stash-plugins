@@ -1,21 +1,21 @@
 // ==UserScript==
-// @name         Stash FastTag (Test Lab)
+// @name         Stash FastTag
 // @namespace    http://tampermonkey.net/
-// @version      3.0
-// @description  Fast scene tagging workflow for Stash: edit tags, performers, and galleries from scene cards with quick search, popups, and sequential navigation
+// @version      3.2
+// @description  Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
 // @grant        none
 // @run-at       document-end
 // @require      https://unpkg.com/tabulator-tables@5.5.2/dist/js/tabulator.min.js
 // @require      https://cdn.jsdelivr.net/npm/toastify-js
-// @updateURL    https://raw.githubusercontent.com/kmarsh2311/my-stash-plugins/main/fasttag.js
-// @downloadURL  https://raw.githubusercontent.com/kmarsh2311/my-stash-plugins/main/fasttag.js
+// @updateURL    https://kmarsh2311.github.io/my-stash-plugins/fasttag.js
+// @downloadURL  https://kmarsh2311.github.io/my-stash-plugins/fasttag.js
 // ==/UserScript==
 
 (async function() {
     'use strict';
-    console.log('[FastTag Test Lab] Initialized with Studios, Suggestions, Pinned Chips, Bulk Mode, and Hotkeys');
+    console.log('[FastTag v3.2] Initialized with Studios, Suggestions, Pinned Chips, Bulk Mode, and Hotkeys');
 
     // --- Entity Configuration & Schema Registry ---
     const ENTITY_CONFIG = {
