@@ -3,5 +3,5 @@
   version: "3.0"
   description: "Fast scene tagging workflow for Stash: edit tags, performers, and galleries from scene cards with quick search, popups, and sequential navigation"
   path: fasttag.zip
-  sha256: f1007365242c70d540fb720f246a6ff4901ab3f40e5fd5a09d9f5f1d589bc897
+  sha256: d0dcc4a3168f221670056304b5b704e7ecea7a204b3790daa477d8eb82e39964
 

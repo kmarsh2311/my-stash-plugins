@@ -1713,69 +1713,67 @@
             if (!window.location.href.includes('setting')) return;
             if (document.querySelector('#fast-tag-plugin-settings')) return;
 
-            const cards = document.querySelectorAll('.card, .list-group-item, .setting-group, tr, .plugin-card, [class*="plugin"]');
-            for (let el of cards) {
-                const text = el.innerText || el.textContent || '';
-                if (text.includes('FastTag') || text.includes('mypluginrc') || text.includes('A Plugin')) {
-                    const target = el.querySelector('.card-body') || el.querySelector('td:last-child') || el;
-                    if (target.querySelector('#fast-tag-plugin-settings')) return;
+            const headers = document.querySelectorAll('h1, h2, h3, h4, h5, h6, .card-title, .setting-title, span, strong, div');
+            let targetCard = null;
 
-                    const childHasMatch = Array.from(el.children).some(child => {
-                        const cText = child.innerText || child.textContent || '';
-                        return cText.includes('FastTag') || cText.includes('mypluginrc') || cText.includes('A Plugin');
-                    });
-                    if (childHasMatch && el.tagName !== 'TR' && !el.classList.contains('card')) continue;
-
-                    const settingsContainer = document.createElement('div');
-                    settingsContainer.id = 'fast-tag-plugin-settings';
-                    settingsContainer.style.cssText = 'margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(128,128,128,0.2); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 13px; width: 100%;';
-
-                    const label = document.createElement('span');
-                    label.textContent = 'Popup Theme:';
-                    label.style.fontWeight = '500';
-
-                    const btnGroup = document.createElement('div');
-                    btnGroup.style.cssText = 'display: flex; gap: 6px; align-items: center;';
-
-                    const updateButtons = (selectedTheme) => {
-                        Array.from(btnGroup.children).forEach(b => {
-                            const bVal = b.getAttribute('data-theme-val');
-                            const isSelected = bVal === selectedTheme;
-                            b.style.border = `1px solid ${isSelected ? '#6366f1' : 'rgba(128,128,128,0.3)'}`;
-                            b.style.background = isSelected ? '#6366f1' : 'transparent';
-                            b.style.color = isSelected ? '#ffffff' : 'inherit';
-                            b.style.fontWeight = isSelected ? '600' : 'normal';
-                        });
-                    };
-
-                    const createThemeBtn = (themeVal, labelText) => {
-                        const btn = document.createElement('button');
-                        btn.type = 'button';
-                        btn.textContent = labelText;
-                        btn.setAttribute('data-theme-val', themeVal);
-                        const isInit = getThemePreference() === themeVal;
-                        btn.style.cssText = `padding: 4px 10px; font-size: 12px; border-radius: 6px; cursor: pointer; border: 1px solid ${isInit ? '#6366f1' : 'rgba(128,128,128,0.3)'}; background: ${isInit ? '#6366f1' : 'transparent'}; color: ${isInit ? '#ffffff' : 'inherit'}; font-weight: ${isInit ? '600' : 'normal'}; transition: all 0.15s ease;`;
-
-                        btn.onclick = (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setThemePreference(themeVal);
-                            updateButtons(themeVal);
-                            toastSuccess(`Theme set to ${labelText}`);
-                        };
-                        return btn;
-                    };
-
-                    btnGroup.appendChild(createThemeBtn('dark', '🌙 Dark'));
-                    btnGroup.appendChild(createThemeBtn('light', '☀️ Light'));
-                    btnGroup.appendChild(createThemeBtn('auto', '⚙ Auto'));
-
-                    settingsContainer.appendChild(label);
-                    settingsContainer.appendChild(btnGroup);
-                    target.appendChild(settingsContainer);
-                    break;
+            for (let el of headers) {
+                const text = (el.innerText || el.textContent || '').trim();
+                if (text.startsWith('FastTag') || text.startsWith('A Plugin') || text === 'FastTag' || text.includes('FastTag (')) {
+                    targetCard = el.closest('.setting-group, .card, .list-group-item, tr, .plugin-item, [class*="setting"]') || el.parentElement?.parentElement;
+                    if (targetCard) break;
                 }
             }
+
+            if (!targetCard) return;
+            if (targetCard.querySelector('#fast-tag-plugin-settings')) return;
+
+            const settingsContainer = document.createElement('div');
+            settingsContainer.id = 'fast-tag-plugin-settings';
+            settingsContainer.style.cssText = 'margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(128,128,128,0.2); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 13px; width: 100%;';
+
+            const label = document.createElement('span');
+            label.textContent = 'Popup Theme:';
+            label.style.fontWeight = '500';
+
+            const btnGroup = document.createElement('div');
+            btnGroup.style.cssText = 'display: flex; gap: 6px; align-items: center;';
+
+            const updateButtons = (selectedTheme) => {
+                Array.from(btnGroup.children).forEach(b => {
+                    const bVal = b.getAttribute('data-theme-val');
+                    const isSelected = bVal === selectedTheme;
+                    b.style.border = `1px solid ${isSelected ? '#6366f1' : 'rgba(128,128,128,0.3)'}`;
+                    b.style.background = isSelected ? '#6366f1' : 'transparent';
+                    b.style.color = isSelected ? '#ffffff' : 'inherit';
+                    b.style.fontWeight = isSelected ? '600' : 'normal';
+                });
+            };
+
+            const createThemeBtn = (themeVal, labelText) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = labelText;
+                btn.setAttribute('data-theme-val', themeVal);
+                const isInit = getThemePreference() === themeVal;
+                btn.style.cssText = `padding: 4px 10px; font-size: 12px; border-radius: 6px; cursor: pointer; border: 1px solid ${isInit ? '#6366f1' : 'rgba(128,128,128,0.3)'}; background: ${isInit ? '#6366f1' : 'transparent'}; color: ${isInit ? '#ffffff' : 'inherit'}; font-weight: ${isInit ? '600' : 'normal'}; transition: all 0.15s ease;`;
+
+                btn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setThemePreference(themeVal);
+                    updateButtons(themeVal);
+                    toastSuccess(`Theme set to ${labelText}`);
+                };
+                return btn;
+            };
+
+            btnGroup.appendChild(createThemeBtn('dark', '🌙 Dark'));
+            btnGroup.appendChild(createThemeBtn('light', '☀️ Light'));
+            btnGroup.appendChild(createThemeBtn('auto', '⚙ Auto'));
+
+            settingsContainer.appendChild(label);
+            settingsContainer.appendChild(btnGroup);
+            targetCard.appendChild(settingsContainer);
         };
 
         tryInjectSettings();
