@@ -1,5 +1,16 @@
 # Release Notes
 
+## 3.1.0 - Resizable Floating Window & Dynamic Adaptive Layout
+
+### Highlights & New Features
+- **8-Direction Window Resizing**: Freely grab any border or corner to resize the popup in all directions.
+- **Dynamic 16:9 Video Scaling**: Proportional real-time video scaling matching the window width with zero distortion or cropping.
+- **Exact DOM Token Fitting**: Recent items automatically calculate exact line wraps, displaying full chips across 1–3 clean rows with no sliced pills.
+- **Dynamic Dependency Autoloader**: Auto-injects Tabulator and Toastify on native Stash installs without requiring userscript managers.
+- **Window Size Memory**: Remembers custom window dimensions across scene transitions and browser sessions.
+
+---
+
 ## 3.0.0 - FastTag Major Refactor & Disambiguation Search
 
 ### Highlights & New Features
@@ -16,4 +27,4 @@
 
 ### Install / Update
 - Repository index: `https://kmarsh2311.github.io/my-stash-plugins/index.yml`
-- Raw script URL: `https://raw.githubusercontent.com/kmarsh2311/my-stash-plugins/main/fasttag.js` (or `a.js`)
+- Full changelog: See [CHANGELOG.md](CHANGELOG.md)
