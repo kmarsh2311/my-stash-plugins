@@ -1273,16 +1273,15 @@
         form.style.fontFamily = 'system-ui, -apple-system, sans-serif';
 
         form.innerHTML = `
-            <div style="margin: 0 0 10px 0; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                <span id="${type}-popup-title" class="popup-title" style="font-size: 13px; font-weight: 600; user-select: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Edit ${config.pluralTitle}</span>
-                <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
-                    <label class="popup-seq-label" style="font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 3px; user-select: none; padding-right: 2px;">
-                        <input type="checkbox" id="${type}-sequential-mode" style="cursor: pointer; margin: 0; accent-color: #6366f1;">
+            <div id="${type}-popup-header" class="popup-header" style="margin: 0 0 13px 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: grab; user-select: none;">
+                <span id="${type}-popup-title" class="popup-title" style="font-size: 13px; font-weight: 600; line-height: 1; user-select: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: grab; flex: 1;">Edit ${config.pluralTitle}</span>
+                <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0; cursor: default;">
+                    <label class="popup-seq-label" style="font-size: 12px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; user-select: none; margin: 0; line-height: 1;">
+                        <input type="checkbox" id="${type}-sequential-mode" style="cursor: pointer; margin: 0; width: 13px; height: 13px; accent-color: #6366f1; vertical-align: middle;">
                         Sequential
                     </label>
-                    <button type="button" id="${type}-prev-btn" class="popup-nav-btn" style="padding: 3px 6px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: none; align-items: center;">◄</button>
-                    <button type="button" id="${type}-next-btn" class="popup-nav-btn" style="padding: 3px 6px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: none; align-items: center;">►</button>
-                    <span class="popup-drag-handle" title="Drag popup" style="font-size: 12px; font-weight: bold; cursor: grab; user-select: none; padding: 1px 4px; border-radius: 4px; line-height: 1.2;">⠿</span>
+                    <button type="button" id="${type}-prev-btn" class="popup-nav-btn" style="padding: 3px 6px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: none; align-items: center; line-height: 1;">◄</button>
+                    <button type="button" id="${type}-next-btn" class="popup-nav-btn" style="padding: 3px 6px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: none; align-items: center; line-height: 1;">►</button>
                 </div>
             </div>
             <div id="${type}-preview-container"></div>
@@ -1392,11 +1391,14 @@
         let isDragging = false;
         let dragOffsetX = 0;
         let dragOffsetY = 0;
-        const dragHandle = form.querySelector('.popup-drag-handle');
+        const header = form.querySelector('.popup-header') || form.querySelector('.popup-drag-handle');
 
-        if (dragHandle) {
-            dragHandle.addEventListener('mousedown', (e) => {
+        if (header) {
+            header.addEventListener('mousedown', (e) => {
+                if (e.target.closest('input, button, label')) return;
                 isDragging = true;
+                header.style.cursor = 'grabbing';
+                document.body.style.userSelect = 'none';
                 dragOffsetX = e.clientX - form.offsetLeft;
                 dragOffsetY = e.clientY - form.offsetTop;
             }, { signal });
@@ -1411,6 +1413,8 @@
             document.addEventListener('mouseup', () => {
                 if (isDragging) {
                     isDragging = false;
+                    header.style.cursor = 'grab';
+                    document.body.style.userSelect = '';
                 }
             }, { signal });
         }
