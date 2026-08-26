@@ -5,6 +5,20 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] - 2026-08-26
+
+### Added
+- **In-Place Sequential Navigation in Edit Everything**: Switching scenes (via `►`, `◄`, `Save & Next Scene`, or `Alt + Right` / `Alt + Left`) now updates the existing popup DOM and Tabulator tables instantaneously with zero visual redraw or window flashing, matching the 60fps performance of Single Entity popups.
+- **Fluid Auto-Flex Popup Resizing**: Upgraded popup resizing with dynamic `ResizeObserver` lifecycle management. Tables and previews dynamically expand and flex to fill 100% of the popup height and width without leaving dead space.
+- **4-Sided 8px Viewport Safety & Clamping**: Enforced strict boundary protection so the popup header never slides under browser bookmarks or navigation bars (`window.scrollY + 8px`), and dragging is clamped at the bottom of the viewport to prevent infinite page expansion.
+- **High-Resolution & Multi-Monitor Support**: Max size caps expanded to `calc(100vh - 16px)` and `calc(100vw - 16px)` for full-screen flexibility on 1080p, 1440p, and 4K displays.
+- **Comprehensive User Guide (`HOWTO.md`)**: Detailed documentation covering all workflows, hotkeys, suggestions, pinned tokens, and window controls.
+
+### Changed
+- **Centered Header Title & Smooth Sequential Toggle**: Header titles (`⚡ Edit Everything [X/N]`) are vertically centered (`line-height: 1.2`), and sequential arrow buttons smoothly slide and fade in/out on toggle (`max-width: 0 → 60px`).
+- **Context Menu Layout**: Moved `⚡ Edit Everything...` directly below `Edit Scene` for a more natural hierarchy.
+- **Support Link**: Updated support link to `Buy me a KitKat 🍫` pointing to `https://buymeacoffee.com/kamarsh`.
+
 ---
 
 ## [3.2.0] - 2026-08-25

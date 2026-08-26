@@ -1,5 +1,26 @@
 # Release Notes
 
+## 3.3.0 - In-Place Sequential Navigation, Fluid Sizing & Comprehensive Guide
+
+### Highlights & New Features
+- **In-Place Sequential Navigation in Edit Everything**: Zero-flash instant scene switching matching Single Entity mode performance.
+- **Fluid Auto-Flex Popup Resizing**: Dual-table layout dynamically flexes and fills 100% of the popup dimensions using `ResizeObserver`.
+- **4-Sided 8px Viewport Safety**: Header never gets lost behind browser bookmarks, and downward dragging is clamped safely at the bottom of the viewport.
+- **Comprehensive User Guide**: Full illustrated guide and hotkey cheatsheet in `HOWTO.md`.
+- **Menu Polish**: Reordered context menu placing `⚡ Edit Everything...` directly below `Edit Scene`, and updated support link (`Buy me a KitKat 🍫`).
+
+---
+
+## 3.2.0 - Smart Scene Suggestions, Studio Hierarchy & Pinned Tokens
+
+### Highlights & New Features
+- **Smart Scene Suggestions**: Auto-detects matching tags, performers, and studios from filenames, titles, and paths with 1-click accept.
+- **Dedicated Studio Support**: Direct studio management with parent hierarchy search and single-select replacement.
+- **Pinned Tokens (`📌`)**: Pin favorite tokens for permanent muscle-memory number hotkeys (`1`–`9`).
+- **Multi-Scene Bulk Tagging**: Batch tag multiple scenes simultaneously from card selections.
+
+---
+
 ## 3.1.0 - Resizable Floating Window & Dynamic Adaptive Layout
 
 ### Highlights & New Features

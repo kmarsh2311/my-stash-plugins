@@ -27,7 +27,7 @@ A fast tagging workflow for Stash scene cards, designed for video libraries wher
 *   **Native Dark Theme & Theme Switcher:** Sleek dark slate styling with an instant live theme toggle (`Dark`, `Light`, `Auto`) in **Settings ➔ Plugins**.
 *   **Automated Dependency Autoloader:** Auto-injects table and toast libraries on native Stash installs.
 
-*See the full release history in [CHANGELOG.md](CHANGELOG.md).*
+*See the full release history in [CHANGELOG.md](CHANGELOG.md) and the comprehensive user guide in [HOWTO.md](HOWTO.md).*
 
 ## 📥 Installation
 
@@ -43,12 +43,27 @@ A fast tagging workflow for Stash scene cards, designed for video libraries wher
 1. Download `fasttag.js` and `fasttag.yml`.
 2. Place them into your Stash plugins folder: `.stash/plugins/mypluginrc/`.
 3. Go to **Settings ➔ Plugins** and click **Reload Plugins**.
-## 💡 How to Use
-*   **Right-Click:** Use the context menu on any scene card to access the quick edit tool.
-*   **Quick Tagging:** Select tags and performers from a searchable popup while reviewing video scenes.
-*   **Scene Preview:** The popup displays the scene's animated preview above the title bar while you work.
-*   **Bulk Review Workflow:** Keep your tagging flow fast while scanning large collections of scenes.
-*   **Save:** Recent tag and performer selections are committed immediately and update the scene card in place. The popup stays open so you can continue choosing recent items, while the full Save button commits the current selection and refreshes the scene view without reloading the page.
+
+---
+
+## 📖 How to Use
+
+> For the full illustrated guide and workflows, see **[HOWTO.md](HOWTO.md)**.
+
+* **Open FastTag:** **Right-Click** anywhere on any scene card in Stash to open the context menu.
+* **⚡ Edit Everything:** Tag everything in one unified window with dual side-by-side tables for Tags & Performers, dedicated Studio bar, smart suggestions, and 16:9 video preview.
+* **Single Entity Modes:** Choose `Edit Tags...`, `Edit Performers...`, `Edit Studio...`, or `Edit Galleries...` for focused edits.
+* **🔁 Sequential Mode:** Check `[x] Sequential` to review and tag scene-by-scene (`[1/60]`) with instant in-place transitions.
+* **💡 Smart Suggestions:** 1-click accept tags, performers, and studios auto-detected from filenames, titles, and video quality badges.
+* **📌 Pin Favorites:** `Alt + Click` or `Right-Click` any recent chip to pin it for permanent number hotkeys (`1`–`9`).
+* **⌨️ Hotkeys:**
+  - `1`–`9`: Toggle recent chips
+  - `/` or `S`: Focus search
+  - `Esc`: Clear search / close popup
+  - `Alt + →` / `Alt + ←`: Next / Previous scene in sequential mode
+  - `Enter`: Save and close (or Save & Next Scene)
+
+---
 
 ## 🎯 Why This Exists
 This plugin is built for quickly tagging scenes in a video library, especially when you want to assign metadata like performers, tags, and galleries without opening multiple pages or navigating away from the current view.
@@ -56,5 +71,4 @@ This plugin is built for quickly tagging scenes in a video library, especially w
 ---
 
 ## 🤝 Support & Contributing
-*   **Support:** If you find these plugins helpful, you can support further development [here](https://www.patreon.com/serechops/membership).
-*   **Issues:** Found a bug? Please open an issue in this repository.
+*   **Support:** If you find FastTag helpful, you can [buy me a KitKat here 🍫](https://buymeacoffee.com/kamarsh).
