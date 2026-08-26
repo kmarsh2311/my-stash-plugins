@@ -1,5 +1,14 @@
 # Release Notes
 
+## 3.3.1 - Multi-CDN Fallback, Auto-Retry & Plugin Updater Date Metadata
+
+### Fixes & Improvements
+- **Multi-CDN Dependency Loading**: Added automatic failover across jsDelivr, cdnjs, and unpkg for Tabulator and Toastify, preventing adblockers (Brave Shields, uBlock Origin) from blocking tables.
+- **Auto-Retry Mechanism**: Fixed an issue where a temporary network hiccup during page load would prevent future popup openings from retrying CDN downloads.
+- **Stash Plugin Manager Update Date**: Added `date:` timestamp field to `index.yml` so Stash's native "Check for updates" displays the update date and auto-updates cleanly.
+
+---
+
 ## 3.3.0 - In-Place Sequential Navigation, Fluid Sizing & Comprehensive Guide
 
 ### Highlights & New Features

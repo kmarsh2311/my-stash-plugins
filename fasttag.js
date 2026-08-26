@@ -168,40 +168,108 @@
     });
 
     // --- Style & Dependency Injections ---
+    const TABULATOR_JS_CDNS = [
+        'https://cdn.jsdelivr.net/npm/tabulator-tables@5.5.2/dist/js/tabulator.min.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/tabulator/5.5.2/js/tabulator.min.js',
+        'https://unpkg.com/tabulator-tables@5.5.2/dist/js/tabulator.min.js'
+    ];
+    const TABULATOR_CSS_CDNS = [
+        'https://cdn.jsdelivr.net/npm/tabulator-tables@5.5.2/dist/css/tabulator.min.css',
+        'https://cdnjs.cloudflare.com/ajax/libs/tabulator/5.5.2/css/tabulator.min.css',
+        'https://unpkg.com/tabulator-tables@5.5.2/dist/css/tabulator.min.css'
+    ];
+    const TOASTIFY_JS_CDNS = [
+        'https://cdn.jsdelivr.net/npm/toastify-js',
+        'https://cdnjs.cloudflare.com/ajax/libs/toastify-js/1.12.0/toastify.min.js',
+        'https://unpkg.com/toastify-js'
+    ];
+    const TOASTIFY_CSS_CDNS = [
+        'https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css',
+        'https://cdnjs.cloudflare.com/ajax/libs/toastify-js/1.12.0/toastify.min.css',
+        'https://unpkg.com/toastify-js/src/toastify.min.css'
+    ];
+
     let dependencyLoadPromise = null;
-    function loadScript(src, id) {
+
+    function isTabulatorLoaded() {
+        return typeof Tabulator !== 'undefined' || typeof window.Tabulator !== 'undefined';
+    }
+
+    function isToastifyLoaded() {
+        return typeof Toastify !== 'undefined' || typeof window.Toastify !== 'undefined';
+    }
+
+    function loadScriptWithFallback(urls, id) {
         return new Promise((resolve, reject) => {
-            if (document.getElementById(id)) {
+            if (document.getElementById(id) && (isTabulatorLoaded() || isToastifyLoaded())) {
                 resolve();
                 return;
             }
-            const script = document.createElement('script');
-            script.id = id;
-            script.src = src;
-            script.async = true;
-            script.onload = () => resolve();
-            script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
-            document.head.appendChild(script);
+            let index = 0;
+            function tryNext() {
+                if (index >= urls.length) {
+                    reject(new Error(`All CDN sources failed for script ${id}`));
+                    return;
+                }
+                const src = urls[index++];
+                const existing = document.getElementById(id);
+                if (existing) existing.remove();
+
+                const script = document.createElement('script');
+                script.id = id;
+                script.src = src;
+                script.async = true;
+                script.onload = () => resolve();
+                script.onerror = () => {
+                    console.warn(`[FastTag] Failed to load ${src}, trying fallback CDN...`);
+                    tryNext();
+                };
+                document.head.appendChild(script);
+            }
+            tryNext();
         });
     }
 
+    function loadCssWithFallback(urls, id) {
+        if (document.getElementById(id)) return;
+        let index = 0;
+        function tryNext() {
+            if (index >= urls.length) return;
+            const href = urls[index++];
+            const existing = document.getElementById(id);
+            if (existing) existing.remove();
+
+            const link = document.createElement('link');
+            link.id = id;
+            link.rel = 'stylesheet';
+            link.href = href;
+            link.onerror = () => tryNext();
+            document.head.appendChild(link);
+        }
+        tryNext();
+    }
+
     function ensureDependenciesLoaded() {
-        if (typeof Tabulator !== 'undefined' && typeof Toastify !== 'undefined') {
+        if (isTabulatorLoaded() && isToastifyLoaded()) {
             return Promise.resolve();
         }
         if (dependencyLoadPromise) return dependencyLoadPromise;
 
         dependencyLoadPromise = (async () => {
             const promises = [];
-            if (typeof Tabulator === 'undefined') {
-                promises.push(loadScript('https://unpkg.com/tabulator-tables@5.5.2/dist/js/tabulator.min.js', 'tabulator-external-js'));
+            if (!isTabulatorLoaded()) {
+                promises.push(loadScriptWithFallback(TABULATOR_JS_CDNS, 'tabulator-external-js'));
             }
-            if (typeof Toastify === 'undefined') {
-                promises.push(loadScript('https://cdn.jsdelivr.net/npm/toastify-js', 'toastify-external-js'));
+            if (!isToastifyLoaded()) {
+                promises.push(loadScriptWithFallback(TOASTIFY_JS_CDNS, 'toastify-external-js'));
             }
+            loadCssWithFallback(TABULATOR_CSS_CDNS, 'tabulator-external-css');
+            loadCssWithFallback(TOASTIFY_CSS_CDNS, 'toastify-external-css');
+
             await Promise.all(promises);
         })().catch(err => {
             console.warn('[FastTag] Dependency autoload note:', err.message);
+            dependencyLoadPromise = null;
         });
 
         return dependencyLoadPromise;
@@ -209,22 +277,6 @@
 
     // Auto-trigger dependency preload immediately
     ensureDependenciesLoaded();
-
-    if (!document.getElementById('tabulator-external-css')) {
-        const link = document.createElement('link');
-        link.id = 'tabulator-external-css';
-        link.rel = 'stylesheet';
-        link.href = 'https://unpkg.com/tabulator-tables@5.5.2/dist/css/tabulator.min.css';
-        document.head.appendChild(link);
-    }
-
-    if (!document.getElementById('toastify-external-css')) {
-        const link = document.createElement('link');
-        link.id = 'toastify-external-css';
-        link.rel = 'stylesheet';
-        link.href = 'https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css';
-        document.head.appendChild(link);
-    }
 
     const styleId = 'scenes-manager-modern-styles';
     if (!document.getElementById(styleId)) {
@@ -2297,12 +2349,12 @@
         const config = ENTITY_CONFIG[type];
         if (!config || !Array.isArray(bulkScenes) || bulkScenes.length === 0) return;
 
-        if (typeof Tabulator === 'undefined') {
+        if (!isTabulatorLoaded()) {
             await ensureDependenciesLoaded();
         }
 
-        if (typeof Tabulator === 'undefined') {
-            toastError("Tabulator library failed to load. Please check your internet connection.");
+        if (!isTabulatorLoaded()) {
+            toastError("Tabulator library failed to load. Please check your internet connection or adblocker.");
             return;
         }
 
@@ -3201,11 +3253,11 @@
     }
 
     async function openEditEverythingPopup(sceneId, cardElement) {
-        if (typeof Tabulator === 'undefined') {
+        if (!isTabulatorLoaded()) {
             await ensureDependenciesLoaded();
         }
-        if (typeof Tabulator === 'undefined') {
-            toastError("Tabulator library failed to load. Please check your internet connection.");
+        if (!isTabulatorLoaded()) {
+            toastError("Tabulator library failed to load. Please check your internet connection or adblocker.");
             return;
         }
 
@@ -3680,12 +3732,12 @@
         const config = ENTITY_CONFIG[type];
         if (!config) return;
 
-        if (typeof Tabulator === 'undefined') {
+        if (!isTabulatorLoaded()) {
             await ensureDependenciesLoaded();
         }
 
-        if (typeof Tabulator === 'undefined') {
-            toastError("Tabulator library failed to load. Please check your internet connection.");
+        if (!isTabulatorLoaded()) {
+            toastError("Tabulator library failed to load. Please check your internet connection or adblocker.");
             return;
         }
 
