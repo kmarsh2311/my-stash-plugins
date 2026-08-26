@@ -5,15 +5,6 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.3.1] - 2026-08-26
-
-### Fixed
-- **Multi-CDN Dependency Fallbacks**: Upgraded dependency loader with automatic multi-CDN fallback (jsDelivr, cdnjs, unpkg) for `Tabulator` and `Toastify` to resolve CDN blockages caused by browser adblockers (Brave Shields, uBlock Origin) and regional network restrictions.
-- **Auto-Retry on Dependency Failure**: Ensured failed initial network loads automatically retry on user interaction instead of caching in a failed state.
-- **Stash Plugin Updater Date Metadata**: Added the `date:` timestamp field to `index.yml` so Stash's native Plugin Manager displays the update date and auto-detects updates via the "Check for updates" button.
-
----
-
 ## [3.3.0] - 2026-08-26
 
 ### Added

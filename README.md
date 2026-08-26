@@ -27,7 +27,7 @@ A fast tagging workflow for Stash scene cards, designed for video libraries wher
 *   **Native Dark Theme & Theme Switcher:** Sleek dark slate styling with an instant live theme toggle (`Dark`, `Light`, `Auto`) in **Settings ➔ Plugins**.
 *   **Automated Dependency Autoloader:** Auto-injects table and toast libraries on native Stash installs.
 
-*See the full release history in [CHANGELOG.md](CHANGELOG.md) and the comprehensive user guide in [HOWTO.md](HOWTO.md).*
+*See the full release history in [CHANGELOG.md](plugins/fasttag/CHANGELOG.md) and the comprehensive user guide in [HOWTO.md](plugins/fasttag/HOWTO.md).*
 
 ## 📥 Installation
 
@@ -40,7 +40,7 @@ A fast tagging workflow for Stash scene cards, designed for video libraries wher
 3. Find **FastTag** in the list and click **Install**.
 
 ### Method 2: Manual Installation
-1. Download `fasttag.js` and `fasttag.yml`.
+1. Download `fasttag.js` and `fasttag.yml` from `plugins/fasttag/`.
 2. Place them into your Stash plugins folder: `.stash/plugins/mypluginrc/`.
 3. Go to **Settings ➔ Plugins** and click **Reload Plugins**.
 
@@ -48,7 +48,7 @@ A fast tagging workflow for Stash scene cards, designed for video libraries wher
 
 ## 📖 How to Use
 
-> For the full illustrated guide and workflows, see **[HOWTO.md](HOWTO.md)**.
+> For the full illustrated guide and workflows, see **[HOWTO.md](plugins/fasttag/HOWTO.md)**.
 
 * **Open FastTag:** **Right-Click** anywhere on any scene card in Stash to open the context menu.
 * **⚡ Edit Everything:** Tag everything in one unified window with dual side-by-side tables for Tags & Performers, dedicated Studio bar, smart suggestions, and 16:9 video preview.
