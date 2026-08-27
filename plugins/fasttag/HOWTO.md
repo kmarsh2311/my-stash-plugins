@@ -40,6 +40,7 @@ When you right-click a scene card, FastTag displays a streamlined context menu:
 | **`Edit Galleries...`** | Opens dedicated Gallery assigner. |
 | **`Edit Scene`** | Navigates directly to the full Stash scene edit page. |
 | **`⚡ Edit Everything...`** | Opens the all-in-one dual-table popup (Tags + Performers + Studio). |
+| **`⚙️ FastTag Settings`** | Opens dedicated settings to toggle ID columns, suggestions, and themes. |
 | **`Buy me a KitKat 🍫`** | Optional support link to sponsor the developer. |
 
 ---
@@ -156,12 +157,14 @@ Tag multiple scenes in batch:
 
 ## 🎨 Themes & Settings
 
-FastTag integrates seamlessly with Stash's native aesthetics:
-* Go to **Settings ➔ Plugins** in Stash to find the **FastTag Configuration Card**.
-* Choose your preferred theme mode:
+FastTag provides a dedicated settings modal accessible directly from the context menu:
+* **Open Settings:** Right-click any scene card ➔ **`⚙️ FastTag Settings`**.
+* **Toggle ID Columns:** Hide or show the numeric database ID column across all popups. When hidden, Name and Title columns expand across 100% of the table width.
+* **Toggle Smart Suggestions:** Enable or disable the `💡 SUGGESTED` bar.
+* **Theme Selection:** Switch instantly between:
   - **Dark (Slate & Indigo)**
   - **Light (Clean White & Slate)**
-  - **Auto (Matches your active Stash theme)**
+  - **Match Stash UI (Automatically syncs with Stash theme)**
 
 ---
 

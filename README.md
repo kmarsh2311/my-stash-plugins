@@ -59,12 +59,15 @@ A fast tagging workflow for Stash scene cards, designed for video libraries wher
 * **🔁 Sequential Mode:** Check `[x] Sequential` to review and tag scene-by-scene (`[1/60]`) with instant in-place transitions.
 * **💡 Smart Suggestions:** 1-click accept tags, performers, and studios auto-detected from filenames, titles, and video quality badges.
 * **📌 Pin Favorites:** `Alt + Click` or `Right-Click` any recent chip to pin it for permanent number hotkeys (`1`–`9`).
+* **➕ Quick Entity Creation:** Type a new name into search and click `+ Create` to check spelling and aliases before adding it to Stash and your scene.
+* **⚙️ FastTag Settings:** Right-click ➔ `FastTag Settings` to toggle database ID columns, enable/disable suggestions, and switch themes.
+* **💾 Save in Place:** Clicking `Save` (or pressing `Enter`) saves changes immediately to Stash and keeps the popup open so you can continue tagging.
 * **⌨️ Hotkeys:**
-  - `1`–`9`: Toggle recent chips
+  - `1`–`9`: Toggle recent chips (auto-saves immediately)
   - `/` or `S`: Focus search
   - `Esc`: Clear search / close popup
   - `Alt + →` / `Alt + ←`: Next / Previous scene in sequential mode
-  - `Enter`: Save and close (or Save & Next Scene)
+  - `Enter`: Save in place (or Save & Next Scene in sequential mode)
 
 ---
 
