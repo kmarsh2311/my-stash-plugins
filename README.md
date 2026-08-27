@@ -1,3 +1,9 @@
+<p align="center">
+  <img src="docs/images/context_menu.png" alt="FastTag Context Menu" height="380" />
+  <img src="docs/images/edit_tags.png" alt="FastTag Edit Tags" height="380" />
+  <img src="docs/images/edit_everything.png" alt="FastTag Edit Everything" height="380" />
+</p>
+
 # My Stash Plugins
 
 A collection of custom scripts and plugins designed to speed up the [Stash](https://github.com/stashapp/stash) workflow for video scene tagging and metadata cleanup. This repository is focused on fast tagging of scenes, performers, galleries, and related metadata without leaving the library view.
