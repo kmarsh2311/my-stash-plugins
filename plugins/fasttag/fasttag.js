@@ -15,7 +15,7 @@
 
 (async function() {
     'use strict';
-    console.log('[FastTag v3.2] Initialized with Studios, Suggestions, Pinned Chips, Bulk Mode, and Hotkeys');
+    console.log('[FastTag v3.4.0] Initialized with Settings, Suggestions, Pinned Chips, Bulk Mode, and Hotkeys');
 
     // --- Entity Configuration & Schema Registry ---
     const ENTITY_CONFIG = {
@@ -67,8 +67,24 @@
                 { title: "ID", field: "id", width: 55, hozAlign: "center", headerHozAlign: "center", resizable: false, headerSort: false },
                 { title: "Title", field: "title", resizable: false, headerSort: false },
             ],
-            fetchQuery: `query { findGalleries(filter: { per_page: -1 }) { galleries { id title } } }`,
-            extractList: data => data?.findGalleries?.galleries || [],
+            fetchQuery: `query { findGalleries(filter: { per_page: -1 }) { galleries { id title folder { path } files { path } } } }`,
+            extractList: data => (data?.findGalleries?.galleries || []).map(g => {
+                let displayTitle = (g.title && g.title.trim()) ? g.title.trim() : '';
+                if (!displayTitle) {
+                    const folderPath = g.folder?.path || g.files?.[0]?.path || '';
+                    if (folderPath) {
+                        const parts = folderPath.replace(/\\/g, '/').split('/').filter(Boolean);
+                        displayTitle = parts.length > 0 ? parts[parts.length - 1] : `Gallery #${g.id}`;
+                    } else {
+                        displayTitle = `Gallery #${g.id}`;
+                    }
+                }
+                return {
+                    id: g.id,
+                    title: displayTitle,
+                    rawTitle: g.title || ''
+                };
+            }),
             fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { galleries { id } } }`,
             extractExisting: data => data?.findScene?.galleries?.map(g => g.id) || [],
             createQuery: `mutation ($title: String!) { galleryCreate(input: { title: $title }) { id title } }`,
@@ -133,6 +149,8 @@
     };
 
     const THEME_STORAGE_KEY = 'stash_fast_tag_theme';
+    const SHOW_IDS_STORAGE_KEY = 'stash_fast_tag_show_ids';
+    const SUGGESTIONS_STORAGE_KEY = 'stash_fast_tag_enable_suggestions';
     const recentStorageKeys = {
         tags: 'stash_fast_tag_recent_tags',
         performers: 'stash_fast_tag_recent_performers',
@@ -656,6 +674,139 @@
 
     function setThemePreference(theme) {
         localStorage.setItem(THEME_STORAGE_KEY, theme);
+    }
+
+    function getShowIdColumns() {
+        const val = localStorage.getItem(SHOW_IDS_STORAGE_KEY);
+        return val === null ? true : val === 'true'; // Default true (ON)
+    }
+
+    function setShowIdColumns(enabled) {
+        localStorage.setItem(SHOW_IDS_STORAGE_KEY, enabled ? 'true' : 'false');
+    }
+
+    function getEnableSuggestions() {
+        const val = localStorage.getItem(SUGGESTIONS_STORAGE_KEY);
+        return val === null ? true : val === 'true'; // Default true (ON)
+    }
+
+    function setEnableSuggestions(enabled) {
+        localStorage.setItem(SUGGESTIONS_STORAGE_KEY, enabled ? 'true' : 'false');
+    }
+
+    function openSettingsModal() {
+        const existing = document.getElementById('fasttag-settings-modal');
+        if (existing) existing.remove();
+
+        const theme = getEffectiveTheme();
+        const currentPref = getThemePreference();
+        const showIds = getShowIdColumns();
+        const enableSug = getEnableSuggestions();
+
+        const modal = document.createElement('div');
+        modal.id = 'fasttag-settings-modal';
+        modal.className = `theme-${theme}`;
+        modal.style.cssText = `
+            position: fixed;
+            inset: 0;
+            z-index: 10000000;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(3px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fasttagFadeIn 0.15s ease-out;
+        `;
+
+        const isDark = theme === 'dark';
+        const bg = isDark ? '#1e293b' : '#ffffff';
+        const text = isDark ? '#f8fafc' : '#0f172a';
+        const textMuted = isDark ? '#94a3b8' : '#64748b';
+        const border = isDark ? '#334155' : '#e2e8f0';
+        const cardBg = isDark ? '#0f172a' : '#f8fafc';
+
+        modal.innerHTML = `
+            <div style="background: ${bg}; color: ${text}; border: 1px solid ${border}; border-radius: 12px; width: 440px; max-width: 90vw; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); overflow: hidden; font-family: inherit;">
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid ${border}; background: ${cardBg};">
+                    <div style="font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px;">
+                        <span>⚙️</span> FastTag Settings
+                    </div>
+                    <button id="fasttag-settings-close" style="background: none; border: none; font-size: 18px; color: ${textMuted}; cursor: pointer; line-height: 1; padding: 4px;">✕</button>
+                </div>
+                <div style="padding: 18px; display: flex; flex-direction: column; gap: 16px;">
+                    <!-- Theme setting -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                        <div>
+                            <div style="font-weight: 600; font-size: 13px;">Theme</div>
+                            <div style="font-size: 11px; color: ${textMuted};">Choose popup visual theme</div>
+                        </div>
+                        <select id="fasttag-setting-theme" style="padding: 6px 10px; border-radius: 6px; border: 1px solid ${border}; background: ${cardBg}; color: ${text}; font-size: 12px; cursor: pointer;">
+                            <option value="dark" ${currentPref === 'dark' ? 'selected' : ''}>Dark</option>
+                            <option value="light" ${currentPref === 'light' ? 'selected' : ''}>Light</option>
+                            <option value="auto" ${currentPref === 'auto' ? 'selected' : ''}>Auto (Match Stash)</option>
+                        </select>
+                    </div>
+
+                    <div style="height: 1px; background: ${border};"></div>
+
+                    <!-- Show ID Column setting -->
+                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; font-size: 13px;">Show ID Column</div>
+                            <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Display numeric database ID column in Tag, Performer, Studio, and Gallery popups. (When unchecked, Name and Title expand to 100% width)</div>
+                        </div>
+                        <input type="checkbox" id="fasttag-setting-show-ids" ${showIds ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                    </div>
+
+                    <div style="height: 1px; background: ${border};"></div>
+
+                    <!-- Smart Suggestions setting -->
+                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; font-size: 13px;">Smart Suggestions</div>
+                            <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Automatically detect and suggest matching Performers, Tags, and Studios from filenames and titles.</div>
+                        </div>
+                        <input type="checkbox" id="fasttag-setting-suggestions" ${enableSug ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                    </div>
+                </div>
+                <div style="padding: 12px 18px; background: ${cardBg}; border-top: 1px solid ${border}; display: flex; justify-content: flex-end;">
+                    <button id="fasttag-settings-done" style="background: #6366f1; color: white; border: none; padding: 7px 18px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer;">Done</button>
+                </div>
+            </div>
+        `;
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal || e.target.id === 'fasttag-settings-close' || e.target.id === 'fasttag-settings-done') {
+                modal.remove();
+            }
+        });
+
+        const themeSelect = modal.querySelector('#fasttag-setting-theme');
+        if (themeSelect) {
+            themeSelect.addEventListener('change', (e) => {
+                setThemePreference(e.target.value);
+                modal.className = `theme-${getEffectiveTheme()}`;
+                showToast(`Theme set to ${e.target.value}`, 'info');
+            });
+        }
+
+        const idToggle = modal.querySelector('#fasttag-setting-show-ids');
+        if (idToggle) {
+            idToggle.addEventListener('change', (e) => {
+                setShowIdColumns(e.target.checked);
+                showToast(`ID column ${e.target.checked ? 'enabled' : 'hidden'}`, 'success');
+            });
+        }
+
+        const sugToggle = modal.querySelector('#fasttag-setting-suggestions');
+        if (sugToggle) {
+            sugToggle.addEventListener('change', (e) => {
+                setEnableSuggestions(e.target.checked);
+                showToast(`Suggestions ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
+            });
+        }
+
+        document.body.appendChild(modal);
     }
 
     function getCachedOrNull(type) {
@@ -1652,6 +1803,8 @@
             createMenuItem(`🏢 Bulk Studio (${bulkScenes.length})`, () => openBulkEntityPopup('studios', bulkScenes));
         }
 
+        createMenuItem('⚙️ FastTag Settings...', () => openSettingsModal());
+
         const hr = document.createElement('div');
         hr.style.height = '1px';
         hr.style.background = '#e2e8f0';
@@ -1738,10 +1891,13 @@
     }
 
     function getColumnsWithSavedWidths(type, scope = 'single') {
-        const baseCols = (ENTITY_CONFIG[type]?.columns || []).map(c => ({ ...c }));
+        let baseCols = (ENTITY_CONFIG[type]?.columns || []).map(c => ({ ...c }));
+        if (!getShowIdColumns()) {
+            baseCols = baseCols.filter(c => c.field !== 'id');
+        }
         return baseCols.map((c, idx) => {
             if (idx === baseCols.length - 1) {
-                return { ...c, width: undefined, widthGrow: undefined };
+                return { ...c, width: undefined, widthGrow: c.widthGrow || 1 };
             }
             try {
                 const saved = localStorage.getItem(`fasttag_col_width_${scope}_${type}_${c.field}`);
@@ -1771,7 +1927,7 @@
 
     // --- Smart Suggestions Engine ---
     async function fetchSceneSmartSuggestions(type, sceneId, allAvailableItems, existingIds, cardElement) {
-        if (!sceneId || !allAvailableItems || !allAvailableItems.length) return [];
+        if (!getEnableSuggestions() || !sceneId || !allAvailableItems || !allAvailableItems.length) return [];
         try {
             let cardText = '';
             let title = '';
@@ -2867,7 +3023,10 @@
     }
 
     async function loadUnifiedSuggestions(sceneId, cardElement, container, ctx) {
-        if (!container || !sceneId) return;
+        if (!getEnableSuggestions() || !container || !sceneId) {
+            if (container) container.style.display = 'none';
+            return;
+        }
 
         const isDark = getEffectiveTheme() === 'dark';
         let cardText = cardElement ? (cardElement.innerText || cardElement.textContent || '') : '';

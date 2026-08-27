@@ -5,6 +5,17 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.0] - 2026-08-27
+
+### Added
+- **FastTag Settings Modal (`⚙️ FastTag Settings...`)**: Dedicated settings screen in the context menu to customize preferences without popup clutter.
+- **Hide / Show ID Column Toggle**: Option in settings to toggle the numeric database ID column on and off across all popups. Defaults to ON for backwards compatibility. When disabled, Name and Title columns expand to fill 100% of the table width.
+- **Gallery Title Auto-Fallback**: Auto-galleries with empty/null titles now automatically fall back to their Folder name or Zip archive name (e.g. `Summer Shoot 2024` instead of an empty row).
+- **Smart Suggestions Toggle**: Easily enable or disable smart suggestions (`💡 SUGGESTED`) from settings.
+- **Theme Switcher in Settings**: Instant selection of Dark, Light, or Match Stash UI themes.
+
+---
+
 ## [3.3.0] - 2026-08-26
 
 ### Added

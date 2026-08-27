@@ -1,4 +1,13 @@
-# Release Notes
+## 3.4.0 - Settings Screen, Column Customization & Gallery Auto-Fallback
+
+### Highlights & New Features
+- **FastTag Settings Modal**: New centralized settings screen accessible via right-click ➔ `⚙️ FastTag Settings...` to customize preferences without popup clutter.
+- **Hide / Show ID Column Toggle**: Toggle the numeric database ID column on and off across all popups. Defaults to ON for backwards compatibility. When disabled, Name and Title columns expand to fill 100% width for maximum readability.
+- **Gallery Title Auto-Fallback**: Auto-galleries with missing or empty titles now automatically fall back to their folder or zip archive name instead of displaying blank rows.
+- **Smart Suggestions Toggle**: Easily toggle smart suggestions on or off from the new settings menu.
+- **Theme Controls**: Conveniently switch between Dark, Light, and Match Stash themes.
+
+---
 
 ## 3.3.1 - Multi-CDN Fallback, Auto-Retry & Plugin Updater Date Metadata
 
