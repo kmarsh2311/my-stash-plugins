@@ -1,9 +1,3 @@
-<p align="center">
-
-  <img width="336" height="672" alt="image" src="https://github.com/user-attachments/assets/4eeabd95-70fb-4be7-9b43-6d9b029769d4" />
-
-</p>
-
 # My Stash Plugins
 
 A collection of custom scripts and plugins designed to speed up the [Stash](https://github.com/stashapp/stash) workflow for video scene tagging and metadata cleanup. This repository is focused on fast tagging of scenes, performers, galleries, and related metadata without leaving the library view.
@@ -16,16 +10,19 @@ A collection of custom scripts and plugins designed to speed up the [Stash](http
 A fast tagging workflow for Stash scene cards, designed for video libraries where you want to assign tags and performers quickly without leaving the page. 
 
 **Key Features:**
+*   **⚡ Smart Auto-Save Workflow:** Quick-action suggestions, recent pills (`1`–`9`), studio chips, and search-and-select immediately auto-save to the scene. Lower table browsing lets you check multiple items without premature auto-saving.
+*   **💾 Save-in-Place Workflow:** Clicking `Save` saves changes directly to Stash while keeping the popup open so you can continue tagging without interruption, preserving your exact scroll position.
+*   **🎨 State-Aware Pulsing Save Button:** Save button stays cleanly dimmed/disabled when everything is saved, and lights up **Emerald Green** with a gentle breathing pulse when pending list edits exist.
+*   **🛡️ Universal Entity Creation Modal:** Creating a new Tag or Performer from any view opens a confirmation popup to verify spelling, aliases, or cancel before creating.
+*   **⚙️ Dedicated FastTag Settings Modal:** Right-click ➔ `⚙️ FastTag Settings` to toggle the numeric ID column, enable/disable suggestions, and switch themes (`Dark`, `Light`, `Match Stash`).
 *   **💡 Smart Scene Suggestions:** Automatically detects and suggests matching tags, performers, and studios from filenames, titles, directory paths, and quality badges (`4K`, `1080p`, `NEW`). One-click `+ Tag` or `✓ Accept All` with instant autosave.
 *   **📌 Pinned Tokens:** Pin favorite tags, performers, and studios (`Alt + Click` or `Right Click`) for fixed, permanent muscle-memory number hotkeys.
 *   **🏢 Full Entity Editing:** Edit Tags, Performers, Studios (with parent hierarchy search), and Galleries directly from any scene card.
+*   **⚡ Edit Everything (All-in-One):** Dual-table workspace for editing Tags, Performers, and Studios simultaneously with resizable columns and 16:9 video preview.
 *   **📦 Multi-Scene Bulk Tagging:** Batch-apply or remove tags, performers, and studios across multiple selected scenes simultaneously.
-*   **⌨️ Number Hotkeys (`1`–`9`):** Fast single-key toggling for the first 9 tokens, with `/` or `S` to jump into search.
-*   **8-Direction Resizing & 16:9 Video Preview:** Freely stretch the modal from any border or corner with automatic size memory and responsive widescreen video preview.
-*   **Sequential Edit Mode:** Bulk review and tag scenes sequentially (`[1/24]`, `[2/24]`) without closing the popup.
-*   **Dynamic Smart Save:** Primary button automatically distinguishes between reviewing/skipping (`Next Scene ►`) and saving edits (`Save & Next Scene ►`).
-*   **Native Dark Theme & Theme Switcher:** Sleek dark slate styling with an instant live theme toggle (`Dark`, `Light`, `Auto`) in **Settings ➔ Plugins**.
-*   **Automated Dependency Autoloader:** Auto-injects table and toast libraries on native Stash installs.
+*   **⌨️ Number Hotkeys (`1`–`9`) & Search Shortcut (`/`):** Fast single-key toggling for the first 9 tokens, with `/` or `S` to jump into search across all views.
+*   **🔁 In-Place Sequential Navigation:** Review and tag scene-by-scene sequentially (`[1/60]`) with instant in-place transitions.
+*   **8-Direction Resizing & Size Memory:** Stretch the modal from any edge or corner with automatic size persistence.
 
 *See the full release history in [CHANGELOG.md](plugins/fasttag/CHANGELOG.md) and the comprehensive user guide in [HOWTO.md](plugins/fasttag/HOWTO.md).*
 
