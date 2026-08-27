@@ -20,6 +20,7 @@
     // --- Entity Configuration & Schema Registry ---
     const ENTITY_CONFIG = {
         tags: {
+            icon: '🏷️',
             title: 'Tag',
             pluralTitle: 'Tags',
             labelKey: 'name',
@@ -30,7 +31,7 @@
             ],
             fetchQuery: `query { findTags(filter: { per_page: -1 }) { tags { id name } } }`,
             extractList: data => data?.findTags?.tags || [],
-            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { tags { id } } }`,
+            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title files { path } tags { id } } }`,
             extractExisting: data => data?.findScene?.tags?.map(t => t.id) || [],
             createQuery: `mutation ($name: String!) { tagCreate(input: { name: $name }) { id name } }`,
             createExtract: data => data?.tagCreate?.id,
@@ -39,6 +40,7 @@
             updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), tag_ids: ids.map(String) })
         },
         performers: {
+            icon: '⭐',
             title: 'Performer',
             pluralTitle: 'Performers',
             labelKey: 'name',
@@ -50,7 +52,7 @@
             ],
             fetchQuery: `query { findPerformers(filter: { per_page: -1 }) { performers { id name disambiguation } } }`,
             extractList: data => data?.findPerformers?.performers || [],
-            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { performers { id } } }`,
+            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title files { path } performers { id } } }`,
             extractExisting: data => data?.findScene?.performers?.map(p => p.id) || [],
             createQuery: `mutation ($name: String!) { performerCreate(input: { name: $name }) { id name } }`,
             createExtract: data => data?.performerCreate?.id,
@@ -59,6 +61,7 @@
             updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), performer_ids: ids.map(String) })
         },
         galleries: {
+            icon: '🖼️',
             title: 'Gallery',
             pluralTitle: 'Galleries',
             labelKey: 'title',
@@ -85,7 +88,7 @@
                     rawTitle: g.title || ''
                 };
             }),
-            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { galleries { id } } }`,
+            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title files { path } galleries { id } } }`,
             extractExisting: data => data?.findScene?.galleries?.map(g => g.id) || [],
             createQuery: `mutation ($title: String!) { galleryCreate(input: { title: $title }) { id title } }`,
             createExtract: data => data?.galleryCreate?.id,
@@ -94,6 +97,7 @@
             updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), gallery_ids: ids.map(String) })
         },
         studios: {
+            icon: '🏢',
             title: 'Studio',
             pluralTitle: 'Studios',
             labelKey: 'name',
@@ -110,7 +114,7 @@
                 name: s.name,
                 parent_name: s.parent_studio ? s.parent_studio.name : ''
             })),
-            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { studio { id name } } }`,
+            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title files { path } studio { id name } } }`,
             extractExisting: data => data?.findScene?.studio?.id ? [data.findScene.studio.id] : [],
             createQuery: `mutation ($name: String!) { studioCreate(input: { name: $name }) { id name } }`,
             createExtract: data => data?.studioCreate?.id,
@@ -593,12 +597,114 @@
         #everything-tags-chips::-webkit-scrollbar,
         #everything-performers-chips::-webkit-scrollbar,
         #everything-suggestions-chips::-webkit-scrollbar,
-        [id*="-chips"]::-webkit-scrollbar,
-        [id*="-chips-container"]::-webkit-scrollbar,
-        [id*="-recent-"]::-webkit-scrollbar,
-        .fasttag-chip-row::-webkit-scrollbar {
-            width: 0 !important;
-            height: 0 !important;
+        /* Seamless 1-Way Infinite Marquee Loop for Long Scene Titles / Filenames */
+        .fasttag-marquee-box {
+            overflow: hidden;
+            max-width: 100%;
+            min-width: 0;
+            flex: 1 1 auto;
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+        .fasttag-marquee-track {
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
+            will-change: transform;
+        }
+        .fasttag-marquee-item {
+            display: inline-block;
+            white-space: nowrap;
+        }
+        @keyframes fasttagMarqueeLoop {
+            0% {
+                transform: translateX(0);
+            }
+            100% {
+                transform: translateX(-50%);
+            }
+        }
+        .fasttag-marquee-track.is-looping {
+            animation: fasttagMarqueeLoop var(--fasttag-marquee-speed, 12s) linear 1s infinite;
+        }
+        .fasttag-marquee-box:hover .fasttag-marquee-track.is-looping {
+            animation-play-state: paused;
+        }
+        .tabulator-placeholder {
+            pointer-events: auto !important;
+            user-select: auto !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 100% !important;
+            height: 100% !important;
+        }
+        .tabulator-placeholder * {
+            pointer-events: auto !important;
+        }
+        .fasttag-create-empty-btn:hover {
+            filter: brightness(1.15);
+            transform: translateY(-1px);
+        }
+        @keyframes fasttagFadeInDialog {
+            from { opacity: 0; transform: scale(0.96); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .fasttag-create-dialog-card {
+            animation: fasttagFadeInDialog 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .fasttag-dialog-confirm-btn:hover {
+            filter: brightness(1.1);
+            transform: translateY(-1px);
+        }
+        .fasttag-dialog-cancel-btn:hover {
+            background: rgba(148, 163, 184, 0.18) !important;
+        }
+        .fasttag-dialog-input {
+            color: #ffffff !important;
+        }
+        .fasttag-dialog-input::selection {
+            background: #6366f1 !important;
+            color: #ffffff !important;
+        }
+        .fasttag-dialog-input:focus {
+            border-color: #6366f1 !important;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25) !important;
+        }
+        @keyframes fasttagSavePulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.65);
+                filter: brightness(1);
+            }
+            50% {
+                box-shadow: 0 0 14px 4px rgba(16, 185, 129, 0.45);
+                filter: brightness(1.12);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.65);
+                filter: brightness(1);
+            }
+        }
+        @keyframes fasttagSavePulseCalm {
+            0% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+                filter: brightness(1);
+            }
+            50% {
+                box-shadow: 0 0 12px 3px rgba(16, 185, 129, 0.38);
+                filter: brightness(1.08);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+                filter: brightness(1);
+            }
+        }
+        .fasttag-btn-pulse {
+            animation: fasttagSavePulse 1.8s infinite ease-in-out !important;
+        }
+        .fasttag-btn-pulse-calm {
+            animation: fasttagSavePulseCalm 2.4s infinite ease-in-out !important;
         }
         `;
         document.head.appendChild(style);
@@ -637,7 +743,7 @@
         const bg = type === "success" ? "#10b981" : (type === "info" ? "#6366f1" : "#ef4444");
         Toastify({
             text: message,
-            duration: 2000,
+            duration: 3000,
             gravity: "top",
             position: "center",
             style: { background: bg }
@@ -674,6 +780,70 @@
 
     function setThemePreference(theme) {
         localStorage.setItem(THEME_STORAGE_KEY, theme);
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function getSceneTitle(sceneData, sceneId, cardElement) {
+        if (sceneData?.title && sceneData.title.trim()) {
+            return sceneData.title.trim();
+        }
+        if (sceneData?.files && sceneData.files.length > 0 && sceneData.files[0]?.path) {
+            const parts = sceneData.files[0].path.replace(/\\/g, '/').split('/').filter(Boolean);
+            if (parts.length > 0) return parts[parts.length - 1];
+        }
+        if (cardElement) {
+            const titleLink = cardElement.querySelector('.card-section-title, a.scene-card-link, .scene-card__title, .title a, a[href*="/scenes/"] span');
+            const text = titleLink ? titleLink.textContent.trim() : '';
+            if (text && !text.match(/^[0-9.]+\s*(?:MiB|GiB|MB|GB|KB|p|k|fps|:)/i)) {
+                return text;
+            }
+        }
+        return `Scene #${sceneId || ''}`;
+    }
+
+    function applyMarqueeAnimation(titleEl) {
+        if (!titleEl) return;
+        const box = titleEl.querySelector('.fasttag-marquee-box') || titleEl;
+        const track = box.querySelector('.fasttag-marquee-track') || box;
+        if (!track) return;
+
+        track.classList.remove('is-looping');
+        track.style.removeProperty('--fasttag-marquee-speed');
+
+        const firstItem = track.querySelector('.fasttag-marquee-item') || track;
+        const titleText = firstItem.getAttribute('data-raw-title') || firstItem.textContent || '';
+        if (!titleText) return;
+
+        // Reset track to single copy
+        track.innerHTML = `<span class="fasttag-marquee-item" data-raw-title="${escapeHtml(titleText)}" title="${escapeHtml(titleText)}">${escapeHtml(titleText)}</span>`;
+
+        requestAnimationFrame(() => {
+            const rawItem = track.querySelector('.fasttag-marquee-item');
+            if (!rawItem) return;
+            const singleWidth = rawItem.scrollWidth;
+            const containerWidth = box.clientWidth;
+
+            if (singleWidth > containerWidth) {
+                track.innerHTML = `
+                    <span class="fasttag-marquee-item" data-raw-title="${escapeHtml(titleText)}">${escapeHtml(titleText)}</span>
+                    <span style="display: inline-block; margin: 0 24px; opacity: 0.4; font-size: 10px; user-select: none;">•</span>
+                    <span class="fasttag-marquee-item">${escapeHtml(titleText)}</span>
+                    <span style="display: inline-block; margin: 0 24px; opacity: 0.4; font-size: 10px; user-select: none;">•</span>
+                `;
+                const cycleWidth = singleWidth + 48;
+                const duration = Math.max(6, Math.min(30, cycleWidth / 35));
+                track.style.setProperty('--fasttag-marquee-speed', `${duration.toFixed(2)}s`);
+                track.classList.add('is-looping');
+            }
+        });
     }
 
     function getShowIdColumns() {
@@ -1225,19 +1395,39 @@
         const saveBtn = form.querySelector(`#${type}-save-btn`);
         const navGroup = form.querySelector(`#${type}-nav-group`);
 
+        const sceneTitle = getSceneTitle(form._fastTagSceneData, form._fastTagSceneId, form._fastTagSceneCard);
+
+        const icon = config.icon || '🏷️';
+        const iconStyle = `display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; font-size: 13px; line-height: 1; flex-shrink: 0; margin-right: 7px; user-select: none; transform: translateY(1.5px);`;
+
+        const isChanged = hasSelectionChanged(selectedIds);
+
         if (!sequentialEditState.enabled) {
             if (navGroup) {
                 navGroup.style.maxWidth = '0';
                 navGroup.style.opacity = '0';
             }
             if (modeCheckbox) modeCheckbox.checked = false;
-            if (title) title.textContent = `Edit ${config.pluralTitle}`;
+            if (title) {
+                title.innerHTML = `<span style="${iconStyle}">${icon}</span><span class="fasttag-marquee-box" style="flex: 1; min-width: 0; overflow: hidden; display: inline-flex; align-items: center;"><span class="fasttag-marquee-track"><span class="fasttag-marquee-item" data-raw-title="${escapeHtml(sceneTitle)}" title="${escapeHtml(sceneTitle)}">${escapeHtml(sceneTitle)}</span></span></span>`;
+                title.title = sceneTitle;
+                applyMarqueeAnimation(title);
+            }
             if (saveBtn) {
                 saveBtn.textContent = `Save ${config.pluralTitle}`;
-                saveBtn.disabled = false;
-                saveBtn.style.opacity = '1';
-                saveBtn.style.cursor = 'pointer';
-                saveBtn.style.background = '#6366f1';
+                if (isChanged) {
+                    saveBtn.disabled = false;
+                    saveBtn.style.opacity = '1';
+                    saveBtn.style.cursor = 'pointer';
+                    saveBtn.style.background = '#10b981';
+                    saveBtn.classList.add('fasttag-btn-pulse');
+                } else {
+                    saveBtn.disabled = true;
+                    saveBtn.style.opacity = '0.45';
+                    saveBtn.style.cursor = 'not-allowed';
+                    saveBtn.style.background = '#475569';
+                    saveBtn.classList.remove('fasttag-btn-pulse');
+                }
             }
             return;
         }
@@ -1250,10 +1440,13 @@
 
         const currentNum = sequentialEditState.currentIndex + 1;
         const totalNum = sequentialEditState.allSceneCards.length;
-        if (title) title.textContent = `Edit ${config.pluralTitle} [${currentNum}/${totalNum}]`;
-
         const isLast = currentNum >= totalNum;
-        const isChanged = hasSelectionChanged(selectedIds);
+
+        if (title) {
+            title.innerHTML = `<span style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; font-size: 13px; line-height: 1; flex-shrink: 0; margin-right: 4px; user-select: none; transform: translateY(1.5px);">${icon}</span><span style="opacity: 0.85; font-size: 11px; background: rgba(99,102,241,0.22); padding: 1px 6px; border-radius: 4px; margin-right: 7px; font-weight: 700; color: #a5b4fc; white-space: nowrap; flex-shrink: 0; line-height: 1.3;">[${currentNum}/${totalNum}]</span><span class="fasttag-marquee-box" style="flex: 1; min-width: 0; overflow: hidden; display: inline-flex; align-items: center;"><span class="fasttag-marquee-track"><span class="fasttag-marquee-item" data-raw-title="${escapeHtml(sceneTitle)}" title="${escapeHtml(sceneTitle)}">${escapeHtml(sceneTitle)}</span></span></span>`;
+            title.title = `${sceneTitle} [${currentNum}/${totalNum}]`;
+            applyMarqueeAnimation(title);
+        }
 
         if (saveBtn) {
             saveBtn.disabled = false;
@@ -1263,9 +1456,11 @@
             if (isChanged) {
                 saveBtn.textContent = isLast ? 'Save & Close' : 'Save & Next Scene ►';
                 saveBtn.style.background = '#10b981';
+                saveBtn.classList.add('fasttag-btn-pulse');
             } else {
                 saveBtn.textContent = isLast ? 'Close' : 'Next Scene ►';
                 saveBtn.style.background = '#6366f1';
+                saveBtn.classList.remove('fasttag-btn-pulse');
             }
         }
 
@@ -1780,12 +1975,12 @@
             menu.appendChild(link);
         };
 
-        createMenuItem('Edit Tags...', () => openEntityPopup('tags', sceneId, cardElement));
-        createMenuItem('Edit Performers...', () => openEntityPopup('performers', sceneId, cardElement));
-        createMenuItem('Edit Studio...', () => openEntityPopup('studios', sceneId, cardElement));
-        createMenuItem('Edit Galleries...', () => openEntityPopup('galleries', sceneId, cardElement));
-        createMenuItem('Edit Scene', () => openEditScenePage(sceneId));
-        createMenuItem('⚡ Edit Everything...', () => openEditEverythingPopup(sceneId, cardElement));
+        createMenuItem('🏷️ Edit Tags', () => openEntityPopup('tags', sceneId, cardElement));
+        createMenuItem('⭐ Edit Performers', () => openEntityPopup('performers', sceneId, cardElement));
+        createMenuItem('🏢 Edit Studio', () => openEntityPopup('studios', sceneId, cardElement));
+        createMenuItem('🖼️ Edit Galleries', () => openEntityPopup('galleries', sceneId, cardElement));
+        createMenuItem('🎬 Edit Scene', () => openEditScenePage(sceneId));
+        createMenuItem('⚡ Edit Everything', () => openEditEverythingPopup(sceneId, cardElement));
 
         const bulkScenes = getBulkSelectedScenes();
         if (bulkScenes.length >= 2) {
@@ -1803,7 +1998,7 @@
             createMenuItem(`🏢 Bulk Studio (${bulkScenes.length})`, () => openBulkEntityPopup('studios', bulkScenes));
         }
 
-        createMenuItem('⚙️ FastTag Settings...', () => openSettingsModal());
+        createMenuItem('⚙️ FastTag Settings', () => openSettingsModal());
 
         const hr = document.createElement('div');
         hr.style.height = '1px';
@@ -1959,11 +2154,9 @@
             const fullTextSpaced = ' ' + rawCombined.replace(/[^a-z0-9]+/g, ' ') + ' ';
             if (!rawCombined.trim()) return [];
 
-            const existingSet = new Set(Array.from(existingIds || []).map(String));
             const suggestions = [];
 
             for (const item of allAvailableItems) {
-                if (existingSet.has(String(item.id))) continue;
                 const name = (item.name || item.title || '').trim();
                 if (!name || name.length < 2) continue;
 
@@ -1975,7 +2168,7 @@
 
                 if (fullTextSpaced.includes(nameSpaced)) {
                     suggestions.push(item);
-                    if (suggestions.length >= 15) break;
+                    if (suggestions.length >= 20) break;
                 }
             }
             return suggestions;
@@ -1989,6 +2182,9 @@
     function createPopupShell(type) {
         const config = ENTITY_CONFIG[type];
         const theme = getEffectiveTheme();
+        const isDark = theme === 'dark';
+        const kbdBg = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+        const kbdBorder = isDark ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid rgba(0, 0, 0, 0.12)';
         const savedSize = getSavedPopupSize('single');
         const form = document.createElement('form');
         form.id = 'scenes-popup';
@@ -1997,7 +2193,7 @@
         form.setAttribute('autocomplete', 'off');
         form.style.position = 'absolute';
         form.style.zIndex = '1000000';
-        form.style.padding = '14px';
+        form.style.padding = '8px 12px 12px 12px';
         form.style.borderRadius = '10px';
         const maxScreenW = Math.max(320, window.innerWidth - 16);
         const maxScreenH = Math.max(380, window.innerHeight - 16);
@@ -2015,7 +2211,7 @@
         form.style.fontFamily = 'system-ui, -apple-system, sans-serif';
 
         form.innerHTML = `
-            <div id="${type}-popup-header" class="popup-header" style="margin: 0 0 13px 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: grab; user-select: none; flex-shrink: 0; min-height: 24px;">
+            <div id="${type}-popup-header" class="popup-header" style="margin: 0 0 7px 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: grab; user-select: none; flex-shrink: 0; min-height: 20px;">
                 <div style="display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 0;">
                     <span id="${type}-popup-title" class="popup-title" style="font-size: 13px; font-weight: 600; line-height: 1.2; user-select: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: grab; display: inline-flex; align-items: center;">Edit ${config.pluralTitle}</span>
                 </div>
@@ -2032,8 +2228,9 @@
             </div>
             <div id="${type}-preview-container" style="flex-shrink: 0;"></div>
             <div style="display: flex; gap: 6px; margin-bottom: 8px; align-items: center; flex-shrink: 0;">
-                <div style="position: relative; flex: 1;">
+                <div style="position: relative; flex: 1; display: flex; align-items: center;">
                     <input type="text" id="${type}-search-input" class="popup-search-input" autocomplete="off" spellcheck="false" placeholder="Search ${config.pluralTitle.toLowerCase()}..." style="width: 100%; padding: 7px 28px 7px 10px; box-sizing: border-box; border-radius: 6px; font-size: 12px; outline: none;">
+                    <span id="${type}-kbd-shortcut" style="position: absolute; right: 8px; font-size: 10px; font-weight: 700; opacity: 0.5; background: ${kbdBg}; padding: 1px 5px; border-radius: 4px; border: ${kbdBorder}; pointer-events: none; user-select: none;">/</span>
                     <span id="${type}-search-clear" class="popup-search-clear" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 16px; line-height: 1; display: none; user-select: none;">&times;</span>
                 </div>
                 <button type="button" id="${type}-create-btn" style="padding: 7px 9px; cursor: pointer; font-size: 12px; font-weight: 500; background: #059669; color: white; border: none; border-radius: 6px; white-space: nowrap; display: none;">+ Create</button>
@@ -2065,6 +2262,7 @@
             tableContainer: form.querySelector(`#${type}-tabulator-table`),
             searchInput: form.querySelector(`#${type}-search-input`),
             searchClear: form.querySelector(`#${type}-search-clear`),
+            kbdShortcut: form.querySelector(`#${type}-kbd-shortcut`),
             createBtn: form.querySelector(`#${type}-create-btn`),
             refreshBtn: form.querySelector(`#${type}-refresh-btn`),
             saveBtn: form.querySelector(`#${type}-save-btn`),
@@ -2587,6 +2785,7 @@
         const clearBtn = activePopup.searchClear;
         const createBtn = activePopup.createBtn;
         const refreshBtn = activePopup.refreshBtn;
+        const kbdShortcut = activePopup.kbdShortcut;
         const saveBtn = activePopup.saveBtn;
 
         saveBtn.textContent = `Apply to ${bulkScenes.length} Scenes`;
@@ -2595,6 +2794,7 @@
             const hasVal = filterInput.value.trim().length > 0;
             clearBtn.style.display = hasVal ? 'block' : 'none';
             createBtn.style.display = hasVal ? 'block' : 'none';
+            if (kbdShortcut) kbdShortcut.style.display = hasVal ? 'none' : 'block';
         };
 
         const onChipSelect = () => {
@@ -2695,14 +2895,20 @@
             const val = filterInput.value.trim();
             if (!val) return;
 
-            const res = await fetchGQL(config.createQuery, config.createVariables(val));
+            const confirmedName = await promptCreateEntityDialog(type, val, form);
+            if (!confirmedName) {
+                filterInput.focus({ preventScroll: true });
+                return;
+            }
+
+            const res = await fetchGQL(config.createQuery, config.createVariables(confirmedName));
             const newId = config.createExtract(res.data);
 
             if (newId) {
-                toastSuccess(`${config.title} created successfully`);
+                toastSuccess(`${config.title} "${confirmedName}" created successfully`);
                 invalidateCache(type);
                 selectedIds.add(String(newId));
-                addRecentEntry(type, { id: newId, [config.labelKey]: val });
+                addRecentEntry(type, { id: newId, [config.labelKey]: confirmedName });
                 filterInput.value = '';
                 updateVisibility();
                 await fetchData("", true);
@@ -2755,6 +2961,127 @@
         positionPopupNearCard(form, bulkScenes[0].card || document.body);
     }
 
+    function promptCreateEntityDialog(type, initialValue, parentForm) {
+        return new Promise((resolve) => {
+            const config = ENTITY_CONFIG[type];
+            const theme = getEffectiveTheme();
+            const isDark = theme === 'dark';
+
+            const overlay = document.createElement('div');
+            overlay.className = 'fasttag-create-dialog-overlay';
+            overlay.style.cssText = `
+                position: absolute;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0, 0, 0, 0.65);
+                backdrop-filter: blur(2px);
+                z-index: 1000100;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 10px;
+                padding: 16px;
+                box-sizing: border-box;
+                animation: fasttagFadeInDialog 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+            `;
+
+            const dialog = document.createElement('div');
+            dialog.className = 'fasttag-create-dialog-card';
+            const cardBg = isDark ? '#1e293b' : '#ffffff';
+            const cardBorder = isDark ? '1px solid rgba(148, 163, 184, 0.25)' : '1px solid #cbd5e1';
+            const textColor = isDark ? '#f8fafc' : '#0f172a';
+            const inputBg = isDark ? 'rgba(15, 23, 42, 0.6)' : '#f8fafc';
+            const inputBorder = isDark ? '1px solid rgba(148, 163, 184, 0.3)' : '1px solid #cbd5e1';
+            const icon = type === 'tags' ? '🏷️' : (type === 'performers' ? '⭐' : '🏢');
+            const actionColor = type === 'tags' ? '#059669' : (type === 'performers' ? '#0284c7' : '#6366f1');
+
+            dialog.style.cssText = `
+                background: ${cardBg};
+                border: ${cardBorder};
+                border-radius: 8px;
+                padding: 16px 18px;
+                width: 100%;
+                max-width: 360px;
+                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                color: ${textColor};
+                box-sizing: border-box;
+            `;
+
+            dialog.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div style="font-size: 13.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                        <span>${icon}</span>
+                        <span>Create New ${config.title}</span>
+                    </div>
+                    <button type="button" class="fasttag-dialog-close-btn" style="background: none; border: none; font-size: 18px; line-height: 1; cursor: pointer; color: inherit; opacity: 0.6; padding: 0 4px;" title="Cancel">&times;</button>
+                </div>
+                <div>
+                    <label style="font-size: 11.5px; font-weight: 600; opacity: 0.85; margin-bottom: 4px; display: block; color: ${textColor};">${config.title} Name:</label>
+                    <input type="text" class="fasttag-dialog-input" value="${escapeHtml(initialValue)}" style="width: 100%; padding: 7px 10px; border-radius: 6px; font-size: 13px; font-weight: 500; background: ${inputBg}; border: ${inputBorder}; color: ${isDark ? '#ffffff' : '#0f172a'} !important; outline: none; box-sizing: border-box;">
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;">
+                    <button type="button" class="fasttag-dialog-cancel-btn" style="padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; background: transparent; border: ${inputBorder}; color: inherit; transition: all 0.15s ease;">Cancel</button>
+                    <button type="button" class="fasttag-dialog-confirm-btn" style="padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; background: ${actionColor}; border: none; color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: all 0.15s ease;">Create ${config.title}</button>
+                </div>
+            `;
+
+            overlay.appendChild(dialog);
+            parentForm.appendChild(overlay);
+
+            const input = dialog.querySelector('.fasttag-dialog-input');
+            const confirmBtn = dialog.querySelector('.fasttag-dialog-confirm-btn');
+            const cancelBtn = dialog.querySelector('.fasttag-dialog-cancel-btn');
+            const closeBtn = dialog.querySelector('.fasttag-dialog-close-btn');
+
+            const cleanup = (val) => {
+                if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                resolve(val);
+            };
+
+            const doConfirm = () => {
+                const finalVal = (input.value || '').trim();
+                if (finalVal) {
+                    cleanup(finalVal);
+                } else {
+                    input.focus();
+                }
+            };
+
+            const doCancel = () => cleanup(null);
+
+            confirmBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); doConfirm(); };
+            cancelBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); doCancel(); };
+            closeBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); doCancel(); };
+
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    doConfirm();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    doCancel();
+                }
+            };
+
+            overlay.onclick = (e) => {
+                if (e.target === overlay) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    doCancel();
+                }
+            };
+
+            setTimeout(() => {
+                input.focus();
+                input.select();
+            }, 50);
+        });
+    }
+
     // --- Edit Everything (Tags + Performers + Studios) ---
     function createEditEverythingPopupShell() {
         const theme = getEffectiveTheme();
@@ -2778,7 +3105,7 @@
         form.setAttribute('autocomplete', 'off');
         form.style.position = 'absolute';
         form.style.zIndex = '1000000';
-        form.style.padding = '14px';
+        form.style.padding = '8px 12px 12px 12px';
         form.style.borderRadius = '10px';
         const maxScreenW = Math.max(320, window.innerWidth - 16);
         const maxScreenH = Math.max(380, window.innerHeight - 16);
@@ -2799,7 +3126,7 @@
         form.style.fontFamily = 'system-ui, -apple-system, sans-serif';
 
         form.innerHTML = `
-            <div id="everything-popup-header" class="popup-header" style="margin: 0 0 10px 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: grab; user-select: none; flex-shrink: 0; min-height: 24px;">
+            <div id="everything-popup-header" class="popup-header" style="margin: 0 0 7px 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: grab; user-select: none; flex-shrink: 0; min-height: 20px;">
                 <div style="display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 0;">
                     <span id="everything-popup-title" class="popup-title" style="font-size: 13px; font-weight: 600; line-height: 1.2; user-select: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: grab; display: inline-flex; align-items: center;">⚡ Edit Scene (Tags + Performers + Studio)</span>
                 </div>
@@ -2870,6 +3197,7 @@
                     </div>
                     <div id="everything-tags-chips" style="display: none; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; flex-shrink: 0;"></div>
                     <div id="everything-tags-table" style="width: 100%; flex: 1 1 auto; min-height: 80px; box-sizing: border-box; overflow: hidden;"></div>
+                    <div id="everything-tags-bottom-create" style="display: none; padding: 6px 0 2px 0; justify-content: center; flex-shrink: 0;"></div>
                 </div>
 
                 <!-- Clean Single 1px Vertical Divider / Resizer with invisible wide hit-area -->
@@ -2885,6 +3213,7 @@
                     </div>
                     <div id="everything-performers-chips" style="display: none; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; flex-shrink: 0;"></div>
                     <div id="everything-performers-table" style="width: 100%; flex: 1 1 auto; min-height: 80px; box-sizing: border-box; overflow: hidden;"></div>
+                    <div id="everything-performers-bottom-create" style="display: none; padding: 6px 0 2px 0; justify-content: center; flex-shrink: 0;"></div>
                 </div>
             </div>
 
@@ -2934,12 +3263,14 @@
             tags: {
                 badge: form.querySelector('#everything-tags-badge'),
                 chipsContainer: form.querySelector('#everything-tags-chips'),
-                tableContainer: form.querySelector('#everything-tags-table')
+                tableContainer: form.querySelector('#everything-tags-table'),
+                bottomCreateContainer: form.querySelector('#everything-tags-bottom-create')
             },
             performers: {
                 badge: form.querySelector('#everything-performers-badge'),
                 chipsContainer: form.querySelector('#everything-performers-chips'),
-                tableContainer: form.querySelector('#everything-performers-table')
+                tableContainer: form.querySelector('#everything-performers-table'),
+                bottomCreateContainer: form.querySelector('#everything-performers-bottom-create')
             },
             saveBtn: form.querySelector('#everything-save-btn'),
             cancelBtn: form.querySelector('#everything-cancel-btn')
@@ -3054,14 +3385,14 @@
         const rawCombined = `${cardText} ${title} ${details} ${fileName} ${filePath}`.toLowerCase();
         const fullTextSpaced = ' ' + rawCombined.replace(/[^a-z0-9]+/g, ' ') + ' ';
         const types = [
-            { type: 'tags', icon: '🏷️', selected: ctx.selectedTagIds },
-            { type: 'performers', icon: '⭐', selected: ctx.selectedPerformerIds },
-            { type: 'studios', icon: '🏢', selected: new Set(ctx.selectedStudioId() ? [ctx.selectedStudioId()] : []) }
+            { type: 'tags', icon: '🏷️' },
+            { type: 'performers', icon: '⭐' },
+            { type: 'studios', icon: '🏢' }
         ];
 
         const allSuggestions = [];
 
-        for (const { type, icon, selected } of types) {
+        for (const { type, icon } of types) {
             const config = ENTITY_CONFIG[type];
             let cached = getCachedOrNull(type);
             if (!cached) {
@@ -3072,7 +3403,6 @@
             if (!cached) continue;
 
             for (const item of cached) {
-                if (selected.has(String(item.id))) continue;
                 const name = (item.name || item.title || '').trim();
                 if (!name || name.length < 2) continue;
 
@@ -3081,21 +3411,15 @@
 
                 if (fullTextSpaced.includes(' ' + nameClean + ' ')) {
                     allSuggestions.push({ type, icon, item });
-                    if (allSuggestions.length >= 15) break;
+                    if (allSuggestions.length >= 25) break;
                 }
             }
         }
-
-        const tagSuggestions = allSuggestions.filter(s => s.type === 'tags');
-        const perfSuggestions = allSuggestions.filter(s => s.type === 'performers' || s.type === 'studios');
 
         const tagsBox = container.querySelector('#everything-sugg-tags-box');
         const tagsChips = container.querySelector('#everything-sugg-tags-chips');
         const perfBox = container.querySelector('#everything-sugg-performers-box');
         const perfChips = container.querySelector('#everything-sugg-performers-chips');
-
-        if (tagsChips) tagsChips.innerHTML = '';
-        if (perfChips) perfChips.innerHTML = '';
 
         const updateBoxVisibility = () => {
             const hasRealTags = tagsChips && tagsChips.querySelectorAll('.fasttag-suggestion-chip').length > 0;
@@ -3179,37 +3503,55 @@
             chip.addEventListener('click', async (e) => {
                 e.preventDefault();
                 await activateSuggestion(sug);
-                chip.remove();
-                updateBoxVisibility();
                 ctx.refreshAllUI();
             });
 
             if (parentChipsContainer) parentChipsContainer.appendChild(chip);
         };
 
-        tagSuggestions.forEach(s => createSuggestionChip(s, tagsChips));
-        perfSuggestions.forEach(s => createSuggestionChip(s, perfChips));
-        updateBoxVisibility();
+        const renderSuggestionsUI = () => {
+            if (tagsChips) tagsChips.innerHTML = '';
+            if (perfChips) perfChips.innerHTML = '';
+
+            const tagSuggestions = allSuggestions.filter(s => s.type === 'tags' && !ctx.selectedTagIds.has(String(s.item.id)));
+            const perfSuggestions = allSuggestions.filter(s => {
+                if (s.type === 'performers') return !ctx.selectedPerformerIds.has(String(s.item.id));
+                if (s.type === 'studios') return ctx.selectedStudioId() !== String(s.item.id);
+                return false;
+            });
+
+            tagSuggestions.forEach(s => createSuggestionChip(s, tagsChips));
+            perfSuggestions.forEach(s => createSuggestionChip(s, perfChips));
+            updateBoxVisibility();
+        };
+
+        container._fastTagRenderSuggestions = renderSuggestionsUI;
+        renderSuggestionsUI();
     }
 
     async function navigateSequentialEditEverything(popup, sceneId, direction, doSaveFn) {
         if (!sequentialEditState.enabled) return;
 
-        if (typeof doSaveFn === 'function') {
-            await doSaveFn();
+        const ctx = popup._context;
+        if (ctx && typeof doSaveFn === 'function' && typeof ctx.isDirty === 'function') {
+            if (ctx.isDirty()) {
+                await doSaveFn();
+            }
         }
 
         const form = popup.element;
-        const formRect = form.getBoundingClientRect();
-        const minTop = window.scrollY + 8;
-        const minLeft = window.scrollX + 8;
-        const maxAllowedTop = Math.max(minTop, window.scrollY + window.innerHeight - form.offsetHeight - 8);
-        const maxAllowedLeft = Math.max(minLeft, window.scrollX + window.innerWidth - form.offsetWidth - 8);
+        if (form && form.isConnected) {
+            const formRect = form.getBoundingClientRect();
+            const minTop = window.scrollY + 8;
+            const minLeft = window.scrollX + 8;
+            const maxAllowedTop = Math.max(minTop, window.scrollY + window.innerHeight - form.offsetHeight - 8);
+            const maxAllowedLeft = Math.max(minLeft, window.scrollX + window.innerWidth - form.offsetWidth - 8);
 
-        sequentialEditState.popupPosition = {
-            left: Math.max(minLeft, Math.min(maxAllowedLeft, formRect.left + window.scrollX)),
-            top: Math.max(minTop, Math.min(maxAllowedTop, formRect.top + window.scrollY))
-        };
+            sequentialEditState.popupPosition = {
+                left: Math.max(minLeft, Math.min(maxAllowedLeft, formRect.left + window.scrollX)),
+                top: Math.max(minTop, Math.min(maxAllowedTop, formRect.top + window.scrollY))
+            };
+        }
 
         if (!sequentialEditState.allSceneCards || sequentialEditState.allSceneCards.length === 0) {
             sequentialEditState.allSceneCards = getAllVisibleSceneCards();
@@ -3246,11 +3588,11 @@
         const prevBtn = popup.prevBtn;
         const nextBtn = popup.nextBtn;
         const titleSpan = popup.titleSpan;
-        const saveBtn = popup.saveBtn;
 
         const updateUI = () => {
             const isEnabled = sequentialEditState.enabled;
             seqCheckbox.checked = isEnabled;
+            const sceneTitle = getSceneTitle(popup.sceneData, sceneId, cardElement);
 
             if (isEnabled) {
                 if (!sequentialEditState.allSceneCards || sequentialEditState.allSceneCards.length === 0) {
@@ -3260,7 +3602,9 @@
                 const idx = getSceneCardIndex(sceneId, cards);
                 if (idx !== -1) {
                     sequentialEditState.currentIndex = idx;
-                    titleSpan.textContent = `⚡ Edit Everything [${idx + 1}/${cards.length}]`;
+                    titleSpan.innerHTML = `<span style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; font-size: 13px; line-height: 1; flex-shrink: 0; margin-right: 4px; user-select: none; transform: translateY(1.5px);">⚡</span><span style="opacity: 0.85; font-size: 11px; background: rgba(99,102,241,0.22); padding: 1px 6px; border-radius: 4px; margin-right: 7px; font-weight: 700; color: #a5b4fc; white-space: nowrap; flex-shrink: 0; line-height: 1.3;">[${idx + 1}/${cards.length}]</span><span class="fasttag-marquee-box" style="flex: 1; min-width: 0; overflow: hidden; display: inline-flex; align-items: center;"><span class="fasttag-marquee-track"><span class="fasttag-marquee-item" data-raw-title="${escapeHtml(sceneTitle)}" title="${escapeHtml(sceneTitle)}">${escapeHtml(sceneTitle)}</span></span></span>`;
+                    titleSpan.title = `${sceneTitle} [${idx + 1}/${cards.length}]`;
+                    applyMarqueeAnimation(titleSpan);
                     const isFirst = idx === 0;
                     const isLast = idx === cards.length - 1;
 
@@ -3271,20 +3615,15 @@
                     nextBtn.disabled = isLast;
                     nextBtn.style.opacity = isLast ? '0.4' : '1';
                     nextBtn.style.cursor = isLast ? 'not-allowed' : 'pointer';
-
-                    if (saveBtn) {
-                        saveBtn.textContent = isLast ? 'Save & Close' : 'Save & Next Scene ►';
-                    }
                 }
                 if (popup.navGroup) {
                     popup.navGroup.style.maxWidth = '60px';
                     popup.navGroup.style.opacity = '1';
                 }
             } else {
-                titleSpan.textContent = '⚡ Edit Scene (Tags + Performers + Studio)';
-                if (saveBtn) {
-                    saveBtn.textContent = 'Save Scene';
-                }
+                titleSpan.innerHTML = `<span style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; font-size: 13px; line-height: 1; flex-shrink: 0; margin-right: 7px; user-select: none; transform: translateY(1.5px);">⚡</span><span class="fasttag-marquee-box" style="flex: 1; min-width: 0; overflow: hidden; display: inline-flex; align-items: center;"><span class="fasttag-marquee-track"><span class="fasttag-marquee-item" data-raw-title="${escapeHtml(sceneTitle)}" title="${escapeHtml(sceneTitle)}">${escapeHtml(sceneTitle)}</span></span></span>`;
+                titleSpan.title = sceneTitle;
+                applyMarqueeAnimation(titleSpan);
                 if (popup.navGroup) {
                     popup.navGroup.style.maxWidth = '0';
                     popup.navGroup.style.opacity = '0';
@@ -3304,7 +3643,7 @@
 
         updateUI();
 
-        seqCheckbox.addEventListener('change', (e) => {
+        seqCheckbox.onchange = (e) => {
             if (e.target.checked) {
                 sequentialEditState.enabled = true;
                 localStorage.setItem('fasttag_sequential_edit_mode', 'true');
@@ -3312,229 +3651,257 @@
                 sequentialEditState.currentIndex = getSceneCardIndex(sceneId, sequentialEditState.allSceneCards);
                 sequentialEditState.currentSceneId = sceneId;
                 const form = popup.element;
-                const formRect = form.getBoundingClientRect();
-                sequentialEditState.popupPosition = {
-                    left: formRect.left + window.scrollX,
-                    top: formRect.top + window.scrollY
-                };
+                if (form) {
+                    const formRect = form.getBoundingClientRect();
+                    sequentialEditState.popupPosition = {
+                        left: formRect.left + window.scrollX,
+                        top: formRect.top + window.scrollY
+                    };
+                }
             } else {
                 sequentialEditState.enabled = false;
                 localStorage.setItem('fasttag_sequential_edit_mode', 'false');
                 resetSequentialEditState();
             }
             updateUI();
-        });
+            popup._context?.refreshAllUI?.();
+        };
 
-        prevBtn.addEventListener('click', (e) => {
+        prevBtn.onclick = (e) => {
             e.preventDefault();
+            e.stopPropagation();
             navigateSequentialEditEverything(popup, sceneId, -1, doSaveFn);
-        });
+        };
 
-        nextBtn.addEventListener('click', (e) => {
+        nextBtn.onclick = (e) => {
             e.preventDefault();
+            e.stopPropagation();
             navigateSequentialEditEverything(popup, sceneId, 1, doSaveFn);
-        });
+        };
     }
 
     async function loadEditEverythingDataIntoPopup(sceneId, cardElement, popup) {
-        const ctx = popup._context;
-        if (!ctx) return;
-
-        ctx.setCurrentSceneId(sceneId);
-        attachScenePreview(popup.previewContainer, sceneId, cardElement);
-
-        popup.globalSearch.value = '';
-        popup.globalClear.style.display = 'none';
-        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-
-        const sceneQuery = `
-            query FindSceneEverything($id: ID!) {
-                findScene(id: $id) {
-                    id
-                    title
-                    details
-                    files { path }
-                    tags { id name }
-                    performers { id name disambiguation }
-                    studio { id name }
-                }
-            }
-        `;
-
-        let sceneData = null;
         try {
-            const res = await fetchGQL(sceneQuery, { id: sceneId });
-            sceneData = res?.data?.findScene;
-        } catch (e) {
-            console.error('[FastTag] Error loading scene details:', e);
+            const ctx = popup._context;
+            if (!ctx) return;
+
+            ctx.setCurrentSceneId(sceneId);
+            attachScenePreview(popup.previewContainer, sceneId, cardElement);
+
+            popup.globalSearch.value = '';
+            popup.globalClear.style.display = 'none';
+            if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+
+            const sceneQuery = `
+                query FindSceneEverything($id: ID!) {
+                    findScene(id: $id) {
+                        id
+                        title
+                        details
+                        files { path }
+                        tags { id name }
+                        performers { id name disambiguation }
+                        studio { id name }
+                    }
+                }
+            `;
+
+            let sceneData = null;
+            try {
+                const res = await fetchGQL(sceneQuery, { id: sceneId });
+                sceneData = res?.data?.findScene;
+            } catch (e) {
+                console.error('[FastTag] Error loading scene details:', e);
+            }
+            popup.sceneData = sceneData;
+
+            const selTags = new Set((sceneData?.tags || []).map(t => String(t.id)));
+            const selPerfs = new Set((sceneData?.performers || []).map(p => String(p.id)));
+            const selStud = sceneData?.studio?.id ? String(sceneData.studio.id) : null;
+
+            ctx.setSelectedTags(selTags);
+            ctx.setSelectedPerformers(selPerfs);
+            ctx.setSelectedStudio(selStud);
+            ctx.setInitialTags(new Set(selTags));
+            ctx.setInitialPerformers(new Set(selPerfs));
+            ctx.setInitialStudio(selStud);
+
+            setupSequentialEditEverythingHandlers(popup, sceneId, cardElement, ctx.doSave);
+
+            await Promise.all([
+                ctx.fetchColumnData('tags', popup.tagsTable, '', selTags),
+                ctx.fetchColumnData('performers', popup.performersTable, '', selPerfs)
+            ]);
+
+            const tagHolder = popup.tags.tableContainer?.querySelector('.tabulator-tableholder');
+            if (tagHolder) tagHolder.scrollTop = 0;
+            const perfHolder = popup.performers.tableContainer?.querySelector('.tabulator-tableholder');
+            if (perfHolder) perfHolder.scrollTop = 0;
+
+            await ctx.renderStudioBar('');
+            ctx.refreshAllUI();
+
+            await loadUnifiedSuggestions(sceneId, cardElement, popup.suggestionsContainer, {
+                selectedTagIds: selTags,
+                selectedPerformerIds: selPerfs,
+                selectedStudioId: () => ctx.getSelectedStudio(),
+                setStudioId: (id) => { ctx.setSelectedStudio(id); },
+                tagsTable: popup.tagsTable,
+                performersTable: popup.performersTable,
+                fetchColumnData: ctx.fetchColumnData,
+                renderStudioBar: ctx.renderStudioBar,
+                onSuggestionActivated: ctx.onSuggestionActivated,
+                doSave: ctx.doSave,
+                refreshAllUI: ctx.refreshAllUI
+            });
+        } catch (err) {
+            console.error('[FastTag] Error in loadEditEverythingDataIntoPopup:', err);
+            toastError(`Error loading data: ${err?.message || err}`);
         }
-        popup.sceneData = sceneData;
-
-        const selTags = new Set((sceneData?.tags || []).map(t => String(t.id)));
-        const selPerfs = new Set((sceneData?.performers || []).map(p => String(p.id)));
-        const selStud = sceneData?.studio?.id ? String(sceneData.studio.id) : null;
-
-        ctx.setSelectedTags(selTags);
-        ctx.setSelectedPerformers(selPerfs);
-        ctx.setSelectedStudio(selStud);
-        ctx.setInitialTags(new Set(selTags));
-        ctx.setInitialPerformers(new Set(selPerfs));
-        ctx.setInitialStudio(selStud);
-
-        setupSequentialEditEverythingHandlers(popup, sceneId, cardElement, ctx.doSave);
-
-        await Promise.all([
-            ctx.fetchColumnData('tags', popup.tagsTable, '', selTags),
-            ctx.fetchColumnData('performers', popup.performersTable, '', selPerfs)
-        ]);
-
-        const tagHolder = popup.tags.tableContainer?.querySelector('.tabulator-tableholder');
-        if (tagHolder) tagHolder.scrollTop = 0;
-        const perfHolder = popup.performers.tableContainer?.querySelector('.tabulator-tableholder');
-        if (perfHolder) perfHolder.scrollTop = 0;
-
-        await ctx.renderStudioBar('');
-        ctx.refreshAllUI();
-
-        await loadUnifiedSuggestions(sceneId, cardElement, popup.suggestionsContainer, {
-            selectedTagIds: selTags,
-            selectedPerformerIds: selPerfs,
-            selectedStudioId: () => ctx.getSelectedStudio(),
-            setStudioId: (id) => { ctx.setSelectedStudio(id); },
-            tagsTable: popup.tagsTable,
-            performersTable: popup.performersTable,
-            fetchColumnData: ctx.fetchColumnData,
-            renderStudioBar: ctx.renderStudioBar,
-            onSuggestionActivated: ctx.onSuggestionActivated,
-            doSave: ctx.doSave,
-            refreshAllUI: ctx.refreshAllUI
-        });
     }
 
     async function openEditEverythingPopup(sceneId, cardElement) {
-        if (!isTabulatorLoaded()) {
-            await ensureDependenciesLoaded();
-        }
-        if (!isTabulatorLoaded()) {
-            toastError("Tabulator library failed to load. Please check your internet connection or adblocker.");
-            return;
-        }
-
-        // If the Everything popup is already open, reuse it in-place! Zero redraw flash!
-        if (activePopup && activePopup.type === 'everything' && activePopup.element && activePopup.element.isConnected) {
-            await loadEditEverythingDataIntoPopup(sceneId, cardElement, activePopup);
-            return;
-        }
-
-        closePopup(false);
-
-        popupAbortController = new AbortController();
-        const { signal } = popupAbortController;
-
-        const popup = createEditEverythingPopupShell();
-        popup.type = 'everything';
-        activePopup = popup;
-        const form = popup.element;
-
-        let selectedTagIds = new Set();
-        let selectedPerformerIds = new Set();
-        let selectedStudioId = null;
-        let initialTagIds = new Set();
-        let initialPerformerIds = new Set();
-        let initialStudioId = null;
-        let isRestoring = false;
-        let currentSceneId = sceneId;
-
-        // Initialize Tabulator tables once
-        const tagsTable = new Tabulator(popup.tags.tableContainer, {
-            data: [],
-            layout: "fitColumns",
-            columnResizeMode: "fit",
-            height: "100%",
-            placeholder: "No Tags Found",
-            selectable: true,
-            index: "id",
-            columnDefaults: { headerSort: false },
-            columns: getColumnsWithSavedWidths('tags', 'everything')
-        });
-        attachColumnWidthSaver(tagsTable, 'tags', 'everything');
-
-        const performersTable = new Tabulator(popup.performers.tableContainer, {
-            data: [],
-            layout: "fitColumns",
-            columnResizeMode: "fit",
-            height: "100%",
-            placeholder: "No Performers Found",
-            selectable: true,
-            index: "id",
-            columnDefaults: { headerSort: false },
-            columns: getColumnsWithSavedWidths('performers', 'everything')
-        });
-        attachColumnWidthSaver(performersTable, 'performers', 'everything');
-
-        popup.tagsTable = tagsTable;
-        popup.performersTable = performersTable;
-
-        const isDirty = () => {
-            if (selectedStudioId !== initialStudioId) return true;
-            if (selectedTagIds.size !== initialTagIds.size) return true;
-            if (selectedPerformerIds.size !== initialPerformerIds.size) return true;
-            for (const id of selectedTagIds) {
-                if (!initialTagIds.has(id)) return true;
+        try {
+            if (!isTabulatorLoaded()) {
+                await ensureDependenciesLoaded();
             }
-            for (const id of selectedPerformerIds) {
-                if (!initialPerformerIds.has(id)) return true;
+            if (!isTabulatorLoaded()) {
+                toastError("Tabulator library failed to load. Please check your internet connection or adblocker.");
+                return;
             }
-            return false;
-        };
 
-        const updateBadges = () => {
-            popup.tags.badge.textContent = `${selectedTagIds.size} selected`;
-            popup.performers.badge.textContent = `${selectedPerformerIds.size} selected`;
-        };
+            // If the Everything popup is already open, reuse it in-place! Zero redraw flash!
+            if (activePopup && activePopup.type === 'everything' && activePopup.element && activePopup.element.isConnected) {
+                await loadEditEverythingDataIntoPopup(sceneId, cardElement, activePopup);
+                return;
+            }
 
-        const updateSaveButton = () => {
-            if (sequentialEditState.enabled) {
-                const dirty = isDirty();
-                const cards = sequentialEditState.allSceneCards || getAllVisibleSceneCards();
-                const idx = getSceneCardIndex(currentSceneId, cards);
-                const isLast = idx !== -1 && idx === cards.length - 1;
-                if (dirty) {
-                    popup.saveBtn.textContent = isLast ? 'Save & Close' : 'Save & Next Scene ►';
-                    popup.saveBtn.style.background = '#10b981';
-                } else {
-                    popup.saveBtn.textContent = isLast ? 'Close' : 'Next Scene ►';
-                    popup.saveBtn.style.background = '#6366f1';
+            closePopup(false);
+
+            popupAbortController = new AbortController();
+            const { signal } = popupAbortController;
+
+            const popup = createEditEverythingPopupShell();
+            popup.type = 'everything';
+            activePopup = popup;
+            const form = popup.element;
+
+            let selectedTagIds = new Set();
+            let selectedPerformerIds = new Set();
+            let selectedStudioId = null;
+            let initialTagIds = new Set();
+            let initialPerformerIds = new Set();
+            let initialStudioId = null;
+            let isRestoring = false;
+            let currentSceneId = sceneId;
+
+            // Initialize Tabulator tables once
+            const tagsTable = new Tabulator(popup.tags.tableContainer, {
+                data: [],
+                layout: "fitColumns",
+                columnResizeMode: "fit",
+                height: "100%",
+                placeholder: "No Tags Found",
+                selectable: true,
+                index: "id",
+                columnDefaults: { headerSort: false },
+                columns: getColumnsWithSavedWidths('tags', 'everything')
+            });
+            attachColumnWidthSaver(tagsTable, 'tags', 'everything');
+
+            const performersTable = new Tabulator(popup.performers.tableContainer, {
+                data: [],
+                layout: "fitColumns",
+                columnResizeMode: "fit",
+                height: "100%",
+                placeholder: "No Performers Found",
+                selectable: true,
+                index: "id",
+                columnDefaults: { headerSort: false },
+                columns: getColumnsWithSavedWidths('performers', 'everything')
+            });
+            attachColumnWidthSaver(performersTable, 'performers', 'everything');
+
+            popup.tagsTable = tagsTable;
+            popup.performersTable = performersTable;
+
+            const isDirty = () => {
+                if (selectedStudioId !== initialStudioId) return true;
+                if (selectedTagIds.size !== initialTagIds.size) return true;
+                if (selectedPerformerIds.size !== initialPerformerIds.size) return true;
+                for (const id of selectedTagIds) {
+                    if (!initialTagIds.has(id)) return true;
                 }
-            } else {
-                popup.saveBtn.textContent = 'Save Scene';
-                popup.saveBtn.style.background = '#4f46e5';
-            }
-        };
+                for (const id of selectedPerformerIds) {
+                    if (!initialPerformerIds.has(id)) return true;
+                }
+                return false;
+            };
 
-        const renderStudioBar = async (searchQuery = '') => {
-            const studioBar = popup.studioBar;
-            if (!studioBar) return;
+            const updateBadges = () => {
+                popup.tags.badge.textContent = `${selectedTagIds.size} selected`;
+                popup.performers.badge.textContent = `${selectedPerformerIds.size} selected`;
+            };
 
-            let allStudios = getCachedOrNull('studios');
-            if (!allStudios) {
-                const res = await fetchGQL(ENTITY_CONFIG.studios.fetchQuery);
-                allStudios = ENTITY_CONFIG.studios.extractList(res.data);
-                setCache('studios', allStudios);
-            }
-            if (!allStudios) return;
+            const updateSaveButton = () => {
+                const dirty = isDirty();
+                if (sequentialEditState.enabled) {
+                    const cards = sequentialEditState.allSceneCards || getAllVisibleSceneCards();
+                    const idx = getSceneCardIndex(currentSceneId, cards);
+                    const isLast = idx !== -1 && idx === cards.length - 1;
+                    if (dirty) {
+                        popup.saveBtn.textContent = isLast ? 'Save & Close' : 'Save & Next Scene ►';
+                        popup.saveBtn.style.background = '#10b981';
+                        popup.saveBtn.classList.add('fasttag-btn-pulse-calm');
+                    } else {
+                        popup.saveBtn.textContent = isLast ? 'Close' : 'Next Scene ►';
+                        popup.saveBtn.style.background = '#6366f1';
+                        popup.saveBtn.classList.remove('fasttag-btn-pulse-calm');
+                    }
+                    popup.saveBtn.disabled = false;
+                    popup.saveBtn.style.opacity = '1';
+                    popup.saveBtn.style.cursor = 'pointer';
+                } else {
+                    popup.saveBtn.textContent = 'Save Scene';
+                    if (dirty) {
+                        popup.saveBtn.disabled = false;
+                        popup.saveBtn.style.opacity = '1';
+                        popup.saveBtn.style.cursor = 'pointer';
+                        popup.saveBtn.style.background = '#10b981';
+                        popup.saveBtn.classList.add('fasttag-btn-pulse-calm');
+                    } else {
+                        popup.saveBtn.disabled = true;
+                        popup.saveBtn.style.opacity = '0.45';
+                        popup.saveBtn.style.cursor = 'not-allowed';
+                        popup.saveBtn.style.background = '#475569';
+                        popup.saveBtn.classList.remove('fasttag-btn-pulse-calm');
+                    }
+                }
+            };
 
-            if (selectedStudioId) {
-                const curStudio = allStudios.find(s => String(s.id) === String(selectedStudioId)) || (popup.sceneData?.studio?.id === selectedStudioId ? popup.sceneData.studio : null);
-                if (curStudio) {
-                    studioBar.chipName.textContent = curStudio.name;
-                    studioBar.chip.style.display = 'inline-flex';
+            const renderStudioBar = async (searchQuery = '') => {
+                const studioBar = popup.studioBar;
+                if (!studioBar) return;
+
+                let allStudios = getCachedOrNull('studios');
+                if (!allStudios) {
+                    const res = await fetchGQL(ENTITY_CONFIG.studios.fetchQuery);
+                    allStudios = ENTITY_CONFIG.studios.extractList(res.data);
+                    setCache('studios', allStudios);
+                }
+                if (!allStudios) return;
+
+                if (selectedStudioId) {
+                    const curStudio = allStudios.find(s => String(s.id) === String(selectedStudioId)) || (popup.sceneData?.studio?.id === selectedStudioId ? popup.sceneData.studio : null);
+                    if (curStudio) {
+                        studioBar.chipName.textContent = curStudio.name;
+                        studioBar.chip.style.display = 'inline-flex';
+                    } else {
+                        studioBar.chip.style.display = 'none';
+                    }
                 } else {
                     studioBar.chip.style.display = 'none';
                 }
-            } else {
-                studioBar.chip.style.display = 'none';
-            }
 
             const term = searchQuery ? searchQuery.trim().toLowerCase() : '';
             studioBar.recentContainer.innerHTML = '';
@@ -3582,309 +3949,416 @@
                         addRecentEntry('studios', st);
                     }
                     refreshAllUI();
-                    if (!sequentialEditState.enabled) {
-                        await doSave();
-                    }
+                    await doSave();
                 };
 
                 studioBar.recentContainer.appendChild(chip);
             });
-        };
+            };
 
-        popup.studioBar.clearBtn.onclick = async (e) => {
-            e.preventDefault();
-            selectedStudioId = null;
-            refreshAllUI();
-            if (!sequentialEditState.enabled) {
-                await doSave();
-            }
-        };
-
-        async function fetchColumnData(type, tableInstance, query, selIds) {
-            const config = ENTITY_CONFIG[type];
-            let cached = getCachedOrNull(type);
-            if (!cached) {
-                const res = await fetchGQL(config.fetchQuery);
-                cached = config.extractList(res.data);
-                setCache(type, cached);
-            }
-            if (!cached) return;
-
-            const term = query.trim().toLowerCase();
-            let data = cached;
-            const searchFields = config.searchFields || [config.labelKey];
-            if (term) {
-                const tokens = term.split(/\s+/);
-                data = cached.filter(item => {
-                    const itemSearchStr = searchFields
-                        .map(f => String(item[f] || '').trim().toLowerCase())
-                        .filter(Boolean)
-                        .join(' ');
-                    return tokens.every(t => itemSearchStr.includes(t));
-                });
+            if (popup.studioBar?.clearBtn) {
+                popup.studioBar.clearBtn.onclick = async (e) => {
+                    e.preventDefault();
+                    selectedStudioId = null;
+                    refreshAllUI();
+                    await doSave();
+                };
             }
 
-            data.sort(getSmartSortComparator(term, selIds, config.labelKey, searchFields));
-
-            isRestoring = true;
-            try {
-                await tableInstance.setData(data);
-                selIds.forEach(id => {
-                    const r = tableInstance.getRow(id);
-                    if (r) tableInstance.selectRow(r);
-                });
-                tableInstance.redraw(true);
-            } finally {
-                isRestoring = false;
-            }
-        }
-
-        const onTagChipSelect = async () => {
-            popup.globalSearch.value = '';
-            popup.globalClear.style.display = 'none';
-            if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-            await Promise.all([
-                fetchColumnData('tags', tagsTable, '', selectedTagIds),
-                fetchColumnData('performers', performersTable, '', selectedPerformerIds)
-            ]);
-            const holder = popup.tags.tableContainer?.querySelector('.tabulator-tableholder');
-            if (holder) holder.scrollTop = 0;
-            refreshAllUI();
-            if (!sequentialEditState.enabled) {
-                await doSave();
-            }
-        };
-
-        const onPerformerChipSelect = async () => {
-            popup.globalSearch.value = '';
-            popup.globalClear.style.display = 'none';
-            if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-            await Promise.all([
-                fetchColumnData('tags', tagsTable, '', selectedTagIds),
-                fetchColumnData('performers', performersTable, '', selectedPerformerIds)
-            ]);
-            const holder = popup.performers.tableContainer?.querySelector('.tabulator-tableholder');
-            if (holder) holder.scrollTop = 0;
-            refreshAllUI();
-            if (!sequentialEditState.enabled) {
-                await doSave();
-            }
-        };
-
-        const refreshAllUI = () => {
-            updateBadges();
-            updateSaveButton();
-            renderStudioBar(popup.globalSearch.value);
-            renderColumnChips(popup.tags.chipsContainer, 'tags', popup.globalSearch, selectedTagIds, onTagChipSelect);
-            renderColumnChips(popup.performers.chipsContainer, 'performers', popup.globalSearch, selectedPerformerIds, onPerformerChipSelect);
-            try {
-                tagsTable.redraw(true);
-                performersTable.redraw(true);
-            } catch (e) {}
-        };
-        form._fastTagOnResize = refreshAllUI;
-
-        tagsTable.on("rowSelected", (row) => {
-            if (isRestoring) return;
-            const id = row.getData()?.id;
-            if (id) selectedTagIds.add(String(id));
-            refreshAllUI();
-        });
-        tagsTable.on("rowDeselected", (row) => {
-            if (isRestoring) return;
-            const id = row.getData()?.id;
-            if (id) selectedTagIds.delete(String(id));
-            refreshAllUI();
-        });
-
-        performersTable.on("rowSelected", (row) => {
-            if (isRestoring) return;
-            const id = row.getData()?.id;
-            if (id) selectedPerformerIds.add(String(id));
-            refreshAllUI();
-        });
-        performersTable.on("rowDeselected", (row) => {
-            if (isRestoring) return;
-            const id = row.getData()?.id;
-            if (id) selectedPerformerIds.delete(String(id));
-            refreshAllUI();
-        });
-
-        const refreshGlobalSearch = (val) => {
-            const query = (val || '').trim();
-            fetchColumnData('tags', tagsTable, query, selectedTagIds);
-            fetchColumnData('performers', performersTable, query, selectedPerformerIds);
-            renderStudioBar(query);
-        };
-
-        if (popup.searchConsole && popup.globalSearch) {
-            popup.globalSearch.addEventListener('focus', () => {
-                popup.searchConsole.style.borderColor = '#6366f1';
-                popup.searchConsole.style.boxShadow = '0 0 0 2px rgba(99, 102, 241, 0.25)';
-            });
-            popup.globalSearch.addEventListener('blur', () => {
-                const isDark = getEffectiveTheme() === 'dark';
-                popup.searchConsole.style.borderColor = isDark ? 'rgba(148, 163, 184, 0.25)' : '#cbd5e1';
-                popup.searchConsole.style.boxShadow = 'none';
-            });
-        }
-
-        let searchDebounce = null;
-        popup.globalSearch.addEventListener('input', () => {
-            const val = popup.globalSearch.value.trim();
-            const hasVal = val.length > 0;
-            popup.globalClear.style.display = hasVal ? 'block' : 'none';
-            if (popup.kbdShortcut) popup.kbdShortcut.style.display = hasVal ? 'none' : 'block';
-            clearTimeout(searchDebounce);
-            searchDebounce = setTimeout(() => {
-                refreshGlobalSearch(val);
-            }, 120);
-        });
-
-        popup.globalClear.addEventListener('click', () => {
-            popup.globalSearch.value = '';
-            popup.globalClear.style.display = 'none';
-            if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-            refreshGlobalSearch('');
-            popup.globalSearch.focus();
-        });
-
-        popup.refreshBtn.addEventListener('click', async () => {
-            invalidateCache('tags');
-            invalidateCache('performers');
-            invalidateCache('studios');
-            popup.globalSearch.value = '';
-            popup.globalClear.style.display = 'none';
-            if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-            await Promise.all([
-                fetchColumnData('tags', tagsTable, '', selectedTagIds),
-                fetchColumnData('performers', performersTable, '', selectedPerformerIds)
-            ]);
-            await renderStudioBar();
-            toastSuccess('Refreshed all caches');
-        });
-
-        const doSave = async () => {
-            const mutation = `
-                mutation SceneUpdateEverything($id: ID!, $tag_ids: [ID!], $performer_ids: [ID!], $studio_id: ID) {
-                    sceneUpdate(input: {
-                        id: $id,
-                        tag_ids: $tag_ids,
-                        performer_ids: $performer_ids,
-                        studio_id: $studio_id
-                    }) {
-                        id
-                    }
+            async function fetchColumnData(type, tableInstance, query, selIds) {
+                const config = ENTITY_CONFIG[type];
+                let cached = getCachedOrNull(type);
+                if (!cached) {
+                    const res = await fetchGQL(config.fetchQuery);
+                    cached = config.extractList(res.data);
+                    setCache(type, cached);
                 }
-            `;
-            try {
-                const res = await fetchGQL(mutation, {
-                    id: currentSceneId,
-                    tag_ids: Array.from(selectedTagIds),
-                    performer_ids: Array.from(selectedPerformerIds),
-                    studio_id: selectedStudioId || null
-                });
+                if (!cached) return;
 
-                if (res?.data?.sceneUpdate?.id) {
-                    selectedTagIds.forEach(id => {
-                        const row = tagsTable.getRow(id);
-                        if (row) addRecentEntry('tags', row.getData());
+                const term = query.trim().toLowerCase();
+                let data = cached;
+                const searchFields = config.searchFields || [config.labelKey];
+                if (term) {
+                    const tokens = term.split(/\s+/);
+                    data = cached.filter(item => {
+                        const itemSearchStr = searchFields
+                            .map(f => String(item[f] || '').trim().toLowerCase())
+                            .filter(Boolean)
+                            .join(' ');
+                        return tokens.every(t => itemSearchStr.includes(t));
                     });
-                    selectedPerformerIds.forEach(id => {
-                        const row = performersTable.getRow(id);
-                        if (row) addRecentEntry('performers', row.getData());
-                    });
-                    if (selectedStudioId) {
-                        const allStudios = getCachedOrNull('studios') || [];
-                        const st = allStudios.find(s => String(s.id) === String(selectedStudioId));
-                        if (st) addRecentEntry('studios', st);
-                    }
-
-                    await refreshSceneCards();
-                    toastSuccess('Scene saved successfully');
-                    return true;
                 }
-            } catch (e) {
-                toastError('Failed to save scene', e);
-            }
-            return false;
-        };
 
-        const onSuggestionActivated = async (sug) => {
-            const query = popup.globalSearch?.value || '';
-            if (sug.type === 'tags') {
-                await fetchColumnData('tags', tagsTable, query, selectedTagIds);
+                data.sort(getSmartSortComparator(term, selIds, config.labelKey, searchFields));
+
+                isRestoring = true;
+                try {
+                    await tableInstance.setData(data);
+                    selIds.forEach(id => {
+                        const r = tableInstance.getRow(id);
+                        if (r) tableInstance.selectRow(r);
+                    });
+                    tableInstance.redraw(true);
+
+                    const rawTerm = (popup.globalSearch?.value || '').trim();
+                    const bottomCreateEl = popup[type]?.bottomCreateContainer;
+
+                    if (rawTerm && bottomCreateEl) {
+                        const hasExactMatch = data.some(item => (item[config.labelKey] || '').toLowerCase() === rawTerm.toLowerCase());
+                        if (!hasExactMatch) {
+                            const btnBg = type === 'tags' ? '#059669' : '#0284c7';
+                            const icon = type === 'tags' ? '🏷️' : '⭐';
+                            bottomCreateEl.innerHTML = `
+                                <button type="button" class="fasttag-create-empty-btn" data-type="${type}" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 16px; background: ${btnBg}; color: #ffffff; border: none; border-radius: 6px; font-size: 11.5px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: all 0.15s ease;">${icon} Create ${config.title} "${escapeHtml(rawTerm)}"</button>
+                            `;
+                            bottomCreateEl.style.display = 'flex';
+                        } else {
+                            bottomCreateEl.innerHTML = '';
+                            bottomCreateEl.style.display = 'none';
+                        }
+                    } else if (bottomCreateEl) {
+                        bottomCreateEl.innerHTML = '';
+                        bottomCreateEl.style.display = 'none';
+                    }
+                } finally {
+                    isRestoring = false;
+                }
+            }
+
+            const onTagChipSelect = async () => {
+                popup.globalSearch.value = '';
+                popup.globalClear.style.display = 'none';
+                if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                await Promise.all([
+                    fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                    fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                ]);
                 const holder = popup.tags.tableContainer?.querySelector('.tabulator-tableholder');
                 if (holder) holder.scrollTop = 0;
-            } else if (sug.type === 'performers') {
-                await fetchColumnData('performers', performersTable, query, selectedPerformerIds);
+                refreshAllUI();
+                await doSave();
+            };
+
+            const onPerformerChipSelect = async () => {
+                popup.globalSearch.value = '';
+                popup.globalClear.style.display = 'none';
+                if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                await Promise.all([
+                    fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                    fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                ]);
                 const holder = popup.performers.tableContainer?.querySelector('.tabulator-tableholder');
                 if (holder) holder.scrollTop = 0;
-            } else if (sug.type === 'studios') {
-                renderStudioBar(query);
-            }
-            refreshAllUI();
-
-            if (!sequentialEditState.enabled) {
+                refreshAllUI();
                 await doSave();
-            }
-        };
+            };
 
-        makeColumnResizable(popup.columnsContainer, popup.colTags, popup.colPerformers, popup.colResizer, () => {
-            try {
-                tagsTable.redraw(true);
-                performersTable.redraw(true);
-            } catch (e) {}
-        }, signal);
-
-        popup.saveBtn.onclick = async () => {
-            if (sequentialEditState.enabled) {
-                const cards = sequentialEditState.allSceneCards || getAllVisibleSceneCards();
-                const idx = getSceneCardIndex(currentSceneId, cards);
-                const isLast = idx !== -1 && idx === cards.length - 1;
-                if (isDirty()) {
-                    await doSave();
+            const refreshAllUI = () => {
+                updateBadges();
+                updateSaveButton();
+                renderStudioBar(popup.globalSearch.value);
+                renderColumnChips(popup.tags.chipsContainer, 'tags', popup.globalSearch, selectedTagIds, onTagChipSelect);
+                renderColumnChips(popup.performers.chipsContainer, 'performers', popup.globalSearch, selectedPerformerIds, onPerformerChipSelect);
+                if (popup.suggestionsContainer && typeof popup.suggestionsContainer._fastTagRenderSuggestions === 'function') {
+                    popup.suggestionsContainer._fastTagRenderSuggestions();
                 }
-                if (isLast) {
-                    closePopup();
+                applyMarqueeAnimation(popup.titleSpan);
+            };
+            form._fastTagOnResize = () => {
+                refreshAllUI();
+                try {
+                    tagsTable.redraw(false);
+                    performersTable.redraw(false);
+                } catch (e) {}
+            };
+
+            tagsTable.on("rowClick", (e, row) => {
+                const id = row.getData()?.id;
+                if (!id) return;
+                const strId = String(id);
+                const isSearching = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
+
+                if (selectedTagIds.has(strId)) {
+                    selectedTagIds.delete(strId);
+                    tagsTable.deselectRow(row);
                 } else {
-                    navigateSequentialEditEverything(popup, currentSceneId, 1, null);
+                    selectedTagIds.add(strId);
+                    tagsTable.selectRow(row);
+                    if (isSearching) {
+                        popup.globalSearch.value = '';
+                        popup.globalClear.style.display = 'none';
+                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                        Promise.all([
+                            fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                            fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                        ]).then(() => {
+                            const r = tagsTable.getRow(id);
+                            if (r) tagsTable.scrollToRow(r, "top", false);
+                            renderStudioBar('');
+                            popup.globalSearch.focus({ preventScroll: true });
+                        });
+                    }
                 }
-            } else {
-                const ok = await doSave();
-                if (ok) closePopup();
+                refreshAllUI();
+                if (isSearching) {
+                    doSave();
+                }
+            });
+
+            performersTable.on("rowClick", (e, row) => {
+                const id = row.getData()?.id;
+                if (!id) return;
+                const strId = String(id);
+                const isSearching = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
+
+                if (selectedPerformerIds.has(strId)) {
+                    selectedPerformerIds.delete(strId);
+                    performersTable.deselectRow(row);
+                } else {
+                    selectedPerformerIds.add(strId);
+                    performersTable.selectRow(row);
+                    if (isSearching) {
+                        popup.globalSearch.value = '';
+                        popup.globalClear.style.display = 'none';
+                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                        Promise.all([
+                            fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                            fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                        ]).then(() => {
+                            const r = performersTable.getRow(id);
+                            if (r) performersTable.scrollToRow(r, "top", false);
+                            renderStudioBar('');
+                            popup.globalSearch.focus({ preventScroll: true });
+                        });
+                    }
+                }
+                refreshAllUI();
+                if (isSearching) {
+                    doSave();
+                }
+            });
+
+            const refreshGlobalSearch = (val) => {
+                const query = (val || '').trim();
+                fetchColumnData('tags', tagsTable, query, selectedTagIds);
+                fetchColumnData('performers', performersTable, query, selectedPerformerIds);
+                renderStudioBar(query);
+            };
+
+            if (popup.searchConsole && popup.globalSearch) {
+                popup.globalSearch.addEventListener('focus', () => {
+                    popup.searchConsole.style.borderColor = '#6366f1';
+                    popup.searchConsole.style.boxShadow = '0 0 0 2px rgba(99, 102, 241, 0.25)';
+                });
+                popup.globalSearch.addEventListener('blur', () => {
+                    const isDark = getEffectiveTheme() === 'dark';
+                    popup.searchConsole.style.borderColor = isDark ? 'rgba(148, 163, 184, 0.25)' : '#cbd5e1';
+                    popup.searchConsole.style.boxShadow = 'none';
+                });
             }
-        };
 
-        popup.cancelBtn.onclick = () => closePopup();
+            let searchDebounce = null;
+            popup.globalSearch.addEventListener('input', () => {
+                const val = popup.globalSearch.value.trim();
+                const hasVal = val.length > 0;
+                popup.globalClear.style.display = hasVal ? 'block' : 'none';
+                if (popup.kbdShortcut) popup.kbdShortcut.style.display = hasVal ? 'none' : 'block';
+                clearTimeout(searchDebounce);
+                searchDebounce = setTimeout(() => {
+                    refreshGlobalSearch(val);
+                }, 120);
+            });
 
-        // Store context methods on popup instance for in-place sequential updates
-        popup._context = {
-            setSelectedTags: (s) => { selectedTagIds = s; },
-            setSelectedPerformers: (s) => { selectedPerformerIds = s; },
-            setSelectedStudio: (s) => { selectedStudioId = s; },
-            setInitialTags: (s) => { initialTagIds = s; },
-            setInitialPerformers: (s) => { initialPerformerIds = s; },
-            setInitialStudio: (s) => { initialStudioId = s; },
-            setCurrentSceneId: (id) => { currentSceneId = id; },
-            getSelectedTags: () => selectedTagIds,
-            getSelectedPerformers: () => selectedPerformerIds,
-            getSelectedStudio: () => selectedStudioId,
-            fetchColumnData,
-            renderStudioBar,
-            refreshAllUI,
-            doSave,
-            onSuggestionActivated,
-            isDirty
-        };
+            popup.globalClear.addEventListener('click', () => {
+                popup.globalSearch.value = '';
+                popup.globalClear.style.display = 'none';
+                if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                refreshGlobalSearch('');
+                popup.globalSearch.focus();
+            });
 
-        setupPopupListeners(form, signal, async () => {
-            await doSave();
-            closePopup();
-        });
+            popup.refreshBtn.addEventListener('click', async () => {
+                invalidateCache('tags');
+                invalidateCache('performers');
+                invalidateCache('studios');
+                popup.globalSearch.value = '';
+                popup.globalClear.style.display = 'none';
+                if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                await Promise.all([
+                    fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                    fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                ]);
+                await renderStudioBar();
+                toastSuccess('Refreshed all caches');
+            });
 
-        await loadEditEverythingDataIntoPopup(sceneId, cardElement, popup);
-        positionPopupNearCard(form, cardElement);
+            const handleCreateEntity = async (type) => {
+                const searchVal = (popup.globalSearch?.value || '').trim();
+                if (!searchVal) return;
+                const finalName = await promptCreateEntityDialog(type, searchVal, form);
+                if (!finalName) return; // user cancelled!
+
+                const config = ENTITY_CONFIG[type];
+                const res = await fetchGQL(config.createQuery, config.createVariables(finalName));
+                const newId = config.createExtract(res.data);
+                if (newId) {
+                    invalidateCache(type);
+                    if (type === 'tags') selectedTagIds.add(String(newId));
+                    if (type === 'performers') selectedPerformerIds.add(String(newId));
+                    addRecentEntry(type, { id: newId, [config.labelKey]: finalName });
+                    popup.globalSearch.value = '';
+                    popup.globalClear.style.display = 'none';
+                    if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                    await Promise.all([
+                        fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                        fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                    ]);
+                    refreshAllUI();
+                    await doSave(`${config.title} "${finalName}" created & added to scene`);
+                    popup.globalSearch.focus({ preventScroll: true });
+                } else {
+                    toastError(`Failed to create ${config.title.toLowerCase()}`, res.errors);
+                }
+            };
+
+            form.addEventListener('click', (e) => {
+                const btn = e.target.closest('.fasttag-create-empty-btn');
+                if (btn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const type = btn.getAttribute('data-type');
+                    if (type) handleCreateEntity(type);
+                }
+            });
+
+            const doSave = async (customSuccessMessage = null) => {
+                const mutation = `
+                    mutation SceneUpdateEverything($id: ID!, $tag_ids: [ID!], $performer_ids: [ID!], $studio_id: ID) {
+                        sceneUpdate(input: {
+                            id: $id,
+                            tag_ids: $tag_ids,
+                            performer_ids: $performer_ids,
+                            studio_id: $studio_id
+                        }) {
+                            id
+                        }
+                    }
+                `;
+                try {
+                    const res = await fetchGQL(mutation, {
+                        id: currentSceneId,
+                        tag_ids: Array.from(selectedTagIds),
+                        performer_ids: Array.from(selectedPerformerIds),
+                        studio_id: selectedStudioId || null
+                    });
+
+                    if (res?.data?.sceneUpdate?.id) {
+                        initialTagIds = new Set(selectedTagIds);
+                        initialPerformerIds = new Set(selectedPerformerIds);
+                        initialStudioId = selectedStudioId;
+
+                        selectedTagIds.forEach(id => {
+                            const row = tagsTable.getRow(id);
+                            if (row) addRecentEntry('tags', row.getData());
+                        });
+                        selectedPerformerIds.forEach(id => {
+                            const row = performersTable.getRow(id);
+                            if (row) addRecentEntry('performers', row.getData());
+                        });
+                        if (selectedStudioId) {
+                            const allStudios = getCachedOrNull('studios') || [];
+                            const st = allStudios.find(s => String(s.id) === String(selectedStudioId));
+                            if (st) addRecentEntry('studios', st);
+                        }
+
+                        await refreshSceneCards();
+                        toastSuccess(customSuccessMessage || 'Scene saved successfully');
+                        updateSaveButton();
+                        return true;
+                    }
+                } catch (e) {
+                    toastError('Failed to save scene', e);
+                }
+                return false;
+            };
+
+            const onSuggestionActivated = async (sug) => {
+                const query = popup.globalSearch?.value || '';
+                if (sug.type === 'tags') {
+                    await fetchColumnData('tags', tagsTable, query, selectedTagIds);
+                    const holder = popup.tags.tableContainer?.querySelector('.tabulator-tableholder');
+                    if (holder) holder.scrollTop = 0;
+                } else if (sug.type === 'performers') {
+                    await fetchColumnData('performers', performersTable, query, selectedPerformerIds);
+                    const holder = popup.performers.tableContainer?.querySelector('.tabulator-tableholder');
+                    if (holder) holder.scrollTop = 0;
+                } else if (sug.type === 'studios') {
+                    renderStudioBar(query);
+                }
+                refreshAllUI();
+                await doSave();
+            };
+
+            makeColumnResizable(popup.columnsContainer, popup.colTags, popup.colPerformers, popup.colResizer, () => {
+                try {
+                    tagsTable.redraw(false);
+                    performersTable.redraw(false);
+                } catch (e) {}
+            }, signal);
+
+            popup.saveBtn.onclick = async () => {
+                if (sequentialEditState.enabled) {
+                    const cards = sequentialEditState.allSceneCards || getAllVisibleSceneCards();
+                    const idx = getSceneCardIndex(currentSceneId, cards);
+                    const isLast = idx !== -1 && idx === cards.length - 1;
+                    if (isDirty()) {
+                        await doSave();
+                    }
+                    if (isLast) {
+                        closePopup();
+                    } else {
+                        navigateSequentialEditEverything(popup, currentSceneId, 1, null);
+                    }
+                } else {
+                    if (isDirty()) {
+                        await doSave();
+                    }
+                }
+            };
+
+            popup.cancelBtn.onclick = () => closePopup();
+
+            // Store context methods on popup instance for in-place sequential updates
+            popup._context = {
+                setSelectedTags: (s) => { selectedTagIds = s; },
+                setSelectedPerformers: (s) => { selectedPerformerIds = s; },
+                setSelectedStudio: (s) => { selectedStudioId = s; },
+                setInitialTags: (s) => { initialTagIds = s; },
+                setInitialPerformers: (s) => { initialPerformerIds = s; },
+                setInitialStudio: (s) => { initialStudioId = s; },
+                setCurrentSceneId: (id) => { currentSceneId = id; },
+                getSelectedTags: () => selectedTagIds,
+                getSelectedPerformers: () => selectedPerformerIds,
+                getSelectedStudio: () => selectedStudioId,
+                fetchColumnData,
+                renderStudioBar,
+                refreshAllUI,
+                doSave,
+                onSuggestionActivated,
+                isDirty
+            };
+
+            setupPopupListeners(form, signal, async () => {
+                await doSave();
+                closePopup();
+            });
+
+            await loadEditEverythingDataIntoPopup(sceneId, cardElement, popup);
+            positionPopupNearCard(form, cardElement);
+        } catch (err) {
+            console.error('[FastTag] Error in openEditEverythingPopup:', err);
+            toastError(`Error opening Edit Everything: ${err?.message || err}`);
+        }
     }
 
     async function openEntityPopup(type, sceneId, cardElement) {
@@ -3941,9 +4415,12 @@
     async function loadEntityDataIntoPopup(type, sceneId, cardElement, popup) {
         const config = ENTITY_CONFIG[type];
         const form = popup.element;
+        form._fastTagSceneId = sceneId;
+        form._fastTagSceneCard = cardElement;
         attachScenePreview(popup.previewContainer, sceneId, cardElement);
 
         const existingRes = await fetchGQL(config.fetchExistingQuery, { id: sceneId });
+        form._fastTagSceneData = existingRes?.data?.findScene;
         const existingIds = config.extractExisting(existingRes.data);
         const selectedIds = new Set(existingIds.map(id => String(id)));
         sequentialEditState.initialSelectedIds = new Set(selectedIds);
@@ -3955,11 +4432,13 @@
         const clearBtn = popup.searchClear;
         const createBtn = popup.createBtn;
         const refreshBtn = popup.refreshBtn;
+        const kbdShortcut = popup.kbdShortcut;
 
         const updateVisibility = () => {
             const hasVal = filterInput.value.trim().length > 0;
             clearBtn.style.display = hasVal ? 'block' : 'none';
             createBtn.style.display = hasVal ? 'block' : 'none';
+            if (kbdShortcut) kbdShortcut.style.display = hasVal ? 'none' : 'block';
         };
 
         let smartSuggestions = [];
@@ -3967,11 +4446,8 @@
             filterInput.value = '';
             updateVisibility();
             await fetchData('', true);
-            if (!sequentialEditState.enabled) {
-                await saveWithoutReload(sceneId, selectedIds);
-            } else {
-                refreshUI();
-            }
+            refreshUI();
+            await saveWithoutReload(sceneId, selectedIds);
         };
 
         const refreshUI = () => {
@@ -3981,43 +4457,50 @@
         };
         form._fastTagOnResize = refreshUI;
 
-        const saveWithoutReload = async (sId, ids) => {
+        const saveWithoutReload = async (sId, ids, showToast = true) => {
             sessionStorage.setItem(scrollKey, window.scrollY);
             const success = await updateEntityForScene(type, sId, Array.from(ids));
             if (success) {
+                sequentialEditState.initialSelectedIds = new Set(ids);
                 await refreshSceneCards();
-                toastSuccess(`${config.title} saved`);
+                if (showToast) {
+                    toastSuccess(`${config.title} saved`);
+                }
+                updateSequentialEditUI(form, type, ids);
             }
             return success;
         };
 
-        activeTableInstance.on("rowSelected", (row) => {
-            if (!isRestoringSelections) {
-                const id = row.getData().id;
-                if (id) selectedIds.add(String(id));
-                refreshUI();
+        activeTableInstance.on("rowClick", async (e, row) => {
+            const id = row.getData()?.id;
+            if (!id) return;
+            const strId = String(id);
+            const wasSearching = filterInput.value.trim().length > 0;
 
-                if (filterInput.value.trim().length > 0) {
+            if (selectedIds.has(strId)) {
+                selectedIds.delete(strId);
+                activeTableInstance.deselectRow(row);
+                if (wasSearching) {
                     filterInput.value = '';
                     updateVisibility();
-                    fetchData("", false).then(() => {
-                        const r = activeTableInstance.getRow(id);
-                        if (r) activeTableInstance.scrollToRow(r, "top", false);
-                        filterInput.focus({ preventScroll: true });
-                    });
+                    await saveWithoutReload(sceneId, selectedIds);
+                    await fetchData("", false);
+                    filterInput.focus({ preventScroll: true });
+                }
+            } else {
+                selectedIds.add(strId);
+                activeTableInstance.selectRow(row);
+                if (wasSearching) {
+                    filterInput.value = '';
+                    updateVisibility();
+                    await saveWithoutReload(sceneId, selectedIds);
+                    await fetchData("", false);
+                    const r = activeTableInstance.getRow(id);
+                    if (r) activeTableInstance.scrollToRow(r, "top", false);
+                    filterInput.focus({ preventScroll: true });
                 }
             }
-        });
-
-        activeTableInstance.on("rowDeselected", (row) => {
-            if (!isRestoringSelections) {
-                const id = row.getData().id;
-                if (id) selectedIds.delete(String(id));
-                refreshUI();
-                if (filterInput.value.trim().length > 0) {
-                    fetchData(filterInput.value.trim(), false);
-                }
-            }
+            refreshUI();
         });
 
         async function fetchData(query, resetScroll = true) {
@@ -4053,6 +4536,7 @@
                     if (r) activeTableInstance.selectRow(r);
                 });
                 renderQuickActions(form, type, filterInput, selectedIds, onRecentChipSelect);
+                renderSmartSuggestions(form, type, filterInput, selectedIds, smartSuggestions, onRecentChipSelect);
                 updateSequentialEditUI(form, type, selectedIds);
                 if (resetScroll && data.length > 0) {
                     activeTableInstance.scrollToRow(activeTableInstance.getRows()[0], "top", false);
@@ -4085,18 +4569,25 @@
             const val = filterInput.value.trim();
             if (!val) return;
 
-            const res = await fetchGQL(config.createQuery, config.createVariables(val));
+            const confirmedName = await promptCreateEntityDialog(type, val, form);
+            if (!confirmedName) {
+                filterInput.focus({ preventScroll: true });
+                return;
+            }
+
+            const res = await fetchGQL(config.createQuery, config.createVariables(confirmedName));
             const newId = config.createExtract(res.data);
 
             if (newId) {
-                toastSuccess(`${config.title} created successfully`);
                 invalidateCache(type);
                 selectedIds.add(String(newId));
-                addRecentEntry(type, { id: newId, [config.labelKey]: val });
+                addRecentEntry(type, { id: newId, [config.labelKey]: confirmedName });
                 filterInput.value = '';
                 updateVisibility();
                 await fetchData("", true);
                 refreshUI();
+                await saveWithoutReload(sceneId, selectedIds, false);
+                toastSuccess(`${config.title} "${confirmedName}" created & added to scene`);
                 filterInput.focus({ preventScroll: true });
             } else {
                 toastError(`Failed to create ${config.title.toLowerCase()}`, res.errors);
@@ -4122,13 +4613,14 @@
                 return;
             }
 
-            const cached = getCachedOrNull(type) || [];
-            const selectedItems = Array.from(selectedIds).map(id => cached.find(entry => String(entry.id) === String(id))).filter(Boolean);
-            addRecentEntriesFromSelection(type, selectedItems);
+            if (hasSelectionChanged(selectedIds)) {
+                const cached = getCachedOrNull(type) || [];
+                const selectedItems = Array.from(selectedIds).map(id => cached.find(entry => String(entry.id) === String(id))).filter(Boolean);
+                addRecentEntriesFromSelection(type, selectedItems);
 
-            if (!isTabActive) await new Promise(r => setTimeout(r, 200));
-            const success = await saveWithoutReload(sceneId, selectedIds);
-            if (success) closePopup();
+                if (!isTabActive) await new Promise(r => setTimeout(r, 200));
+                await saveWithoutReload(sceneId, selectedIds);
+            }
         };
 
         popup.cancelBtn.onclick = () => closePopup();

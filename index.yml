@@ -2,7 +2,7 @@
   name: FastTag
   metadata:
     description: "Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation"
-  version: 3.4.0
-  date: 2026-08-27 16:55:00
+  version: 3.5.0
+  date: 2026-08-27 21:27:00
   path: fasttag.zip
-  sha256: 995101460d42263a0a8212b80944e9983cbb5b0d636b0bec490f4745771f4f6f
+  sha256: f00b45df54b3a2f555d554c7c697587646d536d3953156615cc19790a48a910f

@@ -5,6 +5,31 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.0] - 2026-08-27
+
+### Added
+- **Smart Auto-Save Architecture**:
+  - Top quick actions (*Suggestions, Recent 1–9 pills, Studio Bar, and Created Entities*) auto-save immediately to the scene.
+  - Search & select: Searching for an item and clicking it immediately selects it, clears search, and auto-saves to the scene.
+  - List browsing: Browsing and selecting items in the lower tables without an active search allows multi-item review without triggering premature saves.
+- **Save-in-Place (Keeps Popup Open)**: Clicking `Save Tags` / `Save Scene` saves selections immediately to Stash and keeps the popup open so you can continue tagging without interruption.
+- **State-Aware Save Button with Dynamic Breathing Pulse**:
+  - Dimmed/disabled button (`opacity: 0.45`, `cursor: not-allowed`) when clean (everything saved).
+  - Lights up Emerald Green with a gentle breathing pulse when pending changes exist.
+  - View-specific pulse speeds: **1.8s** for single views, **2.4s** for Edit Everything.
+- **Universal Entity Creation Modal**:
+  - Creating a new Tag or Performer from any view (*Edit Tags, Edit Performers, Edit Everything, Bulk Tagging*) opens a confirmation popup to verify spelling, aliases, or cancel before creating.
+- **Universal Search Shortcut Indicator (`/`)**: Added `/` shortcut badge into search boxes across all single and bulk views.
+- **Unified 3-Second Confirmation Toasts**: Merged dual creation + save notifications into single clear toasts.
+
+### Fixed
+- Fixed Tabulator table scroll jumping back to the top when checking/unchecking items.
+- Fixed non-performer suggestions bleeding into the Performer Suggestions box in Edit Everything.
+- Fixed duplicate event listener stacking on sequential navigation arrows (`◄` / `►`).
+- Added dirty-check before saving on sequential navigation so browsing scenes without edits does not spam save requests.
+
+---
+
 ## [3.4.0] - 2026-08-27
 
 ### Added

@@ -1,3 +1,15 @@
+## 3.5.0 - Smart Auto-Save, Entity Creation Modals, Save-in-Place & UI Polish
+
+### Highlights & New Features
+- **Smart Auto-Save Workflow**: Top quick actions (Suggestions, Recent 1–9, Studio Bar, Created Entities) auto-save immediately. Search & select auto-saves to the scene on click, while table browsing allows batch selections without unwanted saves.
+- **Save-in-Place (No Popup Dismissal)**: Clicking Save saves selections to Stash and keeps the popup open so you can continue tagging without interruption.
+- **State-Aware Save Button with Dynamic Breathing Pulse**: Dimmed/disabled button when clean, lighting up with a gentle pulse (1.8s for single views, 2.4s for Edit Everything) when changes are pending.
+- **Universal Entity Creation Modal**: Pre-flight review popup before creating new Tags or Performers across all single, bulk, and unified views.
+- **Universal Search Shortcut Indicator (`/`)**: Added `/` shortcut badge to search boxes across all single and bulk views.
+- **Unified 3-Second Confirmation Toasts**: Merged dual creation + save notifications into single clear toasts.
+
+---
+
 ## 3.4.0 - Settings Screen, Column Customization & Gallery Auto-Fallback
 
 ### Highlights & New Features
