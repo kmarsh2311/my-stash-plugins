@@ -1,3 +1,10 @@
+## 3.5.2 - UI Refinements & Polish
+
+### Highlights & Fixes
+- **General UI & Performance Polish**: Minor UI refinements and internal milestone optimizations.
+
+---
+
 ## 3.5.1 - Performance & Selector Hardening
 
 ### Highlights & Fixes

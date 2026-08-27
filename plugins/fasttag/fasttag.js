@@ -735,7 +735,7 @@
         }
     };
 
-    function showToast(message, type = "success") {
+    function showToast(message, type = "success", duration = 3000) {
         if (typeof Toastify === 'undefined') {
             console.log(`[Toast Fallback - ${type}] ${message}`);
             return;
@@ -743,7 +743,7 @@
         const bg = type === "success" ? "#10b981" : (type === "info" ? "#6366f1" : "#ef4444");
         Toastify({
             text: message,
-            duration: 3000,
+            duration: duration,
             gravity: "top",
             position: "center",
             style: { background: bg }
@@ -763,6 +763,30 @@
             console.error(`[FastTag Error]: ${message}`);
         }
     };
+
+    // --- Milestone & Usage Helpers ---
+    const USAGE_STORAGE_KEY = 'stash_fast_tag_usage_count';
+
+    function getUsageCount() {
+        const val = localStorage.getItem(USAGE_STORAGE_KEY);
+        return val === null ? 0 : (parseInt(val, 10) || 0);
+    }
+
+    function recordSaveUsage() {
+        const count = getUsageCount() + 1;
+        localStorage.setItem(USAGE_STORAGE_KEY, String(count));
+        if (count === 100) {
+            setTimeout(() => {
+                showToast('🍫 Achievement Unlocked: 100 Scenes Tagged! Have a break, have a KitKat! 🎉', 'success', 7000);
+            }, 500);
+        }
+        return count;
+    }
+
+    function isEasterEggActive() {
+        const count = getUsageCount();
+        return count >= 100 && count <= 105;
+    }
 
     // --- Theme & Storage Helpers ---
     function getThemePreference() {
@@ -1414,7 +1438,7 @@
                 applyMarqueeAnimation(title);
             }
             if (saveBtn) {
-                saveBtn.textContent = `Save ${config.pluralTitle}`;
+                saveBtn.textContent = isEasterEggActive() ? `Save ${config.pluralTitle} 🍫` : `Save ${config.pluralTitle}`;
                 if (isChanged) {
                     saveBtn.disabled = false;
                     saveBtn.style.opacity = '1';
@@ -1454,7 +1478,9 @@
             saveBtn.style.cursor = 'pointer';
 
             if (isChanged) {
-                saveBtn.textContent = isLast ? 'Save & Close' : 'Save & Next Scene ►';
+                const saveText = isEasterEggActive() ? 'Save & Next Scene 🍫 ►' : 'Save & Next Scene ►';
+                const closeText = isEasterEggActive() ? 'Save & Close 🍫' : 'Save & Close';
+                saveBtn.textContent = isLast ? closeText : saveText;
                 saveBtn.style.background = '#10b981';
                 saveBtn.classList.add('fasttag-btn-pulse');
             } else {
@@ -1525,6 +1551,7 @@
 
                 const success = await updateEntityForScene(type, currentSceneId, currentSelectedIds);
                 if (success) {
+                    recordSaveUsage();
                     toastSuccess(`${ENTITY_CONFIG[type].title} saved`);
                     await refreshSceneCards();
                 }
@@ -2008,7 +2035,7 @@
 
         const supportLink = document.createElement('a');
         supportLink.href = 'https://buymeacoffee.com/kamarsh';
-        supportLink.textContent = 'Buy me a KitKat 🍫';
+        supportLink.textContent = isEasterEggActive() ? 'Buy me a KitKat 🍫 (100+ Tagged!)' : 'Buy me a KitKat 🍫';
         supportLink.style.color = '#d97706';
         supportLink.target = '_blank';
         supportLink.addEventListener('click', () => closeMenu());
@@ -2956,6 +2983,7 @@
             }
 
             await refreshSceneCards();
+            recordSaveUsage();
             closePopup();
             toastSuccess(`Applied ${config.title} to ${updatedCount} scenes`);
         };
@@ -3854,7 +3882,9 @@
                     const idx = getSceneCardIndex(currentSceneId, cards);
                     const isLast = idx !== -1 && idx === cards.length - 1;
                     if (dirty) {
-                        popup.saveBtn.textContent = isLast ? 'Save & Close' : 'Save & Next Scene ►';
+                        const saveText = isEasterEggActive() ? 'Save & Next Scene 🍫 ►' : 'Save & Next Scene ►';
+                        const closeText = isEasterEggActive() ? 'Save & Close 🍫' : 'Save & Close';
+                        popup.saveBtn.textContent = isLast ? closeText : saveText;
                         popup.saveBtn.style.background = '#10b981';
                         popup.saveBtn.classList.add('fasttag-btn-pulse-calm');
                     } else {
@@ -3866,7 +3896,7 @@
                     popup.saveBtn.style.opacity = '1';
                     popup.saveBtn.style.cursor = 'pointer';
                 } else {
-                    popup.saveBtn.textContent = 'Save Scene';
+                    popup.saveBtn.textContent = isEasterEggActive() ? 'Save Scene 🍫' : 'Save Scene';
                     if (dirty) {
                         popup.saveBtn.disabled = false;
                         popup.saveBtn.style.opacity = '1';
@@ -4276,6 +4306,7 @@
                         }
 
                         await refreshSceneCards();
+                        recordSaveUsage();
                         toastSuccess(customSuccessMessage || 'Scene saved successfully');
                         updateSaveButton();
                         return true;
@@ -4467,6 +4498,7 @@
             if (success) {
                 sequentialEditState.initialSelectedIds = new Set(ids);
                 await refreshSceneCards();
+                recordSaveUsage();
                 if (showToast) {
                     toastSuccess(`${config.title} saved`);
                 }
