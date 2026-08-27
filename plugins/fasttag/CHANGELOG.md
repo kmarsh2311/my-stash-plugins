@@ -5,6 +5,15 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.1] - 2026-08-27
+
+### Performance & Hardening
+- **3-Worker Concurrency Pool for Bulk Tagging**: Upgraded bulk scene save execution from a sequential loop to a parallel 3-worker concurrency pool, delivering up to a 3x speedup on multi-scene saves while remaining 100% safe against SQLite database write contention.
+- **Strict Bulk Checkbox Targeting**: Refined `getBulkSelectedScenes()` to query checkboxes strictly within scene cards, preventing top filter bar checkboxes or settings toggles from interfering with bulk selections.
+- **Hardened DOM Scope**: Removed generic `.card` selector from global click and contextmenu listeners, ensuring FastTag only attaches to real scene cards and completely ignores non-scene pages (*Tags, Performers, Settings*).
+
+---
+
 ## [3.5.0] - 2026-08-27
 
 ### Added

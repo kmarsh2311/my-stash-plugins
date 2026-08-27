@@ -1,3 +1,12 @@
+## 3.5.1 - Performance & Selector Hardening
+
+### Highlights & Fixes
+- **3-Worker Concurrency Pool for Bulk Tagging**: Speeds up multi-scene bulk tagging by up to 3x using a parallel worker pool, with live progress updates (`Saving (3/15)...`).
+- **Strict Bulk Checkbox Query**: Hardened `getBulkSelectedScenes()` to only inspect checkboxes inside scene cards, preventing page filter checkboxes from interfering.
+- **Clean Scene Card Scope**: Removed generic `.card` selector so FastTag ignores non-scene pages (*Tags, Performers, Settings*).
+
+---
+
 ## 3.5.0 - Smart Auto-Save, Entity Creation Modals, Save-in-Place & UI Polish
 
 ### Highlights & New Features

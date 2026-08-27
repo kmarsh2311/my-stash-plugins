@@ -1068,11 +1068,11 @@
 
     // --- Bulk Scene Selection Detection ---
     function getBulkSelectedScenes() {
-        const checkedBoxes = Array.from(document.querySelectorAll('.scene-card input[type="checkbox"]:checked, .scene-card.selected, [class*="scene-card"] input[type="checkbox"]:checked, input[type="checkbox"]:checked'));
+        const checkedBoxes = Array.from(document.querySelectorAll('.scene-card input[type="checkbox"]:checked, .scene-card.selected, [class*="scene-card"] input[type="checkbox"]:checked, [class*="SceneCard"] input[type="checkbox"]:checked, [class*="scene-card"].selected, [class*="SceneCard"].selected'));
         const scenes = [];
         const seen = new Set();
         checkedBoxes.forEach(el => {
-            const card = el.closest('.scene-card, .card, [class*="scene-card"], [class*="SceneCard"]');
+            const card = el.closest('.scene-card, [class*="scene-card"], [class*="SceneCard"]');
             if (!card) return;
             const sceneId = extractSceneId(card);
             if (sceneId && !seen.has(sceneId)) {
@@ -1348,7 +1348,7 @@
     }
 
     function getAllVisibleSceneCards() {
-        const cards = document.querySelectorAll('.scene-card, .card, [class*="scene-card"], [class*="SceneCard"]');
+        const cards = document.querySelectorAll('.scene-card, [class*="scene-card"], [class*="SceneCard"]');
         return Array.from(cards).filter(card => extractSceneId(card) !== null);
     }
 
@@ -2932,23 +2932,27 @@
             const addedIds = Array.from(selectedIds).filter(id => !initialCommonIds.has(id));
 
             saveBtn.disabled = true;
-            saveBtn.textContent = `Saving (${bulkScenes.length})...`;
-            saveBtn.style.opacity = '0.7';
-
             let updatedCount = 0;
-            for (const scene of bulkScenes) {
-                let targetIds = chosenIds;
-                if (!config.isSingleSelect && config.fetchExistingQuery) {
-                    try {
-                        const existRes = await fetchGQL(config.fetchExistingQuery, { id: scene.id });
-                        const existIds = (config.extractExisting(existRes?.data) || []).map(String);
-                        const filtered = existIds.filter(id => !removedIds.has(id));
-                        const merged = new Set([...filtered, ...addedIds]);
-                        targetIds = Array.from(merged);
-                    } catch (e) {}
+            const CONCURRENCY = 3;
+            for (let i = 0; i < bulkScenes.length; i += CONCURRENCY) {
+                const batch = bulkScenes.slice(i, i + CONCURRENCY);
+                await Promise.all(batch.map(async (scene) => {
+                    let targetIds = chosenIds;
+                    if (!config.isSingleSelect && config.fetchExistingQuery) {
+                        try {
+                            const existRes = await fetchGQL(config.fetchExistingQuery, { id: scene.id });
+                            const existIds = (config.extractExisting(existRes?.data) || []).map(String);
+                            const filtered = existIds.filter(id => !removedIds.has(id));
+                            const merged = new Set([...filtered, ...addedIds]);
+                            targetIds = Array.from(merged);
+                        } catch (e) {}
+                    }
+                    const success = await updateEntityForScene(type, scene.id, targetIds);
+                    if (success) updatedCount++;
+                }));
+                if (saveBtn) {
+                    saveBtn.textContent = `Saving (${Math.min(i + CONCURRENCY, bulkScenes.length)}/${bulkScenes.length})...`;
                 }
-                const success = await updateEntityForScene(type, scene.id, targetIds);
-                if (success) updatedCount++;
             }
 
             await refreshSceneCards();
@@ -4630,7 +4634,7 @@
     document.addEventListener('contextmenu', function(event) {
         if (activePopup) return;
         closeMenu();
-        const sceneCard = event.target.closest('.scene-card, .card, [class*="scene-card"], [class*="SceneCard"]');
+        const sceneCard = event.target.closest('.scene-card, [class*="scene-card"], [class*="SceneCard"]');
         if (!sceneCard) return;
 
         const sceneId = extractSceneId(sceneCard);
@@ -4641,7 +4645,7 @@
 
     document.addEventListener('click', function(event) {
         if (activePopup) return;
-        const sceneCard = event.target.closest('.scene-card, .card, [class*="scene-card"], [class*="SceneCard"]');
+        const sceneCard = event.target.closest('.scene-card, [class*="scene-card"], [class*="SceneCard"]');
         if (!sceneCard) return;
 
         // Ignore checkboxes and scene play/title links
