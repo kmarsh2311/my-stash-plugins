@@ -1,3 +1,15 @@
+## 3.6.0 - Full Video Stream Scrubbing, Velocity Speeds & Shift-to-Freeze
+
+### Highlights & New Features
+- **Full Video Stream Scrubbing**: Switch from looping previews to the full scene video stream (`🎬 Full Video`) with velocity-based mouse wheel scrubbing.
+- **Velocity-Based Scrubbing**: Dynamically adjusts step size based on scroll speed (*Slow*, *Normal*, *Fast*).
+- **Hold Shift to Freeze & Step**: Pauses auto-resume and switches scrubbing to precision frame stepping.
+- **Configurable Speeds in Settings**: Customize Slow, Normal, Fast, and Freeze step sizes with instant real-time auto-saving.
+- **Animated Lordicon Mouse Cue**: Vector animated mouse cue with 3.0s entrance breathing room, 1.5s slow fade-in, and 4.5s on-screen presence.
+- **5-Session Smart Decay**: Shows on the first 5 sessions to train the user, then permanently retires for zero clutter.
+
+---
+
 ## 3.5.3 - Scene Cover Image Fallback for Previews
 
 ### Highlights & Improvements

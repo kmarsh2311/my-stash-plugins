@@ -5,6 +5,21 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.0] - 2026-08-28
+
+### Added & Improved
+- **Full Video Stream Scrubbing**: Click the floating `🎬 Full Video` pill in the 16:9 media box to switch from looping preview clips to the scene's full stream with interactive mouse wheel scrubbing.
+- **Dynamic Velocity-Based Scrubbing**: Wheel scrubbing automatically calculates step sizes based on scroll velocity with customizable tiers (*Slow*, *Normal*, *Fast*).
+- **Hold Shift to Freeze & Frame Scrub**: Holding the <kbd>Shift</kbd> key pauses auto-resume and switches scrubbing to precision frame stepping.
+- **Configurable Scrub Speeds in Settings**: Dedicated section in `⚙️ FastTag Settings` with real-time auto-saving to customize Slow (0–30s), Normal (0–60s), Fast (0–120s), and Freeze (0.1–10s) speeds.
+- **Cinematic Lordicon Animated Mouse Cue**:
+  - Vector mouse with animated Lordicon scroll wheel and static teal directional chevrons.
+  - High-contrast frosted glass mouse mat backdrop with micro-pill hint (`Scroll to scrub • Hold Shift to freeze`).
+  - 3.0s initial video breathing room pause, 1.5s slow cinematic fade-in, and 4.5s on-screen presence.
+- **Progressive Onboarding Smart Decay**: The interactive scrubbing cue automatically displays during the first 5 sessions to train the user, then permanently retires for zero clutter. Protected against spam in sequential mode.
+
+---
+
 ## [3.5.3] - 2026-08-28
 
 ### Added & Improved

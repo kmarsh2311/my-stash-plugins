@@ -136,6 +136,8 @@ Tag multiple scenes in batch:
 
 | Shortcut | Description |
 | :--- | :--- |
+| **`Scroll Wheel`** | Scrub full video forward / backward (Full Video mode) |
+| **`Hold Shift + Scroll`** | Freeze video playback & step frame-by-frame |
 | **`1` – `9`** | Toggle quick-action chip by its numeric badge |
 | **`/`** or **`S`** | Jump directly into the search bar |
 | **`Esc`** | Clear active search text, or close the popup |

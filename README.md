@@ -15,7 +15,8 @@ A collection of custom scripts and plugins designed to speed up the [Stash](http
 ### FastTag - Scene Manager Context Menu
 A fast tagging workflow for Stash scene cards, designed for video libraries where you want to assign tags and performers quickly without leaving the page. 
 
-**Key Features:**
+*   **🎬 Full Video Stream Scrubbing:** Toggle to `🎬 Full Video` to scrub through the entire scene with velocity-based mouse wheel control.
+*   **❄️ Hold Shift to Freeze & Step:** Hold <kbd>Shift</kbd> while scrolling to freeze playback and step frame-by-frame with precision.
 *   **⚡ Smart Auto-Save Workflow:** Quick-action suggestions, recent pills (`1`–`9`), studio chips, and search-and-select immediately auto-save to the scene. Lower table browsing lets you check multiple items without premature auto-saving.
 *   **💾 Save-in-Place Workflow:** Clicking `Save` saves changes directly to Stash while keeping the popup open so you can continue tagging without interruption, preserving your exact scroll position.
 *   **🎨 State-Aware Pulsing Save Button:** Save button stays cleanly dimmed/disabled when everything is saved, and lights up **Emerald Green** with a gentle breathing pulse when pending list edits exist.
@@ -63,6 +64,8 @@ A fast tagging workflow for Stash scene cards, designed for video libraries wher
 * **⚙️ FastTag Settings:** Right-click ➔ `FastTag Settings` to toggle database ID columns, enable/disable suggestions, and switch themes.
 * **💾 Save in Place:** Clicking `Save` (or pressing `Enter`) saves changes immediately to Stash and keeps the popup open so you can continue tagging.
 * **⌨️ Hotkeys:**
+  - `Scroll Wheel`: Scrub full video forward/backward (in Full Video mode)
+  - `Hold Shift + Scroll`: Freeze video and step frame-by-frame
   - `1`–`9`: Toggle recent chips (auto-saves immediately)
   - `/` or `S`: Focus search
   - `Esc`: Clear search / close popup
