@@ -382,22 +382,25 @@
         #scenes-popup.theme-light .popup-refresh-btn { border: 1px solid #cbd5e1 !important; background: #f8fafc !important; color: #475569 !important; }
         #scenes-popup.theme-light .popup-cancel-btn { background: #f1f5f9 !important; border: 1px solid #cbd5e1 !important; color: #334155 !important; }
 
-        #scenes-popup.theme-dark .tabulator {
+        #scenes-popup.theme-dark .tabulator,
+        #scenes-popup.theme-dark .tabulator-tableholder,
+        #scenes-popup.theme-dark .tabulator-table,
+        #scenes-popup.theme-dark .tabulator .tabulator-row,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.tabulator-row-even,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.tabulator-row-odd {
             background-color: #0f172a !important;
-            border: 1px solid #334155 !important;
-            border-radius: 6px !important;
-            font-family: system-ui, -apple-system, sans-serif !important;
-            font-size: 12px !important;
             color: #e2e8f0 !important;
+            outline: none !important;
+            box-shadow: none !important;
         }
         #scenes-popup.theme-dark .tabulator .tabulator-header {
             background-color: #1e293b !important;
-            border-bottom: 1px solid #334155 !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
             color: #94a3b8 !important;
         }
         #scenes-popup.theme-dark .tabulator .tabulator-header .tabulator-col {
             background-color: transparent !important;
-            border-right: 1px solid #334155 !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
         }
         #scenes-popup.theme-dark .tabulator .tabulator-header .tabulator-col:last-child {
             border-right: none !important;
@@ -407,22 +410,28 @@
             font-weight: 600 !important;
         }
         #scenes-popup.theme-dark .tabulator .tabulator-row {
-            background-color: #0f172a !important;
-            color: #e2e8f0 !important;
-            border-bottom: 1px solid #1e293b !important;
+            border-top: none !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07) !important;
         }
         #scenes-popup.theme-dark .tabulator .tabulator-row .tabulator-cell {
-            border-right: 1px solid #1e293b !important;
+            border-top: none !important;
+            border-bottom: none !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.07) !important;
+            outline: none !important;
         }
         #scenes-popup.theme-dark .tabulator .tabulator-row .tabulator-cell:last-child {
             border-right: none !important;
         }
-        #scenes-popup.theme-dark .tabulator .tabulator-row:hover {
+        #scenes-popup.theme-dark .tabulator .tabulator-row:hover,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.tabulator-row-even:hover,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.tabulator-row-odd:hover {
             background-color: #1e293b !important;
             color: #ffffff !important;
         }
         #scenes-popup.theme-dark .tabulator .tabulator-row.tabulator-selected,
-        #scenes-popup.theme-dark .tabulator .tabulator-row.tabulator-selected:hover {
+        #scenes-popup.theme-dark .tabulator .tabulator-row.tabulator-selected:hover,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.tabulator-row-even.tabulator-selected,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.tabulator-row-odd.tabulator-selected {
             background-color: #312e81 !important;
             color: #ffffff !important;
             border-bottom: 1px solid #4338ca !important;
@@ -914,6 +923,93 @@
         } catch (e) {}
     }
 
+    let isVideoPoppedOut = false;
+    let floatingHudElement = null;
+    let floatingHudPosition = null;
+    let floatingHudSize = null;
+
+    function getDefaultPopoutSize(hostContainer) {
+        // Docked video is max-height: 280px in 16:9, so visible docked width is ~380px-440px
+        let dockedWidth = 380;
+        if (hostContainer) {
+            const clientW = hostContainer.clientWidth;
+            const clientH = hostContainer.clientHeight;
+            if (clientW > 50 && clientH > 50) {
+                dockedWidth = Math.min(clientW, clientH * (16 / 9));
+            } else if (clientW > 50) {
+                dockedWidth = Math.min(clientW, 280 * (16 / 9));
+            }
+        }
+        // Normalize dockedWidth to reasonable 340px-420px range
+        dockedWidth = Math.max(340, Math.min(420, dockedWidth));
+
+        // 2x width (around 680px - 720px), bounded so it never exceeds 46vw
+        let targetWidth = Math.round(dockedWidth * 1.85);
+        targetWidth = Math.min(Math.round(window.innerWidth * 0.46), Math.max(480, targetWidth));
+        const targetHeight = Math.round(targetWidth * (9 / 16));
+        return { width: `${targetWidth}px`, height: `${targetHeight}px` };
+    }
+
+    function getInitialPopoutPosition(hudWidth = 680, hudHeight = 382) {
+        const activeForm = activePopup?.element || document.querySelector('#scenes-popup');
+        const margin = 14;
+        if (activeForm) {
+            const rect = activeForm.getBoundingClientRect();
+            const screenWidth = window.innerWidth;
+            const screenHeight = window.innerHeight;
+
+            // 1. Check if it fits to the right of FastTag popup
+            if (screenWidth - rect.right >= hudWidth + margin) {
+                const left = Math.round(rect.right + margin);
+                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                return { left: `${left}px`, top: `${top}px` };
+            }
+            // 2. Check if it fits to the left of FastTag popup
+            if (rect.left >= hudWidth + margin) {
+                const left = Math.round(rect.left - hudWidth - margin);
+                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                return { left: `${left}px`, top: `${top}px` };
+            }
+
+            // 3. For wide modals (like Edit Everything) where neither side currently has room:
+            // Check if the total screen width can fit both side-by-side:
+            if (screenWidth >= rect.width + hudWidth + (margin * 2)) {
+                // Gently shift FastTag to the left margin so both fit side-by-side with 0% overlap!
+                const newFormLeft = margin;
+                activeForm.style.left = `${newFormLeft}px`;
+                const left = Math.round(newFormLeft + rect.width + margin);
+                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                return { left: `${left}px`, top: `${top}px` };
+            }
+
+            // 4. Fallback: place on whichever side has more room
+            const roomRight = screenWidth - rect.right;
+            const roomLeft = rect.left;
+            if (roomRight >= roomLeft) {
+                const left = Math.max(margin, screenWidth - hudWidth - margin);
+                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                return { left: `${left}px`, top: `${top}px` };
+            } else {
+                const left = margin;
+                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                return { left: `${left}px`, top: `${top}px` };
+            }
+        }
+        return { right: '30px', top: '70px' };
+    }
+
+    function closeFloatingVideoHud(fullReset = false) {
+        if (fullReset) {
+            if (floatingHudElement) {
+                floatingHudElement.remove();
+                floatingHudElement = null;
+            }
+            isVideoPoppedOut = false;
+            floatingHudPosition = null;
+            floatingHudSize = null;
+        }
+    }
+
     function getScrubSpeeds() {
         try {
             const raw = localStorage.getItem(SCRUB_SPEEDS_STORAGE_KEY);
@@ -1386,9 +1482,19 @@
         hostContainer.style.boxShadow = 'none';
         hostContainer.style.cursor = 'pointer';
 
-        hostContainer.onclick = (e) => {
-            if (e.shiftKey) return;
-            if (e.target && e.target.closest('#fasttag-stream-toggle-pill')) return;
+        // Media container holds the active video/img, progress bar, cue badge, and top-right controls
+        const mediaContainer = document.createElement('div');
+        mediaContainer.id = 'fasttag-media-container';
+        mediaContainer.style.cssText = 'position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #0f172a; cursor: pointer;';
+
+        let isDragging = false;
+        let hasDragged = false;
+        let dragStartX = 0, dragStartY = 0;
+        let startLeft = 0, startTop = 0;
+
+        mediaContainer.onclick = (e) => {
+            if (e.shiftKey || hasDragged || isDragging) return;
+            if (e.target && (e.target.closest('#fasttag-stream-toggle-pill') || e.target.closest('#fasttag-stream-popout-btn') || e.target.closest('#fasttag-hud-close-btn') || e.target.closest('#fasttag-inline-dock-btn'))) return;
             const sceneUrl = getSceneUrl(sceneId, cardElement);
             if (sceneUrl) {
                 window.open(sceneUrl, '_blank');
@@ -1514,10 +1620,15 @@
             cueBadge.style.opacity = '0';
         };
 
+        // Controls row at top-right of media container
+        const controlsRow = document.createElement('div');
+        controlsRow.id = 'fasttag-media-controls-row';
+        controlsRow.style.cssText = 'position: absolute; top: 5px; right: 5px; z-index: 20; display: flex; align-items: center; gap: 4px; pointer-events: auto;';
+
         // Floating Mode Toggle Pill (compact & semi-transparent)
         const pillBtn = document.createElement('div');
         pillBtn.id = 'fasttag-stream-toggle-pill';
-        pillBtn.style.cssText = 'position: absolute; top: 5px; right: 5px; z-index: 20; background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(4px); color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.8); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px; padding: 2px 7px; font-size: 9.5px; font-weight: 600; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 3.5px; opacity: 0.35; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: all 0.15s ease; line-height: 1;';
+        pillBtn.style.cssText = 'background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.8); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px; padding: 2px 7px; font-size: 9.5px; font-weight: 600; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 3.5px; opacity: 0.35; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: all 0.15s ease; line-height: 1;';
         
         pillBtn.onmouseenter = () => {
             pillBtn.style.opacity = '1';
@@ -1548,16 +1659,191 @@
             renderMedia('stream');
         };
 
+        // Popout Button (Icon only: ⤢, semi-transparent)
+        const popoutBtn = document.createElement('button');
+        popoutBtn.type = 'button';
+        popoutBtn.id = 'fasttag-stream-popout-btn';
+        popoutBtn.style.cssText = 'background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.8); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px; padding: 2px 7px; font-size: 11px; font-weight: 600; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: center; opacity: 0.35; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: all 0.15s ease; line-height: 1; min-width: 22px; height: 19px;';
+        popoutBtn.innerHTML = '⤢';
+        popoutBtn.title = 'Pop out video';
+
+        popoutBtn.onmouseenter = () => {
+            popoutBtn.style.opacity = '1';
+            popoutBtn.style.background = '#6366f1';
+            popoutBtn.style.borderColor = '#818cf8';
+            popoutBtn.style.transform = 'scale(1.08)';
+        };
+        popoutBtn.onmouseleave = () => {
+            popoutBtn.style.opacity = '0.35';
+            popoutBtn.style.background = 'rgba(15, 23, 42, 0.55)';
+            popoutBtn.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+            popoutBtn.style.transform = 'scale(1)';
+        };
+
+        controlsRow.appendChild(pillBtn);
+        controlsRow.appendChild(popoutBtn);
+
+        const togglePopout = (enable) => {
+            if (enable) {
+                isVideoPoppedOut = true;
+
+                let isDragging = false;
+                let hasDragged = false;
+                let dragStartX = 0;
+                let dragStartY = 0;
+                let startLeft = 0;
+                let startTop = 0;
+
+                const onHudMouseMove = (e) => {
+                    if (!floatingHudElement) return;
+                    const dx = e.clientX - dragStartX;
+                    const dy = e.clientY - dragStartY;
+                    if (!isDragging && Math.hypot(dx, dy) > 4) {
+                        isDragging = true;
+                        hasDragged = true;
+                    }
+                    if (isDragging) {
+                        const newLeft = Math.max(8, Math.min(window.innerWidth - floatingHudElement.offsetWidth - 8, startLeft + dx));
+                        const newTop = Math.max(8, Math.min(window.innerHeight - floatingHudElement.offsetHeight - 8, startTop + dy));
+                        floatingHudElement.style.left = `${newLeft}px`;
+                        floatingHudElement.style.top = `${newTop}px`;
+                        floatingHudElement.style.right = 'auto';
+                        floatingHudPosition = { top: `${newTop}px`, left: `${newLeft}px` };
+                    }
+                };
+
+                const onHudMouseUp = () => {
+                    document.removeEventListener('mousemove', onHudMouseMove);
+                    document.removeEventListener('mouseup', onHudMouseUp);
+                    if (isDragging && floatingHudElement) {
+                        floatingHudSize = { width: `${floatingHudElement.offsetWidth}px`, height: `${floatingHudElement.offsetHeight}px` };
+                    }
+                    setTimeout(() => { isDragging = false; hasDragged = false; }, 60);
+                };
+
+                if (!floatingHudElement || !document.body.contains(floatingHudElement)) {
+                    floatingHudElement = document.createElement('div');
+                    floatingHudElement.id = 'fasttag-floating-video-hud';
+                    const savedSize = floatingHudSize || getDefaultPopoutSize(hostContainer);
+                    const defaultPos = getInitialPopoutPosition(parseInt(savedSize.width, 10) || 720, parseInt(savedSize.height, 10) || 405);
+                    const pos = floatingHudPosition || defaultPos;
+                    floatingHudElement.style.cssText = `position: fixed; top: ${pos.top}; ${pos.left ? `left: ${pos.left};` : `right: ${pos.right};`} width: ${savedSize.width}; height: ${savedSize.height}; min-width: 260px; min-height: 150px; max-width: 90vw; max-height: 85vh; z-index: 1000000; background: #0f172a; border: 2px solid #000000; border-radius: 10px; box-shadow: 0 20px 50px rgba(0,0,0,0.85); overflow: hidden; resize: both; cursor: move;`;
+                    document.body.appendChild(floatingHudElement);
+
+                    // Draggable logic directly on floating video
+                    floatingHudElement.onmousedown = (e) => {
+                        e.stopPropagation();
+                        if (e.target && e.target.closest('#fasttag-stream-toggle-pill')) {
+                            return;
+                        }
+                        const rect = floatingHudElement.getBoundingClientRect();
+                        // Don't initiate drag if clicking in the bottom-right corner resize zone
+                        const isResizeZone = (rect.right - e.clientX) <= 24 && (rect.bottom - e.clientY) <= 24;
+                        if (isResizeZone) {
+                            return;
+                        }
+
+                        isDragging = false;
+                        hasDragged = false;
+                        dragStartX = e.clientX;
+                        dragStartY = e.clientY;
+                        startLeft = rect.left;
+                        startTop = rect.top;
+                        document.addEventListener('mousemove', onHudMouseMove);
+                        document.addEventListener('mouseup', onHudMouseUp);
+                    };
+
+                    // Resize tracking
+                    const resizeObserver = new ResizeObserver(() => {
+                        if (floatingHudElement && !isDragging) {
+                            floatingHudSize = { width: `${floatingHudElement.offsetWidth}px`, height: `${floatingHudElement.offsetHeight}px` };
+                        }
+                    });
+                    resizeObserver.observe(floatingHudElement);
+                }
+
+                // Smoothly swap content inside floating window
+                floatingHudElement.innerHTML = '';
+                floatingHudElement.appendChild(mediaContainer);
+
+                // Hide popout button while inside floating window
+                popoutBtn.style.display = 'none';
+
+                // Show slim interactive placeholder in main popup
+                hostContainer.innerHTML = '';
+                hostContainer.style.aspectRatio = 'auto';
+                hostContainer.style.height = '33px';
+                hostContainer.style.maxHeight = '33px';
+                hostContainer.style.margin = '0 0 7px 0';
+                hostContainer.style.background = 'rgba(15, 23, 42, 0.75)';
+                hostContainer.style.border = '1px dashed rgba(99, 102, 241, 0.45)';
+                hostContainer.style.borderRadius = '8px';
+                hostContainer.style.display = 'flex';
+                hostContainer.style.alignItems = 'center';
+                hostContainer.style.justifyContent = 'space-between';
+                hostContainer.style.padding = '0 5px 0 10px';
+                hostContainer.style.cursor = 'pointer';
+                hostContainer.title = 'Click to dock video back into popup';
+
+                const placeholderLabel = document.createElement('span');
+                placeholderLabel.style.cssText = 'font-size: 11.5px; color: #a5b4fc; display: flex; align-items: center; gap: 6px; font-weight: 600; user-select: none;';
+                placeholderLabel.innerHTML = '<span style="display: inline-block; width: 6.5px; height: 6.5px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);"></span> Video detached in Floating HUD';
+                hostContainer.appendChild(placeholderLabel);
+
+                const inlineDockBtn = document.createElement('button');
+                inlineDockBtn.type = 'button';
+                inlineDockBtn.id = 'fasttag-inline-dock-btn';
+                inlineDockBtn.style.cssText = 'background: rgba(99, 102, 241, 0.25); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); color: #ffffff; border: 1px solid rgba(99, 102, 241, 0.55); border-radius: 12px; padding: 2px 9px; font-size: 13px; font-weight: 700; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: center; opacity: 0.9; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: all 0.15s ease; min-width: 26px; height: 23px; line-height: 1;';
+                inlineDockBtn.innerHTML = '⤝';
+                inlineDockBtn.title = 'Dock video back into popup';
+                inlineDockBtn.onmouseenter = () => { inlineDockBtn.style.opacity = '1'; inlineDockBtn.style.background = '#6366f1'; inlineDockBtn.style.borderColor = '#818cf8'; inlineDockBtn.style.transform = 'scale(1.06)'; };
+                inlineDockBtn.onmouseleave = () => { inlineDockBtn.style.opacity = '0.9'; inlineDockBtn.style.background = 'rgba(99, 102, 241, 0.25)'; inlineDockBtn.style.borderColor = 'rgba(99, 102, 241, 0.55)'; inlineDockBtn.style.transform = 'scale(1)'; };
+                inlineDockBtn.onclick = (e) => { e.stopPropagation(); togglePopout(false); };
+                hostContainer.appendChild(inlineDockBtn);
+
+                hostContainer.onclick = (e) => {
+                    e.stopPropagation();
+                    togglePopout(false);
+                };
+
+            } else {
+                isVideoPoppedOut = false;
+                if (floatingHudElement) {
+                    floatingHudElement.remove();
+                    floatingHudElement = null;
+                }
+                hostContainer.onclick = null;
+                hostContainer.innerHTML = '';
+                hostContainer.style.aspectRatio = '16 / 9';
+                hostContainer.style.maxHeight = '280px';
+                hostContainer.style.margin = '0 0 10px 0';
+                hostContainer.style.border = 'none';
+                hostContainer.style.background = '#0f172a';
+                hostContainer.style.display = 'block';
+                hostContainer.style.padding = '0';
+                hostContainer.style.cursor = 'pointer';
+                hostContainer.title = '';
+                hostContainer.appendChild(mediaContainer);
+                popoutBtn.style.display = 'flex';
+            }
+        };
+
+        popoutBtn.onclick = (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            togglePopout(true);
+        };
+
         const detachWheel = () => {
             if (wheelListenerAttached) {
-                hostContainer.removeEventListener('wheel', onWheel);
+                mediaContainer.removeEventListener('wheel', onWheel);
                 wheelListenerAttached = false;
             }
         };
 
         const attachWheel = () => {
             if (!wheelListenerAttached && currentMode === 'stream') {
-                hostContainer.addEventListener('wheel', onWheel, { passive: false, signal });
+                mediaContainer.addEventListener('wheel', onWheel, { passive: false, signal });
                 wheelListenerAttached = true;
             }
         };
@@ -1692,7 +1978,7 @@
                 };
 
                 currentMedia = video;
-                hostContainer.insertBefore(video, hostContainer.firstChild);
+                mediaContainer.insertBefore(video, mediaContainer.firstChild);
                 video.load();
                 video.play().catch(() => {});
                 if (isHovered) attachWheel();
@@ -1727,7 +2013,7 @@
                         });
 
                         currentMedia = video;
-                        hostContainer.insertBefore(video, hostContainer.firstChild);
+                        mediaContainer.insertBefore(video, mediaContainer.firstChild);
                         video.load();
                         video.play().catch(() => {});
                     } else {
@@ -1741,7 +2027,7 @@
                             renderCoverOnly();
                         };
                         currentMedia = img;
-                        hostContainer.insertBefore(img, hostContainer.firstChild);
+                        mediaContainer.insertBefore(img, mediaContainer.firstChild);
                     }
                 } else {
                     renderCoverOnly();
@@ -1773,23 +2059,23 @@
             };
             img.src = coverUrl;
             currentMedia = img;
-            hostContainer.insertBefore(img, hostContainer.firstChild);
+            mediaContainer.insertBefore(img, mediaContainer.firstChild);
         };
 
-        // Append Progress Bar, Cue Badge, and Toggle Pill
-        hostContainer.appendChild(progressBarBg);
-        hostContainer.appendChild(cueBadge);
-        hostContainer.appendChild(pillBtn);
+        // Append Progress Bar, Cue Badge, and Controls Row into mediaContainer
+        mediaContainer.appendChild(progressBarBg);
+        mediaContainer.appendChild(cueBadge);
+        mediaContainer.appendChild(controlsRow);
 
-        // Hover & Key Listeners for Scrubbing & Hold-to-Freeze
-        hostContainer.onmouseenter = () => {
+        // Hover & Key Listeners for Scrubbing & Hold-to-Freeze attached to mediaContainer
+        mediaContainer.onmouseenter = () => {
             isHovered = true;
             if (currentMode === 'stream') {
                 attachWheel();
             }
         };
 
-        hostContainer.onmouseleave = () => {
+        mediaContainer.onmouseleave = () => {
             isHovered = false;
             detachWheel();
             if (shiftHeld) {
@@ -1857,6 +2143,13 @@
 
         // Initial render
         renderMedia('preview');
+
+        // Initial Popout State sync
+        if (isVideoPoppedOut) {
+            togglePopout(true);
+        } else {
+            hostContainer.appendChild(mediaContainer);
+        }
     }
 
     // --- State & Sequential Utilities ---
@@ -2499,6 +2792,7 @@
             activePopup = null;
         }
         document.querySelectorAll('#scenes-popup').forEach(el => el.remove());
+        closeFloatingVideoHud(resetSequential);
         hasShownScrubCueThisSession = false;
 
         if (resetSequential) {
@@ -2881,7 +3175,16 @@
     function setupPopupListeners(form, signal, onSaveCallback) {
         setTimeout(() => {
             document.addEventListener('mousedown', (e) => {
-                if (!form.contains(e.target)) closePopup();
+                if (e.target && (
+                    form.contains(e.target) ||
+                    e.target.closest('#fasttag-floating-video-hud') ||
+                    e.target.closest('#fasttag-settings-modal') ||
+                    e.target.closest('#fasttag-create-modal') ||
+                    e.target.closest('.toastify')
+                )) {
+                    return;
+                }
+                closePopup();
             }, { signal });
         }, 0);
 

@@ -1,12 +1,20 @@
-## 3.6.0 - Full Video Stream Scrubbing, Velocity Speeds & Shift-to-Freeze
+## 3.6.0 - Floating Video Popout HUD, Stream Scrubbing & Velocity Speeds
 
 ### Highlights & New Features
+- **Detachable Floating Video HUD**:
+  - Pop out the video into a draggable, resizable floating window (`⤢`) with a sleek black border.
+  - Collapses FastTag's video slot into a slim interactive 33px placeholder bar, maximizing vertical height for table browsing.
+  - **1-Click Docking**: Click the placeholder bar or **`⤝`** button to snap the video back into FastTag instantly.
+  - **Smart Non-Overlapping Spawning**: Opens at 2x visual docked size beside FastTag with 0% overlap across both single and Edit Everything views.
+  - **Sequential Mode Memory**: Preserves custom position and enlarged size across all subsequent scenes (`Next Scene ►` / `Alt + →`).
+  - **Zero-Flash Transitions**: Window stays permanently mounted during sequential navigation with seamless in-place video replacement.
 - **Full Video Stream Scrubbing**: Switch from looping previews to the full scene video stream (`🎬 Full Video`) with velocity-based mouse wheel scrubbing.
 - **Velocity-Based Scrubbing**: Dynamically adjusts step size based on scroll speed (*Slow*, *Normal*, *Fast*).
 - **Hold Shift to Freeze & Step**: Pauses auto-resume and switches scrubbing to precision frame stepping.
 - **Configurable Speeds in Settings**: Customize Slow, Normal, Fast, and Freeze step sizes with instant real-time auto-saving.
 - **Animated Lordicon Mouse Cue**: Vector animated mouse cue with 3.0s entrance breathing room, 1.5s slow fade-in, and 4.5s on-screen presence.
 - **5-Session Smart Decay**: Shows on the first 5 sessions to train the user, then permanently retires for zero clutter.
+- **Tabulator Dark Mode Polish**: Eliminates white row divider line flicker artifacts.
 
 ---
 

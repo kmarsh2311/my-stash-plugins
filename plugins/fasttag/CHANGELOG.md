@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.6.0] - 2026-08-28
 
 ### Added & Improved
+- **Floating Video Popout HUD**:
+  - Click the floating **`⤢`** button on the video player to pop the video out into a resizable, draggable floating window with a crisp black accent border.
+  - FastTag's video slot collapses into a sleek 33px placeholder bar (`Video detached in Floating HUD`), expanding 100% vertical space for Tag and Performer tables.
+  - **1-Click Docking**: Click anywhere on the placeholder bar or the **`⤝`** button to instantly snap the video back into FastTag.
+  - **Smart Non-Overlapping Spawning**: Automatically calculates 2x visual docked size and spawns beside the FastTag popup with 0% overlap (auto-shifting Edit Everything if needed).
+  - **Sequential Session Persistence**: Remembers custom position and enlarged size across all subsequent scenes (`Next Scene ►` / `Alt + →`) without resetting until FastTag is closed.
+  - **Zero-Flash Transitions**: Floating window stays permanently mounted during sequential navigation with smooth in-place video replacement.
+  - **Smart Drag & Resize Isolation**: Direct-surface window dragging with a `24px` bottom-right corner exclusion zone for smooth native resizing.
 - **Full Video Stream Scrubbing**: Click the floating `🎬 Full Video` pill in the 16:9 media box to switch from looping preview clips to the scene's full stream with interactive mouse wheel scrubbing.
 - **Dynamic Velocity-Based Scrubbing**: Wheel scrubbing automatically calculates step sizes based on scroll velocity with customizable tiers (*Slow*, *Normal*, *Fast*).
 - **Hold Shift to Freeze & Frame Scrub**: Holding the <kbd>Shift</kbd> key pauses auto-resume and switches scrubbing to precision frame stepping.
@@ -17,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - High-contrast frosted glass mouse mat backdrop with micro-pill hint (`Scroll to scrub • Hold Shift to freeze`).
   - 3.0s initial video breathing room pause, 1.5s slow cinematic fade-in, and 4.5s on-screen presence.
 - **Progressive Onboarding Smart Decay**: The interactive scrubbing cue automatically displays during the first 5 sessions to train the user, then permanently retires for zero clutter. Protected against spam in sequential mode.
+- **Tabulator Dark Mode Background Polish**: Forced all virtual DOM row states to `#0f172a`, completely eliminating white row divider line flicker artifacts.
 
 ---
 

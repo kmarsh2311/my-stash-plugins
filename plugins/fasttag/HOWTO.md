@@ -62,8 +62,13 @@ When you right-click a scene card, FastTag displays a streamlined context menu:
 4. **↔️ Split-Column Workspace:**
    - Left column manages **Tags**; right column manages **Performers**.
    - Drag the center vertical divider line to adjust the column split to your preference.
-5. **Dynamic Video Preview:**
-   - Interactive animated widescreen (16:9) video preview displayed above the tables.
+5. **Dynamic Video Preview, Stream Scrubbing & Floating HUD Popout:**
+   - **Looping Previews & Static Cover Fallback**: Automatically loops the scene's preview clip (or displays static scene cover screenshot if no preview clip was generated).
+   - **🎬 Full Video Stream Scrubbing**: Click `🎬 Full Video` in the top right of the player to switch to full-length streaming with velocity-based mouse wheel scrubbing.
+   - **❄️ Hold Shift to Freeze**: Hold <kbd>Shift</kbd> while scrolling to freeze playback and step frame-by-frame.
+   - **⤢ Detachable Floating HUD**: Click **`⤢`** to pop out the video player into a separate resizable, draggable floating window with a sleek border. FastTag collapses into a 33px placeholder bar (`Video detached in Floating HUD`), granting 100% vertical space to the data tables.
+   - **1-Click Docking**: Click anywhere on the placeholder bar or the **`⤝`** button to snap the video back into FastTag instantly.
+   - **Sequential Memory**: The floating HUD remembers your custom position and size across scenes in sequential mode with zero-flash in-place video swaps.
 
 ---
 
