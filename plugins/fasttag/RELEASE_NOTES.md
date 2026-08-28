@@ -1,3 +1,11 @@
+## 3.5.3 - Scene Cover Image Fallback for Previews
+
+### Highlights & Improvements
+- **Automatic Scene Cover / Screenshot Fallback**: When opening FastTag on scenes that have not yet had preview videos (`.mp4`) or animated `.webp` generated, FastTag automatically loads and displays the scene's static cover image in the 16:9 box instead of collapsing or hiding the preview container.
+- **Graceful Error Recovery**: Instantly catches 404 or video playback errors and falls back to the scene cover image.
+
+---
+
 ## 3.5.2 - UI Refinements & Polish
 
 ### Highlights & Fixes

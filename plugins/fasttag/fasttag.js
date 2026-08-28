@@ -1108,52 +1108,110 @@
     }
 
     // --- Preview & Scrubbing ---
-    function extractPreviewUrlFromCard(cardElement) {
-        if (!cardElement) return null;
-        const candidates = [
-            cardElement.querySelector('video'),
-            cardElement.querySelector('img'),
-            cardElement.querySelector('source[src]'),
-            cardElement.querySelector('[src]'),
-            cardElement.querySelector('[poster]')
-        ];
+    function extractMediaUrlsFromCard(cardElement) {
+        if (!cardElement) return { previewUrl: null, coverUrl: null };
+        let previewUrl = null;
+        let coverUrl = null;
 
-        for (const node of candidates) {
-            if (!node) continue;
-            const src = node.currentSrc || node.src || node.getAttribute('src') || node.getAttribute('poster');
-            if (src && /(preview|thumb|screenshot|\.webp|\.mp4|\.webm|\.m4v|\.mov|\.gif)/i.test(src)) {
-                return src;
+        const videoNode = cardElement.querySelector('video');
+        if (videoNode) {
+            const vSrc = videoNode.currentSrc || videoNode.src || videoNode.getAttribute('src');
+            if (vSrc && /(preview|\.mp4|\.webm|\.m4v|\.mov|\.webp|\.gif)/i.test(vSrc)) {
+                previewUrl = vSrc;
+            }
+            const vPoster = videoNode.getAttribute('poster') || videoNode.poster;
+            if (vPoster) {
+                coverUrl = vPoster;
             }
         }
-        return null;
+
+        const sourceNodes = cardElement.querySelectorAll('source[src]');
+        for (const sNode of sourceNodes) {
+            const sSrc = sNode.getAttribute('src') || sNode.src;
+            if (sSrc && !previewUrl && /(preview|\.mp4|\.webm|\.m4v|\.mov|\.webp|\.gif)/i.test(sSrc)) {
+                previewUrl = sSrc;
+            }
+        }
+
+        const imgNodes = cardElement.querySelectorAll('img');
+        for (const imgNode of imgNodes) {
+            const iSrc = imgNode.currentSrc || imgNode.src || imgNode.getAttribute('src');
+            if (iSrc) {
+                if (!previewUrl && /(preview|\.mp4|\.webm|\.webp|\.gif)/i.test(iSrc)) {
+                    previewUrl = iSrc;
+                } else if (!coverUrl && /(screenshot|thumb|image|cover|\.jpe?g|\.png)/i.test(iSrc)) {
+                    coverUrl = iSrc;
+                } else if (!coverUrl) {
+                    coverUrl = iSrc;
+                }
+            }
+        }
+
+        const bgNodes = cardElement.querySelectorAll('[style*="background"]');
+        for (const node of bgNodes) {
+            const bg = node.style.backgroundImage || node.getAttribute('style') || '';
+            const match = bg.match(/url\(['"]?([^'"]+)['"]?\)/i);
+            if (match && match[1]) {
+                const src = match[1];
+                if (!coverUrl && /(screenshot|thumb|image|cover|\/scene\/)/i.test(src)) {
+                    coverUrl = src;
+                }
+            }
+        }
+
+        return { previewUrl, coverUrl };
     }
 
-    async function fetchScenePreviewUrl(sceneId, cardElement) {
-        const fromCard = extractPreviewUrlFromCard(cardElement);
-        if (fromCard) return fromCard;
+    async function fetchSceneMediaUrls(sceneId, cardElement) {
+        const cardMedia = extractMediaUrlsFromCard(cardElement);
+        let previewUrl = cardMedia.previewUrl;
+        let coverUrl = cardMedia.coverUrl;
+        let previewExplicitlyMissing = false;
 
-        if (!sceneId) return null;
-        const directUrl = `${window.location.origin || 'http://localhost:9999'}/scene/${encodeURIComponent(sceneId)}/preview`;
+        if (sceneId) {
+            const queries = [
+                `query ($id: ID!) { findScene(id: $id) { paths { preview screenshot webp } } }`,
+                `query ($id: ID!) { findScene(id: $id) { paths { preview screenshot } } }`,
+                `query ($id: ID!) { findScene(id: $id) { preview screenshot } }`
+            ];
 
-        const queries = [
-            `query ($id: ID!) { findScene(id: $id) { preview screenshot } }`,
-            `query ($id: ID!) { findScene(id: $id) { paths { preview screenshot } } }`
-        ];
+            for (const query of queries) {
+                try {
+                    const res = await fetchGQL(query, { id: sceneId });
+                    if (res.errors) continue;
+                    const scene = res.data?.findScene;
+                    if (!scene) continue;
 
-        for (const query of queries) {
-            try {
-                const res = await fetchGQL(query, { id: sceneId });
-                if (res.errors) continue;
-                const scene = res.data?.findScene;
-                if (!scene) continue;
-                const preview = scene.preview || scene.screenshot || scene.paths?.preview || scene.paths?.screenshot;
-                if (preview) return preview;
-            } catch (error) {
-                console.error('Stash Scene Manager: preview fetch failed', error);
+                    const gqlPreview = scene.paths?.preview || scene.preview || scene.paths?.webp || null;
+                    const gqlScreenshot = scene.paths?.screenshot || scene.screenshot || null;
+
+                    if (gqlPreview) {
+                        previewUrl = gqlPreview;
+                    } else if (scene.paths && ('preview' in scene.paths) && !scene.paths.preview && !scene.paths.webp) {
+                        // Stash explicitly reports that no preview was generated
+                        previewUrl = null;
+                        previewExplicitlyMissing = true;
+                    }
+
+                    if (gqlScreenshot) {
+                        coverUrl = gqlScreenshot;
+                    }
+                    break;
+                } catch (error) {
+                    console.error('FastTag: preview fetch failed', error);
+                }
             }
         }
 
-        return directUrl;
+        const baseOrigin = window.location.origin || 'http://localhost:9999';
+        if (!coverUrl && sceneId) {
+            coverUrl = `${baseOrigin}/scene/${encodeURIComponent(sceneId)}/screenshot`;
+        }
+        if (!previewUrl && !previewExplicitlyMissing && sceneId) {
+            previewUrl = `${baseOrigin}/scene/${encodeURIComponent(sceneId)}/preview`;
+        }
+
+        return { previewUrl, coverUrl };
     }
 
     async function attachScenePreview(hostContainer, sceneId, cardElement) {
@@ -1186,11 +1244,55 @@
             }
         };
 
-        const previewUrl = await fetchScenePreviewUrl(sceneId, cardElement);
+        const { previewUrl, coverUrl } = await fetchSceneMediaUrls(sceneId, cardElement);
         if (signal.aborted) return;
 
-        if (!previewUrl) {
+        let wheelListenerAttached = false;
+        let resumeTimer = null;
+
+        const detachWheel = () => {
+            if (wheelListenerAttached) {
+                hostContainer.removeEventListener('wheel', onWheel);
+                wheelListenerAttached = false;
+            }
+        };
+
+        const showCoverImage = (fallbackCoverUrl) => {
+            if (signal.aborted) return;
+            detachWheel();
+            clearTimeout(resumeTimer);
+            hostContainer.onmouseenter = null;
+            hostContainer.onmouseleave = null;
+
+            if (!fallbackCoverUrl) {
+                hostContainer.style.display = 'none';
+                return;
+            }
+
+            hostContainer.innerHTML = '';
+            const img = document.createElement('img');
+            img.style.display = 'block';
+            img.style.width = '100%';
+            img.style.height = '100%';
+            img.style.objectFit = 'cover';
+            img.style.background = '#0f172a';
+            img.style.pointerEvents = 'none';
+            img.alt = 'Scene cover';
+            img.loading = 'eager';
+            img.onerror = () => {
+                hostContainer.style.display = 'none';
+            };
+            img.src = fallbackCoverUrl;
+            hostContainer.appendChild(img);
+        };
+
+        if (!previewUrl && !coverUrl) {
             hostContainer.style.display = 'none';
+            return;
+        }
+
+        if (!previewUrl) {
+            showCoverImage(coverUrl);
             return;
         }
 
@@ -1204,8 +1306,6 @@
         media.style.background = '#0f172a';
         media.style.pointerEvents = 'none';
 
-        media.onerror = () => { hostContainer.style.display = 'none'; };
-
         if (isVideoPreview) {
             media.src = previewUrl;
             media.muted = true;
@@ -1215,24 +1315,38 @@
             media.preload = 'auto';
             media.setAttribute('playsinline', 'true');
             media.setAttribute('webkit-playsinline', 'true');
+
+            // Graceful fallback to cover screenshot if preview video fails or 404s
+            media.onerror = () => {
+                showCoverImage(coverUrl);
+            };
+            media.addEventListener('error', () => {
+                showCoverImage(coverUrl);
+            });
+
             media.load();
             media.play().catch(() => {});
         } else {
             media.src = previewUrl;
             media.alt = 'Scene preview';
             media.loading = 'eager';
+            media.onerror = () => {
+                if (coverUrl && previewUrl !== coverUrl) {
+                    showCoverImage(coverUrl);
+                } else {
+                    hostContainer.style.display = 'none';
+                }
+            };
         }
 
         hostContainer.appendChild(media);
 
         if (isVideoPreview) {
             let wasPlaying = false;
-            let resumeTimer = null;
             const RESUME_DELAY = 250;
             let scrubbing = false;
             let originalLoop = !!media.loop;
             let shiftHeld = false;
-            let wheelListenerAttached = false;
             let isHovered = false;
 
             hostContainer.onmouseenter = () => {
@@ -1249,7 +1363,7 @@
                 }
             };
 
-            const onWheel = (e) => {
+            var onWheel = (e) => {
                 if (!shiftHeld) return;
                 e.preventDefault();
                 if (!media || media.duration <= 0 || !isFinite(media.duration)) return;
@@ -1277,13 +1391,6 @@
                 if (!wheelListenerAttached) {
                     hostContainer.addEventListener('wheel', onWheel, { passive: false, signal });
                     wheelListenerAttached = true;
-                }
-            };
-
-            const detachWheel = () => {
-                if (wheelListenerAttached) {
-                    hostContainer.removeEventListener('wheel', onWheel);
-                    wheelListenerAttached = false;
                 }
             };
 

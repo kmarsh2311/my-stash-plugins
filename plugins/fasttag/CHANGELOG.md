@@ -5,6 +5,14 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.3] - 2026-08-28
+
+### Added & Improved
+- **Automatic Scene Cover / Screenshot Fallback**: When opening FastTag or navigating sequentially across scenes where no preview video (`.mp4`) or animated `.webp` has been generated, FastTag seamlessly displays the scene's static cover screenshot in the 16:9 media box instead of collapsing or hiding the preview container.
+- **Graceful Error Recovery**: If a preview video URL returns a 404 or fails to load, FastTag instantly catches the error and transitions to the scene cover image without interruption.
+
+---
+
 ## [3.5.2] - 2026-08-28
 
 ### Polish & Improvements
