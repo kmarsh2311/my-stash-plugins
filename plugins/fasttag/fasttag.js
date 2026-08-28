@@ -50,7 +50,7 @@
                 { title: "Name", field: "name", widthGrow: 2, resizable: true, headerSort: false },
                 { title: "Details", field: "disambiguation", widthGrow: 1, resizable: false, headerSort: false },
             ],
-            fetchQuery: `query { findPerformers(filter: { per_page: -1 }) { performers { id name disambiguation } } }`,
+            fetchQuery: `query { findPerformers(filter: { per_page: -1 }) { performers { id name disambiguation image_path country gender birthdate ethnicity rating100 alias_list } } }`,
             extractList: data => data?.findPerformers?.performers || [],
             fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title files { path } performers { id } } }`,
             extractExisting: data => data?.findScene?.performers?.map(p => p.id) || [],
@@ -2793,6 +2793,7 @@
         }
         document.querySelectorAll('#scenes-popup').forEach(el => el.remove());
         closeFloatingVideoHud(resetSequential);
+        hidePerformerHoverCard();
         hasShownScrubCueThisSession = false;
 
         if (resetSequential) {
@@ -2962,6 +2963,257 @@
                     localStorage.setItem(`fasttag_col_width_${scope}_${type}_${field}`, String(Math.round(width)));
                 }
             } catch (e) {}
+        });
+    }
+
+    // --- Performer Hover ID Card ---
+    let performerHoverCardElement = null;
+    let performerHoverTimeout = null;
+
+    function getAgeFromBirthdate(birthdate) {
+        if (!birthdate) return '';
+        try {
+            const birth = new Date(birthdate);
+            if (isNaN(birth.getTime())) return '';
+            const diff = Date.now() - birth.getTime();
+            const ageDate = new Date(diff);
+            const age = Math.abs(ageDate.getUTCFullYear() - 1970);
+            return (age > 0 && age < 120) ? `${age} yrs` : '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function getCountryBadge(country) {
+        if (!country) return '';
+        const code = country.trim().toUpperCase();
+        if (code.length === 2) {
+            try {
+                const flag = String.fromCodePoint(...[...code].map(c => 127397 + c.charCodeAt(0)));
+                return `${flag} ${code}`;
+            } catch (e) {}
+        }
+        return country;
+    }
+
+    function formatGenderBadge(gender) {
+        if (!gender) return '';
+        const g = String(gender).toLowerCase();
+        if (g.includes('female') && !g.includes('trans')) return '♀ Female';
+        if (g.includes('male') && !g.includes('trans')) return '♂ Male';
+        if (g.includes('trans_female') || g.includes('transgender_female')) return '⚧ Trans Female';
+        if (g.includes('trans_male') || g.includes('transgender_male')) return '⚧ Trans Male';
+        return gender;
+    }
+
+    let isHoveringCard = false;
+
+    function hidePerformerHoverCard() {
+        if (isHoveringCard) return;
+        if (performerHoverTimeout) {
+            clearTimeout(performerHoverTimeout);
+            performerHoverTimeout = null;
+        }
+        if (performerHoverCardElement) {
+            performerHoverCardElement.style.opacity = '0';
+            performerHoverCardElement.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                if (performerHoverCardElement && performerHoverCardElement.style.opacity === '0' && !isHoveringCard) {
+                    performerHoverCardElement.remove();
+                    performerHoverCardElement = null;
+                }
+            }, 160);
+        }
+    }
+
+    function showPerformerHoverCard(data, rowElement) {
+        if (!data || !rowElement || !document.body.contains(rowElement)) return;
+        if (!performerHoverCardElement) {
+            performerHoverCardElement = document.createElement('div');
+            performerHoverCardElement.id = 'fasttag-performer-hover-card';
+            document.body.appendChild(performerHoverCardElement);
+        }
+
+        const imgUrl = data.image_path || `/performer/${data.id}/image`;
+        const name = escapeHtml(data.name || `Performer #${data.id}`);
+        const age = getAgeFromBirthdate(data.birthdate);
+        const country = getCountryBadge(data.country);
+        const gender = formatGenderBadge(data.gender);
+        const disambiguation = data.disambiguation ? escapeHtml(data.disambiguation) : '';
+        const aliases = Array.isArray(data.alias_list) && data.alias_list.length > 0 
+            ? data.alias_list.slice(0, 3).map(a => escapeHtml(a)).join(', ') 
+            : '';
+
+        let ratingStars = '';
+        if (typeof data.rating100 === 'number' && data.rating100 > 0) {
+            const count = Math.min(5, Math.max(1, Math.round(data.rating100 / 20)));
+            ratingStars = `<span style="color: #fbbf24; font-size: 11px; letter-spacing: 1px;">${'★'.repeat(count)}</span>`;
+        }
+
+        const pills = [];
+        if (country) pills.push(`<span style="background: rgba(99, 102, 241, 0.2); color: #c7d2fe; border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 600;">${country}</span>`);
+        if (age) pills.push(`<span style="background: rgba(56, 189, 248, 0.15); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 600;">${age}</span>`);
+        if (gender) pills.push(`<span style="background: rgba(244, 114, 182, 0.15); color: #f472b6; border: 1px solid rgba(244, 114, 182, 0.35); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 600;">${gender}</span>`);
+        if (data.ethnicity) pills.push(`<span style="background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 4px; padding: 1px 5px; font-size: 10px;">${escapeHtml(data.ethnicity)}</span>`);
+
+        performerHoverCardElement.style.cssText = `position: fixed; z-index: 1000005; pointer-events: auto; cursor: pointer; width: 315px; background: rgba(15, 23, 42, 0.96); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(148, 163, 184, 0.35); border-radius: 12px; box-shadow: 0 20px 45px rgba(0,0,0,0.85), inset 0 0 0 1px rgba(255,255,255,0.08); padding: 10px 11px; box-sizing: border-box; display: flex; gap: 11px; font-family: system-ui, -apple-system, sans-serif; transition: opacity 0.15s ease, transform 0.15s ease, border-color 0.15s ease; opacity: 0; transform: scale(0.96);`;
+
+        performerHoverCardElement.innerHTML = `
+            <div style="width: 110px; height: 146px; border-radius: 8px; overflow: hidden; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); flex-shrink: 0; display: flex; align-items: center; justify-content: center; position: relative; box-shadow: 0 4px 14px rgba(0,0,0,0.5);">
+                <img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" />
+                <div style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center; font-size: 42px; color: #64748b;">⭐</div>
+            </div>
+            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; margin-bottom: 2px;">
+                        <span style="font-size: 14.5px; font-weight: 700; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${name}</span>
+                        ${ratingStars}
+                    </div>
+                    ${disambiguation ? `<div style="font-size: 11px; color: #94a3b8; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px;">${disambiguation}</div>` : ''}
+                    ${pills.length > 0 ? `<div style="display: flex; flex-wrap: wrap; gap: 3.5px; margin-top: 3px;">${pills.join('')}</div>` : ''}
+                </div>
+                <div>
+                    ${aliases ? `<div style="font-size: 9.5px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px;"><strong style="color: #94a3b8;">aka:</strong> ${aliases}</div>` : ''}
+                    <div style="display: flex; align-items: center; justify-content: flex-end; gap: 3px; font-size: 10px; font-weight: 600; color: #818cf8; opacity: 0.95; margin-top: 4px;">
+                        <span>View Profile</span><span style="font-size: 10.5px;">↗</span>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        performerHoverCardElement.onclick = (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            window.open(`/performers/${data.id}`, '_blank');
+        };
+
+        performerHoverCardElement.onmouseenter = () => {
+            isHoveringCard = true;
+            if (performerHoverTimeout) clearTimeout(performerHoverTimeout);
+            performerHoverCardElement.style.borderColor = 'rgba(99, 102, 241, 0.8)';
+        };
+
+        performerHoverCardElement.onmouseleave = (e) => {
+            isHoveringCard = false;
+            performerHoverCardElement.style.borderColor = 'rgba(148, 163, 184, 0.35)';
+            if (!e.relatedTarget || !e.relatedTarget.closest('.tabulator-row')) {
+                hidePerformerHoverCard();
+            }
+        };
+
+        const rowRect = rowElement.getBoundingClientRect();
+        const cardWidth = 315;
+        const cardHeight = 146;
+        const margin = 12;
+
+        let top = rowRect.top - 20;
+        if (top + cardHeight > window.innerHeight - margin) {
+            top = window.innerHeight - cardHeight - margin;
+        }
+        if (top < margin) {
+            top = margin;
+        }
+
+        let hudRect = null;
+        if (isVideoPoppedOut && floatingHudElement && document.body.contains(floatingHudElement)) {
+            hudRect = floatingHudElement.getBoundingClientRect();
+        }
+
+        let left;
+        if (hudRect) {
+            const form = activePopup && activePopup.element ? activePopup.element : null;
+            const formRect = form ? form.getBoundingClientRect() : rowRect;
+            const hudCenter = hudRect.left + hudRect.width / 2;
+            const formCenter = formRect.left + formRect.width / 2;
+
+            if (hudCenter < formCenter) {
+                // Floating HUD is to the LEFT -> Place card strictly to the RIGHT
+                left = rowRect.right + margin;
+                if (left + cardWidth > window.innerWidth - margin) {
+                    left = window.innerWidth - cardWidth - margin;
+                }
+            } else {
+                // Floating HUD is to the RIGHT -> Place card strictly to the LEFT
+                left = rowRect.left - cardWidth - margin;
+                if (left < margin) {
+                    left = margin;
+                }
+            }
+        } else {
+            // Standard placement: prefer Right, fallback to Left if offscreen
+            left = rowRect.right + margin;
+            if (left + cardWidth > window.innerWidth - margin) {
+                left = rowRect.left - cardWidth - margin;
+            }
+            if (left < margin) {
+                left = margin;
+            }
+            if (left + cardWidth > window.innerWidth - margin) {
+                left = window.innerWidth - cardWidth - margin;
+            }
+        }
+
+        performerHoverCardElement.style.left = `${Math.round(left)}px`;
+        performerHoverCardElement.style.top = `${Math.round(top)}px`;
+
+        requestAnimationFrame(() => {
+            if (performerHoverCardElement) {
+                performerHoverCardElement.style.opacity = '1';
+                performerHoverCardElement.style.transform = 'scale(1)';
+            }
+        });
+    }
+
+    function attachPerformerHoverCard(table, tableContainer) {
+        const container = tableContainer || (table && table.element);
+        if (!container) return;
+
+        let activeRowEl = null;
+
+        container.addEventListener('mouseover', (e) => {
+            const rowEl = e.target.closest('.tabulator-row');
+            if (!rowEl || rowEl.classList.contains('tabulator-placeholder')) {
+                return;
+            }
+
+            if (rowEl === activeRowEl) return;
+            activeRowEl = rowEl;
+
+            let rowData = null;
+            if (table && typeof table.getRow === 'function') {
+                try {
+                    const row = table.getRow(rowEl);
+                    if (row && typeof row.getData === 'function') {
+                        rowData = row.getData();
+                    }
+                } catch (err) {}
+            }
+            if (!rowData) return;
+
+            if (performerHoverTimeout) clearTimeout(performerHoverTimeout);
+            performerHoverTimeout = setTimeout(() => {
+                showPerformerHoverCard(rowData, rowEl);
+            }, 100);
+        });
+
+        container.addEventListener('mouseout', (e) => {
+            const rowEl = e.target.closest('.tabulator-row');
+            if (!rowEl) return;
+            const related = e.relatedTarget ? e.relatedTarget.closest('.tabulator-row') : null;
+            if (related === rowEl) return;
+            if (e.relatedTarget && e.relatedTarget.closest('#fasttag-performer-hover-card')) return;
+            if (!related && !isHoveringCard) {
+                activeRowEl = null;
+                if (performerHoverTimeout) clearTimeout(performerHoverTimeout);
+                hidePerformerHoverCard();
+            }
+        });
+
+        container.addEventListener('mouseleave', (e) => {
+            if (e.relatedTarget && e.relatedTarget.closest('#fasttag-performer-hover-card')) return;
+            activeRowEl = null;
+            if (performerHoverTimeout) clearTimeout(performerHoverTimeout);
+            if (!isHoveringCard) hidePerformerHoverCard();
         });
     }
 
@@ -3178,6 +3430,7 @@
                 if (e.target && (
                     form.contains(e.target) ||
                     e.target.closest('#fasttag-floating-video-hud') ||
+                    e.target.closest('#fasttag-performer-hover-card') ||
                     e.target.closest('#fasttag-settings-modal') ||
                     e.target.closest('#fasttag-create-modal') ||
                     e.target.closest('.toastify')
@@ -3608,6 +3861,7 @@
             columns: getColumnsWithSavedWidths(type, 'bulk'),
         });
         attachColumnWidthSaver(table, type, 'bulk');
+        if (type === 'performers') attachPerformerHoverCard(table, activePopup.tableContainer);
         activeTableInstance = table;
 
         // Pre-fetch common tags/performers/studios across selected scenes
@@ -4680,6 +4934,7 @@
                 columns: getColumnsWithSavedWidths('performers', 'everything')
             });
             attachColumnWidthSaver(performersTable, 'performers', 'everything');
+            attachPerformerHoverCard(performersTable, popup.performers.tableContainer);
 
             popup.tagsTable = tagsTable;
             popup.performersTable = performersTable;
@@ -5257,6 +5512,7 @@
             columns: getColumnsWithSavedWidths(type, 'single'),
         });
         attachColumnWidthSaver(table, type, 'single');
+        if (type === 'performers') attachPerformerHoverCard(table, activePopup.tableContainer);
         activeTableInstance = table;
 
         setupPopupListeners(form, signal, async () => {

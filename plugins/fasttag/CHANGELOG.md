@@ -5,6 +5,19 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.0] - 2026-08-28
+
+### Added & Improved
+- **Performer Hover ID Card & Visual Matcher**:
+  - Hovering over any Performer row in **`⚡ Edit Everything`**, **`Edit Performers`**, or **Bulk Tagging** opens a sleek frosted glass ID badge.
+  - **Large High-Resolution Photo**: Clear `110px × 146px` portrait headshot with fallback icon support.
+  - **Instant Metadata Breakdown**: Displays Performer Name, Star Rating (`★★★★☆`), Disambiguation details, Country flag (`🇺🇸 US`), Gender badge (`♀ Female` / `♂ Male` / `⚧ Trans`), Age (`29 yrs`), Ethnicity, and Known Aliases (`aka: ...`).
+  - **1-Click Profile Navigation**: Click anywhere on the card to open that performer's full profile page in Stash (`/performers/{id}`) in a new browser tab.
+  - **Smart HUD Collision Avoidance**: Automatically detects where the floating video HUD is positioned and directs the card to the opposite side so your video playback is never obstructed.
+  - **Snappy 100ms Hover Intent**: Rapid mouse sweeps stay smooth and flicker-free.
+
+---
+
 ## [3.6.0] - 2026-08-28
 
 ### Added & Improved

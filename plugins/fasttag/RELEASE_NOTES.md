@@ -1,3 +1,16 @@
+## 3.7.0 - Performer Hover ID Card, Visual Matcher & Profile Jump
+
+### Highlights & New Features
+- **Performer Hover ID Card**:
+  - Hovering over any Performer row in **`⚡ Edit Everything`**, **`Edit Performers`**, or **Bulk Tagging** opens a frosted glass ID badge.
+  - **110×146px Portrait Photo**: Large, crisp performer avatar with fallback icon support.
+  - **Instant Metadata Breakdown**: Performer Name, Star Rating (`★★★★☆`), Disambiguation, Country flag (`🇺🇸 US`), Gender badge, Age, Ethnicity, and Known Aliases (`aka: ...`).
+  - **1-Click Profile Jump**: Click anywhere on the card to open that performer's full profile page in Stash (`/performers/{id}`) in a new browser tab.
+  - **Smart Floating HUD Collision Avoidance**: Automatically places the card on the side opposite the popped-out video so playback is never obscured.
+  - **Snappy 100ms Hover Intent**: Zero flicker on rapid sweeps.
+
+---
+
 ## 3.6.0 - Floating Video Popout HUD, Stream Scrubbing & Velocity Speeds
 
 ### Highlights & New Features

@@ -15,6 +15,7 @@ A collection of custom scripts and plugins designed to speed up the [Stash](http
 ### FastTag - Scene Manager Context Menu
 A fast tagging workflow for Stash scene cards, designed for video libraries where you want to assign tags and performers quickly without leaving the page. 
 
+*   **🎭 Performer Hover ID Card & 1-Click Profile Jump:** Hovering over any performer row displays a frosted glass ID card with their 110×146px portrait photo, rating (`★★★★☆`), country flag (`🇺🇸 US`), gender, age, aliases, and disambiguation. Click the card to open their profile in a new tab! Features smart collision avoidance to never block the floating video HUD.
 *   **⤢ Floating Video Popout HUD:** Click `⤢` to detach the video into a 2x floating, resizable window while FastTag collapses into a 33px placeholder bar for 100% vertical table space. Click the placeholder or `⤝` to snap the video back into FastTag instantly!
 *   **🎬 Full Video Stream Scrubbing:** Toggle to `🎬 Full Video` to scrub through the entire scene with velocity-based mouse wheel control.
 *   **❄️ Hold Shift to Freeze & Step:** Hold <kbd>Shift</kbd> while scrolling to freeze playback and step frame-by-frame with precision.

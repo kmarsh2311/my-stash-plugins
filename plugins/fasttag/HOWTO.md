@@ -69,6 +69,7 @@ When you right-click a scene card, FastTag displays a streamlined context menu:
    - **⤢ Detachable Floating HUD**: Click **`⤢`** to pop out the video player into a separate resizable, draggable floating window with a sleek border. FastTag collapses into a 33px placeholder bar (`Video detached in Floating HUD`), granting 100% vertical space to the data tables.
    - **1-Click Docking**: Click anywhere on the placeholder bar or the **`⤝`** button to snap the video back into FastTag instantly.
    - **Sequential Memory**: The floating HUD remembers your custom position and size across scenes in sequential mode with zero-flash in-place video swaps.
+   - **🎭 Performer Hover ID Card**: Hovering over any performer row displays their 110×146px portrait photo, age, country flag, gender, rating, aliases, and disambiguation. Click the card to open their profile in a new tab! Automatically avoids covering the floating video player.
 
 ---
 
@@ -81,6 +82,7 @@ If you only need to adjust one type of metadata:
   - **Quick-Action Chips Bar** showing your recently used items.
   - **Search Input** with instant ID search (e.g. typing `770` immediately finds entity #770).
   - **Tabulator Data Table** with multi-select support and sortable headers.
+  - **🎭 Performer Hover ID Card**: Hovering over any performer row displays their 110×146px portrait photo, age, country flag, gender, rating, aliases, and disambiguation. Click the card to open their profile in a new tab! Automatically avoids covering the floating video player.
 
 ---
 
