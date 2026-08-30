@@ -939,38 +939,72 @@
         .fasttag-btn-pulse-calm {
             animation: fasttagSavePulseCalm 2.4s infinite ease-in-out !important;
         }
-        /* Studio & Group Pills & Chips Micro-Polish */
+        /* Studio & Group Scroll Containers - Scrollbar Hidden (Mouse wheel & gesture scrollable) */
+        #everything-studio-scroll, #everything-groups-scroll {
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
+        }
+        #everything-studio-scroll::-webkit-scrollbar, #everything-groups-scroll::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+        }
+
+        /* Studio & Group SELECTED Pills - Solid Vibrant Filled Gradient */
         .fasttag-studio-pill {
+            background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%) !important;
+            color: #ffffff !important;
+            border: 1px solid #6366f1 !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.35) !important;
             transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
         }
         .fasttag-studio-pill:hover {
             transform: translateY(-1px) !important;
-            filter: brightness(1.12) !important;
-            box-shadow: 0 3px 8px rgba(67, 56, 202, 0.45) !important;
+            filter: brightness(1.15) !important;
+            box-shadow: 0 3px 8px rgba(79, 70, 229, 0.5) !important;
         }
         .fasttag-group-pill {
+            background: linear-gradient(135deg, #9333ea 0%, #6b21a8 100%) !important;
+            color: #ffffff !important;
+            border: 1px solid #a855f7 !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.35) !important;
             transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
         }
         .fasttag-group-pill:hover {
             transform: translateY(-1px) !important;
-            filter: brightness(1.12) !important;
-            box-shadow: 0 3px 8px rgba(126, 34, 206, 0.45) !important;
+            filter: brightness(1.15) !important;
+            box-shadow: 0 3px 8px rgba(147, 51, 234, 0.5) !important;
         }
         .fasttag-pill-clear-btn {
             transition: transform 0.15s ease, color 0.15s ease, opacity 0.15s ease !important;
         }
         .fasttag-pill-clear-btn:hover {
-            color: #f87171 !important;
+            color: #fca5a5 !important;
             opacity: 1 !important;
             transform: scale(1.3) !important;
         }
+
+        /* Unselected Suggestions / Quick Chips - Subtle Ghost / Dashed Outline with colored prefix */
         .fasttag-quick-chip {
+            background: rgba(255, 255, 255, 0.04) !important;
+            border: 1px dashed rgba(148, 163, 184, 0.35) !important;
+            color: #94a3b8 !important;
+            font-weight: 500 !important;
             transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
         }
-        .fasttag-quick-chip:hover {
+        .fasttag-quick-chip.chip-studio:hover {
+            background: rgba(99, 102, 241, 0.22) !important;
+            border: 1px solid #818cf8 !important;
+            color: #ffffff !important;
             transform: translateY(-1px) !important;
-            filter: brightness(1.15) !important;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25) !important;
+            box-shadow: 0 2px 6px rgba(99, 102, 241, 0.35) !important;
+        }
+        .fasttag-quick-chip.chip-group:hover {
+            background: rgba(168, 85, 247, 0.22) !important;
+            border: 1px solid #c084fc !important;
+            color: #ffffff !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 2px 6px rgba(168, 85, 247, 0.35) !important;
         }
         .fasttag-quick-chip:active {
             transform: translateY(0px) scale(0.97) !important;
@@ -6845,11 +6879,11 @@
                 <!-- Left Half: Studio (Pinned Label + Smooth Horizontal Scroll) -->
                 <div id="everything-studio-half" style="display: flex; align-items: center; gap: 5px; flex: 1 1 0px; min-width: 0; padding: 2.5px 6px; background: ${studioBarBg}; border: ${studioBarBorder}; border-radius: 7px; box-sizing: border-box; overflow: hidden;">
                     <span style="font-weight: 700; color: ${isDark ? '#a5b4fc' : '#4f46e5'}; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 3px; flex-shrink: 0; user-select: none;">📁 Studio:</span>
-                    <div id="everything-studio-scroll" style="display: flex; align-items: center; gap: 3.5px; flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: thin; scrollbar-color: ${isDark ? 'rgba(148, 163, 184, 0.25) transparent' : 'rgba(100, 116, 139, 0.25) transparent'};">
-                        <div id="everything-selected-studio-chip" class="fasttag-studio-pill" style="display: none; align-items: center; gap: 4px; background: ${isDark ? '#312e81' : '#e0e7ff'}; color: ${isDark ? '#ffffff' : '#312e81'}; border: 1px solid ${isDark ? '#4338ca' : '#a5b4fc'}; font-weight: 700; padding: 1.5px 6px; border-radius: 999px; font-size: 10px; white-space: nowrap; flex-shrink: 0; box-shadow: 0 1px 2px rgba(0,0,0,0.15); cursor: default;">
+                    <div id="everything-studio-scroll" style="display: flex; align-items: center; gap: 3.5px; flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none;">
+                        <div id="everything-selected-studio-chip" class="fasttag-studio-pill" style="display: none; align-items: center; gap: 4px; font-weight: 700; padding: 1.5px 6px; border-radius: 999px; font-size: 10px; white-space: nowrap; flex-shrink: 0; cursor: default;">
                             <span style="font-weight: 800; font-size: 9.5px; opacity: 0.95;">✓</span>
                             <span id="everything-selected-studio-name"></span>
-                            <button type="button" id="everything-clear-studio-btn" class="fasttag-pill-clear-btn" style="background: none; border: none; cursor: pointer; color: ${isDark ? '#ffffff' : '#312e81'}; font-weight: 700; font-size: 12px; padding: 0 0 0 3px; line-height: 1; opacity: 0.85;" title="Remove Studio">&times;</button>
+                            <button type="button" id="everything-clear-studio-btn" class="fasttag-pill-clear-btn" style="background: none; border: none; cursor: pointer; color: #ffffff; font-weight: 700; font-size: 12px; padding: 0 0 0 3px; line-height: 1; opacity: 0.85;" title="Remove Studio">&times;</button>
                         </div>
                         <div id="everything-recent-studios" style="display: flex; gap: 3.5px; align-items: center; flex-shrink: 0;"></div>
                     </div>
@@ -6858,7 +6892,7 @@
                 <!-- Right Half: Groups (Pinned Label on Left + Smooth Horizontal Scroll) -->
                 <div id="everything-groups-half" style="display: flex; align-items: center; gap: 5px; flex: 1 1 0px; min-width: 0; padding: 2.5px 6px; background: ${studioBarBg}; border: ${studioBarBorder}; border-radius: 7px; box-sizing: border-box; overflow: hidden;">
                     <span style="font-weight: 700; color: ${isDark ? '#c084fc' : '#9333ea'}; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 3px; flex-shrink: 0; user-select: none;">🎬 Group:</span>
-                    <div id="everything-groups-scroll" style="display: flex; align-items: center; gap: 3.5px; flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: thin; scrollbar-color: ${isDark ? 'rgba(148, 163, 184, 0.25) transparent' : 'rgba(100, 116, 139, 0.25) transparent'};">
+                    <div id="everything-groups-scroll" style="display: flex; align-items: center; gap: 3.5px; flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none;">
                         <div id="everything-selected-groups-container" style="display: flex; gap: 3.5px; align-items: center; flex-shrink: 0;"></div>
                         <div id="everything-recent-groups" style="display: flex; gap: 3.5px; align-items: center; flex-shrink: 0;"></div>
                     </div>
@@ -7691,13 +7725,10 @@
                 matchingStudios.forEach(st => {
                     const chip = document.createElement('button');
                     chip.type = 'button';
-                    chip.className = 'fasttag-quick-chip';
+                    chip.className = 'fasttag-quick-chip chip-studio';
                     chip.title = `Click to set studio to "${st.name}"`;
-                    chip.textContent = `+ ${st.name}`;
-                    const bg = isDark ? 'rgba(99, 102, 241, 0.15)' : '#eef2ff';
-                    const border = isDark ? '1px solid rgba(99, 102, 241, 0.45)' : '1px solid #818cf8';
-                    const color = isDark ? '#c7d2fe' : '#3730a3';
-                    chip.style.cssText = `padding: 1.5px 6px; border: ${border}; border-radius: 999px; background: ${bg}; color: ${color}; font-size: 10px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0; line-height: 1.2;`;
+                    chip.innerHTML = `<span style="color: ${isDark ? '#818cf8' : '#4f46e5'}; font-weight: 700; margin-right: 2px;">+</span> ${escapeHtml(st.name)}`;
+                    chip.style.cssText = `padding: 1.5px 6px; border-radius: 999px; font-size: 10px; cursor: pointer; flex-shrink: 0; line-height: 1.2;`;
 
                     chip.onclick = async (e) => {
                         e.preventDefault();
@@ -7750,11 +7781,11 @@
 
                     const pill = document.createElement('div');
                     pill.className = 'fasttag-group-pill';
-                    pill.style.cssText = `display: inline-flex; align-items: center; gap: 3.5px; background: ${isDark ? '#581c87' : '#f3e8ff'}; color: ${isDark ? '#ffffff' : '#581c87'}; border: 1px solid ${isDark ? '#7e22ce' : '#c084fc'}; font-weight: 700; padding: 1.5px 6px; border-radius: 999px; font-size: 10px; white-space: nowrap; flex-shrink: 0; box-shadow: 0 1px 2px rgba(0,0,0,0.15); cursor: default;`;
+                    pill.style.cssText = `display: inline-flex; align-items: center; gap: 3.5px; font-weight: 700; padding: 1.5px 6px; border-radius: 999px; font-size: 10px; white-space: nowrap; flex-shrink: 0; cursor: default;`;
                     pill.innerHTML = `
                         <span style="font-weight: 800; font-size: 9.5px; opacity: 0.95;">🎬</span>
                         <span>${escapeHtml(name)}</span>
-                        <button type="button" class="fasttag-pill-clear-btn" style="background: none; border: none; cursor: pointer; color: ${isDark ? '#ffffff' : '#581c87'}; font-weight: 700; font-size: 12px; padding: 0 0 0 2.5px; line-height: 1; opacity: 0.85;" title="Remove Group">&times;</button>
+                        <button type="button" class="fasttag-pill-clear-btn" style="background: none; border: none; cursor: pointer; color: #ffffff; font-weight: 700; font-size: 12px; padding: 0 0 0 2.5px; line-height: 1; opacity: 0.85;" title="Remove Group">&times;</button>
                     `;
 
                     pill.querySelector('button').onclick = async (e) => {
@@ -7795,13 +7826,10 @@
                 matchingGroups.forEach(grp => {
                     const chip = document.createElement('button');
                     chip.type = 'button';
-                    chip.className = 'fasttag-quick-chip';
+                    chip.className = 'fasttag-quick-chip chip-group';
                     chip.title = `Click to add to group "${grp.name}"`;
-                    chip.textContent = `+ ${grp.name}`;
-                    const bg = isDark ? 'rgba(168, 85, 247, 0.15)' : '#faf5ff';
-                    const border = isDark ? '1px solid rgba(168, 85, 247, 0.45)' : '1px solid #c084fc';
-                    const color = isDark ? '#e9d5ff' : '#6b21a8';
-                    chip.style.cssText = `padding: 1.5px 6px; border: ${border}; border-radius: 999px; background: ${bg}; color: ${color}; font-size: 10px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0; line-height: 1.2;`;
+                    chip.innerHTML = `<span style="color: ${isDark ? '#c084fc' : '#9333ea'}; font-weight: 700; margin-right: 2px;">+</span> ${escapeHtml(grp.name)}`;
+                    chip.style.cssText = `padding: 1.5px 6px; border-radius: 999px; font-size: 10px; cursor: pointer; flex-shrink: 0; line-height: 1.2;`;
 
                     chip.onclick = async (e) => {
                         e.preventDefault();
