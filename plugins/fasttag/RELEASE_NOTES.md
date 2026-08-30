@@ -1,12 +1,24 @@
-## 3.8.0 - Detachable Scraper Sidecar, Auto-Scraping, Zero-Overlap Matrix & Offline Docker Support
+## 3.8.1 - Auto-Scraping for Edit Everything, Sizing Optimizations & UI Polish
+ 
+### Highlights & New Features
+- **Auto-Scrape in Sequential Mode (Edit Everything)**: Automatically fetches and displays StashDB/scraper matches when stepping through scenes in Sequential Mode (`Next Scene ►` / <kbd>Alt</kbd> + <kbd>→</kbd>).
+- **Dedicated Settings Toggle**: Added **"Auto-Scrape in Sequential Mode"** setting in `⚙️ FastTag Settings` with persistent sidecar continuity and session cache protection.
+- **Sleek Proportional Sizing**:
+  - Single edit popups (*Tags, Performers, Studio, Galleries*) default to a sleek `345px × 660px` (fits 9–11 visible rows).
+  - Edit Everything optimized with compact `205px` docked video player and spacious `860px × 760px` layout (fits 10–12 rows).
+- **Enlarged Sidecar Poster**: Adaptively enlarged poster thumbnail in the sidecar HUD (`148px × 94px`) while preserving the high-res 350px hover zoom preview.
+- **Toast Notifications Z-Index**: Layered toast notifications at `z-index: 20,000,000` above all modal backdrops.
+
+---
+
+## 3.8.0 - Detachable Scraper Sidecar, 3-Pane Zero-Overlap Matrix & Offline Docker Support
  
 ### Highlights & New Features
 - **Detachable Scraper Sidecar HUD**: Pop out the StashDB Scraper Match Card into its own floating, draggable, resizable sidecar window (`⤢ Pop Out`) for simultaneous multi-window scraping and video playback.
-- **Auto-Scrape in Sequential Mode (Edit Everything)**: Automatically fetches and displays StashDB/scraper matches when stepping through scenes in Sequential Mode (`Next Scene ►` / <kbd>Alt</kbd> + <kbd>→</kbd>).
 - **Smart 3-Pane Zero-Overlap Matrix**: Multi-window tiling layout with mathematical zero-overlap boundary enforcement across all grid columns (Columns 1–6).
-- **Streamlined Scraper Header & Enlarged Poster**: Moved `✓ Accept` action directly into the Scraper header row, eliminating the bottom bar for maximum content preview space, with an enlarged `148×94px` poster thumbnail in the sidecar.
+- **Streamlined Scraper Header**: Moved `✓ Accept` action directly into the Scraper header row, eliminating the bottom bar for maximum content preview space.
 - **Offline & Strict Docker CSP Support**: Bundled `tabulator.min.js` and `tabulator.min.css` locally in the plugin directory to comply with strict Content-Security-Policy (`script-src 'self'`) and support offline/air-gapped Docker instances.
-- **Native Toast Engine**: Replaced external Toastify dependency with an embedded zero-dependency notification engine layered above all modal backdrops.
+- **Native Toast Engine**: Replaced external Toastify dependency with an embedded zero-dependency notification engine.
 
 ---
 

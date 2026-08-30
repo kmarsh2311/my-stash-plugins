@@ -5,24 +5,35 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.1] - 2026-08-30
+
+### Added & Improved
+- **Auto-Scrape in Sequential Mode (Edit Everything)**:
+  - Automatically fetches and displays StashDB/scraper matches when stepping through scenes in Sequential Mode (`Next Scene ►` / <kbd>Alt</kbd> + <kbd>→</kbd>).
+  - Dedicated toggle setting in `⚙️ FastTag Settings` with persistent sidecar continuity and session cache protection.
+- **Sleek Proportional Sizing & Layout Polish**:
+  - Single edit popups default to a sleek `345px × 660px` (fits 9–11 visible rows).
+  - Edit Everything optimized with compact `205px` docked video player and spacious `860px × 760px` layout (fits 10–12 rows).
+- **Enlarged Sidecar Poster**:
+  - Adaptively enlarged poster thumbnail in the sidecar HUD (`148px × 94px`) while preserving the high-res 350px hover zoom preview.
+- **Toast Notifications Z-Index**:
+  - Layered toast notifications at `z-index: 20,000,000` so notifications render crisp and unobscured in front of modal backdrops.
+
+---
+
 ## [3.8.0] - 2026-08-30
 
 ### Added & Improved
 - **Detachable Scraper Sidecar HUD & 3-Window Multi-Tasking**:
   - Pop out the StashDB Scraper Match Card into its own floating, draggable, resizable sidecar window (`⤢ Pop Out`).
   - Seamless multi-window workflow with simultaneous floating Video player, Scraper Match Card, and FastTag main popup.
-- **Auto-Scrape in Sequential Mode (Edit Everything)**:
-  - Automatically fetches and displays StashDB/scraper matches when stepping through scenes in Sequential Mode (`Next Scene ►` / <kbd>Alt</kbd> + <kbd>→</kbd>).
-  - Dedicated toggle setting in `⚙️ FastTag Settings` with persistent sidecar continuity and session cache protection.
 - **Smart 3-Pane Zero-Overlap Layout Matrix**:
   - Resolution-aware positioning with strict collision avoidance (`enforceZeroOverlap`) preventing windows from overlapping across all grid columns (Columns 1–6).
-  - Sleek proportional defaults (Single popups: `345px × 660px`, Edit Everything: `860px × 760px` with compact `205px` video player).
-- **Header-Streamlined Actions & Enlarged Sidecar Poster**:
+- **Header-Streamlined Actions**:
   - Moved the **`✓ Accept`** action directly into the top header row of the Scraper Match Card, eliminating the bottom bar for 100% vertical preview space.
-  - Adaptively enlarged poster thumbnail in the sidecar HUD (`148px × 94px`) while preserving the high-res 350px hover zoom preview.
 - **Offline & Docker CSP Compatibility**:
   - Bundled local `tabulator.min.js` and `tabulator.min.css` directly in the plugin directory to comply with strict Content-Security-Policy (`script-src 'self'`) and support offline/air-gapped Docker instances.
-  - Replaced external Toastify dependency with a native, zero-dependency floating toast engine layered at `z-index: 20,000,000` above all modal backdrops.
+  - Replaced external Toastify dependency with a native, zero-dependency floating toast engine.
 
 ---
 
