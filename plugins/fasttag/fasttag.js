@@ -6841,26 +6841,26 @@
             <div id="everything-preview-container" style="flex-shrink: 0;"></div>
 
             <!-- Split Metadata Bar: Studio (Left) | Group (Right) -->
-            <div id="everything-metadata-bar" style="display: flex; gap: 8px; margin-bottom: 6px; flex-shrink: 0; min-height: 28px; box-sizing: border-box;">
+            <div id="everything-metadata-bar" style="display: flex; gap: 6px; margin-bottom: 5px; flex-shrink: 0; min-height: 25px; box-sizing: border-box;">
                 <!-- Left Half: Studio (Pinned Label + Smooth Horizontal Scroll) -->
-                <div id="everything-studio-half" style="display: flex; align-items: center; gap: 6px; flex: 1 1 0px; min-width: 0; padding: 4px 8px; background: ${studioBarBg}; border: ${studioBarBorder}; border-radius: 8px; box-sizing: border-box; overflow: hidden;">
-                    <span style="font-weight: 700; color: ${isDark ? '#a5b4fc' : '#4f46e5'}; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 3px; flex-shrink: 0; user-select: none;">📁 Studio:</span>
-                    <div id="everything-studio-scroll" style="display: flex; align-items: center; gap: 4px; flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: thin; scrollbar-color: ${isDark ? 'rgba(148, 163, 184, 0.25) transparent' : 'rgba(100, 116, 139, 0.25) transparent'};">
-                        <div id="everything-selected-studio-chip" class="fasttag-studio-pill" style="display: none; align-items: center; gap: 5px; background: ${isDark ? '#312e81' : '#e0e7ff'}; color: ${isDark ? '#ffffff' : '#312e81'}; border: 1px solid ${isDark ? '#4338ca' : '#a5b4fc'}; font-weight: 700; padding: 2px 8px; border-radius: 999px; font-size: 11px; white-space: nowrap; flex-shrink: 0; box-shadow: 0 1px 2px rgba(0,0,0,0.15); cursor: default;">
-                            <span style="font-weight: 800; font-size: 11px; opacity: 0.95;">✓</span>
+                <div id="everything-studio-half" style="display: flex; align-items: center; gap: 5px; flex: 1 1 0px; min-width: 0; padding: 2.5px 6px; background: ${studioBarBg}; border: ${studioBarBorder}; border-radius: 7px; box-sizing: border-box; overflow: hidden;">
+                    <span style="font-weight: 700; color: ${isDark ? '#a5b4fc' : '#4f46e5'}; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 3px; flex-shrink: 0; user-select: none;">📁 Studio:</span>
+                    <div id="everything-studio-scroll" style="display: flex; align-items: center; gap: 3.5px; flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: thin; scrollbar-color: ${isDark ? 'rgba(148, 163, 184, 0.25) transparent' : 'rgba(100, 116, 139, 0.25) transparent'};">
+                        <div id="everything-selected-studio-chip" class="fasttag-studio-pill" style="display: none; align-items: center; gap: 4px; background: ${isDark ? '#312e81' : '#e0e7ff'}; color: ${isDark ? '#ffffff' : '#312e81'}; border: 1px solid ${isDark ? '#4338ca' : '#a5b4fc'}; font-weight: 700; padding: 1.5px 6px; border-radius: 999px; font-size: 10px; white-space: nowrap; flex-shrink: 0; box-shadow: 0 1px 2px rgba(0,0,0,0.15); cursor: default;">
+                            <span style="font-weight: 800; font-size: 9.5px; opacity: 0.95;">✓</span>
                             <span id="everything-selected-studio-name"></span>
-                            <button type="button" id="everything-clear-studio-btn" class="fasttag-pill-clear-btn" style="background: none; border: none; cursor: pointer; color: ${isDark ? '#ffffff' : '#312e81'}; font-weight: 700; font-size: 14px; padding: 0 0 0 4px; line-height: 1; opacity: 0.85;" title="Remove Studio">&times;</button>
+                            <button type="button" id="everything-clear-studio-btn" class="fasttag-pill-clear-btn" style="background: none; border: none; cursor: pointer; color: ${isDark ? '#ffffff' : '#312e81'}; font-weight: 700; font-size: 12px; padding: 0 0 0 3px; line-height: 1; opacity: 0.85;" title="Remove Studio">&times;</button>
                         </div>
-                        <div id="everything-recent-studios" style="display: flex; gap: 4px; align-items: center; flex-shrink: 0;"></div>
+                        <div id="everything-recent-studios" style="display: flex; gap: 3.5px; align-items: center; flex-shrink: 0;"></div>
                     </div>
                 </div>
 
                 <!-- Right Half: Groups (Pinned Label on Left + Smooth Horizontal Scroll) -->
-                <div id="everything-groups-half" style="display: flex; align-items: center; gap: 6px; flex: 1 1 0px; min-width: 0; padding: 4px 8px; background: ${studioBarBg}; border: ${studioBarBorder}; border-radius: 8px; box-sizing: border-box; overflow: hidden;">
-                    <span style="font-weight: 700; color: ${isDark ? '#c084fc' : '#9333ea'}; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 3px; flex-shrink: 0; user-select: none;">🎬 Group:</span>
-                    <div id="everything-groups-scroll" style="display: flex; align-items: center; gap: 4px; flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: thin; scrollbar-color: ${isDark ? 'rgba(148, 163, 184, 0.25) transparent' : 'rgba(100, 116, 139, 0.25) transparent'};">
-                        <div id="everything-selected-groups-container" style="display: flex; gap: 4px; align-items: center; flex-shrink: 0;"></div>
-                        <div id="everything-recent-groups" style="display: flex; gap: 4px; align-items: center; flex-shrink: 0;"></div>
+                <div id="everything-groups-half" style="display: flex; align-items: center; gap: 5px; flex: 1 1 0px; min-width: 0; padding: 2.5px 6px; background: ${studioBarBg}; border: ${studioBarBorder}; border-radius: 7px; box-sizing: border-box; overflow: hidden;">
+                    <span style="font-weight: 700; color: ${isDark ? '#c084fc' : '#9333ea'}; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 3px; flex-shrink: 0; user-select: none;">🎬 Group:</span>
+                    <div id="everything-groups-scroll" style="display: flex; align-items: center; gap: 3.5px; flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: thin; scrollbar-color: ${isDark ? 'rgba(148, 163, 184, 0.25) transparent' : 'rgba(100, 116, 139, 0.25) transparent'};">
+                        <div id="everything-selected-groups-container" style="display: flex; gap: 3.5px; align-items: center; flex-shrink: 0;"></div>
+                        <div id="everything-recent-groups" style="display: flex; gap: 3.5px; align-items: center; flex-shrink: 0;"></div>
                     </div>
                 </div>
             </div>
@@ -7678,7 +7678,7 @@
                     if (!selectedStudioId) {
                         const emptySpan = document.createElement('span');
                         emptySpan.textContent = '(None)';
-                        emptySpan.style.cssText = `font-size: 11px; opacity: 0.6; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'};`;
+                        emptySpan.style.cssText = `font-size: 10px; opacity: 0.6; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'};`;
                         studioBar.recentContainer.appendChild(emptySpan);
                     }
                     return;
@@ -7697,7 +7697,7 @@
                     const bg = isDark ? 'rgba(99, 102, 241, 0.15)' : '#eef2ff';
                     const border = isDark ? '1px solid rgba(99, 102, 241, 0.45)' : '1px solid #818cf8';
                     const color = isDark ? '#c7d2fe' : '#3730a3';
-                    chip.style.cssText = `padding: 2px 8px; border: ${border}; border-radius: 999px; background: ${bg}; color: ${color}; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0; line-height: 1.25;`;
+                    chip.style.cssText = `padding: 1.5px 6px; border: ${border}; border-radius: 999px; background: ${bg}; color: ${color}; font-size: 10px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0; line-height: 1.2;`;
 
                     chip.onclick = async (e) => {
                         e.preventDefault();
@@ -7750,11 +7750,11 @@
 
                     const pill = document.createElement('div');
                     pill.className = 'fasttag-group-pill';
-                    pill.style.cssText = `display: inline-flex; align-items: center; gap: 4px; background: ${isDark ? '#581c87' : '#f3e8ff'}; color: ${isDark ? '#ffffff' : '#581c87'}; border: 1px solid ${isDark ? '#7e22ce' : '#c084fc'}; font-weight: 700; padding: 2px 8px; border-radius: 999px; font-size: 11px; white-space: nowrap; flex-shrink: 0; box-shadow: 0 1px 2px rgba(0,0,0,0.15); cursor: default;`;
+                    pill.style.cssText = `display: inline-flex; align-items: center; gap: 3.5px; background: ${isDark ? '#581c87' : '#f3e8ff'}; color: ${isDark ? '#ffffff' : '#581c87'}; border: 1px solid ${isDark ? '#7e22ce' : '#c084fc'}; font-weight: 700; padding: 1.5px 6px; border-radius: 999px; font-size: 10px; white-space: nowrap; flex-shrink: 0; box-shadow: 0 1px 2px rgba(0,0,0,0.15); cursor: default;`;
                     pill.innerHTML = `
-                        <span style="font-weight: 800; font-size: 11px; opacity: 0.95;">🎬</span>
+                        <span style="font-weight: 800; font-size: 9.5px; opacity: 0.95;">🎬</span>
                         <span>${escapeHtml(name)}</span>
-                        <button type="button" class="fasttag-pill-clear-btn" style="background: none; border: none; cursor: pointer; color: ${isDark ? '#ffffff' : '#581c87'}; font-weight: 700; font-size: 13px; padding: 0 0 0 3px; line-height: 1; opacity: 0.85;" title="Remove Group">&times;</button>
+                        <button type="button" class="fasttag-pill-clear-btn" style="background: none; border: none; cursor: pointer; color: ${isDark ? '#ffffff' : '#581c87'}; font-weight: 700; font-size: 12px; padding: 0 0 0 2.5px; line-height: 1; opacity: 0.85;" title="Remove Group">&times;</button>
                     `;
 
                     pill.querySelector('button').onclick = async (e) => {
@@ -7773,7 +7773,7 @@
                     if (selectedGroupIds.size === 0) {
                         const emptySpan = document.createElement('span');
                         emptySpan.textContent = '(None)';
-                        emptySpan.style.cssText = `font-size: 11px; opacity: 0.6; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'};`;
+                        emptySpan.style.cssText = `font-size: 10px; opacity: 0.6; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'};`;
                         groupsBar.recentContainer.appendChild(emptySpan);
                     }
                     return;
@@ -7787,7 +7787,7 @@
                 if (!matchingGroups.length && selectedGroupIds.size === 0) {
                     const emptySpan = document.createElement('span');
                     emptySpan.textContent = 'No matching group';
-                    emptySpan.style.cssText = `font-size: 11px; opacity: 0.6; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'};`;
+                    emptySpan.style.cssText = `font-size: 10px; opacity: 0.6; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'};`;
                     groupsBar.recentContainer.appendChild(emptySpan);
                     return;
                 }
@@ -7801,7 +7801,7 @@
                     const bg = isDark ? 'rgba(168, 85, 247, 0.15)' : '#faf5ff';
                     const border = isDark ? '1px solid rgba(168, 85, 247, 0.45)' : '1px solid #c084fc';
                     const color = isDark ? '#e9d5ff' : '#6b21a8';
-                    chip.style.cssText = `padding: 2px 8px; border: ${border}; border-radius: 999px; background: ${bg}; color: ${color}; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0; line-height: 1.25;`;
+                    chip.style.cssText = `padding: 1.5px 6px; border: ${border}; border-radius: 999px; background: ${bg}; color: ${color}; font-size: 10px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0; line-height: 1.2;`;
 
                     chip.onclick = async (e) => {
                         e.preventDefault();
