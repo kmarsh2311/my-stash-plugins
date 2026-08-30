@@ -5,6 +5,23 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.0] - 2026-08-30
+
+### Added & Improved
+- **Detachable Scraper Sidecar HUD & 3-Window Multi-Tasking**:
+  - Pop out the StashDB Scraper Match Card into its own floating, draggable, resizable sidecar window (`⤢ Pop Out`).
+  - Seamless multi-window workflow with simultaneous floating Video player, Scraper Match Card, and FastTag main popup.
+- **Smart 3-Pane Zero-Overlap Layout Matrix**:
+  - Resolution-aware positioning with strict collision avoidance (`enforceZeroOverlap`) preventing windows from overlapping across all grid columns (Columns 1–6).
+  - Ergonomic default dimensions for seamless tiling without overcrowding.
+- **Header-Streamlined Actions**:
+  - Moved the **`✓ Accept`** action directly into the top header row of the Scraper Match Card, eliminating the bottom bar for 100% vertical preview space.
+- **Offline & Docker CSP Compatibility**:
+  - Bundled local `tabulator.min.js` and `tabulator.min.css` directly in the plugin directory to comply with strict Content-Security-Policy (`script-src 'self'`) and support offline/air-gapped Docker instances.
+  - Replaced external Toastify dependency with a native, zero-dependency floating toast engine.
+
+---
+
 ## [3.7.0] - 2026-08-28
 
 ### Added & Improved

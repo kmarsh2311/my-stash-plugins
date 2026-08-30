@@ -189,26 +189,15 @@
         isTabActive = !document.hidden;
     });
 
-    // --- Style & Dependency Injections ---
     const TABULATOR_JS_CDNS = [
-        'https://cdn.jsdelivr.net/npm/tabulator-tables@5.5.2/dist/js/tabulator.min.js',
         'https://cdnjs.cloudflare.com/ajax/libs/tabulator/5.5.2/js/tabulator.min.js',
-        'https://unpkg.com/tabulator-tables@5.5.2/dist/js/tabulator.min.js'
+        'https://unpkg.com/tabulator-tables@5.5.2/dist/js/tabulator.min.js',
+        'https://cdn.jsdelivr.net/npm/tabulator-tables@5.5.2/dist/js/tabulator.min.js'
     ];
     const TABULATOR_CSS_CDNS = [
-        'https://cdn.jsdelivr.net/npm/tabulator-tables@5.5.2/dist/css/tabulator.min.css',
         'https://cdnjs.cloudflare.com/ajax/libs/tabulator/5.5.2/css/tabulator.min.css',
-        'https://unpkg.com/tabulator-tables@5.5.2/dist/css/tabulator.min.css'
-    ];
-    const TOASTIFY_JS_CDNS = [
-        'https://cdn.jsdelivr.net/npm/toastify-js',
-        'https://cdnjs.cloudflare.com/ajax/libs/toastify-js/1.12.0/toastify.min.js',
-        'https://unpkg.com/toastify-js'
-    ];
-    const TOASTIFY_CSS_CDNS = [
-        'https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css',
-        'https://cdnjs.cloudflare.com/ajax/libs/toastify-js/1.12.0/toastify.min.css',
-        'https://unpkg.com/toastify-js/src/toastify.min.css'
+        'https://unpkg.com/tabulator-tables@5.5.2/dist/css/tabulator.min.css',
+        'https://cdn.jsdelivr.net/npm/tabulator-tables@5.5.2/dist/css/tabulator.min.css'
     ];
 
     let dependencyLoadPromise = null;
@@ -217,20 +206,16 @@
         return typeof Tabulator !== 'undefined' || typeof window.Tabulator !== 'undefined';
     }
 
-    function isToastifyLoaded() {
-        return typeof Toastify !== 'undefined' || typeof window.Toastify !== 'undefined';
-    }
-
     function loadScriptWithFallback(urls, id) {
         return new Promise((resolve, reject) => {
-            if (document.getElementById(id) && (isTabulatorLoaded() || isToastifyLoaded())) {
+            if (isTabulatorLoaded()) {
                 resolve();
                 return;
             }
             let index = 0;
             function tryNext() {
                 if (index >= urls.length) {
-                    reject(new Error(`All CDN sources failed for script ${id}`));
+                    reject(new Error(`All sources failed for script ${id}`));
                     return;
                 }
                 const src = urls[index++];
@@ -243,7 +228,7 @@
                 script.async = true;
                 script.onload = () => resolve();
                 script.onerror = () => {
-                    console.warn(`[FastTag] Failed to load ${src}, trying fallback CDN...`);
+                    console.warn(`[FastTag] Failed to load ${src}, trying fallback...`);
                     tryNext();
                 };
                 document.head.appendChild(script);
@@ -272,32 +257,26 @@
     }
 
     function ensureDependenciesLoaded() {
-        if (isTabulatorLoaded() && isToastifyLoaded()) {
+        if (isTabulatorLoaded()) {
             return Promise.resolve();
         }
         if (dependencyLoadPromise) return dependencyLoadPromise;
 
         dependencyLoadPromise = (async () => {
+            if (isTabulatorLoaded()) return;
             const promises = [];
-            if (!isTabulatorLoaded()) {
-                promises.push(loadScriptWithFallback(TABULATOR_JS_CDNS, 'tabulator-external-js'));
-            }
-            if (!isToastifyLoaded()) {
-                promises.push(loadScriptWithFallback(TOASTIFY_JS_CDNS, 'toastify-external-js'));
-            }
+            promises.push(loadScriptWithFallback(TABULATOR_JS_CDNS, 'tabulator-external-js'));
             loadCssWithFallback(TABULATOR_CSS_CDNS, 'tabulator-external-css');
-            loadCssWithFallback(TOASTIFY_CSS_CDNS, 'toastify-external-css');
-
             await Promise.all(promises);
         })().catch(err => {
-            console.warn('[FastTag] Dependency autoload note:', err.message);
+            console.warn('[FastTag] Tabulator load fallback note:', err.message);
             dependencyLoadPromise = null;
         });
 
         return dependencyLoadPromise;
     }
 
-    // Auto-trigger dependency preload immediately
+    // Preload dependencies
     ensureDependenciesLoaded();
 
     const styleId = 'scenes-manager-modern-styles';
@@ -306,6 +285,8 @@
         style.id = styleId;
         style.textContent = `
         #scenes-popup {
+            background-color: #1e293b;
+            background: #1e293b;
             opacity: 0;
             visibility: hidden;
             transform: translateY(4px);
@@ -353,9 +334,10 @@
         #scenes-custom-menu.theme-light a:hover { background: #f1f5f9; color: #0f172a; }
 
         #scenes-popup.theme-dark {
+            background-color: #1e293b !important;
             background: #1e293b !important;
             border: 1px solid #334155 !important;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4) !important;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.5) !important;
             color: #f8fafc !important;
         }
         #scenes-popup.theme-dark .popup-title { color: #f1f5f9 !important; }
@@ -455,6 +437,41 @@
         }
         #scenes-popup.theme-dark .tabulator-tableholder::-webkit-scrollbar-thumb:hover {
             background: rgba(148, 163, 184, 0.6) !important;
+        }
+
+        #fasttag-scrape-items-preview {
+            scrollbar-width: thin !important;
+            scrollbar-color: rgba(129, 140, 248, 0.65) rgba(0, 0, 0, 0.25) !important;
+        }
+        #fasttag-scrape-items-preview::-webkit-scrollbar {
+            width: 6px !important;
+            height: 6px !important;
+            display: block !important;
+        }
+        #fasttag-scrape-items-preview::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.25) !important;
+            border-radius: 4px !important;
+        }
+        #fasttag-scrape-items-preview::-webkit-scrollbar-thumb {
+            background: rgba(129, 140, 248, 0.65) !important;
+            border-radius: 4px !important;
+        }
+        #fasttag-scrape-items-preview::-webkit-scrollbar-thumb:hover {
+            background: rgba(129, 140, 248, 0.9) !important;
+        }
+
+        #fasttag-scrape-v-resizer:hover {
+            border-bottom: 2px solid #818cf8 !important;
+        }
+
+        #scenes-popup.theme-light #fasttag-scrape-items-preview {
+            scrollbar-color: rgba(99, 102, 241, 0.65) rgba(0, 0, 0, 0.08) !important;
+        }
+        #scenes-popup.theme-light #fasttag-scrape-items-preview::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.08) !important;
+        }
+        #scenes-popup.theme-light #fasttag-scrape-items-preview::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.65) !important;
         }
 
         #scenes-popup.theme-light .tabulator {
@@ -569,38 +586,10 @@
             display: none !important;
         }
 
-        /* Instant custom micro-tooltips */
+        /* Micro-tooltip trigger base class */
         .fasttag-tooltip {
-            position: relative;
             display: inline-flex;
             align-items: center;
-            cursor: pointer;
-        }
-        .fasttag-tooltip::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: calc(100% + 5px);
-            left: 0;
-            transform: translateY(2px);
-            background: #0f172a;
-            color: #f8fafc;
-            font-size: 10.5px;
-            font-weight: 600;
-            padding: 3px 7px;
-            border-radius: 5px;
-            white-space: nowrap;
-            pointer-events: none;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.12s ease, transform 0.12s ease;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-            border: 1px solid rgba(148, 163, 184, 0.3);
-            z-index: 10000;
-        }
-        .fasttag-tooltip:hover::after {
-            opacity: 1;
-            visibility: visible;
-            transform: translateY(0);
         }
         #everything-recent-studios::-webkit-scrollbar,
         #everything-tags-chips::-webkit-scrollbar,
@@ -639,6 +628,24 @@
         }
         .fasttag-marquee-box:hover .fasttag-marquee-track.is-looping {
             animation-play-state: paused;
+        }
+        @keyframes fasttagDockPulse {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4), 0 2px 5px rgba(0, 0, 0, 0.3);
+                background: rgba(99, 102, 241, 0.25);
+                border-color: rgba(99, 102, 241, 0.55);
+            }
+            50% {
+                box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2), 0 0 10px rgba(99, 102, 241, 0.6);
+                background: rgba(99, 102, 241, 0.42);
+                border-color: rgba(129, 140, 248, 0.85);
+            }
+        }
+        #fasttag-inline-dock-btn, .fasttag-dock-pulse {
+            animation: fasttagDockPulse 3.8s infinite ease-in-out !important;
+        }
+        #fasttag-inline-dock-btn:hover, .fasttag-dock-pulse:hover {
+            animation-play-state: paused !important;
         }
         .tabulator-placeholder {
             pointer-events: auto !important;
@@ -745,18 +752,31 @@
     };
 
     function showToast(message, type = "success", duration = 3000) {
-        if (typeof Toastify === 'undefined') {
-            console.log(`[Toast Fallback - ${type}] ${message}`);
-            return;
+        try {
+            const existing = document.getElementById('fasttag-native-toast');
+            if (existing) existing.remove();
+
+            const toast = document.createElement('div');
+            toast.id = 'fasttag-native-toast';
+            const bg = type === "success" ? "#059669" : (type === "info" ? "#6366f1" : "#dc2626");
+            const icon = type === "success" ? "✓" : (type === "info" ? "ℹ" : "✕");
+            toast.style.cssText = `position: fixed; top: 18px; left: 50%; transform: translateX(-50%) translateY(-10px); background: ${bg}; color: #ffffff; padding: 7px 15px; border-radius: 8px; font-size: 12px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 2000000; opacity: 0; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); pointer-events: none; display: inline-flex; align-items: center; gap: 6px; font-family: system-ui, -apple-system, sans-serif;`;
+            toast.innerHTML = `<span style="font-size: 13px; line-height: 1;">${icon}</span><span>${escapeHtml(message)}</span>`;
+            document.body.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateX(-50%) translateY(0)';
+            });
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(-50%) translateY(-10px)';
+                setTimeout(() => { if (toast.parentNode) toast.remove(); }, 220);
+            }, duration);
+        } catch (e) {
+            console.log(`[Toast ${type}]: ${message}`);
         }
-        const bg = type === "success" ? "#10b981" : (type === "info" ? "#6366f1" : "#ef4444");
-        Toastify({
-            text: message,
-            duration: duration,
-            gravity: "top",
-            position: "center",
-            style: { background: bg }
-        }).showToast();
     }
 
     const toastSuccess = (message, debug) => {
@@ -929,73 +949,194 @@
     let floatingHudSize = null;
 
     function getDefaultPopoutSize(hostContainer) {
-        // Docked video is max-height: 280px in 16:9, so visible docked width is ~380px-440px
-        let dockedWidth = 380;
-        if (hostContainer) {
-            const clientW = hostContainer.clientWidth;
-            const clientH = hostContainer.clientHeight;
-            if (clientW > 50 && clientH > 50) {
-                dockedWidth = Math.min(clientW, clientH * (16 / 9));
-            } else if (clientW > 50) {
-                dockedWidth = Math.min(clientW, 280 * (16 / 9));
-            }
+        const screenW = window.innerWidth;
+        const screenH = window.innerHeight;
+        
+        let targetWidth = 600;
+        if (screenW >= 2200) {
+            targetWidth = 760;
+        } else if (screenW >= 1600) { // 1080p standard (1920x1080)
+            targetWidth = 600;
+        } else if (screenW >= 1300) {
+            targetWidth = 520;
+        } else if (screenW >= 1000) {
+            targetWidth = 460;
+        } else {
+            targetWidth = Math.max(300, Math.round(screenW * 0.40));
         }
-        // Normalize dockedWidth to reasonable 340px-420px range
-        dockedWidth = Math.max(340, Math.min(420, dockedWidth));
 
-        // 2x width (around 680px - 720px), bounded so it never exceeds 46vw
-        let targetWidth = Math.round(dockedWidth * 1.85);
-        targetWidth = Math.min(Math.round(window.innerWidth * 0.46), Math.max(480, targetWidth));
         const targetHeight = Math.round(targetWidth * (9 / 16));
         return { width: `${targetWidth}px`, height: `${targetHeight}px` };
     }
 
-    function getInitialPopoutPosition(hudWidth = 680, hudHeight = 382) {
-        const activeForm = activePopup?.element || document.querySelector('#scenes-popup');
-        const margin = 14;
-        if (activeForm) {
-            const rect = activeForm.getBoundingClientRect();
-            const screenWidth = window.innerWidth;
-            const screenHeight = window.innerHeight;
+    function enforceZeroOverlap(left, top, width, height, formRect, otherRect, screenWidth, screenHeight, margin = 14) {
+        let finalLeft = left;
+        let finalTop = top;
 
-            // 1. Check if it fits to the right of FastTag popup
-            if (screenWidth - rect.right >= hudWidth + margin) {
-                const left = Math.round(rect.right + margin);
-                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return { left: `${left}px`, top: `${top}px` };
-            }
-            // 2. Check if it fits to the left of FastTag popup
-            if (rect.left >= hudWidth + margin) {
-                const left = Math.round(rect.left - hudWidth - margin);
-                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return { left: `${left}px`, top: `${top}px` };
-            }
-
-            // 3. For wide modals (like Edit Everything) where neither side currently has room:
-            // Check if the total screen width can fit both side-by-side:
-            if (screenWidth >= rect.width + hudWidth + (margin * 2)) {
-                // Gently shift FastTag to the left margin so both fit side-by-side with 0% overlap!
-                const newFormLeft = margin;
-                activeForm.style.left = `${newFormLeft}px`;
-                const left = Math.round(newFormLeft + rect.width + margin);
-                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return { left: `${left}px`, top: `${top}px` };
-            }
-
-            // 4. Fallback: place on whichever side has more room
-            const roomRight = screenWidth - rect.right;
-            const roomLeft = rect.left;
-            if (roomRight >= roomLeft) {
-                const left = Math.max(margin, screenWidth - hudWidth - margin);
-                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return { left: `${left}px`, top: `${top}px` };
-            } else {
-                const left = margin;
-                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return { left: `${left}px`, top: `${top}px` };
+        // If placed to the left of formRect, ensure right edge (finalLeft + width) does not collide with formRect.left
+        if (formRect && finalLeft < formRect.left) {
+            if (finalLeft + width > formRect.left - margin) {
+                finalLeft = Math.max(margin, formRect.left - width - margin);
             }
         }
-        return { right: '30px', top: '70px' };
+        // If placed to the right of formRect, ensure left edge does not collide with formRect.right
+        if (formRect && finalLeft < formRect.right && finalLeft + width > formRect.right) {
+            finalLeft = Math.min(screenWidth - width - margin, formRect.right + margin);
+        }
+
+        // Keep strictly inside viewport bounds
+        finalLeft = Math.max(margin, Math.min(screenWidth - width - margin, finalLeft));
+        finalTop = Math.max(margin, Math.min(screenHeight - height - margin, finalTop));
+
+        return {
+            left: `${Math.round(finalLeft)}px`,
+            top: `${Math.round(finalTop)}px`,
+            width: `${Math.round(width)}px`,
+            height: `${Math.round(height)}px`
+        };
+    }
+
+    function getInitialPopoutPosition(hudWidth = 600, hudHeight = 338) {
+        const activeForm = activePopup?.element || document.querySelector('#scenes-popup');
+        const margin = 14;
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+
+        const isScraperOpen = floatingScraperHudElement && document.body.contains(floatingScraperHudElement);
+        const scraperRect = isScraperOpen ? floatingScraperHudElement.getBoundingClientRect() : null;
+
+        if (activeForm) {
+            const rect = activeForm.getBoundingClientRect();
+            const spaceRight = Math.max(0, screenWidth - rect.right - margin);
+            const spaceLeft = Math.max(0, rect.left - margin);
+
+            // 1. If Scraper Sidecar is open:
+            if (isScraperOpen && scraperRect) {
+                const scraperIsOnRight = scraperRect.left >= rect.right - 50;
+                const scraperIsOnLeft = scraperRect.right <= rect.left + 50;
+
+                if (scraperIsOnRight) {
+                    // Option A: 3-Pane Row - Place Video to the RIGHT of Scraper HUD
+                    if (screenWidth - scraperRect.right >= hudWidth + margin) {
+                        const left = Math.round(scraperRect.right + margin);
+                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
+                    }
+                    // Option B: Flank Opposite Side - Place Video on the LEFT of Main Popup
+                    if (spaceLeft >= hudWidth + margin) {
+                        const left = Math.round(rect.left - hudWidth - margin);
+                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
+                    }
+                    // Option C: Place Video between Popup and Scraper HUD
+                    if (scraperRect.left - rect.right >= hudWidth + (margin * 2)) {
+                        const left = Math.round(rect.right + margin);
+                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
+                    }
+                    // Option D: Vertical Stacking (under Scraper HUD)
+                    if (screenHeight >= scraperRect.height + hudHeight + (margin * 3)) {
+                        if (scraperRect.top > margin + 20 && floatingScraperHudElement) {
+                            floatingScraperHudElement.style.top = `${margin}px`;
+                        }
+                        const top = Math.round(margin + (floatingScraperHudElement ? floatingScraperHudElement.offsetHeight : scraperRect.height) + margin);
+                        const left = Math.round(scraperRect.left);
+                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
+                    }
+                } else if (scraperIsOnLeft) {
+                    // Option A: 3-Pane Row - Place Video to the LEFT of Scraper HUD
+                    if (scraperRect.left >= hudWidth + margin) {
+                        const left = Math.round(scraperRect.left - hudWidth - margin);
+                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
+                    }
+                    // Option B: Flank Opposite Side - Place Video on the RIGHT of Main Popup
+                    if (spaceRight >= hudWidth + margin) {
+                        const left = Math.round(rect.right + margin);
+                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
+                    }
+                    // Option C: Place Video between Scraper HUD and Popup
+                    if (rect.left - scraperRect.right >= hudWidth + (margin * 2)) {
+                        const left = Math.round(scraperRect.right + margin);
+                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
+                    }
+                    // Option D: Vertical Stacking (under Scraper HUD)
+                    if (screenHeight >= scraperRect.height + hudHeight + (margin * 3)) {
+                        if (scraperRect.top > margin + 20 && floatingScraperHudElement) {
+                            floatingScraperHudElement.style.top = `${margin}px`;
+                        }
+                        const top = Math.round(margin + (floatingScraperHudElement ? floatingScraperHudElement.offsetHeight : scraperRect.height) + margin);
+                        const left = Math.round(scraperRect.left);
+                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
+                    }
+                }
+            }
+
+            // 2. Main popup is near the LEFT (Columns 1, 2) -> Place on the RIGHT of popup
+            if (spaceRight >= spaceLeft && spaceRight >= hudWidth + margin) {
+                const left = Math.round(rect.right + margin);
+                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
+            }
+
+            // 3. Main popup is near the RIGHT (Columns 5, 6) -> Place on the LEFT of popup
+            if (spaceLeft > spaceRight && spaceLeft >= hudWidth + margin) {
+                const left = Math.round(rect.left - hudWidth - margin);
+                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
+            }
+
+            // 4. Either side fits without nudging
+            if (spaceRight >= hudWidth + margin) {
+                const left = Math.round(rect.right + margin);
+                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
+            }
+            if (spaceLeft >= hudWidth + margin) {
+                const left = Math.round(rect.left - hudWidth - margin);
+                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
+            }
+
+            // 5. Coordinated Shift
+            if (screenWidth >= rect.width + hudWidth + (margin * 3)) {
+                if (spaceLeft >= spaceRight) {
+                    const newFormLeft = Math.round(screenWidth - rect.width - margin);
+                    activeForm.style.left = `${newFormLeft}px`;
+                    if (sequentialEditState.enabled) {
+                        sequentialEditState.popupPosition = { left: newFormLeft, top: rect.top };
+                    }
+                    const left = Math.round(newFormLeft - hudWidth - margin);
+                    const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                    return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
+                } else {
+                    const newFormLeft = margin;
+                    activeForm.style.left = `${newFormLeft}px`;
+                    if (sequentialEditState.enabled) {
+                        sequentialEditState.popupPosition = { left: newFormLeft, top: rect.top };
+                    }
+                    const left = Math.round(newFormLeft + rect.width + margin);
+                    const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                    return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
+                }
+            }
+
+            // 6. Vertical Stacking fallback
+            if (screenHeight - rect.bottom >= hudHeight + margin) {
+                const top = Math.round(rect.bottom + margin);
+                const left = Math.max(margin, Math.min(screenWidth - hudWidth - margin, Math.round(rect.left)));
+                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
+            }
+            if (rect.top >= hudHeight + margin) {
+                const top = Math.round(rect.top - hudHeight - margin);
+                const left = Math.max(margin, Math.min(screenWidth - hudWidth - margin, Math.round(rect.left)));
+                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
+            }
+        }
+
+        return { right: '30px', top: '70px', width: `${hudWidth}px`, height: `${hudHeight}px` };
     }
 
     function closeFloatingVideoHud(fullReset = false) {
@@ -1008,6 +1149,166 @@
             floatingHudPosition = null;
             floatingHudSize = null;
         }
+    }
+
+    const DETACH_SCRAPER_STORAGE_KEY = 'fasttag_detach_scraper_v1';
+    let floatingScraperHudElement = null;
+    let floatingScraperHudPosition = null;
+    let floatingScraperHudSize = null;
+
+    function getDetachScraper() {
+        try {
+            return localStorage.getItem(DETACH_SCRAPER_STORAGE_KEY) === 'true';
+        } catch (e) {}
+        return false;
+    }
+
+    function setDetachScraper(enabled) {
+        try {
+            localStorage.setItem(DETACH_SCRAPER_STORAGE_KEY, enabled ? 'true' : 'false');
+        } catch (e) {}
+    }
+
+    function closeFloatingScraperHud(fullReset = false) {
+        if (floatingScraperHudElement) {
+            floatingScraperHudElement.remove();
+            floatingScraperHudElement = null;
+        }
+        if (fullReset) {
+            floatingScraperHudPosition = null;
+            floatingScraperHudSize = null;
+        }
+    }
+
+    function getInitialScraperPopoutPosition(hudWidth = 390, hudHeight = 480) {
+        const activeForm = activePopup?.element || document.querySelector('#scenes-popup');
+        const margin = 12;
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+
+        const isVideoOpen = isVideoPoppedOut && floatingHudElement && document.body.contains(floatingHudElement);
+        const videoRect = isVideoOpen ? floatingHudElement.getBoundingClientRect() : null;
+
+        if (activeForm) {
+            const rect = activeForm.getBoundingClientRect();
+            const spaceRight = Math.max(0, screenWidth - rect.right - margin);
+            const spaceLeft = Math.max(0, rect.left - margin);
+
+            // 1. If Video HUD is open:
+            if (isVideoOpen && videoRect) {
+                const videoIsOnRight = videoRect.left >= rect.right - 50;
+                const videoIsOnLeft = videoRect.right <= rect.left + 50;
+
+                if (videoIsOnRight) {
+                    // Option A: 3-Pane Row - Place Scraper to the RIGHT of Video HUD
+                    if (screenWidth - videoRect.right >= hudWidth + margin) {
+                        const left = Math.round(videoRect.right + margin);
+                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
+                    }
+                    // Option B: Flank Opposite Side - Place Scraper on the LEFT of Main Popup
+                    if (spaceLeft >= hudWidth + margin) {
+                        const left = Math.round(rect.left - hudWidth - margin);
+                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
+                    }
+                    // Option C: Place Scraper between Popup and Video HUD
+                    if (videoRect.left - rect.right >= hudWidth + (margin * 2)) {
+                        const left = Math.round(rect.right + margin);
+                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
+                    }
+                    // Option D: Vertical Stacking (under Video HUD)
+                    if (screenHeight >= videoRect.height + hudHeight + (margin * 3)) {
+                        if (videoRect.top > margin + 20 && floatingHudElement) {
+                            floatingHudElement.style.top = `${margin}px`;
+                        }
+                        const top = Math.round(margin + (floatingHudElement ? floatingHudElement.offsetHeight : videoRect.height) + margin);
+                        const left = Math.round(videoRect.left);
+                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
+                    }
+                } else if (videoIsOnLeft) {
+                    // Option A: 3-Pane Row - Place Scraper to the LEFT of Video HUD
+                    if (videoRect.left >= hudWidth + margin) {
+                        const left = Math.round(videoRect.left - hudWidth - margin);
+                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
+                    }
+                    // Option B: Flank Opposite Side - Place Scraper on the RIGHT of Main Popup
+                    if (spaceRight >= hudWidth + margin) {
+                        const left = Math.round(rect.right + margin);
+                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
+                    }
+                    // Option C: Place Scraper between Video HUD and Popup
+                    if (rect.left - videoRect.right >= hudWidth + (margin * 2)) {
+                        const left = Math.round(videoRect.right + margin);
+                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
+                    }
+                    // Option D: Vertical Stacking (under Video HUD)
+                    if (screenHeight >= videoRect.height + hudHeight + (margin * 3)) {
+                        if (videoRect.top > margin + 20 && floatingHudElement) {
+                            floatingHudElement.style.top = `${margin}px`;
+                        }
+                        const top = Math.round(margin + (floatingHudElement ? floatingHudElement.offsetHeight : videoRect.height) + margin);
+                        const left = Math.round(videoRect.left);
+                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
+                    }
+                }
+            }
+
+            // 2. Main popup is near the LEFT (Columns 1, 2) -> Prefer RIGHT
+            if (spaceRight >= spaceLeft && spaceRight >= hudWidth + margin) {
+                const left = Math.round(rect.right + margin);
+                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
+            }
+
+            // 3. Main popup is near the RIGHT (Columns 5, 6) -> Prefer LEFT
+            if (spaceLeft > spaceRight && spaceLeft >= hudWidth + margin) {
+                const left = Math.round(rect.left - hudWidth - margin);
+                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
+            }
+
+            // 4. Either side fallback
+            if (spaceRight >= hudWidth + margin) {
+                const left = Math.round(rect.right + margin);
+                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
+            }
+            if (spaceLeft >= hudWidth + margin) {
+                const left = Math.round(rect.left - hudWidth - margin);
+                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
+            }
+
+            // 5. Coordinated Shift
+            if (screenWidth >= rect.width + hudWidth + (margin * 3)) {
+                if (spaceLeft >= spaceRight) {
+                    const newFormLeft = Math.round(screenWidth - rect.width - margin);
+                    activeForm.style.left = `${newFormLeft}px`;
+                    if (sequentialEditState.enabled) {
+                        sequentialEditState.popupPosition = { left: newFormLeft, top: rect.top };
+                    }
+                    const left = Math.round(newFormLeft - hudWidth - margin);
+                    const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                    return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
+                } else {
+                    const newFormLeft = margin;
+                    activeForm.style.left = `${newFormLeft}px`;
+                    if (sequentialEditState.enabled) {
+                        sequentialEditState.popupPosition = { left: newFormLeft, top: rect.top };
+                    }
+                    const left = Math.round(newFormLeft + rect.width + margin);
+                    const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                    return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
+                }
+            }
+        }
+
+        return { right: '20px', top: '70px', width: `${hudWidth}px`, height: `${hudHeight}px` };
     }
 
     function getScrubSpeeds() {
@@ -1108,6 +1409,17 @@
 
                     <div style="height: 1px; background: ${border};"></div>
 
+                    <!-- Detach Scraper Window setting -->
+                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; font-size: 13px;">Detach Scraper Window</div>
+                            <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Open scraper matches in a floating sidecar window alongside the popup instead of embedding inside.</div>
+                        </div>
+                        <input type="checkbox" id="fasttag-setting-detach-scraper" ${getDetachScraper() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                    </div>
+
+                    <div style="height: 1px; background: ${border};"></div>
+
                     <!-- Video Scrubbing Speeds setting -->
                     <div style="display: flex; flex-direction: column; gap: 10px;">
                         <div style="display: flex; align-items: center; justify-content: space-between;">
@@ -1143,6 +1455,19 @@
                                 <input type="number" id="fasttag-speed-freeze" min="0.1" max="10" step="0.5" value="${scrubSpeeds.freeze}" style="width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px; border: 1px solid ${border}; background: ${bg}; color: ${text}; font-size: 12px; font-family: inherit;">
                             </div>
                         </div>
+                    <div style="height: 1px; background: ${border};"></div>
+
+                    <!-- Reset Layouts & Sizes setting -->
+                    <div style="display: flex; flex-direction: column; gap: 8px; background: ${cardBg}; padding: 12px; border-radius: 8px; border: 1px solid ${border};">
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 5px;">
+                                    <span>📐</span> Layout & Dimensions
+                                </div>
+                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Reset all customized popup sizes, column widths, and window positions back to optimal display defaults.</div>
+                            </div>
+                            <button type="button" id="fasttag-setting-reset-layouts" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); color: #818cf8; font-size: 11.5px; font-weight: 600; padding: 5px 10px; border-radius: 6px; cursor: pointer; transition: all 0.15s ease; white-space: nowrap;">↺ Reset Layouts</button>
+                        </div>
                     </div>
                 </div>
                 <div style="padding: 12px 18px; background: ${cardBg}; border-top: 1px solid ${border}; display: flex; justify-content: flex-end;">
@@ -1173,6 +1498,14 @@
             sugToggle.addEventListener('change', (e) => {
                 setEnableSuggestions(e.target.checked);
                 showToast(`Suggestions ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
+            });
+        }
+
+        const detachToggle = modal.querySelector('#fasttag-setting-detach-scraper');
+        if (detachToggle) {
+            detachToggle.addEventListener('change', (e) => {
+                setDetachScraper(e.target.checked);
+                showToast(`Detached Scraper ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
             });
         }
 
@@ -1214,6 +1547,14 @@
                 if (speedFastInput) speedFastInput.value = DEFAULT_SCRUB_SPEEDS.fast;
                 if (speedFreezeInput) speedFreezeInput.value = DEFAULT_SCRUB_SPEEDS.freeze;
                 showToast('Scrubbing speeds & onboarding tips reset', 'info');
+            });
+        }
+
+        const resetLayoutsBtn = modal.querySelector('#fasttag-setting-reset-layouts');
+        if (resetLayoutsBtn) {
+            resetLayoutsBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                resetAllLayoutsToDefault();
             });
         }
 
@@ -1493,6 +1834,7 @@
         let startLeft = 0, startTop = 0;
 
         mediaContainer.onclick = (e) => {
+            if (isVideoPoppedOut) return; // Do NOT open scene when video is popped out into floating HUD
             if (e.shiftKey || hasDragged || isDragging) return;
             if (e.target && (e.target.closest('#fasttag-stream-toggle-pill') || e.target.closest('#fasttag-stream-popout-btn') || e.target.closest('#fasttag-hud-close-btn') || e.target.closest('#fasttag-inline-dock-btn'))) return;
             const sceneUrl = getSceneUrl(sceneId, cardElement);
@@ -1625,21 +1967,21 @@
         controlsRow.id = 'fasttag-media-controls-row';
         controlsRow.style.cssText = 'position: absolute; top: 5px; right: 5px; z-index: 20; display: flex; align-items: center; gap: 4px; pointer-events: auto;';
 
-        // Floating Mode Toggle Pill (compact & semi-transparent)
+        // Floating Mode Toggle Pill (compact & clear)
         const pillBtn = document.createElement('div');
         pillBtn.id = 'fasttag-stream-toggle-pill';
-        pillBtn.style.cssText = 'background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.8); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px; padding: 2px 7px; font-size: 9.5px; font-weight: 600; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 3.5px; opacity: 0.35; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: all 0.15s ease; line-height: 1;';
+        pillBtn.style.cssText = 'background: rgba(15, 23, 42, 0.78); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.85); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 12px; padding: 2.5px 8px; font-size: 10px; font-weight: 600; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 4px; opacity: 0.85; box-shadow: 0 2px 6px rgba(0,0,0,0.4); transition: all 0.15s ease; line-height: 1;';
         
         pillBtn.onmouseenter = () => {
             pillBtn.style.opacity = '1';
             pillBtn.style.background = '#6366f1';
             pillBtn.style.borderColor = '#818cf8';
-            pillBtn.style.transform = 'scale(1.03)';
+            pillBtn.style.transform = 'scale(1.04)';
         };
         pillBtn.onmouseleave = () => {
-            pillBtn.style.opacity = '0.35';
-            pillBtn.style.background = 'rgba(15, 23, 42, 0.55)';
-            pillBtn.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+            pillBtn.style.opacity = '0.85';
+            pillBtn.style.background = 'rgba(15, 23, 42, 0.78)';
+            pillBtn.style.borderColor = 'rgba(255, 255, 255, 0.25)';
             pillBtn.style.transform = 'scale(1)';
         };
 
@@ -1649,7 +1991,8 @@
             } else {
                 pillBtn.style.display = 'flex';
                 pillBtn.innerHTML = '🎬 Full Video';
-                pillBtn.title = 'Switch to full scene video stream (Scroll to scrub, Hold Shift to freeze)';
+                pillBtn.removeAttribute('title');
+                pillBtn.setAttribute('data-micro-tooltip', 'Switch to full scene video stream (Scroll to scrub, Hold Shift to freeze)');
             }
         };
 
@@ -1659,13 +2002,13 @@
             renderMedia('stream');
         };
 
-        // Popout Button (Icon only: ⤢, semi-transparent)
+        // Popout Button (Icon only: ⤢, clear & crisp)
         const popoutBtn = document.createElement('button');
         popoutBtn.type = 'button';
         popoutBtn.id = 'fasttag-stream-popout-btn';
-        popoutBtn.style.cssText = 'background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.8); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px; padding: 2px 7px; font-size: 11px; font-weight: 600; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: center; opacity: 0.35; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: all 0.15s ease; line-height: 1; min-width: 22px; height: 19px;';
+        popoutBtn.style.cssText = 'background: rgba(15, 23, 42, 0.78); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.85); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 12px; padding: 2px 7px; font-size: 11.5px; font-weight: 600; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: center; opacity: 0.85; box-shadow: 0 2px 6px rgba(0,0,0,0.4); transition: all 0.15s ease; line-height: 1; min-width: 23px; height: 20px;';
         popoutBtn.innerHTML = '⤢';
-        popoutBtn.title = 'Pop out video';
+        popoutBtn.setAttribute('data-micro-tooltip', 'Pop out video into floating HUD');
 
         popoutBtn.onmouseenter = () => {
             popoutBtn.style.opacity = '1';
@@ -1674,9 +2017,9 @@
             popoutBtn.style.transform = 'scale(1.08)';
         };
         popoutBtn.onmouseleave = () => {
-            popoutBtn.style.opacity = '0.35';
-            popoutBtn.style.background = 'rgba(15, 23, 42, 0.55)';
-            popoutBtn.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+            popoutBtn.style.opacity = '0.85';
+            popoutBtn.style.background = 'rgba(15, 23, 42, 0.78)';
+            popoutBtn.style.borderColor = 'rgba(255, 255, 255, 0.25)';
             popoutBtn.style.transform = 'scale(1)';
         };
 
@@ -1701,6 +2044,9 @@
                     if (!isDragging && Math.hypot(dx, dy) > 4) {
                         isDragging = true;
                         hasDragged = true;
+                        floatingHudElement.style.cursor = 'grabbing';
+                        document.body.style.cursor = 'grabbing';
+                        document.body.style.userSelect = 'none';
                     }
                     if (isDragging) {
                         const newLeft = Math.max(8, Math.min(window.innerWidth - floatingHudElement.offsetWidth - 8, startLeft + dx));
@@ -1715,6 +2061,11 @@
                 const onHudMouseUp = () => {
                     document.removeEventListener('mousemove', onHudMouseMove);
                     document.removeEventListener('mouseup', onHudMouseUp);
+                    if (floatingHudElement) {
+                        floatingHudElement.style.cursor = 'default';
+                    }
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
                     if (isDragging && floatingHudElement) {
                         floatingHudSize = { width: `${floatingHudElement.offsetWidth}px`, height: `${floatingHudElement.offsetHeight}px` };
                     }
@@ -1724,10 +2075,47 @@
                 if (!floatingHudElement || !document.body.contains(floatingHudElement)) {
                     floatingHudElement = document.createElement('div');
                     floatingHudElement.id = 'fasttag-floating-video-hud';
-                    const savedSize = floatingHudSize || getDefaultPopoutSize(hostContainer);
-                    const defaultPos = getInitialPopoutPosition(parseInt(savedSize.width, 10) || 720, parseInt(savedSize.height, 10) || 405);
-                    const pos = floatingHudPosition || defaultPos;
-                    floatingHudElement.style.cssText = `position: fixed; top: ${pos.top}; ${pos.left ? `left: ${pos.left};` : `right: ${pos.right};`} width: ${savedSize.width}; height: ${savedSize.height}; min-width: 260px; min-height: 150px; max-width: 90vw; max-height: 85vh; z-index: 1000000; background: #0f172a; border: 2px solid #000000; border-radius: 10px; box-shadow: 0 20px 50px rgba(0,0,0,0.85); overflow: hidden; resize: both; cursor: move;`;
+                    const defaultSize = getDefaultPopoutSize(hostContainer);
+                    const defaultPos = getInitialPopoutPosition(parseInt(defaultSize.width, 10) || 600, parseInt(defaultSize.height, 10) || 338);
+                    
+                    let finalWidth = defaultPos.width || defaultSize.width;
+                    let finalHeight = defaultPos.height || defaultSize.height;
+                    let finalLeft = defaultPos.left;
+                    let finalTop = defaultPos.top;
+                    let finalRight = defaultPos.right;
+
+                    // Check if user's remembered floatingHudPosition is valid and strictly non-overlapping
+                    const activeForm = activePopup?.element || document.querySelector('#scenes-popup');
+                    const isScraperOpen = floatingScraperHudElement && document.body.contains(floatingScraperHudElement);
+                    const scraperRect = isScraperOpen ? floatingScraperHudElement.getBoundingClientRect() : null;
+                    const formRect = activeForm ? activeForm.getBoundingClientRect() : null;
+
+                    let isPositionValid = false;
+                    if (floatingHudPosition && floatingHudPosition.left && floatingHudPosition.top) {
+                        const pLeft = parseInt(floatingHudPosition.left, 10);
+                        const pTop = parseInt(floatingHudPosition.top, 10);
+                        const pW = floatingHudSize?.width ? parseInt(floatingHudSize.width, 10) : parseInt(finalWidth, 10);
+                        const pH = floatingHudSize?.height ? parseInt(floatingHudSize.height, 10) : parseInt(finalHeight, 10);
+
+                        const collidesWithForm = formRect && !(pLeft + pW <= formRect.left + 5 || pLeft >= formRect.right - 5 || pTop + pH <= formRect.top + 5 || pTop >= formRect.bottom - 5);
+                        const collidesWithScraper = scraperRect && !(pLeft + pW <= scraperRect.left + 5 || pLeft >= scraperRect.right - 5 || pTop + pH <= scraperRect.top + 5 || pTop >= scraperRect.bottom - 5);
+
+                        if (!collidesWithForm && !collidesWithScraper) {
+                            finalLeft = floatingHudPosition.left;
+                            finalTop = floatingHudPosition.top;
+                            finalRight = null;
+                            if (floatingHudSize) {
+                                finalWidth = floatingHudSize.width;
+                                finalHeight = floatingHudSize.height;
+                            }
+                            isPositionValid = true;
+                        }
+                    }
+                    if (!isPositionValid) {
+                        floatingHudPosition = null;
+                    }
+
+                    floatingHudElement.style.cssText = `position: fixed; top: ${finalTop}; ${finalLeft ? `left: ${finalLeft};` : `right: ${finalRight};`} width: ${finalWidth}; height: ${finalHeight}; min-width: 260px; min-height: 150px; max-width: 90vw; max-height: 85vh; z-index: 1000000; background: #0f172a; border: 2px solid #000000; border-radius: 10px; box-shadow: 0 20px 50px rgba(0,0,0,0.85); overflow: hidden; resize: both; cursor: default;`;
                     document.body.appendChild(floatingHudElement);
 
                     // Draggable logic directly on floating video
@@ -1764,6 +2152,8 @@
 
                 // Smoothly swap content inside floating window
                 floatingHudElement.innerHTML = '';
+                mediaContainer.style.cursor = 'default';
+                mediaContainer.title = '';
                 floatingHudElement.appendChild(mediaContainer);
 
                 // Hide popout button while inside floating window
@@ -1795,7 +2185,7 @@
                 inlineDockBtn.id = 'fasttag-inline-dock-btn';
                 inlineDockBtn.style.cssText = 'background: rgba(99, 102, 241, 0.25); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); color: #ffffff; border: 1px solid rgba(99, 102, 241, 0.55); border-radius: 12px; padding: 2px 9px; font-size: 13px; font-weight: 700; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: center; opacity: 0.9; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: all 0.15s ease; min-width: 26px; height: 23px; line-height: 1;';
                 inlineDockBtn.innerHTML = '⤝';
-                inlineDockBtn.title = 'Dock video back into popup';
+                inlineDockBtn.setAttribute('data-micro-tooltip', 'Dock video back into popup');
                 inlineDockBtn.onmouseenter = () => { inlineDockBtn.style.opacity = '1'; inlineDockBtn.style.background = '#6366f1'; inlineDockBtn.style.borderColor = '#818cf8'; inlineDockBtn.style.transform = 'scale(1.06)'; };
                 inlineDockBtn.onmouseleave = () => { inlineDockBtn.style.opacity = '0.9'; inlineDockBtn.style.background = 'rgba(99, 102, 241, 0.25)'; inlineDockBtn.style.borderColor = 'rgba(99, 102, 241, 0.55)'; inlineDockBtn.style.transform = 'scale(1)'; };
                 inlineDockBtn.onclick = (e) => { e.stopPropagation(); togglePopout(false); };
@@ -1814,15 +2204,23 @@
                 }
                 hostContainer.onclick = null;
                 hostContainer.innerHTML = '';
+                hostContainer.style.display = 'block';
+                hostContainer.style.position = 'relative';
+                hostContainer.style.width = '100%';
+                hostContainer.style.height = 'auto';
                 hostContainer.style.aspectRatio = '16 / 9';
                 hostContainer.style.maxHeight = '280px';
                 hostContainer.style.margin = '0 0 10px 0';
+                hostContainer.style.borderRadius = '8px';
+                hostContainer.style.overflow = 'hidden';
                 hostContainer.style.border = 'none';
                 hostContainer.style.background = '#0f172a';
-                hostContainer.style.display = 'block';
+                hostContainer.style.boxShadow = 'none';
                 hostContainer.style.padding = '0';
                 hostContainer.style.cursor = 'pointer';
                 hostContainer.title = '';
+                mediaContainer.style.cursor = 'pointer';
+                mediaContainer.title = 'Click to open scene in new tab';
                 hostContainer.appendChild(mediaContainer);
                 popoutBtn.style.display = 'flex';
             }
@@ -2347,6 +2745,20 @@
     async function navigateToNextScene(form, type, direction = 1, getSelectedIdsFn) {
         if (!sequentialEditState.enabled) return;
 
+        const scraperContainer = form.querySelector(`#${type}-scraper-card-container`);
+        if (scraperContainer) {
+            scraperContainer.innerHTML = '';
+            scraperContainer.style.display = 'none';
+        }
+        closeFloatingScraperHud();
+        const scrapeBtn = form.querySelector(`#${type}-scrape-btn`);
+        if (scrapeBtn) {
+            scrapeBtn.classList.remove('fasttag-dock-pulse');
+            scrapeBtn.innerHTML = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
+            scrapeBtn.title = 'Scrape scene metadata';
+        }
+        hideScrapeCoverTooltip();
+
         const currentSceneId = sequentialEditState.currentSceneId;
         if (currentSceneId && typeof getSelectedIdsFn === 'function') {
             const currentSelectedIds = Array.from(getSelectedIdsFn());
@@ -2376,8 +2788,8 @@
 
         const formRect = form.getBoundingClientRect();
         sequentialEditState.popupPosition = {
-            left: formRect.left + window.scrollX,
-            top: formRect.top + window.scrollY
+            left: formRect.left,
+            top: formRect.top
         };
 
         const nextIndex = sequentialEditState.currentIndex + direction;
@@ -2416,8 +2828,8 @@
 
                 const formRect = form.getBoundingClientRect();
                 sequentialEditState.popupPosition = {
-                    left: formRect.left + window.scrollX,
-                    top: formRect.top + window.scrollY
+                    left: formRect.left,
+                    top: formRect.top
                 };
 
                 sequentialEditState.enabled = true;
@@ -2793,11 +3205,15 @@
         }
         document.querySelectorAll('#scenes-popup').forEach(el => el.remove());
         closeFloatingVideoHud(resetSequential);
+        closeFloatingScraperHud(resetSequential);
         hidePerformerHoverCard();
+        hideScrapeCoverTooltip();
+        hideMicroTooltip();
         hasShownScrubCueThisSession = false;
 
         if (resetSequential) {
             resetSequentialEditState();
+            sessionScrapeCache.clear();
         }
     }
 
@@ -2917,18 +3333,93 @@
         }
     }
 
+    function getOptimalPopupSize(type = 'single') {
+        const screenW = window.innerWidth || 1920;
+        const screenH = window.innerHeight || 1080;
+
+        if (type === 'everything') {
+            const rawW = Math.round(screenW * 0.50);
+            const rawH = Math.round(screenH * 0.80);
+            const width = Math.max(720, Math.min(Math.min(screenW - 24, rawW), 940));
+            const height = Math.max(540, Math.min(Math.min(screenH - 24, rawH), 740));
+            return { width, height };
+        } else {
+            const rawW = Math.round(screenW * 0.20);
+            const rawH = Math.round(screenH * 0.68);
+            const width = Math.max(320, Math.min(Math.min(screenW - 24, rawW), 380));
+            const height = Math.max(460, Math.min(Math.min(screenH - 24, rawH), 540));
+            return { width, height };
+        }
+    }
+
     function getSavedPopupSize(type = 'single') {
         try {
             const key = type === 'everything' ? 'stash_fast_tag_popup_size_everything' : 'stash_fast_tag_popup_size_single';
             const val = localStorage.getItem(key) || (type !== 'everything' ? localStorage.getItem('stash_fast_tag_popup_size') : null);
-            return val ? JSON.parse(val) : null;
-        } catch (e) { return null; }
+            if (val) {
+                const parsed = JSON.parse(val);
+                if (parsed && parsed.width && parsed.height) return parsed;
+            }
+        } catch (e) {}
+        return getOptimalPopupSize(type);
     }
     function setSavedPopupSize(width, height, type = 'single') {
         try {
             const key = type === 'everything' ? 'stash_fast_tag_popup_size_everything' : 'stash_fast_tag_popup_size_single';
             localStorage.setItem(key, JSON.stringify({ width: Math.round(width), height: Math.round(height) }));
         } catch (e) {}
+    }
+
+    function resetAllLayoutsToDefault() {
+        try {
+            // 1. Remove custom popup sizes
+            localStorage.removeItem('stash_fast_tag_popup_size_everything');
+            localStorage.removeItem('stash_fast_tag_popup_size_single');
+            localStorage.removeItem('stash_fast_tag_popup_size');
+
+            // 2. Remove all custom column widths and splitters
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && (k.startsWith('fasttag_col_width_') || k.startsWith('fasttag_splitter_') || k === 'fasttag_everything_splitter_ratio')) {
+                    keysToRemove.push(k);
+                }
+            }
+            keysToRemove.forEach(k => localStorage.removeItem(k));
+
+            // 3. Reset floating HUD positions and sizes
+            floatingHudPosition = null;
+            floatingHudSize = null;
+            floatingScraperHudPosition = null;
+            floatingScraperHudSize = null;
+
+            // 4. If a popup is currently open, smoothly snap it to optimal size and redraw tables
+            if (activePopup?.element) {
+                const isEverything = activePopup.element.getAttribute('data-popup-type') === 'everything';
+                const type = isEverything ? 'everything' : 'single';
+                const optimal = getOptimalPopupSize(type);
+                activePopup.element.style.transition = 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1), height 0.25s cubic-bezier(0.4, 0, 0.2, 1)';
+                activePopup.element.style.width = `${optimal.width}px`;
+                activePopup.element.style.height = `${optimal.height}px`;
+                setTimeout(() => {
+                    if (activePopup?.element) activePopup.element.style.transition = '';
+                    if (activeTableInstance) {
+                        try { activeTableInstance.redraw(true); } catch (e) {}
+                    }
+                    if (activePopup?.tagsTable) {
+                        try { activePopup.tagsTable.redraw(true); } catch (e) {}
+                    }
+                    if (activePopup?.performersTable) {
+                        try { activePopup.performersTable.redraw(true); } catch (e) {}
+                    }
+                }, 260);
+            }
+
+            toastSuccess('All popup sizes and column layouts reset to optimal display defaults');
+        } catch (err) {
+            console.error('[FastTag] Error resetting layouts:', err);
+            toastError('Failed to reset layouts: ' + err.message);
+        }
     }
 
     function getColumnsWithSavedWidths(type, scope = 'single') {
@@ -3217,6 +3708,1264 @@
         });
     }
 
+    // --- ⚡ Scraper & StashDB Auto-Match Engine ---
+    let scrapeCoverTooltipEl = null;
+
+    function showScrapeCoverTooltip(imgSrc, triggerEl) {
+        if (!imgSrc || !triggerEl) return;
+        if (!scrapeCoverTooltipEl) {
+            scrapeCoverTooltipEl = document.createElement('div');
+            scrapeCoverTooltipEl.id = 'fasttag-scrape-cover-tooltip';
+            scrapeCoverTooltipEl.style.cssText = `
+                position: fixed;
+                z-index: 10000050;
+                pointer-events: none;
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 18px 45px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.22);
+                background: #0f172a;
+                width: 350px;
+                height: 230px;
+                display: none;
+                opacity: 0;
+                transform: scale(0.95);
+                transition: opacity 0.15s ease, transform 0.15s ease;
+                box-sizing: border-box;
+                padding: 2px;
+            `;
+            scrapeCoverTooltipEl.innerHTML = `
+                <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000; border-radius: 6px; overflow: hidden;">
+                    <img src="" alt="Cover Tooltip" style="width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 6px;" />
+                </div>
+            `;
+            document.body.appendChild(scrapeCoverTooltipEl);
+        }
+
+        const img = scrapeCoverTooltipEl.querySelector('img');
+        if (img) img.src = imgSrc;
+
+        const rect = triggerEl.getBoundingClientRect();
+        scrapeCoverTooltipEl.style.display = 'block';
+
+        const tipW = 350;
+        const tipH = 230;
+
+        let left = rect.right + 12;
+        if (left + tipW > window.innerWidth - 10) {
+            left = rect.left - tipW - 12;
+        }
+        if (left < 10) {
+            left = Math.max(10, rect.left);
+        }
+
+        let top = rect.top - 15;
+        if (top + tipH > window.innerHeight - 10) {
+            top = window.innerHeight - tipH - 10;
+        }
+        if (top < 10) top = 10;
+
+        scrapeCoverTooltipEl.style.left = `${left}px`;
+        scrapeCoverTooltipEl.style.top = `${top}px`;
+
+        requestAnimationFrame(() => {
+            if (scrapeCoverTooltipEl) {
+                scrapeCoverTooltipEl.style.opacity = '1';
+                scrapeCoverTooltipEl.style.transform = 'scale(1)';
+            }
+        });
+    }
+
+    function hideScrapeCoverTooltip() {
+        if (scrapeCoverTooltipEl) {
+            scrapeCoverTooltipEl.style.opacity = '0';
+            scrapeCoverTooltipEl.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                if (scrapeCoverTooltipEl && scrapeCoverTooltipEl.style.opacity === '0') {
+                    scrapeCoverTooltipEl.style.display = 'none';
+                }
+            }, 150);
+        }
+    }
+
+    let floatingMicroTooltipEl = null;
+    let microTooltipTimeout = null;
+
+    function showMicroTooltip(text, triggerEl) {
+        if (!text || !triggerEl) return;
+        if (microTooltipTimeout) clearTimeout(microTooltipTimeout);
+
+        microTooltipTimeout = setTimeout(() => {
+            if (!floatingMicroTooltipEl) {
+                floatingMicroTooltipEl = document.createElement('div');
+                floatingMicroTooltipEl.id = 'fasttag-floating-microtooltip';
+                floatingMicroTooltipEl.style.cssText = `
+                    position: fixed;
+                    z-index: 10000060;
+                    pointer-events: none;
+                    border-radius: 6px;
+                    box-shadow: 0 8px 24px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.14);
+                    background: #0f172a;
+                    color: #f8fafc;
+                    font-family: system-ui, -apple-system, sans-serif;
+                    font-size: 11px;
+                    font-weight: 500;
+                    line-height: 1.4;
+                    padding: 5px 9px;
+                    max-width: 320px;
+                    width: max-content;
+                    box-sizing: border-box;
+                    display: none;
+                    opacity: 0;
+                    transform: translateY(3px);
+                    transition: opacity 0.12s ease, transform 0.12s ease;
+                `;
+                document.body.appendChild(floatingMicroTooltipEl);
+            }
+
+            floatingMicroTooltipEl.textContent = text;
+            floatingMicroTooltipEl.style.display = 'block';
+
+            const rect = triggerEl.getBoundingClientRect();
+            const tipW = Math.min(320, floatingMicroTooltipEl.offsetWidth || 200);
+            const tipH = floatingMicroTooltipEl.offsetHeight || 28;
+
+            // Perfectly centered horizontally above element, clamped to viewport with 10px screen margin
+            let left = rect.left + (rect.width / 2) - (tipW / 2);
+            if (left < 10) left = 10;
+            if (left + tipW > window.innerWidth - 10) {
+                left = window.innerWidth - tipW - 10;
+            }
+
+            // Prefer positioning above element; if near top of window, place below element
+            let top = rect.top - tipH - 6;
+            if (top < 10) {
+                top = rect.bottom + 6;
+            }
+
+            floatingMicroTooltipEl.style.left = `${left}px`;
+            floatingMicroTooltipEl.style.top = `${top}px`;
+
+            requestAnimationFrame(() => {
+                if (floatingMicroTooltipEl) {
+                    floatingMicroTooltipEl.style.opacity = '1';
+                    floatingMicroTooltipEl.style.transform = 'translateY(0)';
+                }
+            });
+        }, 250); // Snappy ~250ms delay
+    }
+
+    function hideMicroTooltip() {
+        if (microTooltipTimeout) {
+            clearTimeout(microTooltipTimeout);
+            microTooltipTimeout = null;
+        }
+        if (floatingMicroTooltipEl) {
+            floatingMicroTooltipEl.style.opacity = '0';
+            floatingMicroTooltipEl.style.transform = 'translateY(3px)';
+            setTimeout(() => {
+                if (floatingMicroTooltipEl && floatingMicroTooltipEl.style.opacity === '0') {
+                    floatingMicroTooltipEl.style.display = 'none';
+                }
+            }, 120);
+        }
+    }
+
+    // Global event delegation for all FastTag micro tooltips (100% immune to CSS clipping/overflow)
+    document.addEventListener('mouseover', (e) => {
+        const target = e.target.closest('[data-micro-tooltip], [data-tooltip], #scenes-popup [title], #fasttag-floating-video-hud [title], #fasttag-settings-modal [title], .fasttag-chip [title], .fasttag-chip-row [title]');
+        if (target) {
+            let tipText = target.getAttribute('data-micro-tooltip') || target.getAttribute('data-tooltip');
+            if (!tipText && target.hasAttribute('title')) {
+                const rawTitle = target.getAttribute('title');
+                if (rawTitle && rawTitle.trim()) {
+                    tipText = rawTitle.trim();
+                    target.setAttribute('data-micro-tooltip', tipText);
+                    target.removeAttribute('title'); // Prevent slow OS tooltip from popping up over it
+                }
+            }
+            if (tipText && tipText.trim()) {
+                showMicroTooltip(tipText.trim(), target);
+            }
+        }
+    }, true);
+
+    document.addEventListener('mouseout', (e) => {
+        const target = e.target.closest('[data-micro-tooltip], [data-tooltip]');
+        if (target) {
+            hideMicroTooltip();
+        }
+    }, true);
+
+    function cleanTitleForScraping(rawStr) {
+        if (!rawStr) return '';
+        let clean = String(rawStr).replace(/\.[a-zA-Z0-9]{2,5}$/, '');
+        clean = clean.replace(/[\b\._-](2160p|1080p|720p|480p|4k|uhd|hd|sd|fhd|hevc|x264|x265|h264|h265|aac|dvdrip|webrip|bluray|mp4|mkv|avi|wmv)[\b\._-]/gi, ' ');
+        clean = clean.replace(/[\b\._-](2160p|1080p|720p|480p|4k|uhd|hd|sd|fhd|hevc|x264|x265|h264|h265|aac|dvdrip|webrip|bluray|mp4|mkv|avi|wmv)$/gi, '');
+        clean = clean.replace(/[\._\-+]/g, ' ');
+        clean = clean.replace(/\s+/g, ' ').trim();
+        return clean;
+    }
+
+    // Temporary in-memory session cache for active scrape results (cleared when popup is closed)
+    const sessionScrapeCache = new Map();
+
+    async function fetchScraperMatchesForScene(sceneId, cardElement) {
+        let sceneTitle = '';
+        let sceneFileName = '';
+        let sceneFilePath = '';
+        let localDuration = null;
+        let localFingerprints = [];
+
+        try {
+            const query = `query ($id: ID!) { findScene(id: $id) { id title details files { path duration fingerprints { type value } } } }`;
+            const res = await fetchGQL(query, { id: sceneId });
+            const sc = res?.data?.findScene;
+            if (sc) {
+                sceneTitle = sc.title || '';
+                if (sc.files && sc.files.length > 0) {
+                    const f0 = sc.files[0];
+                    if (f0?.path) {
+                        sceneFilePath = f0.path;
+                        const parts = sceneFilePath.split(/[/\\]/);
+                        sceneFileName = parts[parts.length - 1] || '';
+                    }
+                    if (f0?.duration) localDuration = f0.duration;
+                    if (f0?.fingerprints) localFingerprints = f0.fingerprints;
+                }
+            }
+        } catch (e) {}
+
+        const SCRAPE_QUERY = `
+            query FastTagScrapeSingleScene($source: ScraperSourceInput!, $input: ScrapeSingleSceneInput!) {
+                scrapeSingleScene(source: $source, input: $input) {
+                    title
+                    code
+                    details
+                    director
+                    urls
+                    date
+                    image
+                    remote_site_id
+                    duration
+                    fingerprints {
+                        algorithm
+                        hash
+                        duration
+                    }
+                    studio {
+                        stored_id
+                        name
+                        image
+                    }
+                    tags {
+                        stored_id
+                        name
+                    }
+                    performers {
+                        stored_id
+                        name
+                        gender
+                        images
+                    }
+                }
+            }
+        `;
+
+        const enrichMatches = (matches, matchType, sourceName) => {
+            if (!Array.isArray(matches)) return [];
+            matches.forEach(m => {
+                m._matchType = matchType;
+                m._sourceName = sourceName;
+                m._localDuration = localDuration;
+                m._localFingerprints = localFingerprints;
+            });
+            return matches;
+        };
+
+        // 1. First try direct hash scrape on StashBox 0
+        try {
+            const res = await fetchGQL(SCRAPE_QUERY, {
+                source: { stash_box_index: 0 },
+                input: { scene_id: String(sceneId) }
+            });
+            const matches = res?.data?.scrapeSingleScene;
+            if (Array.isArray(matches) && matches.length > 0) {
+                return enrichMatches(matches, 'hash', 'StashDB');
+            }
+        } catch (err) {
+            console.log('[FastTag] Scrape by scene_id error/empty:', err);
+        }
+
+        // 2. Query StashBox by cleaned title/filename
+        const candidateQueries = [];
+        if (sceneTitle && sceneTitle.trim()) {
+            candidateQueries.push(cleanTitleForScraping(sceneTitle));
+        }
+        if (sceneFileName && sceneFileName.trim()) {
+            const cleanedFile = cleanTitleForScraping(sceneFileName);
+            if (cleanedFile && !candidateQueries.includes(cleanedFile)) {
+                candidateQueries.push(cleanedFile);
+            }
+        }
+        if (cardElement) {
+            const cardText = (cardElement.querySelector('.title, .card-title, .scene-card__title')?.textContent || '').trim();
+            if (cardText) {
+                const cleanedCard = cleanTitleForScraping(cardText);
+                if (cleanedCard && !candidateQueries.includes(cleanedCard)) {
+                    candidateQueries.push(cleanedCard);
+                }
+            }
+        }
+
+        for (const queryTerm of candidateQueries) {
+            if (!queryTerm || queryTerm.length < 2) continue;
+            try {
+                const res = await fetchGQL(SCRAPE_QUERY, {
+                    source: { stash_box_index: 0 },
+                    input: { query: queryTerm }
+                });
+                const matches = res?.data?.scrapeSingleScene;
+                if (Array.isArray(matches) && matches.length > 0) {
+                    return enrichMatches(matches, 'title', 'StashDB');
+                }
+            } catch (err) {
+                console.log('[FastTag] Scrape query error:', err);
+            }
+        }
+
+        // 3. Fallback: Query installed scene scrapers
+        try {
+            const listRes = await fetchGQL(`query { listScrapers(types: [SCENE]) { id name } }`);
+            const scrapers = listRes?.data?.listScrapers || [];
+            for (const sc of scrapers) {
+                if (sc.id === 'builtin_autotag') continue;
+                for (const queryTerm of candidateQueries) {
+                    if (!queryTerm || queryTerm.length < 2) continue;
+                    try {
+                        const res = await fetchGQL(SCRAPE_QUERY, {
+                            source: { scraper_id: sc.id },
+                            input: { query: queryTerm }
+                        });
+                        const matches = res?.data?.scrapeSingleScene;
+                        if (Array.isArray(matches) && matches.length > 0) {
+                            return enrichMatches(matches, 'scraper', sc.name || 'Scraper');
+                        }
+                    } catch (e) {}
+                }
+            }
+        } catch (e) {}
+
+        return [];
+    }
+
+    function formatDurationSec(sec) {
+        if (!sec || isNaN(sec)) return '';
+        const s = Math.round(Number(sec));
+        const hrs = Math.floor(s / 3600);
+        const mins = Math.floor((s % 3600) / 60);
+        const secs = s % 60;
+        if (hrs > 0) {
+            return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+        return `${mins}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function parseDurationSec(val) {
+        if (!val) return null;
+        if (typeof val === 'number') return val;
+        const str = String(val).trim();
+        if (/^\d+(\.\d+)?$/.test(str)) return Math.round(Number(str));
+        const parts = str.split(':').map(Number);
+        if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+        if (parts.length === 2) return parts[0] * 60 + parts[1];
+        return null;
+    }
+
+    async function renderScraperMatchCard(container, results, sceneId, ctx, popup, onDismiss) {
+        if (!results || results.length === 0) {
+            if (container) {
+                container.innerHTML = '';
+                container.style.display = 'none';
+            }
+            closeFloatingScraperHud();
+            return;
+        }
+
+        const isDetached = getDetachScraper();
+        let targetContainer = container;
+
+        if (isDetached) {
+            if (popup?.scraperCardContainer) {
+                popup.scraperCardContainer.innerHTML = '';
+                popup.scraperCardContainer.style.display = 'none';
+            }
+            if (!floatingScraperHudElement || !document.body.contains(floatingScraperHudElement)) {
+                floatingScraperHudElement = document.createElement('div');
+                floatingScraperHudElement.id = 'fasttag-floating-scraper-hud';
+                const defaultPos = getInitialScraperPopoutPosition(390, 480);
+                let finalWidth = defaultPos.width || '390px';
+                let finalHeight = defaultPos.height || '480px';
+                let finalLeft = defaultPos.left;
+                let finalTop = defaultPos.top;
+                let finalRight = defaultPos.right;
+
+                const activeForm = activePopup?.element || document.querySelector('#scenes-popup');
+                const isVideoOpen = isVideoPoppedOut && floatingHudElement && document.body.contains(floatingHudElement);
+                const videoRect = isVideoOpen ? floatingHudElement.getBoundingClientRect() : null;
+                const formRect = activeForm ? activeForm.getBoundingClientRect() : null;
+
+                let isPositionValid = false;
+                if (floatingScraperHudPosition && floatingScraperHudPosition.left && floatingScraperHudPosition.top) {
+                    const pLeft = parseInt(floatingScraperHudPosition.left, 10);
+                    const pTop = parseInt(floatingScraperHudPosition.top, 10);
+                    const pW = floatingScraperHudSize?.width ? parseInt(floatingScraperHudSize.width, 10) : parseInt(finalWidth, 10);
+                    const pH = floatingScraperHudSize?.height ? parseInt(floatingScraperHudSize.height, 10) : parseInt(finalHeight, 10);
+
+                    const collidesWithForm = formRect && !(pLeft + pW <= formRect.left + 5 || pLeft >= formRect.right - 5 || pTop + pH <= formRect.top + 5 || pTop >= formRect.bottom - 5);
+                    const collidesWithVideo = videoRect && !(pLeft + pW <= videoRect.left + 5 || pLeft >= videoRect.right - 5 || pTop + pH <= videoRect.top + 5 || pTop >= videoRect.bottom - 5);
+
+                    if (!collidesWithForm && !collidesWithVideo) {
+                        finalLeft = floatingScraperHudPosition.left;
+                        finalTop = floatingScraperHudPosition.top;
+                        finalRight = null;
+                        if (floatingScraperHudSize) {
+                            finalWidth = floatingScraperHudSize.width;
+                            finalHeight = floatingScraperHudSize.height;
+                        }
+                        isPositionValid = true;
+                    }
+                }
+                if (!isPositionValid) {
+                    floatingScraperHudPosition = null;
+                }
+                const isDarkTheme = getEffectiveTheme() === 'dark';
+                floatingScraperHudElement.style.cssText = `position: fixed; top: ${finalTop}; ${finalLeft ? `left: ${finalLeft};` : `right: ${finalRight};`} width: ${finalWidth}; height: ${finalHeight}; min-width: 300px; min-height: 220px; max-width: 92vw; max-height: 92vh; z-index: 1000000; background: ${isDarkTheme ? '#1e293b' : '#ffffff'}; border: 1.5px solid ${isDarkTheme ? '#4338ca' : '#a5b4fc'}; border-radius: 10px; box-shadow: 0 20px 50px rgba(0,0,0,0.85); overflow: hidden; resize: both; display: flex; flex-direction: column;`;
+                document.body.appendChild(floatingScraperHudElement);
+
+                const scraperResizeObserver = new ResizeObserver(() => {
+                    if (floatingScraperHudElement && !floatingScraperHudElement._isDragging) {
+                        floatingScraperHudSize = {
+                            width: `${floatingScraperHudElement.offsetWidth}px`,
+                            height: `${floatingScraperHudElement.offsetHeight}px`
+                        };
+                    }
+                });
+                scraperResizeObserver.observe(floatingScraperHudElement);
+            }
+            targetContainer = floatingScraperHudElement;
+            targetContainer.style.display = 'flex';
+        } else {
+            closeFloatingScraperHud();
+            targetContainer = popup?.scraperCardContainer || container;
+            if (targetContainer) {
+                targetContainer.style.display = 'flex';
+            }
+        }
+        if (!targetContainer) return;
+
+        const popupEl = popup?.element || (targetContainer ? targetContainer.closest('#scenes-popup') : null);
+        const restoreSingleSize = () => {};
+        const restoreSingleWidth = restoreSingleSize;
+
+        // Ensure caches for performers, studios, tags are available to detect new vs existing entities
+        const typesToLoad = [];
+        if (!getCachedOrNull('studios')) typesToLoad.push('studios');
+        if (!getCachedOrNull('performers')) typesToLoad.push('performers');
+        if (!getCachedOrNull('tags')) typesToLoad.push('tags');
+
+        if (typesToLoad.length > 0) {
+            await Promise.all(typesToLoad.map(async (type) => {
+                try {
+                    const res = await fetchGQL(ENTITY_CONFIG[type].fetchQuery);
+                    const list = ENTITY_CONFIG[type].extractList(res.data);
+                    setCache(type, list);
+                } catch (e) {
+                    console.log('[FastTag] Error pre-caching ' + type, e);
+                }
+            }));
+        }
+
+        let currentIndex = 0;
+        const isDark = getEffectiveTheme() === 'dark';
+
+        const updateCardView = () => {
+            const match = results[currentIndex];
+            if (!match) return;
+
+            const studioName = match.studio?.name || '';
+            const performers = match.performers || [];
+            const tags = match.tags || [];
+            const urls = match.urls || [];
+
+            const cachedStudios = getCachedOrNull('studios') || [];
+            const cachedPerformers = getCachedOrNull('performers') || [];
+            const cachedTags = getCachedOrNull('tags') || [];
+
+            const isStudioNew = studioName ? !(match.studio?.stored_id || cachedStudios.some(s => (s.name || '').trim().toLowerCase() === studioName.trim().toLowerCase())) : false;
+
+            let stashDbUrl = '';
+            if (match.remote_site_id && match.remote_site_id.trim()) {
+                const rid = match.remote_site_id.trim();
+                stashDbUrl = rid.startsWith('http') ? rid : `https://stashdb.org/scenes/${rid}`;
+            } else if (Array.isArray(urls)) {
+                stashDbUrl = urls.find(u => u && u.includes('stashdb.org')) || '';
+            }
+
+            // Calculate match likelihood & fingerprint verification (mirroring Stash's native scraper)
+            const localFps = match._localFingerprints || [];
+            const localPhash = (localFps.find(f => f.type?.toLowerCase() === 'phash')?.value || '').toLowerCase();
+            const localOshash = (localFps.find(f => f.type?.toLowerCase() === 'oshash')?.value || '').toLowerCase();
+            const localMd5 = (localFps.find(f => f.type?.toLowerCase() === 'md5')?.value || '').toLowerCase();
+
+            const remoteFps = match.fingerprints || [];
+            const phashMatch = localPhash && remoteFps.some(rf => rf.algorithm?.toLowerCase() === 'phash' && (rf.hash || '').toLowerCase() === localPhash);
+            const oshashMatch = localOshash && remoteFps.some(rf => (rf.algorithm?.toLowerCase() === 'oshash' || rf.algorithm?.toLowerCase() === 'md5') && (rf.hash || '').toLowerCase() === localOshash);
+            const md5Match = localMd5 && remoteFps.some(rf => rf.algorithm?.toLowerCase() === 'md5' && (rf.hash || '').toLowerCase() === localMd5);
+
+            const isHashMatch = match._matchType === 'hash' || phashMatch || oshashMatch || md5Match;
+
+            const matchBadges = [];
+            if (phashMatch) matchBadges.push('PHash is a match');
+            if (oshashMatch || md5Match) matchBadges.push('MD5 Checksum is a match');
+
+            if (matchBadges.length === 0 && isHashMatch) {
+                matchBadges.push('Fingerprint is a match');
+            }
+
+            const localDurSec = parseDurationSec(match._localDuration);
+            const scrapedDurSec = parseDurationSec(match.duration);
+
+            const totalFps = remoteFps.length;
+            const matchingDurFps = remoteFps.filter(rf => {
+                const fd = parseDurationSec(rf.duration);
+                return fd && localDurSec && Math.abs(fd - localDurSec) <= 15;
+            }).length;
+
+            let durationBadge = '';
+            if (scrapedDurSec && localDurSec) {
+                const diff = Math.abs(scrapedDurSec - localDurSec);
+                if (diff <= 3) {
+                    durationBadge = `
+                        <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #34d399; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="Duration matches within 3 seconds (${formatDurationSec(scrapedDurSec)})">
+                            <span>⏱</span><span>${formatDurationSec(scrapedDurSec)} (Exact Match)</span>
+                        </span>
+                    `;
+                } else {
+                    durationBadge = `
+                        <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 500; color: ${isDark ? '#cbd5e1' : '#475569'}; background: rgba(148, 163, 184, 0.12); border: 1px solid rgba(148, 163, 184, 0.25); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="Scraped duration is ${formatDurationSec(scrapedDurSec)}, local is ${formatDurationSec(localDurSec)}">
+                            <span>⏱</span><span>${formatDurationSec(scrapedDurSec)} (Local: ${formatDurationSec(localDurSec)})</span>
+                        </span>
+                    `;
+                }
+            } else if (localDurSec) {
+                if (matchingDurFps > 0) {
+                    durationBadge = `
+                        <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #34d399; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="${matchingDurFps} of ${totalFps} StashDB submissions match your duration (${formatDurationSec(localDurSec)})">
+                            <span>⏱</span><span>${formatDurationSec(localDurSec)} (${matchingDurFps}/${totalFps} Match)</span>
+                        </span>
+                    `;
+                } else {
+                    durationBadge = `
+                        <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 500; color: ${isDark ? '#94a3b8' : '#64748b'}; background: rgba(148, 163, 184, 0.12); border: 1px solid rgba(148, 163, 184, 0.25); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;">
+                            <span>⏱</span><span>${formatDurationSec(localDurSec)}</span>
+                        </span>
+                    `;
+                }
+            }
+
+            let savedEmbeddedH = 220;
+            try {
+                const h = parseInt(localStorage.getItem('fasttag_embedded_scraper_h'), 10);
+                if (!isNaN(h) && h >= 50 && h <= 520) savedEmbeddedH = h;
+            } catch (e) {}
+
+            targetContainer.style.display = isDetached ? 'flex' : 'flex';
+            targetContainer.innerHTML = `
+                <div style="background: ${isDark ? 'rgba(15, 23, 42, 0.95)' : '#f8fafc'}; border: ${isDetached ? 'none' : (isDark ? '1px solid rgba(99, 102, 241, 0.5)' : '1px solid #818cf8')}; border-radius: 8px; box-shadow: ${isDetached ? 'none' : '0 10px 25px rgba(0,0,0,0.5)'}, inset 0 0 0 1px rgba(255,255,255,0.06); padding: 9px 12px 6px 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 7px; ${isDetached ? 'height: 100%; min-height: 0; flex: 1 1 auto;' : 'height: auto;'} font-family: system-ui, -apple-system, sans-serif; transition: all 0.2s ease;">
+                    <!-- Top Navigation & Link Header -->
+                    <div id="fasttag-scrape-header" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; user-select: none;">
+                        <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: ${isDark ? '#e0e7ff' : '#312e81'};">
+                            <span style="font-size: 13px; line-height: 1;">⚡</span>
+                            <span>${escapeHtml(match._sourceName || 'StashDB')} Match</span>
+                            ${results.length > 1 ? `
+                                <div style="display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; color: ${isDark ? '#cbd5e1' : '#475569'}; margin-left: 4px;">
+                                    <button type="button" id="fasttag-scrape-prev" style="background: none; border: 1px solid rgba(148,163,184,0.3); border-radius: 3px; cursor: pointer; color: inherit; padding: 1px 5px; font-size: 9px;" ${currentIndex === 0 ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''}>◀</button>
+                                    <span>${currentIndex + 1}/${results.length}</span>
+                                    <button type="button" id="fasttag-scrape-next" style="background: none; border: 1px solid rgba(148,163,184,0.3); border-radius: 3px; cursor: pointer; color: inherit; padding: 1px 5px; font-size: 9px;" ${currentIndex === results.length - 1 ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''}>▶</button>
+                                </div>
+                            ` : ''}
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
+                            ${stashDbUrl ? `
+                                <a href="${stashDbUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; color: #818cf8; text-decoration: none; padding: 2px 6px; border-radius: 4px; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.35); transition: background 0.15s ease;" title="Open in StashDB in new tab">
+                                    <span>🔗 StashDB</span><span style="font-size: 9px;">↗</span>
+                                </a>
+                            ` : ''}
+                            <button type="button" id="fasttag-scrape-popout-toggle" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700; color: #818cf8; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 3px; line-height: 1; transition: all 0.15s ease;" data-micro-tooltip="${isDetached ? 'Dock scraper inside popup' : 'Pop out scraper into floating window'}">
+                                <span>${isDetached ? '⤝' : '⤢'}</span>
+                                <span>${isDetached ? 'Dock' : 'Pop Out'}</span>
+                            </button>
+                            <button type="button" id="fasttag-scrape-accept-btn" style="background: #059669; border: 1px solid #10b981; color: #ffffff; padding: 2.5px 8px; border-radius: 4px; font-size: 10.5px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 3px; box-shadow: 0 1px 4px rgba(5,150,105,0.4); line-height: 1.2; transition: all 0.15s ease;" title="Accept match and save metadata (Enter)">
+                                <span>✓ Accept</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="fasttag-scrape-body-wrapper" style="display: flex; flex-direction: column; gap: 7px; ${isDetached ? 'flex: 1 1 auto; min-height: 0; overflow: hidden;' : 'height: auto;'} transition: all 0.15s ease;">
+                        <!-- Dedicated Verification Badges Row -->
+                        <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap; padding: 3px 6px; background: ${isDark ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.03)'}; border-radius: 5px; border: 1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}; flex-shrink: 0;">
+                            ${isHashMatch ? matchBadges.map(b => `
+                                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #34d399; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="Direct file fingerprint match on StashDB">
+                                    <span>✓</span><span>${b}</span>
+                                </span>
+                            `).join('') : `
+                                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #f87171; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="No file hash/fingerprint match found on StashDB. This scene was found by searching words from your filename/title. Please check the preview to confirm it is the correct scene before saving.">
+                                    <span>✕</span><span>No Hash Match (Keyword Search)</span>
+                                </span>
+                            `}
+                            ${durationBadge}
+                        </div>
+
+                    <!-- Items Preview Box with Relative Wrapper for Scroll Indicator -->
+                    <div style="position: relative; border-radius: 6px; overflow: hidden; ${isDetached ? 'flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;' : 'height: auto;'}">
+                        <div id="fasttag-scrape-items-preview" style="display: flex; flex-direction: column; gap: 7px; background: ${isDark ? 'rgba(0,0,0,0.25)' : 'rgba(0,0,0,0.03)'}; padding: 7px 9px 10px 9px; border-radius: 6px; font-size: 11px; box-sizing: border-box; overflow-y: auto; overflow-x: hidden; ${isDetached ? 'flex: 1 1 auto; min-height: 80px; max-height: none;' : `height: ${savedEmbeddedH}px; min-height: 50px; max-height: 520px;`} scrollbar-width: thin; scrollbar-color: ${isDark ? 'rgba(129, 140, 248, 0.65) rgba(0,0,0,0.25)' : '#a5b4fc #f1f5f9'}; transition: opacity 0.1s ease;">
+                            <!-- Top Row: Cover Thumbnail + Title & Studio (Side-by-Side) -->
+                            <div style="display: flex; gap: 9px; align-items: stretch;">
+                                ${match.image ? `
+                                    <div class="fasttag-scrape-cover-thumb" style="flex-shrink: 0; width: 116px; height: 74px; border-radius: 6px; overflow: hidden; background: #000; border: 1px solid ${isDark ? 'rgba(255,255,255,0.18)' : '#cbd5e1'}; display: flex; align-items: center; justify-content: center; align-self: flex-start; cursor: pointer; position: relative; transition: border-color 0.15s ease;">
+                                        <img src="${match.image}" alt="Cover" style="width: 100%; height: 100%; object-fit: cover; display: block;" loading="lazy" />
+                                    </div>
+                                ` : ''}
+                                <div style="display: flex; flex-direction: column; gap: 6px; justify-content: center; flex: 1; min-width: 0;">
+                                    <!-- Title Row -->
+                                    <div style="display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;">
+                                        <label style="display: inline-flex; align-items: baseline; gap: 4px; min-width: 60px; flex-shrink: 0; cursor: pointer; user-select: none; font-weight: 600; color: ${isDark ? '#e0e7ff' : '#312e81'}; font-size: 11px;" title="Check to update scene title">
+                                            <input type="checkbox" id="fasttag-scrape-chk-title" style="cursor: pointer; width: 12px; height: 12px; accent-color: #6366f1; margin: 0; position: relative; top: 1.5px;">
+                                            <span style="font-size: 11px;">✏️</span>
+                                            <span>Title:</span>
+                                        </label>
+                                        <span style="display: inline-block; background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#e0e7ff' : '#312e81'}; padding: 2px 7px; border-radius: 4px; font-weight: 700; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(match.title || '')}">${escapeHtml(match.title || 'Untitled Match')}</span>
+                                        ${match.date ? `<span style="font-size: 10.5px; color: ${isDark ? '#94a3b8' : '#64748b'}; font-weight: 500;">(${match.date})</span>` : ''}
+                                    </div>
+
+                                    ${studioName ? `
+                                        <div style="display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;">
+                                            <label style="display: inline-flex; align-items: baseline; gap: 4px; min-width: 60px; flex-shrink: 0; cursor: pointer; user-select: none; font-weight: 600; color: ${isDark ? '#a5b4fc' : '#4f46e5'}; font-size: 11px;">
+                                                <input type="checkbox" id="fasttag-scrape-chk-studio" checked style="cursor: pointer; width: 12px; height: 12px; accent-color: ${isStudioNew ? '#f59e0b' : '#6366f1'}; margin: 0; position: relative; top: 1.5px;">
+                                                <span style="font-size: 11px;">🏢</span>
+                                                <span>Studio:</span>
+                                            </label>
+                                            ${isStudioNew ? `
+                                                <span style="display: inline-flex; align-items: baseline; gap: 4px; background: ${isDark ? 'rgba(245, 158, 11, 0.12)' : '#fef3c7'}; color: ${isDark ? '#fde68a' : '#92400e'}; border: 1px dashed ${isDark ? 'rgba(245, 158, 11, 0.55)' : '#f59e0b'}; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 11px;" title="Not in your local library — will create new studio upon saving">
+                                                    <span>${escapeHtml(studioName)}</span>
+                                                    <span style="font-size: 8.5px; font-weight: 700; background: ${isDark ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.25)'}; padding: 0.5px 3.5px; border-radius: 3px; color: ${isDark ? '#fef08a' : '#78350f'};">+ New</span>
+                                                </span>
+                                            ` : `
+                                                <span style="display: inline-block; background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#e0e7ff' : '#312e81'}; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 11px;" title="Exists in your local library">${escapeHtml(studioName)}</span>
+                                            `}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+
+                            <!-- Full-Width Performers, Tags, Details Sections -->
+                            <div style="display: flex; flex-direction: column; gap: 5px; border-top: 1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}; padding-top: 5px;">
+                                ${performers.length > 0 ? `
+                                    <div style="display: flex; flex-direction: column; gap: 3px;">
+                                        <div style="display: flex; align-items: baseline; justify-content: space-between;">
+                                            <label style="display: inline-flex; align-items: baseline; gap: 4px; cursor: pointer; user-select: none; font-weight: 600; color: ${isDark ? '#7dd3fc' : '#0284c7'}; font-size: 11px;">
+                                                <input type="checkbox" id="fasttag-scrape-chk-perf-all" checked style="cursor: pointer; width: 12px; height: 12px; accent-color: #0ea5e9; margin: 0; position: relative; top: 1.5px;">
+                                                <span style="font-size: 11px;">👥</span>
+                                                <span>Performers (${performers.length}):</span>
+                                            </label>
+                                        </div>
+                                        <div id="fasttag-scrape-perf-pills" style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                            ${performers.map((p, pIdx) => {
+                                                const isNew = !(p.stored_id || cachedPerformers.some(cp => (cp.name || '').trim().toLowerCase() === (p.name || '').trim().toLowerCase()));
+                                                if (isNew) {
+                                                    return `
+                                                        <label style="display: inline-flex; align-items: baseline; gap: 4px; background: ${isDark ? 'rgba(245, 158, 11, 0.12)' : '#fef3c7'}; color: ${isDark ? '#fde68a' : '#92400e'}; border: 1px dashed ${isDark ? 'rgba(245, 158, 11, 0.55)' : '#f59e0b'}; padding: 2px 6px; border-radius: 4px; font-size: 10px; cursor: pointer; user-select: none;" title="Not in your local library — will create new performer upon saving">
+                                                            <input type="checkbox" class="fasttag-scrape-perf-item" data-idx="${pIdx}" checked style="cursor: pointer; width: 11px; height: 11px; accent-color: #f59e0b; margin: 0; position: relative; top: 1.5px;">
+                                                            <span>${escapeHtml(p.name)}</span>
+                                                            <span style="font-size: 8.5px; font-weight: 700; background: ${isDark ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.25)'}; padding: 0.5px 3.5px; border-radius: 3px; color: ${isDark ? '#fef08a' : '#78350f'};">+ New</span>
+                                                        </label>
+                                                    `;
+                                                }
+                                                return `
+                                                    <label style="display: inline-flex; align-items: baseline; gap: 4px; background: ${isDark ? 'rgba(14px 165, 233, 0.15)' : '#e0f2fe'}; color: ${isDark ? '#bae6fd' : '#0369a1'}; border: 1px solid ${isDark ? 'rgba(56, 189, 248, 0.35)' : '#7dd3fc'}; padding: 2px 6px; border-radius: 4px; font-size: 10px; cursor: pointer; user-select: none;" title="Exists in your local library">
+                                                        <input type="checkbox" class="fasttag-scrape-perf-item" data-idx="${pIdx}" checked style="cursor: pointer; width: 11px; height: 11px; accent-color: #0ea5e9; margin: 0; position: relative; top: 1.5px;">
+                                                        <span>${escapeHtml(p.name)}</span>
+                                                    </label>
+                                                `;
+                                            }).join('')}
+                                        </div>
+                                    </div>
+                                ` : ''}
+
+                                ${tags.length > 0 ? `
+                                    <div style="display: flex; flex-direction: column; gap: 3px;">
+                                        <div style="display: flex; align-items: baseline; justify-content: space-between;">
+                                            <label style="display: inline-flex; align-items: baseline; gap: 4px; cursor: pointer; user-select: none; font-weight: 600; color: ${isDark ? '#cbd5e1' : '#475569'}; font-size: 11px;">
+                                                <input type="checkbox" id="fasttag-scrape-chk-tags-all" style="cursor: pointer; width: 12px; height: 12px; accent-color: #64748b; margin: 0; position: relative; top: 1.5px;">
+                                                <span style="font-size: 11px;">🏷️</span>
+                                                <span>Tags (${tags.length}):</span>
+                                            </label>
+                                        </div>
+                                        <div id="fasttag-scrape-tags-pills" style="display: flex; flex-wrap: wrap; gap: 3px; align-items: baseline;">
+                                            ${tags.map((t, tIdx) => {
+                                                const isNew = !(t.stored_id || cachedTags.some(ct => (ct.name || '').trim().toLowerCase() === (t.name || '').trim().toLowerCase()));
+                                                if (isNew) {
+                                                    return `
+                                                        <label style="display: inline-flex; align-items: baseline; gap: 3px; background: ${isDark ? 'rgba(245, 158, 11, 0.1)' : '#fffbeb'}; color: ${isDark ? '#fde68a' : '#92400e'}; border: 1px dashed ${isDark ? 'rgba(245, 158, 11, 0.5)' : '#fbbf24'}; padding: 1.5px 5px; border-radius: 4px; font-size: 9.5px; cursor: pointer; user-select: none;" title="Not in your local library — will create new tag upon saving">
+                                                            <input type="checkbox" class="fasttag-scrape-tag-item" data-idx="${tIdx}" style="cursor: pointer; width: 10px; height: 10px; accent-color: #f59e0b; margin: 0; position: relative; top: 1px;">
+                                                            <span>${escapeHtml(t.name)}</span>
+                                                            <span style="font-size: 8px; font-weight: 700; background: ${isDark ? 'rgba(245, 158, 11, 0.28)' : 'rgba(245, 158, 11, 0.2)'}; padding: 0.5px 3px; border-radius: 2px; color: ${isDark ? '#fef08a' : '#78350f'};">+ New</span>
+                                                        </label>
+                                                    `;
+                                                }
+                                                return `
+                                                    <label style="display: inline-flex; align-items: baseline; gap: 3px; background: ${isDark ? 'rgba(148, 163, 184, 0.12)' : '#f1f5f9'}; color: ${isDark ? '#cbd5e1' : '#334155'}; border: 1px solid ${isDark ? 'rgba(148, 163, 184, 0.3)' : '#cbd5e1'}; padding: 1.5px 5px; border-radius: 4px; font-size: 9.5px; cursor: pointer; user-select: none;" title="Exists in your local library">
+                                                        <input type="checkbox" class="fasttag-scrape-tag-item" data-idx="${tIdx}" style="cursor: pointer; width: 10px; height: 10px; accent-color: #64748b; margin: 0; position: relative; top: 1px;">
+                                                        <span>${escapeHtml(t.name)}</span>
+                                                    </label>
+                                                `;
+                                            }).join('')}
+                                        </div>
+                                    </div>
+                                ` : ''}
+
+                                ${match.details && match.details.trim() ? `
+                                    <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 2px; border-top: 1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#e2e8f0'}; padding-top: 4px;">
+                                        <div style="display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;">
+                                            <label style="display: inline-flex; align-items: baseline; gap: 4px; min-width: 60px; flex-shrink: 0; cursor: pointer; user-select: none; font-weight: 600; font-size: 11px; color: ${isDark ? '#93c5fd' : '#2563eb'};">
+                                                <input type="checkbox" id="fasttag-scrape-chk-details" style="cursor: pointer; width: 12px; height: 12px; accent-color: #3b82f6; margin: 0; position: relative; top: 1.5px;">
+                                                <span style="font-size: 11px;">📜</span>
+                                                <span>Details:</span>
+                                            </label>
+                                            <span id="fasttag-scrape-toggle-details" style="display: inline-flex; align-items: baseline; gap: 5px; background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#c7d2fe' : '#3730a3'}; border: 1px solid ${isDark ? 'rgba(99, 102, 241, 0.35)' : '#c7d2fe'}; padding: 2px 7px; border-radius: 4px; font-weight: 500; font-size: 10.5px; cursor: pointer; max-width: 410px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: none; transition: background 0.15s ease;" title="Click to expand/collapse full synopsis">
+                                                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: italic;">"${escapeHtml(match.details.trim().replace(/\s+/g, ' '))}"</span>
+                                                <span id="fasttag-scrape-details-arrow" style="font-size: 7.5px; color: #818cf8; flex-shrink: 0;">▶</span>
+                                            </span>
+                                        </div>
+                                        <div id="fasttag-scrape-details-content" style="display: none; max-height: 110px; overflow-y: auto; font-size: 11.5px; line-height: 1.5; color: ${isDark ? '#e2e8f0' : '#1e293b'}; background: ${isDark ? 'rgba(0,0,0,0.45)' : '#ffffff'}; padding: 7px 10px; border-radius: 5px; border: 1px solid ${isDark ? 'rgba(255,255,255,0.12)' : '#cbd5e1'}; white-space: pre-wrap; word-break: break-word; font-family: system-ui, -apple-system, sans-serif;">
+                                            ${escapeHtml(match.details.trim())}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+
+                        <!-- Guaranteed Visible Bottom Scroll Indicator -->
+                        <div id="fasttag-scrape-scroll-hint" style="display: none; position: absolute; bottom: 0; left: 0; right: 0; height: 28px; background: linear-gradient(to top, ${isDark ? 'rgba(30, 41, 59, 0.95)' : 'rgba(241, 245, 249, 0.95)'} 25%, transparent 100%); pointer-events: none; align-items: flex-end; justify-content: center; padding-bottom: 2px; transition: opacity 0.2s ease;">
+                            <span style="font-size: 9px; font-weight: 600; color: #818cf8; display: inline-flex; align-items: center; gap: 3px; background: ${isDark ? '#1e293b' : '#ffffff'}; padding: 1px 7px; border-radius: 10px; border: 1px solid rgba(129, 140, 248, 0.4); box-shadow: 0 1px 4px rgba(0,0,0,0.3);">
+                                <span>⌄</span><span>More below</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Seamless Edge Resizer (Zero wasted height, cursor: ns-resize) -->
+                    <div id="fasttag-scrape-v-resizer" style="height: 11px; margin: 3px -12px -6px -12px; cursor: ns-resize; border-bottom: 2px solid rgba(99, 102, 241, 0.45); display: ${isDetached ? 'none' : 'flex'}; align-items: center; justify-content: center; user-select: none; transition: border-color 0.15s ease;" title="Drag up or down to resize scraper preview height">
+                        <div style="width: 44px; height: 3px; border-radius: 2px; background: rgba(129, 140, 248, 0.6); pointer-events: none; transition: all 0.15s ease;"></div>
+                    </div>
+                </div>
+            `;
+
+            const previewBox = targetContainer.querySelector('#fasttag-scrape-items-preview');
+            const perfPills = targetContainer.querySelector('#fasttag-scrape-perf-pills');
+            const tagsPills = targetContainer.querySelector('#fasttag-scrape-tags-pills');
+
+            // Wire popout / dock button
+            const popoutToggleBtn = targetContainer.querySelector('#fasttag-scrape-popout-toggle');
+            if (popoutToggleBtn) {
+                popoutToggleBtn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    hideScrapeCoverTooltip();
+                    const nextState = !getDetachScraper();
+                    setDetachScraper(nextState);
+                    if (nextState) {
+                        if (popup?.scraperCardContainer) {
+                            popup.scraperCardContainer.innerHTML = '';
+                            popup.scraperCardContainer.style.display = 'none';
+                        }
+                    } else {
+                        closeFloatingScraperHud();
+                    }
+                    renderScraperMatchCard(popup?.scraperCardContainer || container, results, sceneId, ctx, popup, onDismiss);
+                };
+            }
+
+            // Wire dragging when in detached floating window
+            if (isDetached && floatingScraperHudElement) {
+                const headerEl = targetContainer.querySelector('#fasttag-scrape-header');
+                if (headerEl) {
+                    headerEl.style.cursor = 'grab';
+                    let isDragging = false;
+                    let startX = 0, startY = 0, startL = 0, startT = 0;
+                    const onMouseMove = (e) => {
+                        if (!isDragging || !floatingScraperHudElement) return;
+                        const dx = e.clientX - startX;
+                        const dy = e.clientY - startY;
+                        const newLeft = Math.max(8, Math.min(window.innerWidth - floatingScraperHudElement.offsetWidth - 8, startL + dx));
+                        const newTop = Math.max(8, Math.min(window.innerHeight - floatingScraperHudElement.offsetHeight - 8, startT + dy));
+                        floatingScraperHudElement.style.left = `${newLeft}px`;
+                        floatingScraperHudElement.style.top = `${newTop}px`;
+                        floatingScraperHudElement.style.right = 'auto';
+                        floatingScraperHudPosition = { top: `${newTop}px`, left: `${newLeft}px` };
+                    };
+                    const onMouseUp = () => {
+                        isDragging = false;
+                        if (floatingScraperHudElement) floatingScraperHudElement._isDragging = false;
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                        document.body.style.userSelect = '';
+                        if (headerEl) headerEl.style.cursor = 'grab';
+                    };
+                    headerEl.onmousedown = (e) => {
+                        if (e.target.closest('button, a, input, select')) return;
+                        const rect = floatingScraperHudElement.getBoundingClientRect();
+                        const isResizeZone = (rect.right - e.clientX) <= 24 && (rect.bottom - e.clientY) <= 24;
+                        if (isResizeZone) return;
+
+                        isDragging = true;
+                        if (floatingScraperHudElement) floatingScraperHudElement._isDragging = true;
+                        startX = e.clientX;
+                        startY = e.clientY;
+                        startL = rect.left;
+                        startT = rect.top;
+                        headerEl.style.cursor = 'grabbing';
+                        document.body.style.userSelect = 'none';
+                        document.addEventListener('mousemove', onMouseMove);
+                        document.addEventListener('mouseup', onMouseUp);
+                    };
+                }
+            }
+
+            // Wire vertical resize dragging (allows smooth split resizing between scraper card and tags table)
+            const resizer = targetContainer.querySelector('#fasttag-scrape-v-resizer');
+            if (resizer && previewBox) {
+                if (isDetached) {
+                    resizer.style.display = 'none';
+                } else {
+                    resizer.style.display = 'flex';
+                }
+                let isResizing = false;
+                let startY = 0;
+                let startPreviewH = 0;
+
+                const onMouseMove = (e) => {
+                    if (!isResizing) return;
+                    e.preventDefault();
+                    const dy = e.clientY - startY;
+                    const newPreviewH = Math.max(50, Math.min(520, startPreviewH + dy));
+                    previewBox.style.height = `${newPreviewH}px`;
+                    try {
+                        localStorage.setItem('fasttag_embedded_scraper_h', String(newPreviewH));
+                    } catch (e) {}
+                    if (typeof updateScrollHint === 'function') updateScrollHint();
+                    if (activeTableInstance) {
+                        try { activeTableInstance.redraw(false); } catch (err) {}
+                    }
+                    if (popup?.tagsTable) {
+                        try { popup.tagsTable.redraw(false); } catch (err) {}
+                    }
+                    if (popup?.performersTable) {
+                        try { popup.performersTable.redraw(false); } catch (err) {}
+                    }
+                };
+
+                const onMouseUp = () => {
+                    if (isResizing) {
+                        isResizing = false;
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                        document.body.style.cursor = '';
+                        document.body.style.userSelect = '';
+                        resizer.style.borderBottomColor = 'rgba(99, 102, 241, 0.45)';
+                        const bar = resizer.querySelector('div');
+                        if (bar) {
+                            bar.style.width = '44px';
+                            bar.style.background = 'rgba(129, 140, 248, 0.6)';
+                        }
+                    }
+                };
+
+                resizer.addEventListener('mouseenter', () => {
+                    resizer.style.borderBottomColor = '#818cf8';
+                    const bar = resizer.querySelector('div');
+                    if (bar) {
+                        bar.style.width = '64px';
+                        bar.style.background = '#818cf8';
+                    }
+                });
+
+                resizer.addEventListener('mouseleave', () => {
+                    if (!isResizing) {
+                        resizer.style.borderBottomColor = 'rgba(99, 102, 241, 0.45)';
+                        const bar = resizer.querySelector('div');
+                        if (bar) {
+                            bar.style.width = '44px';
+                            bar.style.background = 'rgba(129, 140, 248, 0.6)';
+                        }
+                    }
+                });
+
+                resizer.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    isResizing = true;
+                    startY = e.clientY;
+                    startPreviewH = previewBox.offsetHeight || 180;
+                    document.body.style.cursor = 'ns-resize';
+                    document.body.style.userSelect = 'none';
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                });
+
+                resizer.addEventListener('mouseenter', () => {
+                    const bar = resizer.querySelector('div');
+                    if (bar) {
+                        bar.style.width = '64px';
+                        bar.style.background = '#818cf8';
+                    }
+                });
+                resizer.addEventListener('mouseleave', () => {
+                    if (!isResizing) {
+                        const bar = resizer.querySelector('div');
+                        if (bar) {
+                            bar.style.width = '44px';
+                            bar.style.background = isDark ? 'rgba(255,255,255,0.3)' : '#94a3b8';
+                        }
+                    }
+                });
+            }
+
+            // Toggle Synopsis / Details blurb
+            const detailsToggleBtn = targetContainer.querySelector('#fasttag-scrape-toggle-details');
+            const detailsContent = targetContainer.querySelector('#fasttag-scrape-details-content');
+            const detailsArrow = targetContainer.querySelector('#fasttag-scrape-details-arrow');
+            if (detailsToggleBtn && detailsContent) {
+                detailsToggleBtn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const isHidden = detailsContent.style.display === 'none';
+                    detailsContent.style.display = isHidden ? 'block' : 'none';
+                    if (detailsArrow) detailsArrow.textContent = isHidden ? '▼' : '▶';
+                    detailsToggleBtn.title = isHidden ? 'Click to collapse synopsis' : 'Click to expand full synopsis';
+                };
+            }
+
+            // Hover zoom tooltip for cover image
+            const thumbEl = targetContainer.querySelector('.fasttag-scrape-cover-thumb');
+            if (thumbEl && match.image) {
+                thumbEl.onmouseenter = () => showScrapeCoverTooltip(match.image, thumbEl);
+                thumbEl.onmouseleave = () => hideScrapeCoverTooltip();
+            }
+
+            // Bind interactions
+            const prevBtn = targetContainer.querySelector('#fasttag-scrape-prev');
+            if (prevBtn) {
+                prevBtn.onclick = (e) => {
+                    e.preventDefault();
+                    hideScrapeCoverTooltip();
+                    if (currentIndex > 0) {
+                        currentIndex--;
+                        updateCardView();
+                    }
+                };
+            }
+
+            const nextBtn = targetContainer.querySelector('#fasttag-scrape-next');
+            if (nextBtn) {
+                nextBtn.onclick = (e) => {
+                    e.preventDefault();
+                    hideScrapeCoverTooltip();
+                    if (currentIndex < results.length - 1) {
+                        currentIndex++;
+                        updateCardView();
+                    }
+                };
+            }
+
+            const perfAllChk = targetContainer.querySelector('#fasttag-scrape-chk-perf-all');
+            if (perfAllChk) {
+                perfAllChk.onchange = (e) => {
+                    targetContainer.querySelectorAll('.fasttag-scrape-perf-item').forEach(chk => {
+                        chk.checked = e.target.checked;
+                    });
+                };
+            }
+
+            const tagsAllChk = targetContainer.querySelector('#fasttag-scrape-chk-tags-all');
+            if (tagsAllChk) {
+                tagsAllChk.onchange = (e) => {
+                    targetContainer.querySelectorAll('.fasttag-scrape-tag-item').forEach(chk => {
+                        chk.checked = e.target.checked;
+                    });
+                };
+            }
+
+            const cancelBtn = targetContainer.querySelector('#fasttag-scrape-cancel-btn');
+            if (cancelBtn) {
+                cancelBtn.onclick = (e) => {
+                    e.preventDefault();
+                    hideScrapeCoverTooltip();
+                    restoreSingleWidth();
+                    closeFloatingScraperHud();
+                    targetContainer.innerHTML = '';
+                    targetContainer.style.display = 'none';
+                    if (typeof onDismiss === 'function') onDismiss();
+                };
+            }
+
+            const scrollHint = targetContainer.querySelector('#fasttag-scrape-scroll-hint');
+            const updateScrollHint = () => {
+                if (!previewBox || !scrollHint) return;
+                const canScrollDown = previewBox.scrollHeight > (previewBox.clientHeight + 6) && ((previewBox.scrollTop + previewBox.clientHeight) < (previewBox.scrollHeight - 8));
+                scrollHint.style.display = canScrollDown ? 'flex' : 'none';
+            };
+
+            if (previewBox) {
+                previewBox.onscroll = updateScrollHint;
+                setTimeout(updateScrollHint, 60);
+            }
+
+            const acceptBtn = targetContainer.querySelector('#fasttag-scrape-accept-btn');
+            if (acceptBtn) {
+                acceptBtn.onclick = async (e) => {
+                    e.preventDefault();
+                    hideScrapeCoverTooltip();
+                    acceptBtn.disabled = true;
+                    acceptBtn.innerHTML = `<span>⏳ Saving...</span>`;
+                    await handleAcceptScrapeMatch(match, targetContainer, sceneId, ctx, popup);
+                };
+            }
+
+            if (popup && popup.scrapeBtn) {
+                popup.scrapeBtn.innerHTML = isEasterEggActive() ? '<span>▲ Hide 🍫</span>' : '<span>▲ Hide</span>';
+                popup.scrapeBtn.title = isDetached ? 'Hide detached scraper window' : 'Hide scrape preview';
+                if (isDetached) {
+                    popup.scrapeBtn.classList.add('fasttag-dock-pulse');
+                } else {
+                    popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
+                }
+            }
+        };
+
+        updateCardView();
+    }
+
+    async function handleAcceptScrapeMatch(match, container, sceneId, ctx, popup) {
+        try {
+            const isStudioChecked = container.querySelector('#fasttag-scrape-chk-studio')?.checked ?? false;
+            const isTitleChecked = container.querySelector('#fasttag-scrape-chk-title')?.checked ?? false;
+            const isDetailsChecked = container.querySelector('#fasttag-scrape-chk-details')?.checked ?? false;
+
+            // 1. Studio Resolution
+            let studioIdToSet = null;
+            if (isStudioChecked && match.studio?.name) {
+                if (match.studio.stored_id) {
+                    studioIdToSet = String(match.studio.stored_id);
+                } else {
+                    let cachedStudios = getCachedOrNull('studios');
+                    if (!cachedStudios) {
+                        const res = await fetchGQL(ENTITY_CONFIG.studios.fetchQuery);
+                        cachedStudios = ENTITY_CONFIG.studios.extractList(res.data);
+                        setCache('studios', cachedStudios);
+                    }
+                    const found = cachedStudios?.find(s => (s.name || '').trim().toLowerCase() === match.studio.name.trim().toLowerCase());
+                    if (found) {
+                        studioIdToSet = String(found.id);
+                    } else {
+                        const createRes = await fetchGQL(ENTITY_CONFIG.studios.createQuery, { name: match.studio.name.trim() });
+                        const newId = ENTITY_CONFIG.studios.createExtract(createRes.data);
+                        if (newId) {
+                            studioIdToSet = String(newId);
+                            setCache('studios', null);
+                        }
+                    }
+                }
+            }
+
+            // 2. Performers Resolution
+            const checkedPerfIndices = Array.from(container.querySelectorAll('.fasttag-scrape-perf-item:checked')).map(el => parseInt(el.getAttribute('data-idx'), 10));
+            const performerIdsToAdd = [];
+
+            if (checkedPerfIndices.length > 0 && match.performers) {
+                let cachedPerformers = getCachedOrNull('performers');
+                if (!cachedPerformers) {
+                    const res = await fetchGQL(ENTITY_CONFIG.performers.fetchQuery);
+                    cachedPerformers = ENTITY_CONFIG.performers.extractList(res.data);
+                    setCache('performers', cachedPerformers);
+                }
+
+                for (const idx of checkedPerfIndices) {
+                    const p = match.performers[idx];
+                    if (!p || !p.name) continue;
+                    if (p.stored_id) {
+                        performerIdsToAdd.push(String(p.stored_id));
+                    } else {
+                        const found = cachedPerformers?.find(cp => (cp.name || '').trim().toLowerCase() === p.name.trim().toLowerCase());
+                        if (found) {
+                            performerIdsToAdd.push(String(found.id));
+                        } else {
+                            const createRes = await fetchGQL(ENTITY_CONFIG.performers.createQuery, { name: p.name.trim() });
+                            const newId = ENTITY_CONFIG.performers.createExtract(createRes.data);
+                            if (newId) {
+                                performerIdsToAdd.push(String(newId));
+                                setCache('performers', null);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Tags Resolution
+            const checkedTagIndices = Array.from(container.querySelectorAll('.fasttag-scrape-tag-item:checked')).map(el => parseInt(el.getAttribute('data-idx'), 10));
+            const tagIdsToAdd = [];
+
+            if (checkedTagIndices.length > 0 && match.tags) {
+                let cachedTags = getCachedOrNull('tags');
+                if (!cachedTags) {
+                    const res = await fetchGQL(ENTITY_CONFIG.tags.fetchQuery);
+                    cachedTags = ENTITY_CONFIG.tags.extractList(res.data);
+                    setCache('tags', cachedTags);
+                }
+
+                for (const idx of checkedTagIndices) {
+                    const t = match.tags[idx];
+                    if (!t || !t.name) continue;
+                    if (t.stored_id) {
+                        tagIdsToAdd.push(String(t.stored_id));
+                    } else {
+                        const found = cachedTags?.find(ct => (ct.name || '').trim().toLowerCase() === t.name.trim().toLowerCase());
+                        if (found) {
+                            tagIdsToAdd.push(String(found.id));
+                        } else {
+                            const createRes = await fetchGQL(ENTITY_CONFIG.tags.createQuery, { name: t.name.trim() });
+                            const newId = ENTITY_CONFIG.tags.createExtract(createRes.data);
+                            if (newId) {
+                                tagIdsToAdd.push(String(newId));
+                                setCache('tags', null);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 4. Update Scene & Synchronize Context
+            if (ctx) {
+                // In Edit Everything Popup: Update metadata first, then merge into context and trigger doSave()
+                const metaInput = { id: sceneId };
+                if (match.date) metaInput.date = match.date;
+                if (isDetailsChecked && match.details) metaInput.details = match.details;
+                if (match.image) metaInput.cover_image = match.image;
+                if (isTitleChecked && match.title) metaInput.title = match.title;
+
+                if (metaInput.date || metaInput.details || metaInput.cover_image || metaInput.title) {
+                    const metaUpdate = `
+                        mutation UpdateSceneMeta($input: SceneUpdateInput!) {
+                            sceneUpdate(input: $input) { id }
+                        }
+                    `;
+                    await fetchGQL(metaUpdate, { input: metaInput });
+                }
+
+                if (typeof ctx.setSelectedStudio === 'function' && studioIdToSet) {
+                    ctx.setSelectedStudio(studioIdToSet);
+                }
+                if (typeof ctx.setSelectedPerformers === 'function') {
+                    const currentPerfs = ctx.getSelectedPerformers ? ctx.getSelectedPerformers() : new Set();
+                    performerIdsToAdd.forEach(id => currentPerfs.add(id));
+                    ctx.setSelectedPerformers(currentPerfs);
+                }
+                if (typeof ctx.setSelectedTags === 'function') {
+                    const currentTags = ctx.getSelectedTags ? ctx.getSelectedTags() : new Set();
+                    tagIdsToAdd.forEach(id => currentTags.add(id));
+                    ctx.setSelectedTags(currentTags);
+                }
+
+                if (typeof ctx.fetchColumnData === 'function' && popup) {
+                    if (popup.tagsTable) await ctx.fetchColumnData('tags', popup.tagsTable, '', ctx.getSelectedTags());
+                    if (popup.performersTable) await ctx.fetchColumnData('performers', popup.performersTable, '', ctx.getSelectedPerformers());
+                }
+                if (typeof ctx.renderStudioBar === 'function') {
+                    await ctx.renderStudioBar('');
+                }
+                if (typeof ctx.refreshAllUI === 'function') {
+                    ctx.refreshAllUI();
+                }
+                if (typeof ctx.doSave === 'function') {
+                    await ctx.doSave('Matched & Saved from StashDB!');
+                }
+            } else {
+                // In Single-Column Popup (Edit Tags, Edit Performers, Edit Studio):
+                // Fetch current scene tags and performers first to safely MERGE without overwriting existing data
+                const sceneRes = await fetchGQL(`query ($id: ID!) { findScene(id: $id) { id performers { id } tags { id } studio { id } } }`, { id: sceneId });
+                const existingPerformerIds = (sceneRes?.data?.findScene?.performers || []).map(p => String(p.id));
+                const existingTagIds = (sceneRes?.data?.findScene?.tags || []).map(t => String(t.id));
+
+                const mergedPerformerIds = Array.from(new Set([...existingPerformerIds, ...performerIdsToAdd]));
+                const mergedTagIds = Array.from(new Set([...existingTagIds, ...tagIdsToAdd]));
+
+                const updateVars = { id: sceneId };
+                if (studioIdToSet) updateVars.studio_id = studioIdToSet;
+                if (mergedPerformerIds.length > 0) updateVars.performer_ids = mergedPerformerIds;
+                if (mergedTagIds.length > 0) updateVars.tag_ids = mergedTagIds;
+                if (match.date) updateVars.date = match.date;
+                if (isDetailsChecked && match.details) updateVars.details = match.details;
+                if (match.image) updateVars.cover_image = match.image;
+                if (isTitleChecked && match.title) updateVars.title = match.title;
+
+                await fetchGQL(`
+                    mutation DirectSceneUpdate($input: SceneUpdateInput!) {
+                        sceneUpdate(input: $input) { id }
+                    }
+                `, { input: updateVars });
+                await refreshSceneCards();
+                toastSuccess('Matched & Saved from StashDB!');
+
+                sessionScrapeCache.delete(sceneId);
+
+                // If in sequential edit mode, navigate to next scene; otherwise close popup cleanly
+                if (sequentialEditState.enabled && popup && popup.element) {
+                    const formEl = popup.element;
+                    const type = formEl.getAttribute('data-entity-type') || 'tags';
+                    if (sequentialEditState.currentIndex < sequentialEditState.allSceneCards.length - 1) {
+                        let currentSelectedSet = new Set(mergedTagIds);
+                        if (type === 'performers') currentSelectedSet = new Set(mergedPerformerIds);
+                        else if (type === 'studios') currentSelectedSet = new Set(studioIdToSet ? [studioIdToSet] : []);
+                        navigateToNextScene(formEl, type, 1, () => currentSelectedSet);
+                        return;
+                    }
+                }
+                closePopup();
+                return;
+            }
+
+            const popupEl = popup?.element || (container ? container.closest('#scenes-popup') : null);
+            if (popupEl && popupEl._savedPreScrapeSize) {
+                popupEl.style.transition = 'width 0.22s cubic-bezier(0.4, 0, 0.2, 1), height 0.22s cubic-bezier(0.4, 0, 0.2, 1)';
+                popupEl.style.width = popupEl._savedPreScrapeSize.width;
+                popupEl.style.height = popupEl._savedPreScrapeSize.height;
+                popupEl._savedPreScrapeSize = null;
+            }
+
+            closeFloatingScraperHud();
+            container.innerHTML = '';
+            container.style.display = 'none';
+            if (popup && popup.scrapeBtn) {
+                popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
+                popup.scrapeBtn.innerHTML = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
+                popup.scrapeBtn.title = 'Scrape scene metadata';
+            }
+            sessionScrapeCache.delete(sceneId);
+        } catch (err) {
+            console.error('[FastTag] Error accepting scrape match:', err);
+            toastError('Failed to apply match: ' + (err?.message || err));
+        }
+    }
+
     // --- Smart Suggestions Engine ---
     async function fetchSceneSmartSuggestions(type, sceneId, allAvailableItems, existingIds, cardElement) {
         if (!getEnableSuggestions() || !sceneId || !allAvailableItems || !allAvailableItems.length) return [];
@@ -3288,14 +5037,19 @@
         form.setAttribute('data-popup-type', 'single');
         form.className = `theme-${theme}`;
         form.setAttribute('autocomplete', 'off');
-        form.style.position = 'absolute';
+        form.style.position = 'fixed';
         form.style.zIndex = '1000000';
+        form.style.backgroundColor = isDark ? '#1e293b' : '#ffffff';
+        form.style.background = isDark ? '#1e293b' : '#ffffff';
+        form.style.border = isDark ? '1px solid #334155' : '1px solid #cbd5e1';
+        form.style.boxShadow = isDark ? '0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.5)' : '0 20px 25px -5px rgba(0, 0, 0, 0.15)';
         form.style.padding = '8px 12px 12px 12px';
         form.style.borderRadius = '10px';
         const maxScreenW = Math.max(320, window.innerWidth - 16);
         const maxScreenH = Math.max(380, window.innerHeight - 16);
-        const rawW = savedSize?.width && savedSize.width >= 320 ? savedSize.width : 340;
-        const rawH = savedSize?.height && savedSize.height >= 380 ? savedSize.height : 580;
+        const optimal = getOptimalPopupSize('single');
+        const rawW = savedSize?.width && savedSize.width >= 320 ? savedSize.width : optimal.width;
+        const rawH = savedSize?.height && savedSize.height >= 380 ? savedSize.height : optimal.height;
         form.style.width = `${Math.min(rawW, maxScreenW)}px`;
         form.style.height = `${Math.min(rawH, maxScreenH)}px`;
         form.style.minWidth = '320px';
@@ -3305,6 +5059,7 @@
         form.style.boxSizing = 'border-box';
         form.style.display = 'flex';
         form.style.flexDirection = 'column';
+        form.style.overflow = 'hidden';
         form.style.fontFamily = 'system-ui, -apple-system, sans-serif';
 
         form.innerHTML = `
@@ -3326,16 +5081,18 @@
             <div id="${type}-preview-container" style="flex-shrink: 0;"></div>
             <div style="display: flex; gap: 6px; margin-bottom: 8px; align-items: center; flex-shrink: 0;">
                 <div style="position: relative; flex: 1; display: flex; align-items: center;">
-                    <input type="text" id="${type}-search-input" class="popup-search-input" autocomplete="off" spellcheck="false" placeholder="Search ${config.pluralTitle.toLowerCase()}..." style="width: 100%; padding: 7px 28px 7px 10px; box-sizing: border-box; border-radius: 6px; font-size: 12px; outline: none;">
+                    <input type="text" id="${type}-search-input" autofocus class="popup-search-input" autocomplete="off" spellcheck="false" placeholder="Search ${config.pluralTitle.toLowerCase()}..." style="width: 100%; padding: 7px 28px 7px 10px; box-sizing: border-box; border-radius: 6px; font-size: 12px; outline: none;">
                     <span id="${type}-kbd-shortcut" style="position: absolute; right: 8px; font-size: 10px; font-weight: 700; opacity: 0.5; background: ${kbdBg}; padding: 1px 5px; border-radius: 4px; border: ${kbdBorder}; pointer-events: none; user-select: none;">/</span>
                     <span id="${type}-search-clear" class="popup-search-clear" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 16px; line-height: 1; display: none; user-select: none;">&times;</span>
                 </div>
                 <button type="button" id="${type}-create-btn" style="padding: 7px 9px; cursor: pointer; font-size: 12px; font-weight: 500; background: #059669; color: white; border: none; border-radius: 6px; white-space: nowrap; display: none;">+ Create</button>
                 <button type="button" id="${type}-refresh-btn" class="popup-refresh-btn" title="Refresh cache" style="padding: 7px 9px; cursor: pointer; font-size: 13px; font-weight: 500; border-radius: 6px; white-space: nowrap; line-height: 1;">↻</button>
+                <button type="button" id="${type}-scrape-btn" class="popup-scrape-btn" title="Scrape scene metadata (StashDB / Scrapers) [Alt+S]" style="padding: 6px 8px; cursor: pointer; font-size: 11px; font-weight: 700; border-radius: 6px; white-space: nowrap; line-height: 1; background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#c7d2fe' : '#4338ca'}; border: 1px solid ${isDark ? 'rgba(99, 102, 241, 0.45)' : '#a5b4fc'}; display: inline-flex; align-items: center; gap: 3px; transition: all 0.15s ease;">⚡ Scrape</button>
             </div>
+            <div id="${type}-scraper-card-container" style="display: none; flex-direction: column; margin-bottom: 8px; flex-shrink: 0; width: 100%; box-sizing: border-box;"></div>
             <div id="${type}-suggestions-container" style="display: none; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; flex-shrink: 0; background: rgba(245, 158, 11, 0.08); padding: 6px 8px; border-radius: 6px; border: 1px dashed rgba(245, 158, 11, 0.35);"></div>
             <div id="${type}-quick-actions" style="display: none; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; flex-shrink: 0;"></div>
-            <div id="${type}-tabulator-table" style="margin-bottom: 10px; width: 100%; flex: 1 1 auto; min-height: 140px; box-sizing: border-box; overflow: hidden;"></div>
+            <div id="${type}-tabulator-table" style="margin-bottom: 10px; width: 100%; flex: 1 1 0px; min-height: 60px; box-sizing: border-box; overflow: hidden;"></div>
             <div style="display: flex; gap: 8px; flex-shrink: 0;">
                 <button type="button" id="${type}-save-btn" style="flex: 1; padding: 8px; cursor: pointer; font-size: 12px; font-weight: 600; background: #6366f1; color: white; border: none; border-radius: 6px; transition: background 0.15s ease;">Save ${config.pluralTitle}</button>
                 <button type="button" id="${type}-cancel-btn" class="popup-cancel-btn" style="padding: 8px 14px; cursor: pointer; font-size: 12px; font-weight: 500; border-radius: 6px;">Close</button>
@@ -3361,6 +5118,8 @@
             searchClear: form.querySelector(`#${type}-search-clear`),
             kbdShortcut: form.querySelector(`#${type}-kbd-shortcut`),
             createBtn: form.querySelector(`#${type}-create-btn`),
+            scrapeBtn: form.querySelector(`#${type}-scrape-btn`),
+            scraperCardContainer: form.querySelector(`#${type}-scraper-card-container`),
             refreshBtn: form.querySelector(`#${type}-refresh-btn`),
             saveBtn: form.querySelector(`#${type}-save-btn`),
             cancelBtn: form.querySelector(`#${type}-cancel-btn`)
@@ -3368,14 +5127,14 @@
     }
 
     function positionPopupNearCard(form, cardElement) {
-        const minTop = window.scrollY + 8;
-        const minLeft = window.scrollX + 8;
+        const minTop = 8;
+        const minLeft = 8;
 
         const clampPos = (x, y) => {
             const formW = form.offsetWidth || 400;
             const formH = form.offsetHeight || 500;
-            const maxAllowedTop = Math.max(minTop, window.scrollY + window.innerHeight - formH - 8);
-            const maxAllowedLeft = Math.max(minLeft, window.scrollX + window.innerWidth - formW - 8);
+            const maxAllowedTop = Math.max(minTop, window.innerHeight - formH - 8);
+            const maxAllowedLeft = Math.max(minLeft, window.innerWidth - formW - 8);
             return {
                 x: Math.max(minLeft, Math.min(maxAllowedLeft, x)),
                 y: Math.max(minTop, Math.min(maxAllowedTop, y))
@@ -3388,14 +5147,14 @@
             form.style.top = `${pos.y}px`;
 
             requestAnimationFrame(() => form.classList.add('popup-visible'));
-            const firstInput = form.querySelector('input[type="text"]');
+            const firstInput = form.querySelector('#everything-global-search, input[type="text"], input[type="search"]');
             if (firstInput) firstInput.focus({ preventScroll: true });
             return;
         }
 
-        const cardRect = cardElement.getBoundingClientRect();
-        let popupX = cardRect.right + window.scrollX + 10;
-        let popupY = Math.max(minTop, cardRect.top + window.scrollY);
+        const cardRect = cardElement ? cardElement.getBoundingClientRect() : { right: 100, top: 100, left: 100 };
+        let popupX = cardRect.right + 10;
+        let popupY = Math.max(minTop, cardRect.top);
 
         form.style.left = `${popupX}px`;
         form.style.top = `${popupY}px`;
@@ -3403,10 +5162,10 @@
         requestAnimationFrame(() => {
             const formRect = form.getBoundingClientRect();
             if (cardRect.right + 10 + formRect.width > window.innerWidth) {
-                popupX = cardRect.left + window.scrollX - formRect.width - 10;
+                popupX = cardRect.left - formRect.width - 10;
             }
             if (cardRect.top + formRect.height > window.innerHeight) {
-                popupY = (window.innerHeight + window.scrollY) - formRect.height - 8;
+                popupY = window.innerHeight - formRect.height - 8;
             }
             const pos = clampPos(popupX, popupY);
 
@@ -3419,7 +5178,7 @@
                 form._fastTagOnResize();
             }
 
-            const firstInput = form.querySelector('input[type="text"]');
+            const firstInput = form.querySelector('#everything-global-search, input[type="text"], input[type="search"]');
             if (firstInput) firstInput.focus({ preventScroll: true });
         });
     }
@@ -3430,9 +5189,12 @@
                 if (e.target && (
                     form.contains(e.target) ||
                     e.target.closest('#fasttag-floating-video-hud') ||
+                    e.target.closest('#fasttag-floating-scraper-hud') ||
                     e.target.closest('#fasttag-performer-hover-card') ||
                     e.target.closest('#fasttag-settings-modal') ||
                     e.target.closest('#fasttag-create-modal') ||
+                    e.target.closest('#fasttag-scrape-cover-tooltip') ||
+                    e.target.closest('#fasttag-micro-tooltip') ||
                     e.target.closest('.toastify')
                 )) {
                     return;
@@ -3445,7 +5207,20 @@
             if (e.key === 'Escape') {
                 e.preventDefault();
                 closePopup();
+            } else if (e.altKey && (e.key === 's' || e.key === 'S')) {
+                const scrapeBtn = form.querySelector('.popup-scrape-btn');
+                if (scrapeBtn && !scrapeBtn.disabled) {
+                    e.preventDefault();
+                    scrapeBtn.click();
+                }
             } else if (e.key === 'Enter') {
+                const scrapeAcceptBtn = form.querySelector('#fasttag-scrape-accept-btn');
+                if (scrapeAcceptBtn && !scrapeAcceptBtn.disabled && scrapeAcceptBtn.offsetParent !== null) {
+                    e.preventDefault();
+                    scrapeAcceptBtn.click();
+                    return;
+                }
+
                 const isSearchFocused = document.activeElement && document.activeElement.tagName === 'INPUT';
                 if (isSearchFocused && !(e.ctrlKey || e.metaKey)) return;
 
@@ -3472,8 +5247,10 @@
         }, { signal });
 
         let isDragging = false;
-        let dragOffsetX = 0;
-        let dragOffsetY = 0;
+        let startX = 0;
+        let startY = 0;
+        let startLeft = 0;
+        let startTop = 0;
         const header = form.querySelector('.popup-header') || form.querySelector('.popup-drag-handle');
 
         if (header) {
@@ -3482,20 +5259,25 @@
                 isDragging = true;
                 header.style.cursor = 'grabbing';
                 document.body.style.userSelect = 'none';
-                dragOffsetX = e.clientX - form.offsetLeft;
-                dragOffsetY = e.clientY - form.offsetTop;
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = form.getBoundingClientRect();
+                startLeft = rect.left;
+                startTop = rect.top;
             }, { signal });
 
             document.addEventListener('mousemove', (e) => {
                 if (isDragging) {
-                    let targetX = e.clientX - dragOffsetX;
-                    let targetY = e.clientY - dragOffsetY;
+                    const dx = e.clientX - startX;
+                    const dy = e.clientY - startY;
+                    let targetX = startLeft + dx;
+                    let targetY = startTop + dy;
 
                     // Strictly clamp to viewport bounds so the popup stays 100% inside visible screen
-                    const minTop = window.scrollY + 8;
-                    const maxTop = Math.max(minTop, window.scrollY + window.innerHeight - form.offsetHeight - 8);
-                    const minLeft = window.scrollX + 8;
-                    const maxLeft = Math.max(minLeft, window.scrollX + window.innerWidth - form.offsetWidth - 8);
+                    const minTop = 8;
+                    const maxTop = Math.max(minTop, window.innerHeight - form.offsetHeight - 8);
+                    const minLeft = 8;
+                    const maxLeft = Math.max(minLeft, window.innerWidth - form.offsetWidth - 8);
 
                     targetY = Math.max(minTop, Math.min(maxTop, targetY));
                     targetX = Math.max(minLeft, Math.min(maxLeft, targetX));
@@ -3540,12 +5322,12 @@
         // --- 8-Direction Resizing ---
         let isResizing = false;
         let resizeDir = '';
-        let startX = 0;
-        let startY = 0;
-        let startLeft = 0;
-        let startTop = 0;
-        let startWidth = 0;
-        let startHeight = 0;
+        let resizeStartX = 0;
+        let resizeStartY = 0;
+        let resizeStartLeft = 0;
+        let resizeStartTop = 0;
+        let resizeStartWidth = 0;
+        let resizeStartHeight = 0;
 
         const resizeHandles = form.querySelectorAll('.popup-resize-handle');
         resizeHandles.forEach(handle => {
@@ -3554,12 +5336,13 @@
                 e.stopPropagation();
                 isResizing = true;
                 resizeDir = handle.getAttribute('data-dir') || '';
-                startX = e.clientX;
-                startY = e.clientY;
-                startLeft = form.offsetLeft;
-                startTop = form.offsetTop;
-                startWidth = form.offsetWidth;
-                startHeight = form.offsetHeight;
+                resizeStartX = e.clientX;
+                resizeStartY = e.clientY;
+                const rect = form.getBoundingClientRect();
+                resizeStartLeft = rect.left;
+                resizeStartTop = rect.top;
+                resizeStartWidth = form.offsetWidth;
+                resizeStartHeight = form.offsetHeight;
 
                 document.body.style.cursor = handle.style.cursor;
                 document.body.style.userSelect = 'none';
@@ -3568,27 +5351,27 @@
 
         document.addEventListener('mousemove', (e) => {
             if (isResizing) {
-                const deltaX = e.clientX - startX;
-                const deltaY = e.clientY - startY;
+                const deltaX = e.clientX - resizeStartX;
+                const deltaY = e.clientY - resizeStartY;
 
-                let newWidth = startWidth;
-                let newHeight = startHeight;
-                let newLeft = startLeft;
-                let newTop = startTop;
+                let newWidth = resizeStartWidth;
+                let newHeight = resizeStartHeight;
+                let newLeft = resizeStartLeft;
+                let newTop = resizeStartTop;
 
                 if (resizeDir.includes('e')) {
-                    newWidth = startWidth + deltaX;
+                    newWidth = resizeStartWidth + deltaX;
                 }
                 if (resizeDir.includes('w')) {
-                    newWidth = startWidth - deltaX;
-                    newLeft = startLeft + deltaX;
+                    newWidth = resizeStartWidth - deltaX;
+                    newLeft = resizeStartLeft + deltaX;
                 }
                 if (resizeDir.includes('s')) {
-                    newHeight = startHeight + deltaY;
+                    newHeight = resizeStartHeight + deltaY;
                 }
                 if (resizeDir.includes('n')) {
-                    newHeight = startHeight - deltaY;
-                    newTop = startTop + deltaY;
+                    newHeight = resizeStartHeight - deltaY;
+                    newTop = resizeStartTop + deltaY;
                 }
 
                 // Bounds clamping
@@ -3596,51 +5379,51 @@
                 const maxW = Math.max(minW, window.innerWidth - 16);
                 const minH = 380;
                 const maxH = Math.max(minH, window.innerHeight - 16);
-                const minTop = window.scrollY + 8;
-                const maxBottom = window.scrollY + window.innerHeight - 8;
-                const minLeft = window.scrollX + 8;
-                const maxRight = window.scrollX + window.innerWidth - 8;
+                const minTop = 8;
+                const maxBottom = window.innerHeight - 8;
+                const minLeft = 8;
+                const maxRight = window.innerWidth - 8;
 
                 if (newTop < minTop) {
                     if (resizeDir.includes('n')) {
-                        newHeight = startHeight - (minTop - startTop);
+                        newHeight = resizeStartHeight - (minTop - resizeStartTop);
                         newTop = minTop;
                     }
                 }
                 if (newLeft < minLeft) {
                     if (resizeDir.includes('w')) {
-                        newWidth = startWidth - (minLeft - startLeft);
+                        newWidth = resizeStartWidth - (minLeft - resizeStartLeft);
                         newLeft = minLeft;
                     }
                 }
 
                 // South clamping (bottom of screen >= 8px)
                 if (resizeDir.includes('s')) {
-                    if (startTop + newHeight > maxBottom) {
-                        newHeight = Math.max(minH, maxBottom - startTop);
+                    if (resizeStartTop + newHeight > maxBottom) {
+                        newHeight = Math.max(minH, maxBottom - resizeStartTop);
                     }
                 }
 
                 // East clamping (right of screen >= 8px)
                 if (resizeDir.includes('e')) {
-                    if (startLeft + newWidth > maxRight) {
-                        newWidth = Math.max(minW, maxRight - startLeft);
+                    if (resizeStartLeft + newWidth > maxRight) {
+                        newWidth = Math.max(minW, maxRight - resizeStartLeft);
                     }
                 }
 
                 if (newWidth < minW) {
-                    if (resizeDir.includes('w')) newLeft = startLeft + (startWidth - minW);
+                    if (resizeDir.includes('w')) newLeft = resizeStartLeft + (resizeStartWidth - minW);
                     newWidth = minW;
                 } else if (newWidth > maxW) {
-                    if (resizeDir.includes('w')) newLeft = startLeft - (maxW - startWidth);
+                    if (resizeDir.includes('w')) newLeft = resizeStartLeft - (maxW - resizeStartWidth);
                     newWidth = maxW;
                 }
 
                 if (newHeight < minH) {
-                    if (resizeDir.includes('n')) newTop = startTop + (startHeight - minH);
+                    if (resizeDir.includes('n')) newTop = resizeStartTop + (resizeStartHeight - minH);
                     newHeight = minH;
                 } else if (newHeight > maxH) {
-                    if (resizeDir.includes('n')) newTop = startTop - (maxH - startHeight);
+                    if (resizeDir.includes('n')) newTop = resizeStartTop - (maxH - resizeStartHeight);
                     newHeight = maxH;
                 }
 
@@ -4072,6 +5855,11 @@
         setupPopupListeners(form, signal, () => {});
         await fetchData("", true);
         positionPopupNearCard(form, bulkScenes[0].card || document.body);
+        setTimeout(() => {
+            if (filterInput && document.body.contains(filterInput)) {
+                filterInput.focus({ preventScroll: true });
+            }
+        }, 80);
     }
 
     function promptCreateEntityDialog(type, initialValue, parentForm) {
@@ -4216,16 +6004,19 @@
         form.setAttribute('data-popup-type', 'everything');
         form.className = `theme-${theme}`;
         form.setAttribute('autocomplete', 'off');
-        form.style.position = 'absolute';
+        form.style.position = 'fixed';
         form.style.zIndex = '1000000';
+        form.style.backgroundColor = isDark ? '#1e293b' : '#ffffff';
+        form.style.background = isDark ? '#1e293b' : '#ffffff';
+        form.style.border = isDark ? '1px solid #334155' : '1px solid #cbd5e1';
+        form.style.boxShadow = isDark ? '0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.5)' : '0 20px 25px -5px rgba(0, 0, 0, 0.15)';
         form.style.padding = '8px 12px 12px 12px';
         form.style.borderRadius = '10px';
         const maxScreenW = Math.max(320, window.innerWidth - 16);
         const maxScreenH = Math.max(380, window.innerHeight - 16);
-        const defaultW = Math.min(Math.round(window.innerWidth * 0.9), 800);
-        const defaultH = Math.min(Math.round(window.innerHeight * 0.9), 680);
-        const rawW = savedSize?.width && savedSize.width >= 320 ? savedSize.width : defaultW;
-        const rawH = savedSize?.height && savedSize.height >= 380 ? savedSize.height : defaultH;
+        const optimal = getOptimalPopupSize('everything');
+        const rawW = savedSize?.width && savedSize.width >= 320 ? savedSize.width : optimal.width;
+        const rawH = savedSize?.height && savedSize.height >= 380 ? savedSize.height : optimal.height;
         form.style.width = `${Math.min(rawW, maxScreenW)}px`;
         form.style.height = `${Math.min(rawH, maxScreenH)}px`;
         form.style.minWidth = '320px';
@@ -4271,12 +6062,16 @@
             <div id="everything-search-console" style="display: flex; gap: 6px; margin-bottom: 6px; align-items: center; flex-shrink: 0; background: ${searchConsoleBg}; border: ${searchConsoleBorder}; border-radius: 8px; padding: 3px 6px; box-sizing: border-box; transition: border-color 0.15s ease, box-shadow 0.15s ease;">
                 <div style="position: relative; flex: 1; display: flex; align-items: center; min-width: 0;">
                     <span style="position: absolute; left: 8px; font-size: 13px; opacity: 0.6; pointer-events: none; user-select: none;">🔍</span>
-                    <input type="text" id="everything-global-search" class="popup-search-input" autocomplete="off" spellcheck="false" placeholder="Search tags, performers & studios..." style="width: 100%; padding: 5px 28px 5px 28px; box-sizing: border-box; border-radius: 6px; font-size: 12px; outline: none; border: none; background: transparent; color: inherit; font-family: inherit;">
+                    <input type="text" id="everything-global-search" autofocus class="popup-search-input" autocomplete="off" spellcheck="false" placeholder="Search tags, performers & studios..." style="width: 100%; padding: 5px 28px 5px 28px; box-sizing: border-box; border-radius: 6px; font-size: 12px; outline: none; border: none; background: transparent; color: inherit; font-family: inherit;">
                     <span id="everything-kbd-shortcut" style="position: absolute; right: 8px; font-size: 10px; font-weight: 700; opacity: 0.5; background: ${kbdBg}; padding: 1px 5px; border-radius: 4px; border: ${kbdBorder}; pointer-events: none; user-select: none;">/</span>
                     <span id="everything-global-clear" class="popup-search-clear" style="position: absolute; right: 8px; cursor: pointer; font-size: 15px; line-height: 1; display: none; user-select: none;">&times;</span>
                 </div>
                 <button type="button" id="everything-refresh-btn" class="popup-refresh-btn" title="Refresh all caches" style="padding: 5px 9px; cursor: pointer; font-size: 12px; font-weight: 500; border-radius: 6px; white-space: nowrap; line-height: 1; flex-shrink: 0;">↻</button>
+                <button type="button" id="everything-scrape-btn" class="popup-scrape-btn" title="Scrape scene metadata (StashDB / Scrapers) [Alt+S]" style="padding: 5px 9px; cursor: pointer; font-size: 11.5px; font-weight: 700; border-radius: 6px; white-space: nowrap; line-height: 1; flex-shrink: 0; background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#c7d2fe' : '#4338ca'}; border: 1px solid ${isDark ? 'rgba(99, 102, 241, 0.45)' : '#a5b4fc'}; display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s ease;">⚡ Scrape</button>
             </div>
+
+            <!-- Interactive Scraper Match Card Container -->
+            <div id="everything-scraper-card-container" style="display: none; flex-direction: column; margin-bottom: 6px; flex-shrink: 0; width: 100%; box-sizing: border-box;"></div>
 
             <!-- Dual-Column Suggestions Bar (Single Compact Row, Always Visible) -->
             <div id="everything-suggestions-container" style="display: flex; align-items: center; margin-bottom: 6px; flex-shrink: 0; width: 100%; box-sizing: border-box;">
@@ -4321,7 +6116,7 @@
                 <!-- Column 2: Performers (Right) -->
                 <div id="everything-col-performers" style="flex: 1 1 0px; min-width: 140px; display: flex; flex-direction: column; padding: 6px; box-sizing: border-box; overflow: hidden;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; flex-shrink: 0;">
-                        <span style="font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px;">⭐ Performers</span>
+                        <span style="font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px;">👥 Performers</span>
                         <span id="everything-performers-badge" style="font-size: 10.5px; font-weight: 600; color: ${badgeColor};">0 selected</span>
                     </div>
                     <div id="everything-performers-chips" style="display: none; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; flex-shrink: 0;"></div>
@@ -4330,9 +6125,10 @@
                 </div>
             </div>
 
-            <div style="display: flex; gap: 6px; flex-shrink: 0;">
-                <button type="button" id="everything-save-btn" style="flex: 1; padding: 7px; cursor: pointer; font-size: 11.5px; font-weight: 600; background: #6366f1; color: white; border: none; border-radius: 6px; transition: background 0.15s ease;">Save Scene</button>
-                <button type="button" id="everything-cancel-btn" class="popup-cancel-btn" style="padding: 7px 12px; cursor: pointer; font-size: 11.5px; font-weight: 500; border-radius: 6px;">Close</button>
+            <!-- Global Action Bar -->
+            <div style="display: flex; gap: 8px; flex-shrink: 0;">
+                <button type="button" id="everything-save-btn" style="flex: 1; padding: 8px; cursor: pointer; font-size: 12px; font-weight: 600; background: #6366f1; color: white; border: none; border-radius: 6px; transition: background 0.15s ease;">Save Scene</button>
+                <button type="button" id="everything-cancel-btn" class="popup-cancel-btn" style="padding: 8px 14px; cursor: pointer; font-size: 12px; font-weight: 500; border-radius: 6px;">Close</button>
             </div>
 
             <!-- 8-Direction Resize Handles -->
@@ -4349,7 +6145,6 @@
         document.body.appendChild(form);
         return {
             element: form,
-            header: form.querySelector('#everything-popup-header'),
             titleSpan: form.querySelector('#everything-popup-title'),
             sequentialCheckbox: form.querySelector('#everything-sequential-mode'),
             navGroup: form.querySelector('#everything-nav-group'),
@@ -4368,6 +6163,8 @@
             globalSearch: form.querySelector('#everything-global-search'),
             kbdShortcut: form.querySelector('#everything-kbd-shortcut'),
             globalClear: form.querySelector('#everything-global-clear'),
+            scrapeBtn: form.querySelector('#everything-scrape-btn'),
+            scraperCardContainer: form.querySelector('#everything-scraper-card-container'),
             refreshBtn: form.querySelector('#everything-refresh-btn'),
             columnsContainer: form.querySelector('#everything-columns-container'),
             colTags: form.querySelector('#everything-col-tags'),
@@ -4645,6 +6442,18 @@
     async function navigateSequentialEditEverything(popup, sceneId, direction, doSaveFn) {
         if (!sequentialEditState.enabled) return;
 
+        if (popup.scraperCardContainer) {
+            popup.scraperCardContainer.innerHTML = '';
+            popup.scraperCardContainer.style.display = 'none';
+        }
+        closeFloatingScraperHud();
+        if (popup.scrapeBtn) {
+            popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
+            popup.scrapeBtn.innerHTML = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
+            popup.scrapeBtn.title = 'Scrape scene metadata';
+        }
+        hideScrapeCoverTooltip();
+
         const ctx = popup._context;
         if (ctx && typeof doSaveFn === 'function' && typeof ctx.isDirty === 'function') {
             if (ctx.isDirty()) {
@@ -4655,14 +6464,14 @@
         const form = popup.element;
         if (form && form.isConnected) {
             const formRect = form.getBoundingClientRect();
-            const minTop = window.scrollY + 8;
-            const minLeft = window.scrollX + 8;
-            const maxAllowedTop = Math.max(minTop, window.scrollY + window.innerHeight - form.offsetHeight - 8);
-            const maxAllowedLeft = Math.max(minLeft, window.scrollX + window.innerWidth - form.offsetWidth - 8);
+            const minTop = 8;
+            const minLeft = 8;
+            const maxAllowedTop = Math.max(minTop, window.innerHeight - form.offsetHeight - 8);
+            const maxAllowedLeft = Math.max(minLeft, window.innerWidth - form.offsetWidth - 8);
 
             sequentialEditState.popupPosition = {
-                left: Math.max(minLeft, Math.min(maxAllowedLeft, formRect.left + window.scrollX)),
-                top: Math.max(minTop, Math.min(maxAllowedTop, formRect.top + window.scrollY))
+                left: Math.max(minLeft, Math.min(maxAllowedLeft, formRect.left)),
+                top: Math.max(minTop, Math.min(maxAllowedTop, formRect.top))
             };
         }
 
@@ -4718,29 +6527,23 @@
                     titleSpan.innerHTML = `<span style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; font-size: 13px; line-height: 1; flex-shrink: 0; margin-right: 4px; user-select: none; transform: translateY(1.5px);">⚡</span><span style="opacity: 0.85; font-size: 11px; background: rgba(99,102,241,0.22); padding: 1px 6px; border-radius: 4px; margin-right: 7px; font-weight: 700; color: #a5b4fc; white-space: nowrap; flex-shrink: 0; line-height: 1.3;">[${idx + 1}/${cards.length}]</span><span class="fasttag-marquee-box" style="flex: 1; min-width: 0; overflow: hidden; display: inline-flex; align-items: center;"><span class="fasttag-marquee-track"><span class="fasttag-marquee-item" data-raw-title="${escapeHtml(sceneTitle)}" title="${escapeHtml(sceneTitle)}">${escapeHtml(sceneTitle)}</span></span></span>`;
                     titleSpan.title = `${sceneTitle} [${idx + 1}/${cards.length}]`;
                     applyMarqueeAnimation(titleSpan);
-                    const isFirst = idx === 0;
-                    const isLast = idx === cards.length - 1;
-
-                    prevBtn.disabled = isFirst;
-                    prevBtn.style.opacity = isFirst ? '0.4' : '1';
-                    prevBtn.style.cursor = isFirst ? 'not-allowed' : 'pointer';
-
-                    nextBtn.disabled = isLast;
-                    nextBtn.style.opacity = isLast ? '0.4' : '1';
-                    nextBtn.style.cursor = isLast ? 'not-allowed' : 'pointer';
-                }
-                if (popup.navGroup) {
-                    popup.navGroup.style.maxWidth = '60px';
-                    popup.navGroup.style.opacity = '1';
                 }
             } else {
                 titleSpan.innerHTML = `<span style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; font-size: 13px; line-height: 1; flex-shrink: 0; margin-right: 7px; user-select: none; transform: translateY(1.5px);">⚡</span><span class="fasttag-marquee-box" style="flex: 1; min-width: 0; overflow: hidden; display: inline-flex; align-items: center;"><span class="fasttag-marquee-track"><span class="fasttag-marquee-item" data-raw-title="${escapeHtml(sceneTitle)}" title="${escapeHtml(sceneTitle)}">${escapeHtml(sceneTitle)}</span></span></span>`;
                 titleSpan.title = sceneTitle;
                 applyMarqueeAnimation(titleSpan);
-                if (popup.navGroup) {
-                    popup.navGroup.style.maxWidth = '0';
-                    popup.navGroup.style.opacity = '0';
-                }
+            }
+
+            prevBtn.disabled = !isEnabled;
+            nextBtn.disabled = !isEnabled;
+            prevBtn.style.opacity = isEnabled ? '1' : '0.4';
+            nextBtn.style.opacity = isEnabled ? '1' : '0.4';
+            prevBtn.style.cursor = isEnabled ? 'pointer' : 'not-allowed';
+            nextBtn.style.cursor = isEnabled ? 'pointer' : 'not-allowed';
+
+            if (popup.navGroup) {
+                popup.navGroup.style.maxWidth = isEnabled ? '60px' : '0';
+                popup.navGroup.style.opacity = isEnabled ? '1' : '0';
             }
         };
 
@@ -4767,8 +6570,8 @@
                 if (form) {
                     const formRect = form.getBoundingClientRect();
                     sequentialEditState.popupPosition = {
-                        left: formRect.left + window.scrollX,
-                        top: formRect.top + window.scrollY
+                        left: formRect.left,
+                        top: formRect.top
                     };
                 }
             } else {
@@ -4783,12 +6586,22 @@
         prevBtn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
+            if (popup.scraperCardContainer) {
+                popup.scraperCardContainer.innerHTML = '';
+                popup.scraperCardContainer.style.display = 'none';
+            }
+            hideScrapeCoverTooltip();
             navigateSequentialEditEverything(popup, sceneId, -1, doSaveFn);
         };
 
         nextBtn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
+            if (popup.scraperCardContainer) {
+                popup.scraperCardContainer.innerHTML = '';
+                popup.scraperCardContainer.style.display = 'none';
+            }
+            hideScrapeCoverTooltip();
             navigateSequentialEditEverything(popup, sceneId, 1, doSaveFn);
         };
     }
@@ -4797,6 +6610,12 @@
         try {
             const ctx = popup._context;
             if (!ctx) return;
+
+            if (popup.scraperCardContainer) {
+                popup.scraperCardContainer.innerHTML = '';
+                popup.scraperCardContainer.style.display = 'none';
+            }
+            hideScrapeCoverTooltip();
 
             ctx.setCurrentSceneId(sceneId);
             attachScenePreview(popup.previewContainer, sceneId, cardElement);
@@ -4867,6 +6686,12 @@
                 doSave: ctx.doSave,
                 refreshAllUI: ctx.refreshAllUI
             });
+
+            setTimeout(() => {
+                if (popup.globalSearch && document.body.contains(popup.globalSearch)) {
+                    popup.globalSearch.focus({ preventScroll: true });
+                }
+            }, 60);
         } catch (err) {
             console.error('[FastTag] Error in loadEditEverythingDataIntoPopup:', err);
             toastError(`Error loading data: ${err?.message || err}`);
@@ -5348,6 +7173,12 @@
             });
 
             const doSave = async (customSuccessMessage = null) => {
+                if (popup.scraperCardContainer) {
+                    popup.scraperCardContainer.innerHTML = '';
+                    popup.scraperCardContainer.style.display = 'none';
+                }
+                hideScrapeCoverTooltip();
+
                 const mutation = `
                     mutation SceneUpdateEverything($id: ID!, $tag_ids: [ID!], $performer_ids: [ID!], $studio_id: ID) {
                         sceneUpdate(input: {
@@ -5423,6 +7254,64 @@
                 } catch (e) {}
             }, signal);
 
+            if (popup.scrapeBtn) {
+                popup.scrapeBtn.onclick = async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    // If scraper card is currently open, clicking this button (which says "Hide") closes it and toggles back to "Scrape"
+                    const isScraperOpen = (popup.scraperCardContainer && popup.scraperCardContainer.style.display !== 'none' && popup.scraperCardContainer.innerHTML.trim() !== '') || (floatingScraperHudElement && document.body.contains(floatingScraperHudElement));
+                    if (isScraperOpen) {
+                        if (popup.scraperCardContainer) {
+                            popup.scraperCardContainer.style.display = 'none';
+                            popup.scraperCardContainer.innerHTML = '';
+                        }
+                        closeFloatingScraperHud();
+                        popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
+                        popup.scrapeBtn.innerHTML = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
+                        popup.scrapeBtn.title = 'Scrape scene metadata';
+                        hideScrapeCoverTooltip();
+                        return;
+                    }
+
+                    // If already scraped for this scene during this active session, reopen instantly with 0ms lag!
+                    if (sessionScrapeCache.has(currentSceneId) && sessionScrapeCache.get(currentSceneId)?.length > 0) {
+                        const cached = sessionScrapeCache.get(currentSceneId);
+                        cached._fromCache = true;
+                        renderScraperMatchCard(popup.scraperCardContainer, cached, currentSceneId, popup._context, popup, () => {
+                            popup.globalSearch?.focus({ preventScroll: true });
+                        });
+                        return;
+                    }
+
+                    const origHtml = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
+                    popup.scrapeBtn.disabled = true;
+                    popup.scrapeBtn.innerHTML = `<span>⏳ Scraping...</span>`;
+
+                    try {
+                        const matches = await fetchScraperMatchesForScene(currentSceneId, cardElement);
+                        if (!matches || matches.length === 0) {
+                            popup.scrapeBtn.innerHTML = `<span>✕ No Matches</span>`;
+                            toastError('No scraper matches found on configured scrapers');
+                            setTimeout(() => {
+                                popup.scrapeBtn.disabled = false;
+                                popup.scrapeBtn.innerHTML = origHtml;
+                            }, 2500);
+                        } else {
+                            sessionScrapeCache.set(currentSceneId, matches);
+                            popup.scrapeBtn.disabled = false;
+                            renderScraperMatchCard(popup.scraperCardContainer, matches, currentSceneId, popup._context, popup, () => {
+                                popup.globalSearch?.focus({ preventScroll: true });
+                            });
+                        }
+                    } catch (err) {
+                        popup.scrapeBtn.disabled = false;
+                        popup.scrapeBtn.innerHTML = origHtml;
+                        toastError('Scrape error: ' + (err?.message || err));
+                    }
+                };
+            }
+
             popup.saveBtn.onclick = async () => {
                 if (sequentialEditState.enabled) {
                     const cards = sequentialEditState.allSceneCards || getAllVisibleSceneCards();
@@ -5472,6 +7361,11 @@
 
             await loadEditEverythingDataIntoPopup(sceneId, cardElement, popup);
             positionPopupNearCard(form, cardElement);
+            setTimeout(() => {
+                if (popup.globalSearch && document.body.contains(popup.globalSearch)) {
+                    popup.globalSearch.focus({ preventScroll: true });
+                }
+            }, 80);
         } catch (err) {
             console.error('[FastTag] Error in openEditEverythingPopup:', err);
             toastError(`Error opening Edit Everything: ${err?.message || err}`);
@@ -5528,11 +7422,23 @@
 
         await loadEntityDataIntoPopup(type, sceneId, cardElement, activePopup);
         positionPopupNearCard(form, cardElement);
+        setTimeout(() => {
+            if (activePopup?.searchInput && document.body.contains(activePopup.searchInput)) {
+                activePopup.searchInput.focus({ preventScroll: true });
+            }
+        }, 80);
     }
 
     async function loadEntityDataIntoPopup(type, sceneId, cardElement, popup) {
         const config = ENTITY_CONFIG[type];
         const form = popup.element;
+
+        if (popup.scraperCardContainer) {
+            popup.scraperCardContainer.innerHTML = '';
+            popup.scraperCardContainer.style.display = 'none';
+        }
+        hideScrapeCoverTooltip();
+
         form._fastTagSceneId = sceneId;
         form._fastTagSceneCard = cardElement;
         attachScenePreview(popup.previewContainer, sceneId, cardElement);
@@ -5684,6 +7590,64 @@
             await fetchData(filterInput.value.trim(), false);
         };
 
+        if (popup.scrapeBtn) {
+            popup.scrapeBtn.onclick = async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // If scraper card is currently open, clicking this button (which says "Hide") closes it and toggles back to "Scrape"
+                const isScraperOpen = (popup.scraperCardContainer && popup.scraperCardContainer.style.display !== 'none' && popup.scraperCardContainer.innerHTML.trim() !== '') || (floatingScraperHudElement && document.body.contains(floatingScraperHudElement));
+                if (isScraperOpen) {
+                    if (popup.scraperCardContainer) {
+                        popup.scraperCardContainer.style.display = 'none';
+                        popup.scraperCardContainer.innerHTML = '';
+                    }
+                    closeFloatingScraperHud();
+                    popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
+                    popup.scrapeBtn.innerHTML = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
+                    popup.scrapeBtn.title = 'Scrape scene metadata';
+                    hideScrapeCoverTooltip();
+                    return;
+                }
+
+                // If already scraped for this scene during this active session, reopen instantly with 0ms lag!
+                if (sessionScrapeCache.has(sceneId) && sessionScrapeCache.get(sceneId)?.length > 0) {
+                    const cached = sessionScrapeCache.get(sceneId);
+                    cached._fromCache = true;
+                    renderScraperMatchCard(popup.scraperCardContainer, cached, sceneId, null, popup, () => {
+                        filterInput.focus({ preventScroll: true });
+                    });
+                    return;
+                }
+
+                const origHtml = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
+                popup.scrapeBtn.disabled = true;
+                popup.scrapeBtn.innerHTML = `<span>⏳ Scraping...</span>`;
+
+                try {
+                    const matches = await fetchScraperMatchesForScene(sceneId, cardElement);
+                    if (!matches || matches.length === 0) {
+                        popup.scrapeBtn.innerHTML = `<span>✕ No Matches</span>`;
+                        toastError('No scraper matches found on configured scrapers');
+                        setTimeout(() => {
+                            popup.scrapeBtn.disabled = false;
+                            popup.scrapeBtn.innerHTML = origHtml;
+                        }, 2500);
+                    } else {
+                        sessionScrapeCache.set(sceneId, matches);
+                        popup.scrapeBtn.disabled = false;
+                        renderScraperMatchCard(popup.scraperCardContainer, matches, sceneId, null, popup, () => {
+                            filterInput.focus({ preventScroll: true });
+                        });
+                    }
+                } catch (err) {
+                    popup.scrapeBtn.disabled = false;
+                    popup.scrapeBtn.innerHTML = origHtml;
+                    toastError('Scrape error: ' + (err?.message || err));
+                }
+            };
+        }
+
         createBtn.onclick = async () => {
             const val = filterInput.value.trim();
             if (!val) return;
@@ -5714,6 +7678,9 @@
         };
 
         await fetchData("", true);
+        if (filterInput && document.body.contains(filterInput)) {
+            filterInput.focus({ preventScroll: true });
+        }
 
         const allLoadedItems = getCachedOrNull(type) || [];
         fetchSceneSmartSuggestions(type, sceneId, allLoadedItems, selectedIds, cardElement).then(suggs => {
