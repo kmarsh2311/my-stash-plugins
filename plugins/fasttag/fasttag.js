@@ -29,7 +29,7 @@
                 { title: "ID", field: "id", width: 55, hozAlign: "center", headerHozAlign: "center", resizable: false, headerSort: false },
                 { title: "Name", field: "name", resizable: false, headerSort: false },
             ],
-            fetchQuery: `query { findTags(filter: { per_page: -1 }) { tags { id name } } }`,
+            fetchQuery: `query { findTags(filter: { per_page: -1 }) { tags { id name sort_name scene_count created_at updated_at } } }`,
             extractList: data => data?.findTags?.tags || [],
             fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title files { path } tags { id } } }`,
             extractExisting: data => data?.findScene?.tags?.map(t => t.id) || [],
@@ -50,7 +50,7 @@
                 { title: "Name", field: "name", widthGrow: 2, resizable: true, headerSort: false },
                 { title: "Details", field: "disambiguation", widthGrow: 1, resizable: false, headerSort: false },
             ],
-            fetchQuery: `query { findPerformers(filter: { per_page: -1 }) { performers { id name disambiguation image_path country gender birthdate ethnicity rating100 alias_list } } }`,
+            fetchQuery: `query { findPerformers(filter: { per_page: -1 }) { performers { id name disambiguation scene_count birthdate rating100 created_at updated_at image_path country gender alias_list } } }`,
             extractList: data => data?.findPerformers?.performers || [],
             fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title files { path } performers { id } } }`,
             extractExisting: data => data?.findScene?.performers?.map(p => p.id) || [],
@@ -70,7 +70,7 @@
                 { title: "ID", field: "id", width: 55, hozAlign: "center", headerHozAlign: "center", resizable: false, headerSort: false },
                 { title: "Title", field: "title", resizable: false, headerSort: false },
             ],
-            fetchQuery: `query { findGalleries(filter: { per_page: -1 }) { galleries { id title folder { path } files { path } } } }`,
+            fetchQuery: `query { findGalleries(filter: { per_page: -1 }) { galleries { id title folder { path } files { path } created_at updated_at } } }`,
             extractList: data => (data?.findGalleries?.galleries || []).map(g => {
                 let displayTitle = (g.title && g.title.trim()) ? g.title.trim() : '';
                 if (!displayTitle) {
@@ -85,7 +85,9 @@
                 return {
                     id: g.id,
                     title: displayTitle,
-                    rawTitle: g.title || ''
+                    rawTitle: g.title || '',
+                    created_at: g.created_at || '',
+                    updated_at: g.updated_at || ''
                 };
             }),
             fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title files { path } galleries { id } } }`,
@@ -108,11 +110,14 @@
                 { title: "Name", field: "name", widthGrow: 2, resizable: true, headerSort: false },
                 { title: "Parent Studio", field: "parent_name", widthGrow: 1, resizable: false, headerSort: false },
             ],
-            fetchQuery: `query { findStudios(filter: { per_page: -1 }) { studios { id name parent_studio { id name } } } }`,
+            fetchQuery: `query { findStudios(filter: { per_page: -1 }) { studios { id name parent_studio { id name } scene_count image_path created_at updated_at } } }`,
             extractList: data => (data?.findStudios?.studios || []).map(s => ({
                 id: s.id,
                 name: s.name,
-                parent_name: s.parent_studio ? s.parent_studio.name : ''
+                parent_name: s.parent_studio ? s.parent_studio.name : '',
+                scene_count: s.scene_count || 0,
+                created_at: s.created_at || '',
+                updated_at: s.updated_at || ''
             })),
             fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title files { path } studio { id name } } }`,
             extractExisting: data => data?.findScene?.studio?.id ? [data.findScene.studio.id] : [],
@@ -121,6 +126,26 @@
             createVariables: val => ({ name: val }),
             updateQuery: `mutation ($scene_id: ID!, $studio_id: ID) { sceneUpdate(input: { id: $scene_id, studio_id: $studio_id }) { id } }`,
             updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), studio_id: ids.length > 0 ? String(ids[0]) : null })
+        },
+        groups: {
+            icon: '🎬',
+            title: 'Group',
+            pluralTitle: 'Groups',
+            labelKey: 'name',
+            searchFields: ['name', 'id'],
+            columns: [
+                { title: "ID", field: "id", width: 55, hozAlign: "center", headerHozAlign: "center", resizable: false, headerSort: false },
+                { title: "Name", field: "name", resizable: false, headerSort: false },
+            ],
+            fetchQuery: `query { findGroups(filter: { per_page: -1 }) { groups { id name scene_count created_at updated_at } } }`,
+            extractList: data => data?.findGroups?.groups || [],
+            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title files { path } groups { group { id name } scene_index } } }`,
+            extractExisting: data => (data?.findScene?.groups || []).map(g => g.group?.id).filter(Boolean),
+            createQuery: `mutation ($name: String!) { groupCreate(input: { name: $name }) { id name } }`,
+            createExtract: data => data?.groupCreate?.id,
+            createVariables: val => ({ name: val }),
+            updateQuery: `mutation ($scene_id: ID!, $groups: [SceneGroupInput!]) { sceneUpdate(input: { id: $scene_id, groups: $groups }) { id } }`,
+            updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), groups: ids.map(id => ({ group_id: String(id) })) })
         }
     };
 
@@ -309,6 +334,7 @@
             transform: translateY(4px);
             transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
             will-change: opacity, transform;
+            overscroll-behavior: contain !important;
         }
         #scenes-popup.popup-visible {
             opacity: 1;
@@ -357,12 +383,37 @@
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.5) !important;
             color: #f8fafc !important;
         }
+        #scenes-popup .tabulator-tableholder,
+        #fasttag-floating-video-hud,
+        #fasttag-floating-scraper-hud,
+        #fasttag-settings-modal,
+        #fasttag-scrape-items-preview {
+            overscroll-behavior: contain !important;
+        }
+
         #scenes-popup.theme-dark .popup-title { color: #f1f5f9 !important; }
         #scenes-popup.theme-dark .popup-seq-label { color: #94a3b8 !important; }
         #scenes-popup.theme-dark .popup-nav-btn { background: #334155 !important; color: #e2e8f0 !important; border: 1px solid #475569 !important; }
         #scenes-popup.theme-dark .popup-drag-handle { border: 1px solid #334155 !important; background: #0f172a !important; color: #94a3b8 !important; }
-        #scenes-popup.theme-dark .popup-search-input { border: 1px solid #334155 !important; background: #0f172a !important; color: #f8fafc !important; }
-        #scenes-popup.theme-dark .popup-search-clear { color: #64748b !important; }
+        #scenes-popup.theme-dark .popup-search-input {
+            border: 1px solid rgba(99, 102, 241, 0.35) !important;
+            background: #0f172a !important;
+            color: #ffffff !important;
+            font-weight: 500 !important;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+            transition: all 0.15s ease !important;
+        }
+        #scenes-popup.theme-dark .popup-search-input:focus {
+            border-color: #818cf8 !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25), inset 0 1px 2px rgba(0, 0, 0, 0.4) !important;
+            background: #131c2e !important;
+        }
+        #scenes-popup.theme-dark .popup-search-input::placeholder {
+            color: rgba(148, 163, 184, 0.45) !important;
+            font-weight: 400 !important;
+            letter-spacing: 0.15px !important;
+        }
+        #scenes-popup.theme-dark .popup-search-clear { color: #818cf8 !important; }
         #scenes-popup.theme-dark .popup-refresh-btn { border: 1px solid #334155 !important; background: #0f172a !important; color: #94a3b8 !important; }
         #scenes-popup.theme-dark .popup-cancel-btn { background: #334155 !important; border: 1px solid #475569 !important; color: #e2e8f0 !important; }
 
@@ -376,11 +427,32 @@
         #scenes-popup.theme-light .popup-seq-label { color: #64748b !important; }
         #scenes-popup.theme-light .popup-nav-btn { background: #64748b !important; color: white !important; border: none !important; }
         #scenes-popup.theme-light .popup-drag-handle { border: 1px solid #e2e8f0 !important; background: #f8fafc !important; color: #94a3b8 !important; }
-        #scenes-popup.theme-light .popup-search-input { border: 1px solid #cbd5e1 !important; background: #ffffff !important; color: #1e293b !important; }
-        #scenes-popup.theme-light .popup-search-clear { color: #94a3b8 !important; }
+        #scenes-popup.theme-light .popup-search-input {
+            border: 1px solid rgba(99, 102, 241, 0.38) !important;
+            background: #ffffff !important;
+            color: #0f172a !important;
+            font-weight: 500 !important;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+            transition: all 0.15s ease !important;
+        }
+        #scenes-popup.theme-light .popup-search-input:focus {
+            border-color: #6366f1 !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
+        }
+        #scenes-popup.theme-light .popup-search-input::placeholder {
+            color: rgba(100, 116, 139, 0.5) !important;
+            font-weight: 400 !important;
+            letter-spacing: 0.15px !important;
+        }
+        #scenes-popup.theme-light .popup-search-clear { color: #6366f1 !important; }
         #scenes-popup.theme-light .popup-refresh-btn { border: 1px solid #cbd5e1 !important; background: #f8fafc !important; color: #475569 !important; }
         #scenes-popup.theme-light .popup-cancel-btn { background: #f1f5f9 !important; border: 1px solid #cbd5e1 !important; color: #334155 !important; }
 
+        #scenes-popup.theme-dark .tabulator {
+            border: 1px solid #334155 !important;
+            border-radius: 8px !important;
+            overflow: hidden !important;
+        }
         #scenes-popup.theme-dark .tabulator,
         #scenes-popup.theme-dark .tabulator-tableholder,
         #scenes-popup.theme-dark .tabulator-table,
@@ -393,9 +465,9 @@
             box-shadow: none !important;
         }
         #scenes-popup.theme-dark .tabulator .tabulator-header {
-            background-color: #1e293b !important;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-            color: #94a3b8 !important;
+            background-color: #131c2e !important;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.22) !important;
+            color: #cbd5e1 !important;
         }
         #scenes-popup.theme-dark .tabulator .tabulator-header .tabulator-col {
             background-color: transparent !important;
@@ -405,7 +477,7 @@
             border-right: none !important;
         }
         #scenes-popup.theme-dark .tabulator .tabulator-header .tabulator-col-title {
-            color: #94a3b8 !important;
+            color: #cbd5e1 !important;
             font-weight: 600 !important;
         }
         #scenes-popup.theme-dark .tabulator .tabulator-row {
@@ -434,6 +506,24 @@
             background-color: #312e81 !important;
             color: #ffffff !important;
             border-bottom: 1px solid #4338ca !important;
+        }
+
+        #scenes-popup .tabulator .tabulator-row.fasttag-keyboard-active,
+        #scenes-popup .tabulator .tabulator-row.fasttag-keyboard-active.tabulator-row-even,
+        #scenes-popup .tabulator .tabulator-row.fasttag-keyboard-active.tabulator-row-odd,
+        #scenes-popup .tabulator .tabulator-row.fasttag-keyboard-active .tabulator-cell,
+        .tabulator .tabulator-row.fasttag-keyboard-active {
+            outline: 2px dashed #f43f5e !important;
+            outline-offset: -2px !important;
+            box-shadow: inset 0 0 0 1px #f43f5e, 0 0 8px rgba(244, 63, 94, 0.4) !important;
+            background-color: rgba(244, 63, 94, 0.15) !important;
+        }
+        #scenes-popup.theme-light .tabulator .tabulator-row.fasttag-keyboard-active,
+        #scenes-popup.theme-light .tabulator .tabulator-row.fasttag-keyboard-active .tabulator-cell {
+            outline: 2px dashed #e11d48 !important;
+            outline-offset: -2px !important;
+            box-shadow: inset 0 0 0 1px #e11d48, 0 0 8px rgba(225, 29, 72, 0.3) !important;
+            background-color: rgba(225, 29, 72, 0.12) !important;
         }
         #scenes-popup.theme-dark .tabulator .tabulator-placeholder { color: #64748b !important; }
         #scenes-popup.theme-dark .tabulator-tableholder {
@@ -494,15 +584,16 @@
         #scenes-popup.theme-light .tabulator {
             background-color: #ffffff !important;
             border: 1px solid #e2e8f0 !important;
-            border-radius: 6px !important;
+            border-radius: 8px !important;
+            overflow: hidden !important;
             font-family: system-ui, -apple-system, sans-serif !important;
             font-size: 12px !important;
             color: #1e293b !important;
         }
         #scenes-popup.theme-light .tabulator .tabulator-header {
-            background-color: #f8fafc !important;
-            border-bottom: 1px solid #e2e8f0 !important;
-            color: #64748b !important;
+            background-color: #f1f5f9 !important;
+            border-bottom: 1px solid #cbd5e1 !important;
+            color: #334155 !important;
         }
         #scenes-popup.theme-light .tabulator .tabulator-header .tabulator-col {
             background-color: transparent !important;
@@ -586,21 +677,96 @@
         }
         #scenes-popup .tabulator .tabulator-header .tabulator-col:last-child { flex: 1 1 0px !important; width: auto !important; }
 
-        /* Hide ugly native horizontal scrollbars cleanly across all chip rows */
-        #everything-recent-studios, #everything-tags-chips, #everything-performers-chips, #everything-suggestions-chips,
-        [id*="-chips"], [id*="-chips-container"], [id*="-recent-"], .fasttag-chip-row {
-            scrollbar-width: none !important;
-            -ms-overflow-style: none !important;
+        /* Pill containers - Clean fenced card perfectly married with table */
+        [id$="-quick-actions"] {
+            box-sizing: border-box !important;
+            padding: 5px 6px !important;
+            border-radius: 6px !important;
+            height: 52px !important;
+            max-height: 52px !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            overscroll-behavior: contain !important;
+            scrollbar-width: thin !important;
+            scrollbar-color: rgba(148, 163, 184, 0.35) transparent !important;
+            margin-bottom: 8px !important;
         }
-        #everything-recent-studios::-webkit-scrollbar,
+        #scenes-popup.theme-dark [id$="-quick-actions"] {
+            background-color: #1e293b !important;
+            border: 1px solid #334155 !important;
+        }
+        #scenes-popup.theme-light [id$="-quick-actions"] {
+            background-color: #f8fafc !important;
+            border: 1px solid #e2e8f0 !important;
+        }
+        [id$="-quick-actions"]::-webkit-scrollbar,
         #everything-tags-chips::-webkit-scrollbar,
-        #everything-performers-chips::-webkit-scrollbar,
-        #everything-suggestions-chips::-webkit-scrollbar,
-        [id*="-chips"]::-webkit-scrollbar,
-        [id*="-chips-container"]::-webkit-scrollbar,
-        [id*="-recent-"]::-webkit-scrollbar,
-        .fasttag-chip-row::-webkit-scrollbar {
-            display: none !important;
+        #everything-performers-chips::-webkit-scrollbar {
+            width: 4px !important;
+            display: block !important;
+        }
+        [id$="-quick-actions"]::-webkit-scrollbar-thumb,
+        #everything-tags-chips::-webkit-scrollbar-thumb,
+        #everything-performers-chips::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.35) !important;
+            border-radius: 4px !important;
+        }
+
+        /* Body scroll lock when FastTag is open */
+        body.fasttag-modal-open {
+            overflow: hidden !important;
+        }
+
+        /* Sortable column header styling - Idea 2 */
+        .fasttag-sortable-header {
+            cursor: pointer !important;
+            user-select: none !important;
+            transition: background-color 0.15s ease !important;
+        }
+        #scenes-popup.theme-dark .fasttag-sortable-header:hover {
+            background-color: rgba(99, 102, 241, 0.16) !important;
+        }
+        #scenes-popup.theme-dark .fasttag-sortable-header:hover .tabulator-col-title {
+            color: #ffffff !important;
+        }
+        #scenes-popup.theme-light .fasttag-sortable-header:hover {
+            background-color: rgba(99, 102, 241, 0.08) !important;
+        }
+        #scenes-popup.theme-light .fasttag-sortable-header:hover .tabulator-col-title {
+            color: #1e1b4b !important;
+        }
+
+        .fasttag-sort-arrow-btn {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 18px !important;
+            height: 18px !important;
+            border-radius: 4px !important;
+            font-size: 10px !important;
+            color: #818cf8 !important;
+            cursor: pointer !important;
+            user-select: none !important;
+            transition: all 0.15s ease !important;
+            line-height: 1 !important;
+        }
+        #scenes-popup.theme-dark .fasttag-sort-arrow-btn:hover {
+            background: rgba(99, 102, 241, 0.3) !important;
+            color: #ffffff !important;
+            transform: scale(1.18);
+        }
+        #scenes-popup.theme-light .fasttag-sort-arrow-btn:hover {
+            background: rgba(99, 102, 241, 0.15) !important;
+            color: #4f46e5 !important;
+            transform: scale(1.18);
+        }
+
+        #fasttag-sort-dropdown-menu {
+            animation: fasttagMenuFadeIn 0.12s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes fasttagMenuFadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         /* Micro-tooltip trigger base class */
@@ -676,9 +842,43 @@
         .tabulator-placeholder * {
             pointer-events: auto !important;
         }
+        @keyframes fasttagCreatePulse {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4), 0 2px 5px rgba(0, 0, 0, 0.25);
+                filter: brightness(1);
+            }
+            50% {
+                box-shadow: 0 0 14px 3px rgba(16, 185, 129, 0.55), 0 2px 6px rgba(0, 0, 0, 0.3);
+                filter: brightness(1.12);
+            }
+        }
+        @keyframes fasttagCreatePulsePerformer {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.4), 0 2px 5px rgba(0, 0, 0, 0.25);
+                filter: brightness(1);
+            }
+            50% {
+                box-shadow: 0 0 14px 3px rgba(2, 132, 199, 0.55), 0 2px 6px rgba(0, 0, 0, 0.3);
+                filter: brightness(1.12);
+            }
+        }
+        .fasttag-create-empty-btn {
+            animation: fasttagCreatePulse 3.5s infinite ease-in-out !important;
+            transition: transform 0.15s ease, filter 0.15s ease !important;
+        }
+        .fasttag-create-empty-btn[data-type="performers"] {
+            animation: fasttagCreatePulsePerformer 3.5s infinite ease-in-out !important;
+        }
         .fasttag-create-empty-btn:hover {
-            filter: brightness(1.15);
-            transform: translateY(-1px);
+            animation-play-state: paused !important;
+            filter: brightness(1.18) !important;
+            transform: translateY(-1px) scale(1.01) !important;
+        }
+        .fasttag-create-empty-btn.fasttag-create-btn-active {
+            animation-play-state: paused !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.6), 0 0 14px rgba(99, 102, 241, 0.7) !important;
+            filter: brightness(1.2) !important;
+            transform: scale(1.02) !important;
         }
         @keyframes fasttagFadeInDialog {
             from { opacity: 0; transform: scale(0.96); }
@@ -738,6 +938,42 @@
         }
         .fasttag-btn-pulse-calm {
             animation: fasttagSavePulseCalm 2.4s infinite ease-in-out !important;
+        }
+        /* Studio & Group Pills & Chips Micro-Polish */
+        .fasttag-studio-pill {
+            transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+        .fasttag-studio-pill:hover {
+            transform: translateY(-1px) !important;
+            filter: brightness(1.12) !important;
+            box-shadow: 0 3px 8px rgba(67, 56, 202, 0.45) !important;
+        }
+        .fasttag-group-pill {
+            transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+        .fasttag-group-pill:hover {
+            transform: translateY(-1px) !important;
+            filter: brightness(1.12) !important;
+            box-shadow: 0 3px 8px rgba(126, 34, 206, 0.45) !important;
+        }
+        .fasttag-pill-clear-btn {
+            transition: transform 0.15s ease, color 0.15s ease, opacity 0.15s ease !important;
+        }
+        .fasttag-pill-clear-btn:hover {
+            color: #f87171 !important;
+            opacity: 1 !important;
+            transform: scale(1.3) !important;
+        }
+        .fasttag-quick-chip {
+            transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+        .fasttag-quick-chip:hover {
+            transform: translateY(-1px) !important;
+            filter: brightness(1.15) !important;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25) !important;
+        }
+        .fasttag-quick-chip:active {
+            transform: translateY(0px) scale(0.97) !important;
         }
         `;
         document.head.appendChild(style);
@@ -934,13 +1170,31 @@
         localStorage.setItem(SUGGESTIONS_STORAGE_KEY, enabled ? 'true' : 'false');
     }
 
-    const SCRUB_SPEEDS_STORAGE_KEY = 'stash_fast_tag_scrub_speeds';
+    const SCRUB_SPEEDS_STORAGE_KEY = 'fasttag_scrub_speeds';
+
     const DEFAULT_SCRUB_SPEEDS = {
         slow: 5.0,
         normal: 10.0,
         fast: 20.0,
         freeze: 1.0
     };
+
+    function getScrubSpeeds() {
+        try {
+            const raw = localStorage.getItem(SCRUB_SPEEDS_STORAGE_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                return {
+                    slow: Math.max(0, Math.min(30, Number(parsed.slow) !== undefined && !isNaN(Number(parsed.slow)) ? Number(parsed.slow) : DEFAULT_SCRUB_SPEEDS.slow)),
+                    normal: Math.max(0, Math.min(60, Number(parsed.normal) !== undefined && !isNaN(Number(parsed.normal)) ? Number(parsed.normal) : DEFAULT_SCRUB_SPEEDS.normal)),
+                    fast: Math.max(0, Math.min(120, Number(parsed.fast) !== undefined && !isNaN(Number(parsed.fast)) ? Number(parsed.fast) : DEFAULT_SCRUB_SPEEDS.fast)),
+                    freeze: Math.max(0.1, Math.min(10, Number(parsed.freeze) || DEFAULT_SCRUB_SPEEDS.freeze))
+                };
+            }
+        } catch (e) {}
+        return { ...DEFAULT_SCRUB_SPEEDS };
+    }
+
     let hasShownScrubCueThisSession = false;
     const SCRUB_CUE_COUNT_KEY = 'stash_fast_tag_scrub_cue_count_v6';
     const MAX_SCRUB_CUE_DISPLAYS = 5;
@@ -1329,22 +1583,6 @@
         return { right: '20px', top: '70px', width: `${hudWidth}px`, height: `${hudHeight}px` };
     }
 
-    function getScrubSpeeds() {
-        try {
-            const raw = localStorage.getItem(SCRUB_SPEEDS_STORAGE_KEY);
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                return {
-                    slow: Math.max(0, Math.min(30, Number(parsed.slow) !== undefined && !isNaN(Number(parsed.slow)) ? Number(parsed.slow) : DEFAULT_SCRUB_SPEEDS.slow)),
-                    normal: Math.max(0, Math.min(60, Number(parsed.normal) !== undefined && !isNaN(Number(parsed.normal)) ? Number(parsed.normal) : DEFAULT_SCRUB_SPEEDS.normal)),
-                    fast: Math.max(0, Math.min(120, Number(parsed.fast) !== undefined && !isNaN(Number(parsed.fast)) ? Number(parsed.fast) : DEFAULT_SCRUB_SPEEDS.fast)),
-                    freeze: Math.max(0.1, Math.min(10, Number(parsed.freeze) || DEFAULT_SCRUB_SPEEDS.freeze))
-                };
-            }
-        } catch (e) {}
-        return { ...DEFAULT_SCRUB_SPEEDS };
-    }
-
     function setScrubSpeeds(speeds) {
         localStorage.setItem(SCRUB_SPEEDS_STORAGE_KEY, JSON.stringify(speeds));
     }
@@ -1539,11 +1777,11 @@
             });
         }
 
-        const detachToggle = modal.querySelector('#fasttag-setting-detach-scraper');
-        if (detachToggle) {
-            detachToggle.addEventListener('change', (e) => {
+        const detachScraperToggle = modal.querySelector('#fasttag-setting-detach-scraper');
+        if (detachScraperToggle) {
+            detachScraperToggle.addEventListener('change', (e) => {
                 setDetachScraper(e.target.checked);
-                showToast(`Detached Scraper ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
+                showToast(`Scraper sidecar ${e.target.checked ? 'detached' : 'embedded'}`, 'info');
             });
         }
 
@@ -1596,12 +1834,36 @@
             });
         }
 
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal || e.target.id === 'fasttag-settings-close' || e.target.id === 'fasttag-settings-done') {
+        const closeModal = () => {
+            try {
                 saveSpeedsFromInputs();
-                modal.remove();
+            } catch (err) {
+                console.warn('[FastTag] Error saving speeds:', err);
             }
-        });
+            document.removeEventListener('keydown', onSettingsKeyDown);
+            modal.remove();
+        };
+
+        const onSettingsKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                closeModal();
+            }
+        };
+        document.addEventListener('keydown', onSettingsKeyDown);
+
+        const closeBtn = modal.querySelector('#fasttag-settings-close');
+        if (closeBtn) closeBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); closeModal(); };
+
+        const doneBtn = modal.querySelector('#fasttag-settings-done');
+        if (doneBtn) doneBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); closeModal(); };
+
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        };
 
         document.body.appendChild(modal);
     }
@@ -2041,12 +2303,17 @@
             renderMedia('stream');
         };
 
-        // Popout Button (Icon only: ⤢, clear & crisp)
+        // Popout Button (YouTube Picture-in-Picture overlapping screens icon)
         const popoutBtn = document.createElement('button');
         popoutBtn.type = 'button';
         popoutBtn.id = 'fasttag-stream-popout-btn';
         popoutBtn.style.cssText = 'background: rgba(15, 23, 42, 0.78); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.85); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 12px; padding: 2px 7px; font-size: 11.5px; font-weight: 600; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: center; opacity: 0.85; box-shadow: 0 2px 6px rgba(0,0,0,0.4); transition: all 0.15s ease; line-height: 1; min-width: 23px; height: 20px;';
-        popoutBtn.innerHTML = '⤢';
+        popoutBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: block; pointer-events: none;">
+                <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" fill="none" stroke-width="2"></rect>
+                <rect x="12" y="11" width="8" height="7" rx="1.5" fill="currentColor" stroke="none"></rect>
+            </svg>
+        `;
         popoutBtn.setAttribute('data-micro-tooltip', 'Pop out video into floating HUD');
 
         popoutBtn.onmouseenter = () => {
@@ -2195,49 +2462,59 @@
                 mediaContainer.title = '';
                 floatingHudElement.appendChild(mediaContainer);
 
-                // Hide popout button while inside floating window
-                popoutBtn.style.display = 'none';
+                // Switch popout button to PiP Dock button directly on floating video player
+                popoutBtn.style.display = 'flex';
+                popoutBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: block; pointer-events: none;">
+                        <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" fill="none" stroke-width="2"></rect>
+                        <path d="M12 12l-4 4m0 0h3.5m-3.5 0v-3.5" stroke="currentColor" stroke-width="2"></path>
+                    </svg>
+                `;
+                popoutBtn.setAttribute('data-micro-tooltip', 'Dock video back into popup');
 
-                // Show slim interactive placeholder in main popup
-                hostContainer.innerHTML = '';
-                hostContainer.style.aspectRatio = 'auto';
-                hostContainer.style.height = '33px';
-                hostContainer.style.maxHeight = '33px';
-                hostContainer.style.margin = '0 0 7px 0';
-                hostContainer.style.background = 'rgba(15, 23, 42, 0.75)';
-                hostContainer.style.border = '1px dashed rgba(99, 102, 241, 0.45)';
-                hostContainer.style.borderRadius = '8px';
-                hostContainer.style.display = 'flex';
-                hostContainer.style.alignItems = 'center';
-                hostContainer.style.justifyContent = 'space-between';
-                hostContainer.style.padding = '0 5px 0 10px';
-                hostContainer.style.cursor = 'pointer';
-                hostContainer.title = 'Click to dock video back into popup';
-
-                const placeholderLabel = document.createElement('span');
-                placeholderLabel.style.cssText = 'font-size: 11.5px; color: #a5b4fc; display: flex; align-items: center; gap: 6px; font-weight: 600; user-select: none;';
-                placeholderLabel.innerHTML = '<span style="display: inline-block; width: 6.5px; height: 6.5px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);"></span> Video detached in Floating HUD';
-                hostContainer.appendChild(placeholderLabel);
-
-                const inlineDockBtn = document.createElement('button');
-                inlineDockBtn.type = 'button';
-                inlineDockBtn.id = 'fasttag-inline-dock-btn';
-                inlineDockBtn.style.cssText = 'background: rgba(99, 102, 241, 0.25); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); color: #ffffff; border: 1px solid rgba(99, 102, 241, 0.55); border-radius: 12px; padding: 2px 9px; font-size: 13px; font-weight: 700; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: center; opacity: 0.9; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: all 0.15s ease; min-width: 26px; height: 23px; line-height: 1;';
-                inlineDockBtn.innerHTML = '⤝';
-                inlineDockBtn.setAttribute('data-micro-tooltip', 'Dock video back into popup');
-                inlineDockBtn.onmouseenter = () => { inlineDockBtn.style.opacity = '1'; inlineDockBtn.style.background = '#6366f1'; inlineDockBtn.style.borderColor = '#818cf8'; inlineDockBtn.style.transform = 'scale(1.06)'; };
-                inlineDockBtn.onmouseleave = () => { inlineDockBtn.style.opacity = '0.9'; inlineDockBtn.style.background = 'rgba(99, 102, 241, 0.25)'; inlineDockBtn.style.borderColor = 'rgba(99, 102, 241, 0.55)'; inlineDockBtn.style.transform = 'scale(1)'; };
-                inlineDockBtn.onclick = (e) => { e.stopPropagation(); togglePopout(false); };
-                hostContainer.appendChild(inlineDockBtn);
-
-                hostContainer.onclick = (e) => {
-                    e.stopPropagation();
-                    togglePopout(false);
+                // 5-Second Inactivity Fade for Floating Video Controls
+                let controlsFadeTimer = null;
+                const resetControlsFade = () => {
+                    if (!isVideoPoppedOut) return;
+                    clearTimeout(controlsFadeTimer);
+                    controlsRow.style.transition = 'opacity 0.2s ease';
+                    controlsRow.style.opacity = '0.9';
+                    controlsFadeTimer = setTimeout(() => {
+                        if (isVideoPoppedOut) {
+                            controlsRow.style.transition = 'opacity 1s ease';
+                            controlsRow.style.opacity = '0.15';
+                        }
+                    }, 5000);
                 };
 
+                floatingHudElement.onmousemove = resetControlsFade;
+                floatingHudElement.onmouseenter = resetControlsFade;
+                controlsRow.onmouseenter = () => {
+                    clearTimeout(controlsFadeTimer);
+                    controlsRow.style.transition = 'opacity 0.15s ease';
+                    controlsRow.style.opacity = '1';
+                };
+                controlsRow.onmouseleave = resetControlsFade;
+
+                resetControlsFade();
+
+                // Collapse preview container completely so tables get 100% full height
+                hostContainer.innerHTML = '';
+                hostContainer.style.display = 'none';
+                hostContainer.style.margin = '0';
+                hostContainer.style.height = '0';
+                hostContainer.style.maxHeight = '0';
+                hostContainer.onclick = null;
             } else {
                 isVideoPoppedOut = false;
+                controlsRow.style.transition = 'all 0.15s ease';
+                controlsRow.style.opacity = '0.9';
+                controlsRow.onmouseenter = null;
+                controlsRow.onmouseleave = null;
                 if (floatingHudElement) {
+                    floatingHudElement.onmousemove = null;
+                    floatingHudElement.onmouseenter = null;
+                    floatingHudElement.onmouseleave = null;
                     floatingHudElement.remove();
                     floatingHudElement = null;
                 }
@@ -2263,13 +2540,20 @@
                 mediaContainer.title = 'Click to open scene in new tab';
                 hostContainer.appendChild(mediaContainer);
                 popoutBtn.style.display = 'flex';
+                popoutBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: block; pointer-events: none;">
+                        <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" fill="none" stroke-width="2"></rect>
+                        <rect x="12" y="11" width="8" height="7" rx="1.5" fill="currentColor" stroke="none"></rect>
+                    </svg>
+                `;
+                popoutBtn.setAttribute('data-micro-tooltip', 'Pop out video into floating HUD');
             }
         };
 
         popoutBtn.onclick = (e) => {
             e.stopPropagation();
             e.preventDefault();
-            togglePopout(true);
+            togglePopout(!isVideoPoppedOut);
         };
 
         const detachWheel = () => {
@@ -2909,8 +3193,278 @@
         }
     }
 
+    // --- Sort Options Registry & Dropdown Menu ---
+    const ENTITY_SORT_CRITERIA = {
+        tags: [
+            { field: 'name', label: 'Name', defaultDir: 'asc' },
+            { field: 'sort_name', label: 'Stash Sort Name', defaultDir: 'asc' },
+            { field: 'scene_count', label: 'Scene Count', defaultDir: 'desc' },
+            { field: 'created_at', label: 'Date Added', defaultDir: 'desc' },
+            { field: 'updated_at', label: 'Date Updated', defaultDir: 'desc' }
+        ],
+        performers: [
+            { field: 'name', label: 'Name', defaultDir: 'asc' },
+            { field: 'scene_count', label: 'Scene Count', defaultDir: 'desc' },
+            { field: 'rating100', label: 'Rating', defaultDir: 'desc' },
+            { field: 'birthdate', label: 'Age / Birthdate', defaultDir: 'desc' },
+            { field: 'created_at', label: 'Date Added', defaultDir: 'desc' },
+            { field: 'updated_at', label: 'Date Updated', defaultDir: 'desc' }
+        ],
+        studios: [
+            { field: 'name', label: 'Name', defaultDir: 'asc' },
+            { field: 'scene_count', label: 'Scene Count', defaultDir: 'desc' },
+            { field: 'created_at', label: 'Date Added', defaultDir: 'desc' },
+            { field: 'updated_at', label: 'Date Updated', defaultDir: 'desc' }
+        ],
+        galleries: [
+            { field: 'name', label: 'Title', defaultDir: 'asc' },
+            { field: 'created_at', label: 'Date Added', defaultDir: 'desc' },
+            { field: 'updated_at', label: 'Date Updated', defaultDir: 'desc' }
+        ],
+        groups: [
+            { field: 'name', label: 'Name', defaultDir: 'asc' },
+            { field: 'scene_count', label: 'Scene Count', defaultDir: 'desc' },
+            { field: 'created_at', label: 'Date Added', defaultDir: 'desc' },
+            { field: 'updated_at', label: 'Date Updated', defaultDir: 'desc' }
+        ]
+    };
+
+    function getEntitySortCriteria(type) {
+        return ENTITY_SORT_CRITERIA[type] || [];
+    }
+
+    function getSavedSortField(type) {
+        try {
+            const savedField = localStorage.getItem(`fasttag_sort_field_${type}`);
+            const criteria = getEntitySortCriteria(type);
+            if (savedField && criteria.some(c => c.field === savedField)) return savedField;
+
+            const legacyKey = localStorage.getItem(`fasttag_sort_${type}`);
+            if (legacyKey) {
+                const match = criteria.find(c => legacyKey.startsWith(c.field));
+                if (match) return match.field;
+            }
+        } catch (e) {}
+        return 'name';
+    }
+
+    function getSavedSortDirection(type) {
+        try {
+            const savedDir = localStorage.getItem(`fasttag_sort_dir_${type}`);
+            if (savedDir === 'asc' || savedDir === 'desc') return savedDir;
+
+            const legacyKey = localStorage.getItem(`fasttag_sort_${type}`);
+            if (legacyKey) {
+                if (legacyKey.endsWith('_desc')) return 'desc';
+                if (legacyKey.endsWith('_asc')) return 'asc';
+            }
+        } catch (e) {}
+        const currentField = getSavedSortField(type);
+        const criteria = getEntitySortCriteria(type);
+        const opt = criteria.find(c => c.field === currentField);
+        return opt?.defaultDir || 'asc';
+    }
+
+    function setSavedSort(type, field, dir) {
+        try {
+            localStorage.setItem(`fasttag_sort_field_${type}`, field);
+            localStorage.setItem(`fasttag_sort_dir_${type}`, dir);
+            localStorage.setItem(`fasttag_sort_${type}`, `${field}_${dir}`);
+        } catch (e) {}
+    }
+
+    function getSavedSortKey(type) {
+        return `${getSavedSortField(type)}_${getSavedSortDirection(type)}`;
+    }
+
+    function getSortHeaderTitle(type, field = 'name') {
+        if (field !== 'name' && field !== 'title') {
+            return field.charAt(0).toUpperCase() + field.slice(1);
+        }
+        const currentField = getSavedSortField(type);
+        const currentDir = getSavedSortDirection(type);
+        const criteria = getEntitySortCriteria(type);
+        const opt = criteria.find(c => c.field === currentField) || criteria[0];
+        const label = opt ? opt.label : 'Name';
+        const arrow = currentDir === 'asc' ? '▲' : '▼';
+        return `
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 6px; box-sizing: border-box;">
+                <span class="fasttag-sort-title-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">${label}</span>
+                <span data-sort-arrow="true" class="fasttag-sort-arrow-btn" title="Click to flip order (${currentDir === 'asc' ? 'Ascending' : 'Descending'})">${arrow}</span>
+            </div>
+        `;
+    }
+
+    function handleHeaderSortClick(e, col, type, onSortChanged) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const arrowEl = e.target.closest('[data-sort-arrow]');
+        if (arrowEl) {
+            // 1-Click Direction Flip!
+            const currentField = getSavedSortField(type);
+            const currentDir = getSavedSortDirection(type);
+            const newDir = currentDir === 'asc' ? 'desc' : 'asc';
+            setSavedSort(type, currentField, newDir);
+            if (col && typeof col.updateDefinition === 'function') {
+                col.updateDefinition({ title: getSortHeaderTitle(type, col.getField()) });
+            }
+            if (typeof onSortChanged === 'function') {
+                onSortChanged(`${currentField}_${newDir}`);
+            }
+            return;
+        }
+
+        // Open criteria dropdown menu
+        openSortDropdownMenu(e, col, type, onSortChanged);
+    }
+
+    function openSortDropdownMenu(e, col, type, onSortChanged) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const colEl = e.target.closest('.tabulator-col') || e.target;
+        if (colEl && colEl._fastTagLastMenuClosedAt && (Date.now() - colEl._fastTagLastMenuClosedAt < 250)) {
+            colEl._fastTagLastMenuClosedAt = 0;
+            return;
+        }
+
+        const existingMenu = document.querySelector('#fasttag-sort-dropdown-menu');
+        if (existingMenu) {
+            existingMenu.remove();
+            return;
+        }
+
+        const criteria = getEntitySortCriteria(type);
+        if (!criteria.length) return;
+
+        const currentField = getSavedSortField(type);
+        const currentDir = getSavedSortDirection(type);
+        const isDark = getEffectiveTheme() === 'dark';
+
+        const menu = document.createElement('div');
+        menu.id = 'fasttag-sort-dropdown-menu';
+        menu.style.position = 'fixed';
+        menu.style.zIndex = '2000000';
+        menu.style.minWidth = '200px';
+        menu.style.maxWidth = '265px';
+        menu.style.maxHeight = '360px';
+        menu.style.overflowY = 'auto';
+        menu.style.backgroundColor = isDark ? '#1e293b' : '#ffffff';
+        menu.style.background = isDark ? '#1e293b' : '#ffffff';
+        menu.style.border = isDark ? '1px solid #334155' : '1px solid #cbd5e1';
+        menu.style.borderRadius = '8px';
+        menu.style.boxShadow = isDark ? '0 10px 25px -5px rgba(0,0,0,0.6)' : '0 10px 25px -5px rgba(0,0,0,0.15)';
+        menu.style.padding = '4px 0';
+        menu.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+        menu.style.fontSize = '12px';
+        menu.style.color = isDark ? '#e2e8f0' : '#1e293b';
+
+        menu.addEventListener('mousedown', (ev) => {
+            ev.stopPropagation();
+        });
+
+        const headerItem = document.createElement('div');
+        headerItem.textContent = `Sort ${ENTITY_CONFIG[type]?.pluralTitle || 'Items'} By`;
+        headerItem.style.cssText = `padding: 6px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; color: ${isDark ? '#94a3b8' : '#64748b'}; letter-spacing: 0.5px; border-bottom: ${isDark ? '1px solid #334155' : '1px solid #e2e8f0'}; margin-bottom: 2px; position: sticky; top: 0; background: inherit; z-index: 1;`;
+        menu.appendChild(headerItem);
+
+        criteria.forEach(opt => {
+            const itemBtn = document.createElement('div');
+            const isActive = opt.field === currentField;
+            itemBtn.style.cssText = `padding: 6px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; transition: background 0.1s ease; font-weight: ${isActive ? '600' : '400'}; color: ${isActive ? (isDark ? '#818cf8' : '#4f46e5') : (isDark ? '#e2e8f0' : '#1e293b')}; background: ${isActive ? (isDark ? 'rgba(99, 102, 241, 0.12)' : 'rgba(99, 102, 241, 0.08)') : 'transparent'};`;
+            
+            const labelSpan = document.createElement('span');
+            labelSpan.textContent = opt.label;
+            itemBtn.appendChild(labelSpan);
+
+            if (isActive) {
+                const rightBadge = document.createElement('div');
+                rightBadge.style.cssText = 'display: inline-flex; align-items: center; gap: 4px;';
+                const arrowIcon = currentDir === 'asc' ? '▲' : '▼';
+                rightBadge.innerHTML = `<span style="font-size: 9.5px; opacity: 0.85; background: ${isDark ? 'rgba(99,102,241,0.25)' : 'rgba(99,102,241,0.15)'}; padding: 1px 5px; border-radius: 4px; font-weight: 700;">${arrowIcon}</span><span style="font-weight: 700;">✓</span>`;
+                itemBtn.appendChild(rightBadge);
+            }
+
+            itemBtn.addEventListener('mouseenter', () => {
+                if (!isActive) itemBtn.style.background = isDark ? '#334155' : '#f1f5f9';
+            });
+            itemBtn.addEventListener('mouseleave', () => {
+                if (!isActive) itemBtn.style.background = 'transparent';
+            });
+
+            itemBtn.addEventListener('mousedown', (ev) => {
+                ev.stopPropagation();
+            });
+
+            itemBtn.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                let nextDir = opt.defaultDir || 'asc';
+                if (isActive) {
+                    nextDir = currentDir === 'asc' ? 'desc' : 'asc';
+                }
+                setSavedSort(type, opt.field, nextDir);
+                if (col && typeof col.updateDefinition === 'function') {
+                    col.updateDefinition({ title: getSortHeaderTitle(type, col.getField()) });
+                }
+                menu.remove();
+                if (typeof onSortChanged === 'function') {
+                    onSortChanged(`${opt.field}_${nextDir}`);
+                }
+            });
+
+            menu.appendChild(itemBtn);
+        });
+
+        document.body.appendChild(menu);
+
+        const rect = colEl.getBoundingClientRect();
+        const menuW = menu.offsetWidth || 200;
+        let top = rect.bottom + 4;
+        let left = Math.min(rect.left, window.innerWidth - menuW - 10);
+        left = Math.max(10, left);
+
+        if (top + menu.offsetHeight > window.innerHeight - 10) {
+            top = Math.max(10, rect.top - menu.offsetHeight - 4);
+        }
+
+        menu.style.top = `${top}px`;
+        menu.style.left = `${left}px`;
+
+        const cleanupListeners = () => {
+            document.removeEventListener('mousedown', closeHandler, true);
+            document.removeEventListener('click', closeHandler, true);
+            document.removeEventListener('keydown', keyHandler, true);
+        };
+
+        const closeHandler = (ev) => {
+            if (!menu.contains(ev.target)) {
+                if (colEl && (colEl === ev.target || colEl.contains(ev.target))) {
+                    colEl._fastTagLastMenuClosedAt = Date.now();
+                }
+                menu.remove();
+                cleanupListeners();
+            }
+        };
+        const keyHandler = (ev) => {
+            if (ev.key === 'Escape') {
+                ev.preventDefault();
+                ev.stopPropagation();
+                menu.remove();
+                cleanupListeners();
+            }
+        };
+
+        setTimeout(() => {
+            document.addEventListener('mousedown', closeHandler, true);
+            document.addEventListener('click', closeHandler, true);
+            document.addEventListener('keydown', keyHandler, true);
+        }, 10);
+    }
+
     // --- Search, Sorting, and Quick Selection ---
-    function getSmartSortComparator(term, selectedIds, labelKey, searchFields = [labelKey]) {
+    function getSmartSortComparator(term, selectedIds, labelKey, searchFields = [labelKey], sortKey = 'name_asc') {
         return (a, b) => {
             const aSel = selectedIds.has(String(a.id));
             const bSel = selectedIds.has(String(b.id));
@@ -2921,7 +3475,81 @@
             const bName = String(b[labelKey] || '').trim().toLowerCase();
             const aId = String(a.id || '').trim();
             const bId = String(b.id || '').trim();
-            if (!term) return aName.localeCompare(bName);
+
+            if (!term) {
+                switch (sortKey) {
+                    case 'name_desc':
+                        return bName.localeCompare(aName);
+                    case 'sort_name':
+                    case 'sort_name_asc': {
+                        const aSort = String(a.sort_name || a[labelKey] || '').trim().toLowerCase();
+                        const bSort = String(b.sort_name || b[labelKey] || '').trim().toLowerCase();
+                        return aSort.localeCompare(bSort) || aName.localeCompare(bName);
+                    }
+                    case 'sort_name_desc': {
+                        const aSort = String(a.sort_name || a[labelKey] || '').trim().toLowerCase();
+                        const bSort = String(b.sort_name || b[labelKey] || '').trim().toLowerCase();
+                        return bSort.localeCompare(aSort) || bName.localeCompare(aName);
+                    }
+                    case 'scene_count_desc':
+                        return (Number(b.scene_count) || 0) - (Number(a.scene_count) || 0) || aName.localeCompare(bName);
+                    case 'scene_count_asc':
+                        return (Number(a.scene_count) || 0) - (Number(b.scene_count) || 0) || aName.localeCompare(bName);
+                    case 'image_count_desc':
+                        return (Number(b.image_count) || 0) - (Number(a.image_count) || 0) || aName.localeCompare(bName);
+                    case 'image_count_asc':
+                        return (Number(a.image_count) || 0) - (Number(b.image_count) || 0) || aName.localeCompare(bName);
+                    case 'gallery_count_desc':
+                        return (Number(b.gallery_count) || 0) - (Number(a.gallery_count) || 0) || aName.localeCompare(bName);
+                    case 'gallery_count_asc':
+                        return (Number(a.gallery_count) || 0) - (Number(b.gallery_count) || 0) || aName.localeCompare(bName);
+                    case 'o_counter_desc':
+                        return (Number(b.o_counter) || 0) - (Number(a.o_counter) || 0) || aName.localeCompare(bName);
+                    case 'o_counter_asc':
+                        return (Number(a.o_counter) || 0) - (Number(b.o_counter) || 0) || aName.localeCompare(bName);
+                    case 'career_start_year_desc':
+                        return (Number(b.career_start_year) || 0) - (Number(a.career_start_year) || 0) || aName.localeCompare(bName);
+                    case 'career_start_year_asc': {
+                        const aYr = Number(a.career_start_year) || 9999;
+                        const bYr = Number(b.career_start_year) || 9999;
+                        return aYr - bYr || aName.localeCompare(bName);
+                    }
+                    case 'height_cm_desc':
+                        return (Number(b.height_cm) || 0) - (Number(a.height_cm) || 0) || aName.localeCompare(bName);
+                    case 'height_cm_asc': {
+                        const aH = Number(a.height_cm) || 9999;
+                        const bH = Number(b.height_cm) || 9999;
+                        return aH - bH || aName.localeCompare(bName);
+                    }
+                    case 'rating100_desc':
+                        return (Number(b.rating100) || 0) - (Number(a.rating100) || 0) || aName.localeCompare(bName);
+                    case 'rating100_asc':
+                        return (Number(a.rating100) || 0) - (Number(b.rating100) || 0) || aName.localeCompare(bName);
+                    case 'birthdate_desc':
+                        return String(b.birthdate || '').localeCompare(String(a.birthdate || '')) || aName.localeCompare(bName);
+                    case 'birthdate_asc': {
+                        const aBirth = a.birthdate || '9999-99-99';
+                        const bBirth = b.birthdate || '9999-99-99';
+                        return aBirth.localeCompare(bBirth) || aName.localeCompare(bName);
+                    }
+                    case 'created_at_desc':
+                        return String(b.created_at || '').localeCompare(String(a.created_at || '')) || aName.localeCompare(bName);
+                    case 'created_at_asc':
+                        return String(a.created_at || '9999').localeCompare(String(b.created_at || '9999')) || aName.localeCompare(bName);
+                    case 'updated_at_desc':
+                        return String(b.updated_at || '').localeCompare(String(a.updated_at || '')) || aName.localeCompare(bName);
+                    case 'updated_at_asc':
+                        return String(a.updated_at || '9999').localeCompare(String(b.updated_at || '9999')) || aName.localeCompare(bName);
+                    case 'random': {
+                        const hashA = ((Number(a.id) || 1) * 9301 + 49297) % 233280;
+                        const hashB = ((Number(b.id) || 1) * 9301 + 49297) % 233280;
+                        return hashA - hashB;
+                    }
+                    case 'name_asc':
+                    default:
+                        return aName.localeCompare(bName);
+                }
+            }
 
             const aIdExact = aId === term ? 1 : 0;
             const bIdExact = bId === term ? 1 : 0;
@@ -3007,25 +3635,31 @@
         const formHeight = form ? (form.offsetHeight || parseInt(form.style.height, 10) || 580) : 580;
         const maxRows = formHeight > 720 ? 3 : (formHeight > 520 ? 2 : 1);
 
+        const isDark = getEffectiveTheme() === 'dark';
         target.innerHTML = '';
         target.style.display = 'flex';
         target.style.alignItems = 'center';
         target.style.flexWrap = 'wrap';
-        target.style.gap = '5px';
-        target.style.maxHeight = 'none';
-        target.style.overflow = 'visible';
+        target.style.gap = '4px';
+        target.style.height = '52px';
+        target.style.maxHeight = '52px';
+        target.style.boxSizing = 'border-box';
+        target.style.overflowY = 'auto';
+        target.style.overflowX = 'hidden';
+        target.style.overscrollBehavior = 'contain';
+        target.style.scrollbarWidth = 'thin';
+        target.style.padding = '5px 6px';
+        target.style.backgroundColor = isDark ? '#1e293b' : '#f8fafc';
+        target.style.border = isDark ? '1px solid #334155' : '1px solid #e2e8f0';
+        target.style.borderRadius = '8px';
         target.style.marginBottom = '8px';
-
-        const isDark = getEffectiveTheme() === 'dark';
         const label = document.createElement('span');
         label.textContent = 'Recent:';
         label.className = 'popup-recent-label';
-        label.style.cssText = `font-size: 11px; font-weight: 700; text-transform: uppercase; margin-right: 3px; user-select: none; flex-shrink: 0; line-height: 24px;`;
+        label.style.cssText = `font-size: 10px; font-weight: 700; text-transform: uppercase; color: ${isDark ? '#94a3b8' : '#64748b'}; letter-spacing: 0.5px; margin-right: 2px; user-select: none; flex-shrink: 0; line-height: 20px;`;
         target.appendChild(label);
 
-        const rowTops = [];
         let chipIndex = 0;
-
         for (const item of combinedList) {
             chipIndex++;
             const isSelected = selectedIds && selectedIds.has(String(item.id));
@@ -3033,7 +3667,7 @@
             chip.type = 'button';
             chip.className = 'fasttag-quick-chip';
             chip.setAttribute('data-index', String(chipIndex));
-            chip.title = `[Hotkey: ${chipIndex <= 9 ? chipIndex : 'None'}] Click to toggle. Right-Click or Alt-Click to ${item.isPinned ? 'unpin' : 'pin'}.`;
+            chip.title = `Click to toggle. Right-Click or Alt-Click to ${item.isPinned ? 'unpin' : 'pin'}.`;
 
             if (item.isPinned) {
                 const pinSpan = document.createElement('span');
@@ -3049,19 +3683,12 @@
             const textNode = document.createTextNode(item.name);
             chip.appendChild(textNode);
 
-            if (chipIndex <= 9) {
-                const numSpan = document.createElement('span');
-                numSpan.textContent = ` ${chipIndex}`;
-                numSpan.style.cssText = `font-size: 10px; font-weight: 700; opacity: 0.9; margin-left: 2px; vertical-align: super; line-height: 0;`;
-                chip.appendChild(numSpan);
-            }
-
             if (isDark) {
                 const bg = item.isPinned ? (isSelected ? '#4338ca' : '#1e1b4b') : (isSelected ? '#4f46e5' : '#1e293b');
                 const border = item.isPinned ? (isSelected ? '#a5b4fc' : '#6366f1') : (isSelected ? '#818cf8' : '#475569');
                 const color = isSelected ? '#ffffff' : (item.isPinned ? '#e0e7ff' : '#f1f5f9');
 
-                chip.style.cssText = `padding: 3px 9px; border: 1px solid ${border}; border-radius: 999px; background: ${bg}; color: ${color}; font-size: 11.5px; font-weight: ${item.isPinned || isSelected ? '600' : '500'}; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0; line-height: 1.3;`;
+                chip.style.cssText = `padding: 2px 7px; border: 1px solid ${border}; border-radius: 999px; background: ${bg}; color: ${color}; font-size: 10.5px; font-weight: ${item.isPinned || isSelected ? '600' : '500'}; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0; line-height: 1.25;`;
                 chip.addEventListener('mouseenter', () => {
                     chip.style.background = isSelected ? '#4338ca' : '#334155';
                     chip.style.borderColor = isSelected ? '#c7d2fe' : '#64748b';
@@ -3077,7 +3704,7 @@
                 const border = item.isPinned ? '#6366f1' : (isSelected ? '#6366f1' : '#cbd5e1');
                 const color = isSelected ? '#312e81' : '#1e293b';
 
-                chip.style.cssText = `padding: 3px 9px; border: 1px solid ${border}; border-radius: 999px; background: ${bg}; color: ${color}; font-size: 11.5px; font-weight: ${item.isPinned || isSelected ? '600' : '500'}; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0; line-height: 1.3;`;
+                chip.style.cssText = `padding: 2px 7px; border: 1px solid ${border}; border-radius: 999px; background: ${bg}; color: ${color}; font-size: 10.5px; font-weight: ${item.isPinned || isSelected ? '600' : '500'}; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0; line-height: 1.25;`;
                 chip.addEventListener('mouseenter', () => {
                     chip.style.background = isSelected ? '#c7d2fe' : '#e2e8f0';
                     chip.style.color = '#0f172a';
@@ -3108,16 +3735,6 @@
             });
 
             target.appendChild(chip);
-
-            const topPos = chip.offsetTop;
-            if (!rowTops.includes(topPos)) {
-                rowTops.push(topPos);
-            }
-
-            if (rowTops.length > maxRows) {
-                target.removeChild(chip);
-                break;
-            }
         }
     }
 
@@ -3251,6 +3868,7 @@
         hideMicroTooltip();
         hasShownScrubCueThisSession = false;
 
+        document.body.classList.remove('fasttag-modal-open');
         if (resetSequential) {
             resetSequentialEditState();
             sessionScrapeCache.clear();
@@ -3379,9 +3997,9 @@
         const screenH = window.innerHeight || 1080;
 
         if (type === 'everything') {
-            const rawW = Math.round(screenW * 0.46);
+            const rawW = Math.round(screenW * 0.40);
             const rawH = Math.round(screenH * 0.82);
-            const width = Math.max(760, Math.min(Math.min(screenW - 24, rawW), 880));
+            const width = Math.max(720, Math.min(Math.min(screenW - 24, rawW), 760));
             const height = Math.max(620, Math.min(Math.min(screenH - 24, rawH), 760));
             return { width, height };
         } else {
@@ -3463,25 +4081,33 @@
         }
     }
 
-    function getColumnsWithSavedWidths(type, scope = 'single') {
+    function getColumnsWithSavedWidths(type, scope = 'single', onSortChanged = null) {
         let baseCols = (ENTITY_CONFIG[type]?.columns || []).map(c => ({ ...c }));
         if (!getShowIdColumns()) {
             baseCols = baseCols.filter(c => c.field !== 'id');
         }
         return baseCols.map((c, idx) => {
+            let colDef = { ...c };
+            if (c.field === 'name' || c.field === 'title') {
+                colDef.title = getSortHeaderTitle(type, c.field);
+                colDef.cssClass = (colDef.cssClass ? colDef.cssClass + ' ' : '') + 'fasttag-sortable-header';
+                colDef.headerClick = (e, col) => {
+                    handleHeaderSortClick(e, col, type, onSortChanged);
+                };
+            }
             if (idx === baseCols.length - 1) {
-                return { ...c, width: undefined, widthGrow: c.widthGrow || 1 };
+                return { ...colDef, width: undefined, widthGrow: colDef.widthGrow || 1 };
             }
             try {
                 const saved = localStorage.getItem(`fasttag_col_width_${scope}_${type}_${c.field}`);
                 if (saved) {
                     const w = parseInt(saved, 10);
                     if (!isNaN(w) && w >= 35) {
-                        return { ...c, width: w, widthGrow: undefined };
+                        return { ...colDef, width: w, widthGrow: undefined };
                     }
                 }
             } catch (e) {}
-            return c;
+            return colDef;
         });
     }
 
@@ -4342,8 +4968,11 @@
                                     <span>🔗 StashDB</span><span style="font-size: 9px;">↗</span>
                                 </a>
                             ` : ''}
-                            <button type="button" id="fasttag-scrape-popout-toggle" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700; color: #818cf8; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 3px; line-height: 1; transition: all 0.15s ease;" data-micro-tooltip="${isDetached ? 'Dock scraper inside popup' : 'Pop out scraper into floating window'}">
-                                <span>${isDetached ? '⤝' : '⤢'}</span>
+                            <button type="button" id="fasttag-scrape-popout-toggle" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700; color: #818cf8; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 4px; line-height: 1; transition: all 0.15s ease;" data-micro-tooltip="${isDetached ? 'Dock scraper inside popup' : 'Pop out scraper into floating window'}">
+                                <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: block; pointer-events: none;">
+                                    <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" fill="none" stroke-width="2"></rect>
+                                    <rect x="12" y="11" width="8" height="7" rx="1.5" fill="currentColor" stroke="none"></rect>
+                                </svg>
                                 <span>${isDetached ? 'Dock' : 'Pop Out'}</span>
                             </button>
                             <button type="button" id="fasttag-scrape-accept-btn" style="background: #059669; border: 1px solid #10b981; color: #ffffff; padding: 2.5px 8px; border-radius: 4px; font-size: 10.5px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 3px; box-shadow: 0 1px 4px rgba(5,150,105,0.4); line-height: 1.2; transition: all 0.15s ease;" title="Accept match and save metadata (Enter)">
@@ -5122,18 +5751,23 @@
             <div id="${type}-preview-container" style="flex-shrink: 0;"></div>
             <div style="display: flex; gap: 6px; margin-bottom: 8px; align-items: center; flex-shrink: 0;">
                 <div style="position: relative; flex: 1; display: flex; align-items: center;">
-                    <input type="text" id="${type}-search-input" autofocus class="popup-search-input" autocomplete="off" spellcheck="false" placeholder="Search ${config.pluralTitle.toLowerCase()}..." style="width: 100%; padding: 7px 28px 7px 10px; box-sizing: border-box; border-radius: 6px; font-size: 12px; outline: none;">
-                    <span id="${type}-kbd-shortcut" style="position: absolute; right: 8px; font-size: 10px; font-weight: 700; opacity: 0.5; background: ${kbdBg}; padding: 1px 5px; border-radius: 4px; border: ${kbdBorder}; pointer-events: none; user-select: none;">/</span>
+                    <svg viewBox="0 0 24 24" width="13.5" height="13.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 10px; color: ${isDark ? '#818cf8' : '#6366f1'}; opacity: 0.8; pointer-events: none; user-select: none;">
+                        <circle cx="11" cy="11" r="7"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" id="${type}-search-input" autofocus class="popup-search-input" autocomplete="off" spellcheck="false" placeholder="Search ${config.pluralTitle.toLowerCase()}..." style="width: 100%; padding: 8px 28px 8px 31px; box-sizing: border-box; border-radius: 8px; font-size: 12.5px; font-weight: 500; outline: none;">
                     <span id="${type}-search-clear" class="popup-search-clear" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 16px; line-height: 1; display: none; user-select: none;">&times;</span>
                 </div>
-                <button type="button" id="${type}-create-btn" style="padding: 7px 9px; cursor: pointer; font-size: 12px; font-weight: 500; background: #059669; color: white; border: none; border-radius: 6px; white-space: nowrap; display: none;">+ Create</button>
-                <button type="button" id="${type}-refresh-btn" class="popup-refresh-btn" title="Refresh cache" style="padding: 7px 9px; cursor: pointer; font-size: 13px; font-weight: 500; border-radius: 6px; white-space: nowrap; line-height: 1;">↻</button>
-                <button type="button" id="${type}-scrape-btn" class="popup-scrape-btn" title="Scrape scene metadata (StashDB / Scrapers) [Alt+S]" style="padding: 6px 8px; cursor: pointer; font-size: 11px; font-weight: 700; border-radius: 6px; white-space: nowrap; line-height: 1; background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#c7d2fe' : '#4338ca'}; border: 1px solid ${isDark ? 'rgba(99, 102, 241, 0.45)' : '#a5b4fc'}; display: inline-flex; align-items: center; gap: 3px; transition: all 0.15s ease;">⚡ Scrape</button>
+                <button type="button" id="${type}-refresh-btn" class="popup-refresh-btn" title="Refresh cache" style="padding: 8px 10px; cursor: pointer; font-size: 13px; font-weight: 500; border-radius: 8px; white-space: nowrap; line-height: 1;">↻</button>
+                <button type="button" id="${type}-scrape-btn" class="popup-scrape-btn" title="Scrape scene metadata (StashDB / Scrapers) [Alt+S]" style="padding: 7px 10px; cursor: pointer; font-size: 11.5px; font-weight: 700; border-radius: 8px; white-space: nowrap; line-height: 1; background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#c7d2fe' : '#4338ca'}; border: 1px solid ${isDark ? 'rgba(99, 102, 241, 0.45)' : '#a5b4fc'}; display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s ease;">⚡ Scrape</button>
             </div>
             <div id="${type}-scraper-card-container" style="display: none; flex-direction: column; margin-bottom: 8px; flex-shrink: 0; width: 100%; box-sizing: border-box;"></div>
             <div id="${type}-suggestions-container" style="display: none; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; flex-shrink: 0; background: rgba(245, 158, 11, 0.08); padding: 6px 8px; border-radius: 6px; border: 1px dashed rgba(245, 158, 11, 0.35);"></div>
             <div id="${type}-quick-actions" style="display: none; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; flex-shrink: 0;"></div>
-            <div id="${type}-tabulator-table" style="margin-bottom: 10px; width: 100%; flex: 1 1 0px; min-height: 60px; box-sizing: border-box; overflow: hidden;"></div>
+            <div id="${type}-tabulator-table" style="margin-bottom: 6px; width: 100%; flex: 1 1 0px; min-height: 60px; box-sizing: border-box; overflow: hidden;"></div>
+            <div id="${type}-bottom-create-container" style="display: none; align-items: center; justify-content: center; margin-bottom: 8px; flex-shrink: 0;">
+                <button type="button" id="${type}-create-btn" class="fasttag-create-empty-btn" style="display: inline-flex; align-items: center; gap: 6px; width: 100%; justify-content: center; padding: 7px 14px; background: #059669; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 5px rgba(5,150,105,0.3); transition: all 0.15s ease;"></button>
+            </div>
             <div style="display: flex; gap: 8px; flex-shrink: 0;">
                 <button type="button" id="${type}-save-btn" style="flex: 1; padding: 8px; cursor: pointer; font-size: 12px; font-weight: 600; background: #6366f1; color: white; border: none; border-radius: 6px; transition: background 0.15s ease;">Save ${config.pluralTitle}</button>
                 <button type="button" id="${type}-cancel-btn" class="popup-cancel-btn" style="padding: 8px 14px; cursor: pointer; font-size: 12px; font-weight: 500; border-radius: 6px;">Close</button>
@@ -5155,6 +5789,7 @@
             element: form,
             previewContainer: form.querySelector(`#${type}-preview-container`),
             tableContainer: form.querySelector(`#${type}-tabulator-table`),
+            bottomCreateContainer: form.querySelector(`#${type}-bottom-create-container`),
             searchInput: form.querySelector(`#${type}-search-input`),
             searchClear: form.querySelector(`#${type}-search-clear`),
             kbdShortcut: form.querySelector(`#${type}-kbd-shortcut`),
@@ -5229,6 +5864,7 @@
             document.addEventListener('mousedown', (e) => {
                 if (e.target && (
                     form.contains(e.target) ||
+                    e.target.closest('#fasttag-sort-dropdown-menu') ||
                     e.target.closest('#fasttag-floating-video-hud') ||
                     e.target.closest('#fasttag-floating-scraper-hud') ||
                     e.target.closest('#fasttag-performer-hover-card') ||
@@ -5244,17 +5880,105 @@
             }, { signal });
         }, 0);
 
+        document.body.classList.add('fasttag-modal-open');
+
+        // Global Wheel Trap for FastTag Modal:
+        // Completely locks background Stash page from scrolling, while allowing popup scroll containers to scroll
+        window.addEventListener('wheel', (e) => {
+            const popup = document.querySelector('#scenes-popup');
+            if (!popup || popup.style.display === 'none') return;
+
+            // Check if mouse is over a horizontal scroll container (Studio or Groups bar)
+            const hScrollable = e.target.closest('#everything-studio-scroll, #everything-groups-scroll, #everything-studio-half, #everything-groups-half');
+            if (hScrollable && popup.contains(hScrollable)) {
+                const target = hScrollable.closest('#everything-studio-scroll, #everything-groups-scroll') || hScrollable;
+                let delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+                if (e.deltaMode === 1) delta *= 28;
+                else if (e.deltaMode === 2) delta *= 400;
+                if (delta !== 0) {
+                    target.scrollLeft += delta;
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                return;
+            }
+
+            const scrollable = e.target.closest('.tabulator-tableholder, #fasttag-scrape-items-preview, [id$="-quick-actions"], [id*="-chips"], .fasttag-chip-row, textarea');
+            if (scrollable && popup.contains(scrollable)) {
+                const hasScrollableY = scrollable.scrollHeight > scrollable.clientHeight;
+                const atTop = scrollable.scrollTop <= 0 && e.deltaY < 0;
+                const atBottom = (scrollable.scrollTop + scrollable.clientHeight >= scrollable.scrollHeight - 1) && e.deltaY > 0;
+                if (atTop || atBottom || !hasScrollableY) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            } else {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }, { passive: false, capture: true, signal });
+
+        // Strictly contain all popup keyboard events so they never bubble out to Stash
+        form.addEventListener('keydown', (e) => {
+            e.stopPropagation();
+            const isTyping = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+            if (!isTyping && (e.key === ' ' || e.key === 'Spacebar' || e.key === 'j' || e.key === 'k' || e.key === 'l' || e.key === 'n' || e.key === 'p')) {
+                e.preventDefault();
+            }
+        }, { signal });
+
         document.addEventListener('keydown', (e) => {
+            if (!document.body.contains(form)) return;
+
+            // Handle Escape to close popup
             if (e.key === 'Escape') {
                 e.preventDefault();
+                e.stopPropagation();
                 closePopup();
-            } else if (e.altKey && (e.key === 's' || e.key === 'S')) {
+                return;
+            }
+
+            // Alt+S for Scrape
+            if (e.altKey && (e.key === 's' || e.key === 'S')) {
                 const scrapeBtn = form.querySelector('.popup-scrape-btn');
                 if (scrapeBtn && !scrapeBtn.disabled) {
                     e.preventDefault();
+                    e.stopPropagation();
                     scrapeBtn.click();
+                    return;
                 }
-            } else if (e.key === 'Enter') {
+            }
+
+            // Alt+Left / Alt+Right for Sequential
+            if (sequentialEditState.enabled && e.altKey) {
+                if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const nextBtn = form.querySelector('button[id$="-next-btn"]');
+                    if (nextBtn && !nextBtn.disabled) nextBtn.click();
+                    return;
+                } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const prevBtn = form.querySelector('button[id$="-prev-btn"]');
+                    if (prevBtn && !prevBtn.disabled) prevBtn.click();
+                    return;
+                }
+            }
+
+            // If key event originated OUTSIDE form, block Stash hotkeys from running in background
+            if (!form.contains(e.target)) {
+                const pageNavKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ', 'Spacebar', 'n', 'N', 'p', 'P', 'j', 'J', 'k', 'K', 'l', 'L'];
+                if (pageNavKeys.includes(e.key) && !e.altKey && !e.ctrlKey && !e.metaKey) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                }
+            }
+        }, { capture: true, signal });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
                 const scrapeAcceptBtn = document.querySelector('#fasttag-scrape-accept-btn');
                 if (scrapeAcceptBtn && !scrapeAcceptBtn.disabled && scrapeAcceptBtn.offsetParent !== null) {
                     e.preventDefault();
@@ -5263,9 +5987,9 @@
                 }
 
                 const isSearchFocused = document.activeElement && document.activeElement.tagName === 'INPUT';
-                if (isSearchFocused && !(e.ctrlKey || e.metaKey)) return;
+                if (isSearchFocused && document.activeElement.value && document.activeElement.value.trim().length > 0 && !(e.ctrlKey || e.metaKey)) return;
 
-                if (!isSearchFocused || e.ctrlKey || e.metaKey) {
+                if (!isSearchFocused || e.ctrlKey || e.metaKey || (isSearchFocused && (!document.activeElement.value || !document.activeElement.value.trim()))) {
                     e.preventDefault();
                     const saveBtn = form.querySelector('button[id$="-save-btn"]');
                     if (saveBtn) {
@@ -5273,16 +5997,6 @@
                     } else if (onSaveCallback) {
                         onSaveCallback();
                     }
-                }
-            } else if (sequentialEditState.enabled && e.altKey) {
-                if (e.key === 'ArrowRight') {
-                    e.preventDefault();
-                    const nextBtn = form.querySelector('button[id$="-next-btn"]');
-                    if (nextBtn && !nextBtn.disabled) nextBtn.click();
-                } else if (e.key === 'ArrowLeft') {
-                    e.preventDefault();
-                    const prevBtn = form.querySelector('button[id$="-prev-btn"]');
-                    if (prevBtn && !prevBtn.disabled) prevBtn.click();
                 }
             }
         }, { signal });
@@ -5337,28 +6051,48 @@
             }, { signal });
         }
 
-        // --- Number Hotkeys (1-9) & Shortcut Navigation ---
+        // --- Type-to-Search (Omnibox Auto-Focus) & Background Hotkey Blocker ---
         document.addEventListener('keydown', (e) => {
             const isInputFocused = document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
 
+            const isSubModalOpen = document.querySelector('#fasttag-settings-modal, #fasttag-create-modal');
+            if (isSubModalOpen && isSubModalOpen.style.display !== 'none') return;
+
             if (!isInputFocused) {
-                if (e.key >= '1' && e.key <= '9') {
-                    const idx = parseInt(e.key, 10);
-                    const chipBtn = form.querySelector(`.fasttag-quick-chip[data-index="${idx}"]`);
-                    if (chipBtn) {
+                if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    const searchBox = form.querySelector('#scenes-popup-global-filter, #scenes-popup-filter, input[type="text"]');
+                    if (searchBox && document.body.contains(searchBox)) {
                         e.preventDefault();
-                        chipBtn.click();
-                    }
-                } else if (e.key === '/' || e.key === 's' || e.key === 'S') {
-                    const searchBox = form.querySelector('input[type="text"]');
-                    if (searchBox) {
-                        e.preventDefault();
+                        e.stopPropagation();
+                        e.stopImmediatePropagation();
                         searchBox.focus();
-                        searchBox.select();
+                        searchBox.value += e.key;
+                        searchBox.dispatchEvent(new Event('input', { bubbles: true }));
+                        return;
+                    }
+                } else if (e.key === 'Backspace') {
+                    const searchBox = form.querySelector('#scenes-popup-global-filter, #scenes-popup-filter, input[type="text"]');
+                    if (searchBox && document.body.contains(searchBox)) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.stopImmediatePropagation();
+                        searchBox.focus();
+                        if (searchBox.value.length > 0) {
+                            searchBox.value = searchBox.value.slice(0, -1);
+                            searchBox.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                        return;
+                    }
+                } else {
+                    const stashHotkeys = [' ', 'Spacebar', 'n', 'N', 'p', 'P', 'j', 'J', 'k', 'K', 'l', 'L'];
+                    if (stashHotkeys.includes(e.key) && !e.altKey && !e.ctrlKey && !e.metaKey) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.stopImmediatePropagation();
                     }
                 }
             }
-        }, { signal });
+        }, { capture: true, signal });
 
         // --- 8-Direction Resizing ---
         let isResizing = false;
@@ -5682,7 +6416,11 @@
             columnDefaults: {
                 headerSort: false
             },
-            columns: getColumnsWithSavedWidths(type, 'bulk'),
+            columns: getColumnsWithSavedWidths(type, 'bulk', () => {
+                if (activePopup?._fastTagFetchData) {
+                    activePopup._fastTagFetchData(filterInput.value, false);
+                }
+            }),
         });
         attachColumnWidthSaver(table, type, 'bulk');
         if (type === 'performers') attachPerformerHoverCard(table, activePopup.tableContainer);
@@ -5723,10 +6461,23 @@
         saveBtn.textContent = `Apply to ${bulkScenes.length} Scenes`;
 
         const updateVisibility = () => {
-            const hasVal = filterInput.value.trim().length > 0;
+            const val = filterInput.value.trim();
+            const hasVal = val.length > 0;
             clearBtn.style.display = hasVal ? 'block' : 'none';
-            createBtn.style.display = hasVal ? 'block' : 'none';
             if (kbdShortcut) kbdShortcut.style.display = hasVal ? 'none' : 'block';
+
+            if (hasVal && activePopup.bottomCreateContainer && createBtn) {
+                const currentData = activeTableInstance && typeof activeTableInstance.getData === 'function' ? activeTableInstance.getData() : [];
+                const hasExactMatch = currentData.some(item => (item[config.labelKey] || '').toLowerCase() === val.toLowerCase());
+                if (!hasExactMatch) {
+                    createBtn.textContent = `+ Create ${config.title} "${val}"`;
+                    activePopup.bottomCreateContainer.style.display = 'flex';
+                } else {
+                    activePopup.bottomCreateContainer.style.display = 'none';
+                }
+            } else if (activePopup.bottomCreateContainer) {
+                activePopup.bottomCreateContainer.style.display = 'none';
+            }
         };
 
         const onChipSelect = () => {
@@ -5786,7 +6537,7 @@
                 });
             }
 
-            data.sort(getSmartSortComparator(term, selectedIds, config.labelKey, searchFields));
+            data.sort(getSmartSortComparator(term, selectedIds, config.labelKey, searchFields, getSavedSortKey(type)));
 
             isRestoringSelections = true;
             try {
@@ -5803,6 +6554,7 @@
                 isRestoringSelections = false;
             }
         }
+        activePopup._fastTagFetchData = fetchData;
 
         let debounceTimer = null;
         filterInput.oninput = (e) => {
@@ -6088,27 +6840,43 @@
             </div>
             <div id="everything-preview-container" style="flex-shrink: 0;"></div>
 
-            <!-- Dedicated Studio Selector Bar (Unified Indigo/Slate Theme) -->
-            <div id="everything-studio-bar" style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; padding: 4px 8px; background: ${studioBarBg}; border: ${studioBarBorder}; border-radius: 6px; flex-shrink: 0; font-size: 11.5px; overflow: hidden;">
-                <span style="font-weight: 700; color: ${isDark ? '#a5b4fc' : '#4f46e5'}; white-space: nowrap; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0;">🏢 Studio:</span>
-                <div id="everything-selected-studio-chip" style="display: none; align-items: center; gap: 5px; background: ${isDark ? '#312e81' : '#e0e7ff'}; color: ${isDark ? '#ffffff' : '#312e81'}; border: 1px solid ${isDark ? '#4338ca' : '#a5b4fc'}; font-weight: 700; padding: 2px 9px; border-radius: 999px; font-size: 11px; white-space: nowrap; flex-shrink: 0; box-shadow: 0 1px 2px rgba(0,0,0,0.15);">
-                    <span style="font-weight: 800; font-size: 11.5px; opacity: 0.95;">✓</span>
-                    <span id="everything-selected-studio-name"></span>
-                    <button type="button" id="everything-clear-studio-btn" style="background: none; border: none; cursor: pointer; color: ${isDark ? '#ffffff' : '#312e81'}; font-weight: 700; font-size: 14px; padding: 0 0 0 4px; line-height: 1; opacity: 0.85; transition: opacity 0.15s ease;" title="Remove Studio">&times;</button>
+            <!-- Split Metadata Bar: Studio (Left) | Group (Right) -->
+            <div id="everything-metadata-bar" style="display: flex; gap: 8px; margin-bottom: 6px; flex-shrink: 0; min-height: 28px; box-sizing: border-box;">
+                <!-- Left Half: Studio (Pinned Label + Smooth Horizontal Scroll) -->
+                <div id="everything-studio-half" style="display: flex; align-items: center; gap: 6px; flex: 1 1 0px; min-width: 0; padding: 4px 8px; background: ${studioBarBg}; border: ${studioBarBorder}; border-radius: 8px; box-sizing: border-box; overflow: hidden;">
+                    <span style="font-weight: 700; color: ${isDark ? '#a5b4fc' : '#4f46e5'}; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 3px; flex-shrink: 0; user-select: none;">📁 Studio:</span>
+                    <div id="everything-studio-scroll" style="display: flex; align-items: center; gap: 4px; flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: thin; scrollbar-color: ${isDark ? 'rgba(148, 163, 184, 0.25) transparent' : 'rgba(100, 116, 139, 0.25) transparent'};">
+                        <div id="everything-selected-studio-chip" class="fasttag-studio-pill" style="display: none; align-items: center; gap: 5px; background: ${isDark ? '#312e81' : '#e0e7ff'}; color: ${isDark ? '#ffffff' : '#312e81'}; border: 1px solid ${isDark ? '#4338ca' : '#a5b4fc'}; font-weight: 700; padding: 2px 8px; border-radius: 999px; font-size: 11px; white-space: nowrap; flex-shrink: 0; box-shadow: 0 1px 2px rgba(0,0,0,0.15); cursor: default;">
+                            <span style="font-weight: 800; font-size: 11px; opacity: 0.95;">✓</span>
+                            <span id="everything-selected-studio-name"></span>
+                            <button type="button" id="everything-clear-studio-btn" class="fasttag-pill-clear-btn" style="background: none; border: none; cursor: pointer; color: ${isDark ? '#ffffff' : '#312e81'}; font-weight: 700; font-size: 14px; padding: 0 0 0 4px; line-height: 1; opacity: 0.85;" title="Remove Studio">&times;</button>
+                        </div>
+                        <div id="everything-recent-studios" style="display: flex; gap: 4px; align-items: center; flex-shrink: 0;"></div>
+                    </div>
                 </div>
-                <div id="everything-recent-studios" style="display: flex; gap: 4px; overflow-x: auto; flex: 1; align-items: center; padding: 1px 0;"></div>
+
+                <!-- Right Half: Groups (Pinned Label on Left + Smooth Horizontal Scroll) -->
+                <div id="everything-groups-half" style="display: flex; align-items: center; gap: 6px; flex: 1 1 0px; min-width: 0; padding: 4px 8px; background: ${studioBarBg}; border: ${studioBarBorder}; border-radius: 8px; box-sizing: border-box; overflow: hidden;">
+                    <span style="font-weight: 700; color: ${isDark ? '#c084fc' : '#9333ea'}; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 3px; flex-shrink: 0; user-select: none;">🎬 Group:</span>
+                    <div id="everything-groups-scroll" style="display: flex; align-items: center; gap: 4px; flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: thin; scrollbar-color: ${isDark ? 'rgba(148, 163, 184, 0.25) transparent' : 'rgba(100, 116, 139, 0.25) transparent'};">
+                        <div id="everything-selected-groups-container" style="display: flex; gap: 4px; align-items: center; flex-shrink: 0;"></div>
+                        <div id="everything-recent-groups" style="display: flex; gap: 4px; align-items: center; flex-shrink: 0;"></div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Option 1A: Clean Full-Width Command Center Search Bar -->
-            <div id="everything-search-console" style="display: flex; gap: 6px; margin-bottom: 6px; align-items: center; flex-shrink: 0; background: ${searchConsoleBg}; border: ${searchConsoleBorder}; border-radius: 8px; padding: 3px 6px; box-sizing: border-box; transition: border-color 0.15s ease, box-shadow 0.15s ease;">
+            <!-- Clean Full-Width Search Bar (Matching Single Entity Popups) -->
+            <div style="display: flex; gap: 6px; margin-bottom: 6px; align-items: center; flex-shrink: 0;">
                 <div style="position: relative; flex: 1; display: flex; align-items: center; min-width: 0;">
-                    <span style="position: absolute; left: 8px; font-size: 13px; opacity: 0.6; pointer-events: none; user-select: none;">🔍</span>
-                    <input type="text" id="everything-global-search" autofocus class="popup-search-input" autocomplete="off" spellcheck="false" placeholder="Search tags, performers & studios..." style="width: 100%; padding: 5px 28px 5px 28px; box-sizing: border-box; border-radius: 6px; font-size: 12px; outline: none; border: none; background: transparent; color: inherit; font-family: inherit;">
-                    <span id="everything-kbd-shortcut" style="position: absolute; right: 8px; font-size: 10px; font-weight: 700; opacity: 0.5; background: ${kbdBg}; padding: 1px 5px; border-radius: 4px; border: ${kbdBorder}; pointer-events: none; user-select: none;">/</span>
-                    <span id="everything-global-clear" class="popup-search-clear" style="position: absolute; right: 8px; cursor: pointer; font-size: 15px; line-height: 1; display: none; user-select: none;">&times;</span>
+                    <svg viewBox="0 0 24 24" width="13.5" height="13.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 10px; color: ${isDark ? '#818cf8' : '#6366f1'}; opacity: 0.8; pointer-events: none; user-select: none;">
+                        <circle cx="11" cy="11" r="7"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" id="everything-global-search" autofocus class="popup-search-input" autocomplete="off" spellcheck="false" placeholder="Search tags, performers, studios & groups..." style="width: 100%; padding: 8px 28px 8px 31px; box-sizing: border-box; border-radius: 8px; font-size: 12.5px; font-weight: 500; outline: none;">
+                    <span id="everything-global-clear" class="popup-search-clear" style="position: absolute; right: 8px; cursor: pointer; font-size: 16px; line-height: 1; display: none; user-select: none; color: #818cf8;">&times;</span>
                 </div>
-                <button type="button" id="everything-refresh-btn" class="popup-refresh-btn" title="Refresh all caches" style="padding: 5px 9px; cursor: pointer; font-size: 12px; font-weight: 500; border-radius: 6px; white-space: nowrap; line-height: 1; flex-shrink: 0;">↻</button>
-                <button type="button" id="everything-scrape-btn" class="popup-scrape-btn" title="Scrape scene metadata (StashDB / Scrapers) [Alt+S]" style="padding: 5px 9px; cursor: pointer; font-size: 11.5px; font-weight: 700; border-radius: 6px; white-space: nowrap; line-height: 1; flex-shrink: 0; background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#c7d2fe' : '#4338ca'}; border: 1px solid ${isDark ? 'rgba(99, 102, 241, 0.45)' : '#a5b4fc'}; display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s ease;">⚡ Scrape</button>
+                <button type="button" id="everything-refresh-btn" class="popup-refresh-btn" title="Refresh all caches" style="padding: 8px 10px; cursor: pointer; font-size: 13px; font-weight: 500; border-radius: 8px; white-space: nowrap; line-height: 1; flex-shrink: 0;">↻</button>
+                <button type="button" id="everything-scrape-btn" class="popup-scrape-btn" title="Scrape scene metadata (StashDB / Scrapers) [Alt+S]" style="padding: 7px 10px; cursor: pointer; font-size: 11.5px; font-weight: 700; border-radius: 8px; white-space: nowrap; line-height: 1; flex-shrink: 0; background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#c7d2fe' : '#4338ca'}; border: 1px solid ${isDark ? 'rgba(99, 102, 241, 0.45)' : '#a5b4fc'}; display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s ease;">⚡ Scrape</button>
             </div>
 
             <!-- Interactive Scraper Match Card Container -->
@@ -6193,11 +6961,18 @@
             nextBtn: form.querySelector('#everything-next-btn'),
             previewContainer: form.querySelector('#everything-preview-container'),
             studioBar: {
-                container: form.querySelector('#everything-studio-bar'),
+                container: form.querySelector('#everything-studio-half'),
+                scrollContainer: form.querySelector('#everything-studio-scroll'),
                 chip: form.querySelector('#everything-selected-studio-chip'),
                 chipName: form.querySelector('#everything-selected-studio-name'),
                 clearBtn: form.querySelector('#everything-clear-studio-btn'),
                 recentContainer: form.querySelector('#everything-recent-studios')
+            },
+            groupsBar: {
+                container: form.querySelector('#everything-groups-half'),
+                scrollContainer: form.querySelector('#everything-groups-scroll'),
+                selectedContainer: form.querySelector('#everything-selected-groups-container'),
+                recentContainer: form.querySelector('#everything-recent-groups')
             },
             suggestionsContainer: form.querySelector('#everything-suggestions-container'),
             searchConsole: form.querySelector('#everything-search-console'),
@@ -6232,7 +7007,7 @@
         if (!container) return;
         const pinned = readPinnedEntries(type).map(p => ({ ...p, isPinned: true }));
         const recent = readRecentEntries(type).filter(r => !pinned.some(p => String(p.id) === String(r.id)));
-        const combined = [...pinned, ...recent].slice(0, 9);
+        const combined = [...pinned, ...recent];
 
         if (!combined.length) {
             container.style.display = 'none';
@@ -6240,6 +7015,14 @@
         }
 
         container.style.display = 'flex';
+        container.style.flexWrap = 'wrap';
+        container.style.gap = '4px';
+        container.style.maxHeight = '46px';
+        container.style.overflowY = 'auto';
+        container.style.overflowX = 'hidden';
+        container.style.overscrollBehavior = 'contain';
+        container.style.scrollbarWidth = 'none';
+        container.style.marginBottom = '6px';
         container.innerHTML = '';
         const isDark = getEffectiveTheme() === 'dark';
 
@@ -6250,7 +7033,7 @@
             const chip = document.createElement('button');
             chip.type = 'button';
             chip.className = 'fasttag-quick-chip';
-            chip.title = `[Hotkey: ${index <= 9 ? index : 'None'}] Click to toggle. Right-Click or Alt-Click to ${item.isPinned ? 'unpin' : 'pin'}.`;
+            chip.title = `Click to toggle. Right-Click or Alt-Click to ${item.isPinned ? 'unpin' : 'pin'}.`;
 
             if (item.isPinned) {
                 const pinSpan = document.createElement('span');
@@ -6259,13 +7042,6 @@
             }
             const textNode = document.createTextNode(item.name || item.title || '');
             chip.appendChild(textNode);
-
-            if (index <= 9) {
-                const numSpan = document.createElement('span');
-                numSpan.textContent = ` ${index}`;
-                numSpan.style.cssText = `font-size: 10px; font-weight: 700; opacity: 0.9; margin-left: 2px; vertical-align: super; line-height: 0;`;
-                chip.appendChild(numSpan);
-            }
 
             const bg = isDark ? (isSelected ? '#312e81' : (item.isPinned ? '#1e1b4b' : '#1e293b')) : (isSelected ? '#e0e7ff' : '#f1f5f9');
             const border = isDark ? (isSelected ? '#4338ca' : (item.isPinned ? '#6366f1' : '#475569')) : (isSelected ? '#a5b4fc' : '#cbd5e1');
@@ -6376,38 +7152,19 @@
             const hasRealTags = tagsChips && tagsChips.querySelectorAll('.fasttag-suggestion-chip').length > 0;
             const hasRealPerf = perfChips && perfChips.querySelectorAll('.fasttag-suggestion-chip').length > 0;
 
+            if (!hasRealTags && !hasRealPerf) {
+                container.style.display = 'none';
+                return;
+            }
+
             container.style.display = 'flex';
             if (tagsBox) {
-                tagsBox.style.display = 'flex';
-                tagsBox.style.visibility = 'visible';
-                const emptyMsg = tagsBox.querySelector('.fasttag-sugg-empty');
-                if (!hasRealTags) {
-                    if (!emptyMsg) {
-                        const span = document.createElement('span');
-                        span.className = 'fasttag-sugg-empty';
-                        span.textContent = 'None';
-                        span.style.cssText = `font-size: 10px; font-weight: 500; opacity: 0.45; font-style: italic; color: #818cf8; user-select: none; line-height: 1;`;
-                        tagsChips.appendChild(span);
-                    }
-                } else if (emptyMsg) {
-                    emptyMsg.remove();
-                }
+                tagsBox.style.display = hasRealTags ? 'flex' : 'none';
+                tagsBox.style.visibility = hasRealTags ? 'visible' : 'hidden';
             }
             if (perfBox) {
-                perfBox.style.display = 'flex';
-                perfBox.style.visibility = 'visible';
-                const emptyMsg = perfBox.querySelector('.fasttag-sugg-empty');
-                if (!hasRealPerf) {
-                    if (!emptyMsg) {
-                        const span = document.createElement('span');
-                        span.className = 'fasttag-sugg-empty';
-                        span.textContent = 'None';
-                        span.style.cssText = `font-size: 10px; font-weight: 500; opacity: 0.45; font-style: italic; color: #38bdf8; user-select: none; line-height: 1;`;
-                        perfChips.appendChild(span);
-                    }
-                } else if (emptyMsg) {
-                    emptyMsg.remove();
-                }
+                perfBox.style.display = hasRealPerf ? 'flex' : 'none';
+                perfBox.style.visibility = hasRealPerf ? 'visible' : 'hidden';
             }
             syncSuggestionsAlignment(container.closest('form'));
         };
@@ -6677,6 +7434,7 @@
                         tags { id name }
                         performers { id name disambiguation }
                         studio { id name }
+                        groups { group { id name } scene_index }
                     }
                 }
             `;
@@ -6693,13 +7451,16 @@
             const selTags = new Set((sceneData?.tags || []).map(t => String(t.id)));
             const selPerfs = new Set((sceneData?.performers || []).map(p => String(p.id)));
             const selStud = sceneData?.studio?.id ? String(sceneData.studio.id) : null;
+            const selGroups = new Set((sceneData?.groups || []).map(g => g.group?.id ? String(g.group.id) : '').filter(Boolean));
 
             ctx.setSelectedTags(selTags);
             ctx.setSelectedPerformers(selPerfs);
             ctx.setSelectedStudio(selStud);
+            ctx.setSelectedGroups(selGroups);
             ctx.setInitialTags(new Set(selTags));
             ctx.setInitialPerformers(new Set(selPerfs));
             ctx.setInitialStudio(selStud);
+            ctx.setInitialGroups(new Set(selGroups));
 
             setupSequentialEditEverythingHandlers(popup, sceneId, cardElement, ctx.doSave);
 
@@ -6713,7 +7474,10 @@
             const perfHolder = popup.performers.tableContainer?.querySelector('.tabulator-tableholder');
             if (perfHolder) perfHolder.scrollTop = 0;
 
-            await ctx.renderStudioBar('');
+            await Promise.all([
+                ctx.renderStudioBar(''),
+                ctx.renderGroupBar('')
+            ]);
             ctx.refreshAllUI();
 
             if (getAutoScrapeSequential() && sequentialEditState.enabled && window._fastTagEverythingScraperOpen && popup._isNavigatingSequential) {
@@ -6779,9 +7543,11 @@
             let selectedTagIds = new Set();
             let selectedPerformerIds = new Set();
             let selectedStudioId = null;
+            let selectedGroupIds = new Set();
             let initialTagIds = new Set();
             let initialPerformerIds = new Set();
             let initialStudioId = null;
+            let initialGroupIds = new Set();
             let isRestoring = false;
             let currentSceneId = sceneId;
 
@@ -6795,7 +7561,9 @@
                 selectable: true,
                 index: "id",
                 columnDefaults: { headerSort: false },
-                columns: getColumnsWithSavedWidths('tags', 'everything')
+                columns: getColumnsWithSavedWidths('tags', 'everything', () => {
+                    if (popup.tagsFetchData) popup.tagsFetchData();
+                })
             });
             attachColumnWidthSaver(tagsTable, 'tags', 'everything');
 
@@ -6808,7 +7576,9 @@
                 selectable: true,
                 index: "id",
                 columnDefaults: { headerSort: false },
-                columns: getColumnsWithSavedWidths('performers', 'everything')
+                columns: getColumnsWithSavedWidths('performers', 'everything', () => {
+                    if (popup.performersFetchData) popup.performersFetchData();
+                })
             });
             attachColumnWidthSaver(performersTable, 'performers', 'everything');
             attachPerformerHoverCard(performersTable, popup.performers.tableContainer);
@@ -6820,11 +7590,15 @@
                 if (selectedStudioId !== initialStudioId) return true;
                 if (selectedTagIds.size !== initialTagIds.size) return true;
                 if (selectedPerformerIds.size !== initialPerformerIds.size) return true;
+                if (selectedGroupIds.size !== initialGroupIds.size) return true;
                 for (const id of selectedTagIds) {
                     if (!initialTagIds.has(id)) return true;
                 }
                 for (const id of selectedPerformerIds) {
                     if (!initialPerformerIds.has(id)) return true;
+                }
+                for (const id of selectedGroupIds) {
+                    if (!initialGroupIds.has(id)) return true;
                 }
                 return false;
             };
@@ -6896,57 +7670,149 @@
                     studioBar.chip.style.display = 'none';
                 }
 
-            const term = searchQuery ? searchQuery.trim().toLowerCase() : '';
-            studioBar.recentContainer.innerHTML = '';
-            const isDark = getEffectiveTheme() === 'dark';
+                const term = searchQuery ? searchQuery.trim().toLowerCase() : '';
+                studioBar.recentContainer.innerHTML = '';
+                const isDark = getEffectiveTheme() === 'dark';
 
-            if (!term) {
-                if (!selectedStudioId) {
-                    const emptySpan = document.createElement('span');
-                    emptySpan.textContent = '(None - search below to assign)';
-                    emptySpan.style.cssText = `font-size: 11px; opacity: 0.6; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'};`;
-                    studioBar.recentContainer.appendChild(emptySpan);
-                }
-                return;
-            }
-
-            const matchingStudios = allStudios
-                .filter(s => (s.name || '').toLowerCase().includes(term) && String(s.id) !== String(selectedStudioId))
-                .slice(0, 10);
-
-            if (!matchingStudios.length && !selectedStudioId) {
-                const emptySpan = document.createElement('span');
-                emptySpan.textContent = 'No matching studio';
-                emptySpan.style.cssText = `font-size: 11px; opacity: 0.6; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'};`;
-                studioBar.recentContainer.appendChild(emptySpan);
-                return;
-            }
-
-            matchingStudios.forEach(st => {
-                const chip = document.createElement('button');
-                chip.type = 'button';
-                chip.className = 'fasttag-quick-chip';
-                chip.title = `Click to set studio to "${st.name}"`;
-                chip.textContent = `+ ${st.name}`;
-                const bg = isDark ? 'rgba(99, 102, 241, 0.15)' : '#eef2ff';
-                const border = isDark ? '1px solid rgba(99, 102, 241, 0.45)' : '1px solid #818cf8';
-                const color = isDark ? '#c7d2fe' : '#3730a3';
-                chip.style.cssText = `padding: 2px 8px; border: ${border}; border-radius: 999px; background: ${bg}; color: ${color}; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0; line-height: 1.25;`;
-
-                chip.onclick = async (e) => {
-                    e.preventDefault();
-                    if (selectedStudioId === String(st.id)) {
-                        selectedStudioId = null;
-                    } else {
-                        selectedStudioId = String(st.id);
-                        addRecentEntry('studios', st);
+                if (!term) {
+                    if (!selectedStudioId) {
+                        const emptySpan = document.createElement('span');
+                        emptySpan.textContent = '(None)';
+                        emptySpan.style.cssText = `font-size: 11px; opacity: 0.6; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'};`;
+                        studioBar.recentContainer.appendChild(emptySpan);
                     }
-                    refreshAllUI();
-                    await doSave();
-                };
+                    return;
+                }
 
-                studioBar.recentContainer.appendChild(chip);
-            });
+                const matchingStudios = allStudios
+                    .filter(s => (s.name || '').toLowerCase().includes(term) && String(s.id) !== String(selectedStudioId))
+                    .slice(0, 8);
+
+                matchingStudios.forEach(st => {
+                    const chip = document.createElement('button');
+                    chip.type = 'button';
+                    chip.className = 'fasttag-quick-chip';
+                    chip.title = `Click to set studio to "${st.name}"`;
+                    chip.textContent = `+ ${st.name}`;
+                    const bg = isDark ? 'rgba(99, 102, 241, 0.15)' : '#eef2ff';
+                    const border = isDark ? '1px solid rgba(99, 102, 241, 0.45)' : '1px solid #818cf8';
+                    const color = isDark ? '#c7d2fe' : '#3730a3';
+                    chip.style.cssText = `padding: 2px 8px; border: ${border}; border-radius: 999px; background: ${bg}; color: ${color}; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0; line-height: 1.25;`;
+
+                    chip.onclick = async (e) => {
+                        e.preventDefault();
+                        if (selectedStudioId === String(st.id)) {
+                            selectedStudioId = null;
+                        } else {
+                            selectedStudioId = String(st.id);
+                            addRecentEntry('studios', st);
+                        }
+                        refreshAllUI();
+                        await doSave();
+                    };
+
+                    studioBar.recentContainer.appendChild(chip);
+                });
+            };
+
+            const renderGroupBar = async (searchQuery = '') => {
+                const groupsBar = popup.groupsBar;
+                if (!groupsBar) return;
+
+                let allGroups = getCachedOrNull('groups');
+                if (!allGroups) {
+                    try {
+                        const res = await fetchGQL(ENTITY_CONFIG.groups.fetchQuery);
+                        allGroups = ENTITY_CONFIG.groups.extractList(res?.data);
+                        if (!allGroups || !allGroups.length) {
+                            allGroups = res?.data?.findGroups?.groups || res?.data?.findMovies?.movies || [];
+                        }
+                    } catch (e) {
+                        try {
+                            const fallbackRes = await fetchGQL(`query { findMovies(filter: { per_page: -1 }) { movies { id name } } }`);
+                            allGroups = fallbackRes?.data?.findMovies?.movies || [];
+                        } catch (e2) {
+                            console.error('[FastTag] Failed to fetch groups:', e, e2);
+                        }
+                    }
+                    if (allGroups && allGroups.length) setCache('groups', allGroups);
+                }
+                if (!allGroups) allGroups = [];
+
+                const isDark = getEffectiveTheme() === 'dark';
+                groupsBar.selectedContainer.innerHTML = '';
+                groupsBar.recentContainer.innerHTML = '';
+
+                // Render Selected Group Pills with Remove Button (✕)
+                selectedGroupIds.forEach(id => {
+                    const grp = allGroups.find(g => String(g.id) === String(id)) || (popup.sceneData?.groups || []).map(g => g.group).find(g => g && String(g.id) === String(id));
+                    const name = grp ? grp.name : `Group #${id}`;
+
+                    const pill = document.createElement('div');
+                    pill.className = 'fasttag-group-pill';
+                    pill.style.cssText = `display: inline-flex; align-items: center; gap: 4px; background: ${isDark ? '#581c87' : '#f3e8ff'}; color: ${isDark ? '#ffffff' : '#581c87'}; border: 1px solid ${isDark ? '#7e22ce' : '#c084fc'}; font-weight: 700; padding: 2px 8px; border-radius: 999px; font-size: 11px; white-space: nowrap; flex-shrink: 0; box-shadow: 0 1px 2px rgba(0,0,0,0.15); cursor: default;`;
+                    pill.innerHTML = `
+                        <span style="font-weight: 800; font-size: 11px; opacity: 0.95;">🎬</span>
+                        <span>${escapeHtml(name)}</span>
+                        <button type="button" class="fasttag-pill-clear-btn" style="background: none; border: none; cursor: pointer; color: ${isDark ? '#ffffff' : '#581c87'}; font-weight: 700; font-size: 13px; padding: 0 0 0 3px; line-height: 1; opacity: 0.85;" title="Remove Group">&times;</button>
+                    `;
+
+                    pill.querySelector('button').onclick = async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        selectedGroupIds.delete(String(id));
+                        renderGroupBar(popup.globalSearch ? popup.globalSearch.value : '');
+                        updateSaveButton();
+                        await doSave();
+                    };
+                    groupsBar.selectedContainer.appendChild(pill);
+                });
+
+                const term = searchQuery ? searchQuery.trim().toLowerCase() : '';
+                if (!term) {
+                    if (selectedGroupIds.size === 0) {
+                        const emptySpan = document.createElement('span');
+                        emptySpan.textContent = '(None)';
+                        emptySpan.style.cssText = `font-size: 11px; opacity: 0.6; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'};`;
+                        groupsBar.recentContainer.appendChild(emptySpan);
+                    }
+                    return;
+                }
+
+                // When searching: match groups
+                const matchingGroups = allGroups
+                    .filter(g => (g.name || '').toLowerCase().includes(term) && !selectedGroupIds.has(String(g.id)))
+                    .slice(0, 8);
+
+                if (!matchingGroups.length && selectedGroupIds.size === 0) {
+                    const emptySpan = document.createElement('span');
+                    emptySpan.textContent = 'No matching group';
+                    emptySpan.style.cssText = `font-size: 11px; opacity: 0.6; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'};`;
+                    groupsBar.recentContainer.appendChild(emptySpan);
+                    return;
+                }
+
+                matchingGroups.forEach(grp => {
+                    const chip = document.createElement('button');
+                    chip.type = 'button';
+                    chip.className = 'fasttag-quick-chip';
+                    chip.title = `Click to add to group "${grp.name}"`;
+                    chip.textContent = `+ ${grp.name}`;
+                    const bg = isDark ? 'rgba(168, 85, 247, 0.15)' : '#faf5ff';
+                    const border = isDark ? '1px solid rgba(168, 85, 247, 0.45)' : '1px solid #c084fc';
+                    const color = isDark ? '#e9d5ff' : '#6b21a8';
+                    chip.style.cssText = `padding: 2px 8px; border: ${border}; border-radius: 999px; background: ${bg}; color: ${color}; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0; line-height: 1.25;`;
+
+                    chip.onclick = async (e) => {
+                        e.preventDefault();
+                        selectedGroupIds.add(String(grp.id));
+                        addRecentEntry('groups', grp);
+                        renderGroupBar(popup.globalSearch ? popup.globalSearch.value : '');
+                        updateSaveButton();
+                        await doSave();
+                    };
+                    groupsBar.recentContainer.appendChild(chip);
+                });
             };
 
             if (popup.studioBar?.clearBtn) {
@@ -6982,7 +7848,7 @@
                     });
                 }
 
-                data.sort(getSmartSortComparator(term, selIds, config.labelKey, searchFields));
+                data.sort(getSmartSortComparator(term, selIds, config.labelKey, searchFields, getSavedSortKey(type)));
 
                 isRestoring = true;
                 try {
@@ -7018,6 +7884,9 @@
                 }
             }
 
+            popup.tagsFetchData = () => fetchColumnData('tags', tagsTable, popup.globalSearch?.value || '', selectedTagIds);
+            popup.performersFetchData = () => fetchColumnData('performers', performersTable, popup.globalSearch?.value || '', selectedPerformerIds);
+
             const onTagChipSelect = async () => {
                 popup.globalSearch.value = '';
                 popup.globalClear.style.display = 'none';
@@ -7046,96 +7915,84 @@
                 await doSave();
             };
 
-            const refreshAllUI = () => {
-                updateBadges();
-                updateSaveButton();
-                renderStudioBar(popup.globalSearch.value);
-                renderColumnChips(popup.tags.chipsContainer, 'tags', popup.globalSearch, selectedTagIds, onTagChipSelect);
-                renderColumnChips(popup.performers.chipsContainer, 'performers', popup.globalSearch, selectedPerformerIds, onPerformerChipSelect);
-                if (popup.suggestionsContainer && typeof popup.suggestionsContainer._fastTagRenderSuggestions === 'function') {
-                    popup.suggestionsContainer._fastTagRenderSuggestions();
-                }
-                applyMarqueeAnimation(popup.titleSpan);
-            };
-            form._fastTagOnResize = () => {
-                refreshAllUI();
-                try {
-                    tagsTable.redraw(false);
-                    performersTable.redraw(false);
-                } catch (e) {}
-            };
-
-            tagsTable.on("rowClick", (e, row) => {
+            tagsTable.on("rowSelected", async (row) => {
+                if (isRestoring) return;
                 const id = row.getData()?.id;
                 if (!id) return;
                 const strId = String(id);
-                const isSearching = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
-
-                if (selectedTagIds.has(strId)) {
-                    selectedTagIds.delete(strId);
-                    tagsTable.deselectRow(row);
-                } else {
-                    selectedTagIds.add(strId);
-                    tagsTable.selectRow(row);
-                    if (isSearching) {
-                        popup.globalSearch.value = '';
-                        popup.globalClear.style.display = 'none';
-                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-                        Promise.all([
-                            fetchColumnData('tags', tagsTable, '', selectedTagIds),
-                            fetchColumnData('performers', performersTable, '', selectedPerformerIds)
-                        ]).then(() => {
-                            const r = tagsTable.getRow(id);
-                            if (r) tagsTable.scrollToRow(r, "top", false);
-                            renderStudioBar('');
-                            popup.globalSearch.focus({ preventScroll: true });
-                        });
-                    }
-                }
+                selectedTagIds.add(strId);
+                addRecentEntry('tags', row.getData());
                 refreshAllUI();
+
+                const isSearching = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
                 if (isSearching) {
+                    popup.globalSearch.value = '';
+                    popup.globalClear.style.display = 'none';
+                    if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                    await Promise.all([
+                        fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                        fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                    ]);
+                    const r = tagsTable.getRow(id);
+                    if (r) tagsTable.scrollToRow(r, "top", false);
+                    renderStudioBar('');
+                    renderGroupBar('');
+                    popup.globalSearch.focus({ preventScroll: true });
                     doSave();
                 }
             });
 
-            performersTable.on("rowClick", (e, row) => {
+            tagsTable.on("rowDeselected", (row) => {
+                if (isRestoring) return;
+                const id = row.getData()?.id;
+                if (!id) return;
+                selectedTagIds.delete(String(id));
+                refreshAllUI();
+            });
+
+            performersTable.on("rowSelected", async (row) => {
+                if (isRestoring) return;
                 const id = row.getData()?.id;
                 if (!id) return;
                 const strId = String(id);
-                const isSearching = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
-
-                if (selectedPerformerIds.has(strId)) {
-                    selectedPerformerIds.delete(strId);
-                    performersTable.deselectRow(row);
-                } else {
-                    selectedPerformerIds.add(strId);
-                    performersTable.selectRow(row);
-                    if (isSearching) {
-                        popup.globalSearch.value = '';
-                        popup.globalClear.style.display = 'none';
-                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-                        Promise.all([
-                            fetchColumnData('tags', tagsTable, '', selectedTagIds),
-                            fetchColumnData('performers', performersTable, '', selectedPerformerIds)
-                        ]).then(() => {
-                            const r = performersTable.getRow(id);
-                            if (r) performersTable.scrollToRow(r, "top", false);
-                            renderStudioBar('');
-                            popup.globalSearch.focus({ preventScroll: true });
-                        });
-                    }
-                }
+                selectedPerformerIds.add(strId);
+                addRecentEntry('performers', row.getData());
                 refreshAllUI();
+
+                const isSearching = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
                 if (isSearching) {
+                    popup.globalSearch.value = '';
+                    popup.globalClear.style.display = 'none';
+                    if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                    await Promise.all([
+                        fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                        fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                    ]);
+                    const r = performersTable.getRow(id);
+                    if (r) performersTable.scrollToRow(r, "top", false);
+                    renderStudioBar('');
+                    renderGroupBar('');
+                    popup.globalSearch.focus({ preventScroll: true });
                     doSave();
                 }
             });
 
-            const refreshGlobalSearch = (val) => {
+            performersTable.on("rowDeselected", (row) => {
+                if (isRestoring) return;
+                const id = row.getData()?.id;
+                if (!id) return;
+                selectedPerformerIds.delete(String(id));
+                refreshAllUI();
+            });
+
+            const refreshGlobalSearch = async (val) => {
                 const query = (val || '').trim();
-                fetchColumnData('tags', tagsTable, query, selectedTagIds);
-                fetchColumnData('performers', performersTable, query, selectedPerformerIds);
-                renderStudioBar(query);
+                await Promise.all([
+                    fetchColumnData('tags', tagsTable, query, selectedTagIds),
+                    fetchColumnData('performers', performersTable, query, selectedPerformerIds),
+                    renderStudioBar(query),
+                    renderGroupBar(query)
+                ]);
             };
 
             if (popup.searchConsole && popup.globalSearch) {
@@ -7151,15 +8008,300 @@
             }
 
             let searchDebounce = null;
+            let activeColType = 'tags';
+            let activeColIndex = -1;
+
+            const scrollRowIntoViewIfNeeded = (table, row) => {
+                if (!table || !row) return;
+                const el = typeof row.getElement === 'function' ? row.getElement() : null;
+                const holder = table.element?.querySelector('.tabulator-tableholder');
+                if (holder && el) {
+                    const holderRect = holder.getBoundingClientRect();
+                    const elRect = el.getBoundingClientRect();
+                    if (elRect.bottom > holderRect.bottom) {
+                        holder.scrollTop += (elRect.bottom - holderRect.bottom + 4);
+                    } else if (elRect.top < holderRect.top) {
+                        holder.scrollTop -= (holderRect.top - elRect.top + 4);
+                    }
+                } else if (typeof row.scrollTo === 'function') {
+                    row.scrollTo('nearest', false);
+                }
+            };
+
+            const updateEverythingKeyboardHighlight = () => {
+                // Remove highlight classes across both tables
+                form.querySelectorAll('.tabulator-row.fasttag-keyboard-active').forEach(el => el.classList.remove('fasttag-keyboard-active'));
+
+                // Reset button highlights
+                form.querySelectorAll('.fasttag-create-empty-btn').forEach(btn => {
+                    btn.classList.remove('fasttag-create-btn-active');
+                    btn.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+                    btn.style.transform = 'none';
+                    btn.style.filter = 'none';
+                });
+
+                const isSearching = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
+                const isNavigating = activeColIndex >= 0;
+
+                const tagsHeader = form.querySelector('#everything-col-tags span');
+                const perfHeader = form.querySelector('#everything-col-performers span');
+                if (tagsHeader) {
+                    tagsHeader.style.textDecoration = (isSearching || isNavigating) && (activeColType === 'tags') ? 'underline 2px #818cf8' : 'none';
+                }
+                if (perfHeader) {
+                    perfHeader.style.textDecoration = (isSearching || isNavigating) && (activeColType === 'performers') ? 'underline 2px #38bdf8' : 'none';
+                }
+
+                if (activeColIndex < 0) return;
+
+                const curTable = activeColType === 'tags' ? tagsTable : performersTable;
+                const curCreateBtn = form.querySelector(`.fasttag-create-empty-btn[data-type="${activeColType}"]`);
+                const isCreateVisible = curCreateBtn && curCreateBtn.parentElement && curCreateBtn.parentElement.style.display !== 'none';
+                const rows = curTable && typeof curTable.getRows === 'function' ? curTable.getRows() : [];
+
+                if (isCreateVisible && activeColIndex === rows.length) {
+                    curCreateBtn.classList.add('fasttag-create-btn-active');
+                    curCreateBtn.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.5), 0 2px 8px rgba(0,0,0,0.3)';
+                    curCreateBtn.style.transform = 'scale(1.02)';
+                    curCreateBtn.style.filter = 'brightness(1.15)';
+                    return;
+                }
+
+                if (rows.length === 0) return;
+
+                if (activeColIndex >= rows.length) activeColIndex = rows.length - 1;
+
+                const targetRow = rows[activeColIndex];
+                if (targetRow) {
+                    const el = targetRow.getElement();
+                    if (el) {
+                        el.classList.add('fasttag-keyboard-active');
+                    }
+                    scrollRowIntoViewIfNeeded(curTable, targetRow);
+                }
+            };
+
             popup.globalSearch.addEventListener('input', () => {
                 const val = popup.globalSearch.value.trim();
                 const hasVal = val.length > 0;
                 popup.globalClear.style.display = hasVal ? 'block' : 'none';
                 if (popup.kbdShortcut) popup.kbdShortcut.style.display = hasVal ? 'none' : 'block';
                 clearTimeout(searchDebounce);
-                searchDebounce = setTimeout(() => {
-                    refreshGlobalSearch(val);
-                }, 120);
+                searchDebounce = setTimeout(async () => {
+                    await refreshGlobalSearch(val);
+                    if (hasVal) {
+                        activeColIndex = 0;
+                        const tagCount = tagsTable ? tagsTable.getRows().length : 0;
+                        const perfCount = performersTable ? performersTable.getRows().length : 0;
+                        if (tagCount === 0 && perfCount > 0) {
+                            activeColType = 'performers';
+                        } else {
+                            activeColType = 'tags';
+                        }
+                    } else {
+                        activeColIndex = -1;
+                        activeColType = 'tags';
+                    }
+                    updateEverythingKeyboardHighlight();
+                }, 100);
+            });
+
+            const rolloverToColumn = (targetType, position = 'top') => {
+                const targetTable = targetType === 'tags' ? tagsTable : performersTable;
+                const targetRows = targetTable && typeof targetTable.getRows === 'function' ? targetTable.getRows() : [];
+                const targetCreateBtn = form.querySelector(`.fasttag-create-empty-btn[data-type="${targetType}"]`);
+                const isTargetCreateVisible = targetCreateBtn && targetCreateBtn.parentElement && targetCreateBtn.parentElement.style.display !== 'none';
+
+                activeColType = targetType;
+                if (position === 'top') {
+                    if (targetRows.length > 0) {
+                        activeColIndex = 0;
+                        if (targetRows[0] && typeof targetRows[0].scrollTo === 'function') targetRows[0].scrollTo("top", false);
+                    } else if (isTargetCreateVisible) {
+                        activeColIndex = 0; // Focus Create button
+                    } else {
+                        activeColIndex = -1;
+                    }
+                } else {
+                    // position === 'bottom'
+                    if (isTargetCreateVisible) {
+                        activeColIndex = targetRows.length; // Focus Create button at bottom
+                    } else if (targetRows.length > 0) {
+                        activeColIndex = targetRows.length - 1;
+                        const lastRow = targetRows[targetRows.length - 1];
+                        if (lastRow && typeof lastRow.scrollTo === 'function') lastRow.scrollTo("bottom", false);
+                    } else {
+                        activeColIndex = -1;
+                    }
+                }
+            };
+
+            popup.globalSearch.addEventListener('keydown', async (e) => {
+                if (e.key === 'Tab' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    const other = activeColType === 'tags' ? 'performers' : 'tags';
+                    rolloverToColumn(other, 'top');
+                    updateEverythingKeyboardHighlight();
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const curTable = activeColType === 'tags' ? tagsTable : performersTable;
+                    const rows = curTable ? curTable.getRows() : [];
+                    const curCreateBtn = form.querySelector(`.fasttag-create-empty-btn[data-type="${activeColType}"]`);
+                    const isCreateVisible = curCreateBtn && curCreateBtn.parentElement && curCreateBtn.parentElement.style.display !== 'none';
+
+                    if (activeColType === 'tags') {
+                        if (rows.length > 0) {
+                            if (activeColIndex < 0) {
+                                activeColIndex = 0;
+                            } else if (activeColIndex < rows.length - 1) {
+                                activeColIndex++;
+                            } else if (activeColIndex === rows.length - 1 && isCreateVisible) {
+                                activeColIndex = rows.length; // Move onto Tag Create button!
+                            } else {
+                                // Rollover from bottom of Tags to Performers!
+                                rolloverToColumn('performers', 'top');
+                            }
+                        } else if (isCreateVisible && activeColIndex < rows.length) {
+                            activeColIndex = rows.length; // Move onto Tag Create button!
+                        } else {
+                            // Rollover from empty Tags to Performers!
+                            rolloverToColumn('performers', 'top');
+                        }
+                    } else {
+                        // In Performers
+                        if (rows.length > 0) {
+                            if (activeColIndex < 0) {
+                                activeColIndex = 0;
+                            } else if (activeColIndex < rows.length - 1) {
+                                activeColIndex++;
+                            } else if (activeColIndex === rows.length - 1 && isCreateVisible) {
+                                activeColIndex = rows.length; // Move onto Performer Create button!
+                            }
+                        } else if (isCreateVisible) {
+                            activeColIndex = rows.length; // Move onto Performer Create button when 0 rows!
+                        }
+                    }
+                    updateEverythingKeyboardHighlight();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const curTable = activeColType === 'tags' ? tagsTable : performersTable;
+                    const rows = curTable ? curTable.getRows() : [];
+
+                    if (activeColType === 'performers') {
+                        if (activeColIndex === rows.length) {
+                            if (rows.length > 0) {
+                                activeColIndex = rows.length - 1;
+                            } else {
+                                // Roll back up to Tags!
+                                rolloverToColumn('tags', 'bottom');
+                            }
+                        } else if (activeColIndex > 0) {
+                            activeColIndex = Math.max(0, activeColIndex - 1);
+                        } else if (activeColIndex === 0) {
+                            // Roll back up to Tags!
+                            rolloverToColumn('tags', 'bottom');
+                        } else {
+                            activeColIndex = -1;
+                        }
+                    } else {
+                        // In Tags
+                        if (activeColIndex === rows.length) {
+                            activeColIndex = rows.length > 0 ? rows.length - 1 : -1;
+                        } else if (activeColIndex > 0) {
+                            activeColIndex = Math.max(0, activeColIndex - 1);
+                        } else {
+                            activeColIndex = -1;
+                        }
+                    }
+                    updateEverythingKeyboardHighlight();
+                } else if (e.key === 'Enter') {
+                    if (e.ctrlKey || e.metaKey) {
+                        e.preventDefault();
+                        if (popup.saveBtn) popup.saveBtn.click();
+                        return;
+                    }
+
+                    const curCreateBtn = form.querySelector(`.fasttag-create-empty-btn[data-type="${activeColType}"]`);
+                    const isCreateVisible = curCreateBtn && curCreateBtn.parentElement && curCreateBtn.parentElement.style.display !== 'none';
+                    const curTable = activeColType === 'tags' ? tagsTable : performersTable;
+                    const rows = curTable ? curTable.getRows() : [];
+
+                    // If user navigated onto the Create button:
+                    if (isCreateVisible && activeColIndex === rows.length) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleCreateEntity(activeColType);
+                        return;
+                    }
+
+                    const hasSearch = popup.globalSearch.value.trim().length > 0;
+                    if (!hasSearch && activeColIndex < 0) {
+                        // Empty search and no row navigated with arrows -> Save & Next Scene
+                        e.preventDefault();
+                        if (popup.saveBtn) popup.saveBtn.click();
+                        return;
+                    }
+
+                    let selCol = activeColType;
+                    let targetRows = rows;
+                    let targetTable = curTable;
+
+                    if (targetRows.length === 0) {
+                        const other = activeColType === 'tags' ? 'performers' : 'tags';
+                        const otherTable = other === 'tags' ? tagsTable : performersTable;
+                        if (otherTable && otherTable.getRows().length > 0) {
+                            targetRows = otherTable.getRows();
+                            selCol = other;
+                            activeColIndex = 0;
+                            targetTable = otherTable;
+                        }
+                    }
+
+                    const targetIdx = activeColIndex >= 0 ? activeColIndex : 0;
+                    if (targetRows.length > 0 && targetRows[targetIdx]) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const targetRow = targetRows[targetIdx];
+                        const rowData = targetRow.getData();
+                        if (rowData && rowData.id) {
+                            const strId = String(rowData.id);
+                            if (selCol === 'tags') {
+                                if (selectedTagIds.has(strId)) {
+                                    selectedTagIds.delete(strId);
+                                    tagsTable.deselectRow(targetRow);
+                                } else {
+                                    selectedTagIds.add(strId);
+                                    tagsTable.selectRow(targetRow);
+                                    addRecentEntry('tags', rowData);
+                                }
+                            } else {
+                                if (selectedPerformerIds.has(strId)) {
+                                    selectedPerformerIds.delete(strId);
+                                    performersTable.deselectRow(targetRow);
+                                } else {
+                                    selectedPerformerIds.add(strId);
+                                    performersTable.selectRow(targetRow);
+                                    addRecentEntry('performers', rowData);
+                                }
+                            }
+                            if (hasSearch) {
+                                popup.globalSearch.value = '';
+                                popup.globalClear.style.display = 'none';
+                                if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                                await Promise.all([
+                                    fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                                    fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                                ]);
+                                renderStudioBar('');
+                                activeColIndex = -1;
+                            }
+                            refreshAllUI();
+                            await doSave();
+                            popup.globalSearch.focus({ preventScroll: true });
+                            updateEverythingKeyboardHighlight();
+                        }
+                    }
+                }
             });
 
             popup.globalClear.addEventListener('click', () => {
@@ -7209,95 +8351,115 @@
                     refreshAllUI();
                     await doSave(`${config.title} "${finalName}" created & added to scene`);
                     popup.globalSearch.focus({ preventScroll: true });
-                } else {
-                    toastError(`Failed to create ${config.title.toLowerCase()}`, res.errors);
-                }
-            };
-
-            form.addEventListener('click', (e) => {
-                const btn = e.target.closest('.fasttag-create-empty-btn');
-                if (btn) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const type = btn.getAttribute('data-type');
-                    if (type) handleCreateEntity(type);
-                }
-            });
-
-            const doSave = async (customSuccessMessage = null) => {
-                if (popup.scraperCardContainer) {
-                    popup.scraperCardContainer.innerHTML = '';
-                    popup.scraperCardContainer.style.display = 'none';
-                }
-                hideScrapeCoverTooltip();
-
-                const mutation = `
-                    mutation SceneUpdateEverything($id: ID!, $tag_ids: [ID!], $performer_ids: [ID!], $studio_id: ID) {
-                        sceneUpdate(input: {
-                            id: $id,
-                            tag_ids: $tag_ids,
-                            performer_ids: $performer_ids,
-                            studio_id: $studio_id
-                        }) {
-                            id
-                        }
+                    } else {
+                        toastError(`Failed to create ${config.title.toLowerCase()}`, res.errors);
                     }
-                `;
-                try {
-                    const res = await fetchGQL(mutation, {
-                        id: currentSceneId,
-                        tag_ids: Array.from(selectedTagIds),
-                        performer_ids: Array.from(selectedPerformerIds),
-                        studio_id: selectedStudioId || null
-                    });
+                };
 
-                    if (res?.data?.sceneUpdate?.id) {
-                        initialTagIds = new Set(selectedTagIds);
-                        initialPerformerIds = new Set(selectedPerformerIds);
-                        initialStudioId = selectedStudioId;
-
-                        selectedTagIds.forEach(id => {
-                            const row = tagsTable.getRow(id);
-                            if (row) addRecentEntry('tags', row.getData());
-                        });
-                        selectedPerformerIds.forEach(id => {
-                            const row = performersTable.getRow(id);
-                            if (row) addRecentEntry('performers', row.getData());
-                        });
-                        if (selectedStudioId) {
-                            const allStudios = getCachedOrNull('studios') || [];
-                            const st = allStudios.find(s => String(s.id) === String(selectedStudioId));
-                            if (st) addRecentEntry('studios', st);
-                        }
-
-                        await refreshSceneCards();
-                        recordSaveUsage();
-                        toastSuccess(customSuccessMessage || 'Scene saved successfully');
-                        updateSaveButton();
-                        return true;
+                const refreshAllUI = () => {
+                    updateBadges();
+                    updateSaveButton();
+                    renderStudioBar(popup.globalSearch.value);
+                    renderGroupBar(popup.globalSearch.value);
+                    renderColumnChips(popup.tags.chipsContainer, 'tags', popup.globalSearch, selectedTagIds, onTagChipSelect);
+                    renderColumnChips(popup.performers.chipsContainer, 'performers', popup.globalSearch, selectedPerformerIds, onPerformerChipSelect);
+                    if (popup.suggestionsContainer && typeof popup.suggestionsContainer._fastTagRenderSuggestions === 'function') {
+                        popup.suggestionsContainer._fastTagRenderSuggestions();
                     }
-                } catch (e) {
-                    toastError('Failed to save scene', e);
-                }
-                return false;
-            };
+                    applyMarqueeAnimation(popup.titleSpan);
+                };
+                form._fastTagOnResize = () => {
+                    refreshAllUI();
+                    try {
+                        tagsTable.redraw(false);
+                        performersTable.redraw(false);
+                    } catch (e) {}
+                };
 
-            const onSuggestionActivated = async (sug) => {
-                const query = popup.globalSearch?.value || '';
-                if (sug.type === 'tags') {
-                    await fetchColumnData('tags', tagsTable, query, selectedTagIds);
-                    const holder = popup.tags.tableContainer?.querySelector('.tabulator-tableholder');
-                    if (holder) holder.scrollTop = 0;
-                } else if (sug.type === 'performers') {
-                    await fetchColumnData('performers', performersTable, query, selectedPerformerIds);
-                    const holder = popup.performers.tableContainer?.querySelector('.tabulator-tableholder');
-                    if (holder) holder.scrollTop = 0;
-                } else if (sug.type === 'studios') {
-                    renderStudioBar(query);
-                }
-                refreshAllUI();
-                await doSave();
-            };
+                const doSave = async (customSuccessMessage = null) => {
+                    if (popup.scraperCardContainer) {
+                        popup.scraperCardContainer.innerHTML = '';
+                        popup.scraperCardContainer.style.display = 'none';
+                    }
+                    hideScrapeCoverTooltip();
+
+                    const mutation = `
+                        mutation SceneUpdateEverything($id: ID!, $tag_ids: [ID!], $performer_ids: [ID!], $studio_id: ID, $groups: [SceneGroupInput!]) {
+                            sceneUpdate(input: {
+                                id: $id,
+                                tag_ids: $tag_ids,
+                                performer_ids: $performer_ids,
+                                studio_id: $studio_id,
+                                groups: $groups
+                            }) {
+                                id
+                            }
+                        }
+                    `;
+                    try {
+                        const res = await fetchGQL(mutation, {
+                            id: currentSceneId,
+                            tag_ids: Array.from(selectedTagIds),
+                            performer_ids: Array.from(selectedPerformerIds),
+                            studio_id: selectedStudioId || null,
+                            groups: Array.from(selectedGroupIds).map(gid => ({ group_id: gid }))
+                        });
+
+                        if (res?.data?.sceneUpdate?.id) {
+                            initialTagIds = new Set(selectedTagIds);
+                            initialPerformerIds = new Set(selectedPerformerIds);
+                            initialStudioId = selectedStudioId;
+                            initialGroupIds = new Set(selectedGroupIds);
+
+                            selectedTagIds.forEach(id => {
+                                const row = tagsTable.getRow(id);
+                                if (row) addRecentEntry('tags', row.getData());
+                            });
+                            selectedPerformerIds.forEach(id => {
+                                const row = performersTable.getRow(id);
+                                if (row) addRecentEntry('performers', row.getData());
+                            });
+                            if (selectedStudioId) {
+                                const allStudios = getCachedOrNull('studios') || [];
+                                const st = allStudios.find(s => String(s.id) === String(selectedStudioId));
+                                if (st) addRecentEntry('studios', st);
+                            }
+                            selectedGroupIds.forEach(gid => {
+                                const allGroups = getCachedOrNull('groups') || [];
+                                const grp = allGroups.find(g => String(g.id) === String(gid));
+                                if (grp) addRecentEntry('groups', grp);
+                            });
+
+                            await refreshSceneCards();
+                            recordSaveUsage();
+                            toastSuccess(customSuccessMessage || 'Scene saved successfully');
+                            updateSaveButton();
+                            return true;
+                        }
+                    } catch (e) {
+                        toastError('Failed to save scene', e);
+                    }
+                    return false;
+                };
+
+                const onSuggestionActivated = async (sug) => {
+                    const query = popup.globalSearch?.value || '';
+                    if (sug.type === 'tags') {
+                        await fetchColumnData('tags', tagsTable, query, selectedTagIds);
+                        const holder = popup.tags.tableContainer?.querySelector('.tabulator-tableholder');
+                        if (holder) holder.scrollTop = 0;
+                    } else if (sug.type === 'performers') {
+                        await fetchColumnData('performers', performersTable, query, selectedPerformerIds);
+                        const holder = popup.performers.tableContainer?.querySelector('.tabulator-tableholder');
+                        if (holder) holder.scrollTop = 0;
+                    } else if (sug.type === 'studios') {
+                        renderStudioBar(query);
+                    } else if (sug.type === 'groups') {
+                        renderGroupBar(query);
+                    }
+                    refreshAllUI();
+                    await doSave();
+                };
 
             makeColumnResizable(popup.columnsContainer, popup.colTags, popup.colPerformers, popup.colResizer, () => {
                 try {
@@ -7398,23 +8560,52 @@
 
             // Store context methods on popup instance for in-place sequential updates
             popup._context = {
+                setCurrentSceneId: (id) => { currentSceneId = id; },
                 setSelectedTags: (s) => { selectedTagIds = s; },
                 setSelectedPerformers: (s) => { selectedPerformerIds = s; },
                 setSelectedStudio: (s) => { selectedStudioId = s; },
+                setSelectedGroups: (s) => { selectedGroupIds = s; },
+                getSelectedStudio: () => selectedStudioId,
+                getSelectedGroups: () => selectedGroupIds,
                 setInitialTags: (s) => { initialTagIds = s; },
                 setInitialPerformers: (s) => { initialPerformerIds = s; },
                 setInitialStudio: (s) => { initialStudioId = s; },
-                setCurrentSceneId: (id) => { currentSceneId = id; },
-                getSelectedTags: () => selectedTagIds,
-                getSelectedPerformers: () => selectedPerformerIds,
-                getSelectedStudio: () => selectedStudioId,
+                setInitialGroups: (s) => { initialGroupIds = s; },
                 fetchColumnData,
                 renderStudioBar,
+                renderGroupBar,
                 refreshAllUI,
                 doSave,
                 onSuggestionActivated,
                 isDirty
             };
+
+            const enableHScroll = (containerEl, scrollTargetEl) => {
+                if (!containerEl) return;
+                const target = scrollTargetEl || containerEl;
+                const onWheel = (e) => {
+                    let delta = 0;
+                    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+                        delta = e.deltaX;
+                    } else {
+                        delta = e.deltaY;
+                    }
+                    if (e.deltaMode === 1) delta *= 28;
+                    else if (e.deltaMode === 2) delta *= 400;
+
+                    if (delta !== 0) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        target.scrollLeft += delta;
+                    }
+                };
+                containerEl.addEventListener('wheel', onWheel, { passive: false });
+                if (scrollTargetEl && scrollTargetEl !== containerEl) {
+                    scrollTargetEl.addEventListener('wheel', onWheel, { passive: false });
+                }
+            };
+            enableHScroll(popup.studioBar?.container, popup.studioBar?.scrollContainer);
+            enableHScroll(popup.groupsBar?.container, popup.groupsBar?.scrollContainer);
 
             setupPopupListeners(form, signal, async () => {
                 await doSave();
@@ -7465,7 +8656,11 @@
             columnDefaults: {
                 headerSort: false
             },
-            columns: getColumnsWithSavedWidths(type, 'single'),
+            columns: getColumnsWithSavedWidths(type, 'single', () => {
+                if (activePopup?._fastTagFetchData) {
+                    activePopup._fastTagFetchData(activePopup.searchInput?.value || '', false);
+                }
+            }),
         });
         attachColumnWidthSaver(table, type, 'single');
         if (type === 'performers') attachPerformerHoverCard(table, activePopup.tableContainer);
@@ -7521,10 +8716,23 @@
         const kbdShortcut = popup.kbdShortcut;
 
         const updateVisibility = () => {
-            const hasVal = filterInput.value.trim().length > 0;
+            const val = filterInput.value.trim();
+            const hasVal = val.length > 0;
             clearBtn.style.display = hasVal ? 'block' : 'none';
-            createBtn.style.display = hasVal ? 'block' : 'none';
             if (kbdShortcut) kbdShortcut.style.display = hasVal ? 'none' : 'block';
+
+            if (hasVal && popup.bottomCreateContainer && createBtn) {
+                const currentData = activeTableInstance && typeof activeTableInstance.getData === 'function' ? activeTableInstance.getData() : [];
+                const hasExactMatch = currentData.some(item => (item[config.labelKey] || '').toLowerCase() === val.toLowerCase());
+                if (!hasExactMatch) {
+                    createBtn.textContent = `+ Create ${config.title} "${val}"`;
+                    popup.bottomCreateContainer.style.display = 'flex';
+                } else {
+                    popup.bottomCreateContainer.style.display = 'none';
+                }
+            } else if (popup.bottomCreateContainer) {
+                popup.bottomCreateContainer.style.display = 'none';
+            }
         };
 
         let smartSuggestions = [];
@@ -7551,40 +8759,31 @@
                 await refreshSceneCards();
                 recordSaveUsage();
                 if (showToast) {
-                    toastSuccess(`${config.title} saved`);
+                    toastSuccess(`${config.pluralTitle} updated`);
                 }
                 updateSequentialEditUI(form, type, ids);
             }
             return success;
         };
 
-        activeTableInstance.on("rowClick", async (e, row) => {
-            const id = row.getData()?.id;
-            if (!id) return;
-            const strId = String(id);
-            const wasSearching = filterInput.value.trim().length > 0;
-
-            if (selectedIds.has(strId)) {
-                selectedIds.delete(strId);
-                activeTableInstance.deselectRow(row);
-                if (wasSearching) {
-                    filterInput.value = '';
-                    updateVisibility();
-                    await saveWithoutReload(sceneId, selectedIds);
-                    await fetchData("", false);
-                    filterInput.focus({ preventScroll: true });
+        activeTableInstance.on("rowSelected", (row) => {
+            if (!isRestoringSelections) {
+                const id = row.getData().id;
+                if (id) {
+                    selectedIds.add(String(id));
+                    addRecentEntry(type, row.getData());
+                    saveWithoutReload(sceneId, selectedIds);
                 }
-            } else {
-                selectedIds.add(strId);
-                activeTableInstance.selectRow(row);
-                if (wasSearching) {
-                    filterInput.value = '';
-                    updateVisibility();
-                    await saveWithoutReload(sceneId, selectedIds);
-                    await fetchData("", false);
-                    const r = activeTableInstance.getRow(id);
-                    if (r) activeTableInstance.scrollToRow(r, "top", false);
-                    filterInput.focus({ preventScroll: true });
+            }
+            refreshUI();
+        });
+
+        activeTableInstance.on("rowDeselected", (row) => {
+            if (!isRestoringSelections) {
+                const id = row.getData().id;
+                if (id) {
+                    selectedIds.delete(String(id));
+                    saveWithoutReload(sceneId, selectedIds);
                 }
             }
             refreshUI();
@@ -7613,7 +8812,7 @@
                 });
             }
 
-            data.sort(getSmartSortComparator(term, selectedIds, config.labelKey, searchFields));
+            data.sort(getSmartSortComparator(term, selectedIds, config.labelKey, searchFields, getSavedSortKey(type)));
 
             isRestoringSelections = true;
             try {
@@ -7625,6 +8824,7 @@
                 renderQuickActions(form, type, filterInput, selectedIds, onRecentChipSelect);
                 renderSmartSuggestions(form, type, filterInput, selectedIds, smartSuggestions, onRecentChipSelect);
                 updateSequentialEditUI(form, type, selectedIds);
+                updateVisibility();
                 if (resetScroll && data.length > 0) {
                     activeTableInstance.scrollToRow(activeTableInstance.getRows()[0], "top", false);
                 }
@@ -7632,13 +8832,160 @@
                 isRestoringSelections = false;
             }
         }
+        popup._fastTagFetchData = fetchData;
 
         let debounceTimer = null;
+        let singleHighlightedIndex = -1;
+
+        const scrollSingleRowIntoViewIfNeeded = (row) => {
+            if (!activeTableInstance || !row) return;
+            const el = typeof row.getElement === 'function' ? row.getElement() : null;
+            const holder = activeTableInstance.element?.querySelector('.tabulator-tableholder');
+            if (holder && el) {
+                const holderRect = holder.getBoundingClientRect();
+                const elRect = el.getBoundingClientRect();
+                if (elRect.bottom > holderRect.bottom) {
+                    holder.scrollTop += (elRect.bottom - holderRect.bottom + 4);
+                } else if (elRect.top < holderRect.top) {
+                    holder.scrollTop -= (holderRect.top - elRect.top + 4);
+                }
+            } else if (typeof row.scrollTo === 'function') {
+                row.scrollTo('nearest', false);
+            }
+        };
+
+        const updateSingleKeyboardHighlight = () => {
+            if (!activeTableInstance || typeof activeTableInstance.getRows !== 'function') return;
+            const rows = activeTableInstance.getRows();
+            const isBottomCreateVisible = popup.bottomCreateContainer && popup.bottomCreateContainer.style.display !== 'none';
+            const createBtnIndex = rows.length;
+
+            rows.forEach((r, idx) => {
+                const el = r.getElement();
+                if (el) {
+                    if (singleHighlightedIndex >= 0 && idx === singleHighlightedIndex) {
+                        el.classList.add('fasttag-keyboard-active');
+                    } else {
+                        el.classList.remove('fasttag-keyboard-active');
+                    }
+                }
+            });
+
+            if (createBtn) {
+                if (isBottomCreateVisible && singleHighlightedIndex === createBtnIndex) {
+                    createBtn.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.5), 0 2px 8px rgba(0,0,0,0.3)';
+                    createBtn.style.transform = 'scale(1.02)';
+                    createBtn.style.filter = 'brightness(1.15)';
+                } else {
+                    createBtn.style.boxShadow = '0 2px 5px rgba(5,150,105,0.3)';
+                    createBtn.style.transform = 'none';
+                    createBtn.style.filter = 'none';
+                }
+            }
+
+            if (singleHighlightedIndex >= 0 && singleHighlightedIndex < rows.length && rows[singleHighlightedIndex]) {
+                scrollSingleRowIntoViewIfNeeded(rows[singleHighlightedIndex]);
+            }
+        };
+
         filterInput.oninput = (e) => {
             updateVisibility();
             clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => fetchData(e.target.value, true), 150);
+            const val = e.target.value.trim();
+            debounceTimer = setTimeout(async () => {
+                await fetchData(e.target.value, true);
+                singleHighlightedIndex = val.length > 0 ? 0 : -1;
+                updateSingleKeyboardHighlight();
+            }, 150);
         };
+
+        filterInput.addEventListener('keydown', async (e) => {
+            const rows = activeTableInstance && typeof activeTableInstance.getRows === 'function' ? activeTableInstance.getRows() : [];
+            const isBottomCreateVisible = popup.bottomCreateContainer && popup.bottomCreateContainer.style.display !== 'none';
+            const createBtnIndex = rows.length;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (rows.length > 0) {
+                    if (singleHighlightedIndex < 0) {
+                        singleHighlightedIndex = 0;
+                    } else if (singleHighlightedIndex < rows.length - 1) {
+                        singleHighlightedIndex++;
+                    } else if (singleHighlightedIndex === rows.length - 1 && isBottomCreateVisible) {
+                        singleHighlightedIndex = createBtnIndex; // Move highlight down onto Create button!
+                    }
+                } else if (isBottomCreateVisible) {
+                    singleHighlightedIndex = createBtnIndex; // Highlight Create button directly when 0 rows!
+                }
+                updateSingleKeyboardHighlight();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (singleHighlightedIndex === createBtnIndex) {
+                    singleHighlightedIndex = rows.length > 0 ? rows.length - 1 : -1;
+                } else if (singleHighlightedIndex > 0) {
+                    singleHighlightedIndex--;
+                } else {
+                    singleHighlightedIndex = -1;
+                }
+                updateSingleKeyboardHighlight();
+            } else if (e.key === 'Enter') {
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    const saveBtn = form.querySelector('button[id$="-save-btn"]');
+                    if (saveBtn) saveBtn.click();
+                    return;
+                }
+
+                // If user pressed Down Arrow onto the Create button:
+                if (isBottomCreateVisible && singleHighlightedIndex === createBtnIndex) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    createBtn.click();
+                    return;
+                }
+
+                const hadSearch = filterInput.value.trim().length > 0;
+                if (!hadSearch && singleHighlightedIndex < 0) {
+                    e.preventDefault();
+                    const saveBtn = form.querySelector('button[id$="-save-btn"]');
+                    if (saveBtn) saveBtn.click();
+                    return;
+                }
+
+                const targetIdx = singleHighlightedIndex >= 0 ? singleHighlightedIndex : 0;
+                if (rows.length > 0 && rows[targetIdx]) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const targetRow = rows[targetIdx];
+                    const rowData = targetRow.getData();
+                    if (rowData && rowData.id) {
+                        const strId = String(rowData.id);
+                        if (selectedIds.has(strId)) {
+                            selectedIds.delete(strId);
+                            activeTableInstance.deselectRow(targetRow);
+                        } else {
+                            selectedIds.add(strId);
+                            activeTableInstance.selectRow(targetRow);
+                            addRecentEntry(type, rowData);
+                        }
+                        if (hadSearch) {
+                            filterInput.value = '';
+                            updateVisibility();
+                            await saveWithoutReload(sceneId, selectedIds);
+                            await fetchData("", false);
+                            const r = activeTableInstance.getRow(rowData.id);
+                            if (r) activeTableInstance.scrollToRow(r, "top", false);
+                            singleHighlightedIndex = -1;
+                        } else {
+                            refreshUI();
+                            await saveWithoutReload(sceneId, selectedIds);
+                        }
+                        filterInput.focus({ preventScroll: true });
+                        updateSingleKeyboardHighlight();
+                    }
+                }
+            }
+        });
 
         clearBtn.onclick = () => {
             filterInput.value = '';
