@@ -1009,6 +1009,15 @@
         .fasttag-quick-chip:active {
             transform: translateY(0px) scale(0.97) !important;
         }
+        /* Keyboard Focus Indicator for Studio & Group Chips */
+        .fasttag-keyboard-meta-focus {
+            outline: 2px solid #38bdf8 !important;
+            outline-offset: 1px !important;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.7) !important;
+            transform: scale(1.06) translateY(-1px) !important;
+            filter: brightness(1.25) !important;
+            z-index: 10 !important;
+        }
         `;
         document.head.appendChild(style);
     }
@@ -8038,6 +8047,35 @@
             let searchDebounce = null;
             let activeColType = 'tags';
             let activeColIndex = -1;
+            let activeMetaIndex = -1;
+
+            const getMetadataBarItems = () => {
+                const items = [];
+                // 1. Selected Studio pill (if visible)
+                if (popup.studioBar?.chip && popup.studioBar.chip.style.display !== 'none') {
+                    items.push({ type: 'studio-selected', el: popup.studioBar.chip, clickTarget: popup.studioBar.clearBtn });
+                }
+                // 2. Studio quick chips
+                if (popup.studioBar?.recentContainer) {
+                    popup.studioBar.recentContainer.querySelectorAll('.fasttag-quick-chip').forEach(btn => {
+                        items.push({ type: 'studio-chip', el: btn, clickTarget: btn });
+                    });
+                }
+                // 3. Selected Group pills
+                if (popup.groupsBar?.selectedContainer) {
+                    popup.groupsBar.selectedContainer.querySelectorAll('.fasttag-group-pill').forEach(pill => {
+                        const btn = pill.querySelector('button');
+                        items.push({ type: 'group-selected', el: pill, clickTarget: btn || pill });
+                    });
+                }
+                // 4. Group quick chips
+                if (popup.groupsBar?.recentContainer) {
+                    popup.groupsBar.recentContainer.querySelectorAll('.fasttag-quick-chip').forEach(btn => {
+                        items.push({ type: 'group-chip', el: btn, clickTarget: btn });
+                    });
+                }
+                return items;
+            };
 
             const scrollRowIntoViewIfNeeded = (table, row) => {
                 if (!table || !row) return;
@@ -8057,8 +8095,9 @@
             };
 
             const updateEverythingKeyboardHighlight = () => {
-                // Remove highlight classes across both tables
+                // Remove highlight classes across both tables and metadata bar
                 form.querySelectorAll('.tabulator-row.fasttag-keyboard-active').forEach(el => el.classList.remove('fasttag-keyboard-active'));
+                form.querySelectorAll('.fasttag-keyboard-meta-focus').forEach(el => el.classList.remove('fasttag-keyboard-meta-focus'));
 
                 // Reset button highlights
                 form.querySelectorAll('.fasttag-create-empty-btn').forEach(btn => {
@@ -8068,8 +8107,27 @@
                     btn.style.filter = 'none';
                 });
 
+                // If in metadata bar navigation mode:
+                if (activeColType === 'metadata') {
+                    const metaItems = getMetadataBarItems();
+                    if (metaItems.length > 0) {
+                        if (activeMetaIndex < 0) activeMetaIndex = 0;
+                        if (activeMetaIndex >= metaItems.length) activeMetaIndex = metaItems.length - 1;
+                        const item = metaItems[activeMetaIndex];
+                        if (item && item.el) {
+                            item.el.classList.add('fasttag-keyboard-meta-focus');
+                            if (typeof item.el.scrollIntoView === 'function') {
+                                item.el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                            }
+                        }
+                    } else {
+                        activeColType = 'tags';
+                        activeColIndex = 0;
+                    }
+                }
+
                 const isSearching = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
-                const isNavigating = activeColIndex >= 0;
+                const isNavigating = activeColIndex >= 0 && activeColType !== 'metadata';
 
                 const tagsHeader = form.querySelector('#everything-col-tags span');
                 const perfHeader = form.querySelector('#everything-col-performers span');
@@ -8080,7 +8138,7 @@
                     perfHeader.style.textDecoration = (isSearching || isNavigating) && (activeColType === 'performers') ? 'underline 2px #38bdf8' : 'none';
                 }
 
-                if (activeColIndex < 0) return;
+                if (activeColType === 'metadata' || activeColIndex < 0) return;
 
                 const curTable = activeColType === 'tags' ? tagsTable : performersTable;
                 const curCreateBtn = form.querySelector(`.fasttag-create-empty-btn[data-type="${activeColType}"]`);
@@ -8166,12 +8224,31 @@
 
             popup.globalSearch.addEventListener('keydown', async (e) => {
                 if (e.key === 'Tab' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                    if (activeColType === 'metadata') {
+                        e.preventDefault();
+                        const metaItems = getMetadataBarItems();
+                        if (metaItems.length > 0) {
+                            if (e.key === 'ArrowLeft') {
+                                activeMetaIndex = (activeMetaIndex - 1 + metaItems.length) % metaItems.length;
+                            } else {
+                                activeMetaIndex = (activeMetaIndex + 1) % metaItems.length;
+                            }
+                            updateEverythingKeyboardHighlight();
+                        }
+                        return;
+                    }
                     e.preventDefault();
                     const other = activeColType === 'tags' ? 'performers' : 'tags';
                     rolloverToColumn(other, 'top');
                     updateEverythingKeyboardHighlight();
                 } else if (e.key === 'ArrowDown') {
                     e.preventDefault();
+                    if (activeColType === 'metadata') {
+                        activeColType = 'tags';
+                        activeColIndex = 0;
+                        updateEverythingKeyboardHighlight();
+                        return;
+                    }
                     const curTable = activeColType === 'tags' ? tagsTable : performersTable;
                     const rows = curTable ? curTable.getRows() : [];
                     const curCreateBtn = form.querySelector(`.fasttag-create-empty-btn[data-type="${activeColType}"]`);
@@ -8212,6 +8289,16 @@
                     updateEverythingKeyboardHighlight();
                 } else if (e.key === 'ArrowUp') {
                     e.preventDefault();
+                    if (activeColType === 'metadata') {
+                        // Already in metadata, cycle left
+                        const metaItems = getMetadataBarItems();
+                        if (metaItems.length > 0) {
+                            activeMetaIndex = (activeMetaIndex - 1 + metaItems.length) % metaItems.length;
+                            updateEverythingKeyboardHighlight();
+                        }
+                        return;
+                    }
+
                     const curTable = activeColType === 'tags' ? tagsTable : performersTable;
                     const rows = curTable ? curTable.getRows() : [];
 
@@ -8238,7 +8325,14 @@
                         } else if (activeColIndex > 0) {
                             activeColIndex = Math.max(0, activeColIndex - 1);
                         } else {
-                            activeColIndex = -1;
+                            // At top of Tags or search input -> Jump up into Studio & Group metadata bar!
+                            const metaItems = getMetadataBarItems();
+                            if (metaItems.length > 0) {
+                                activeColType = 'metadata';
+                                activeMetaIndex = 0;
+                            } else {
+                                activeColIndex = -1;
+                            }
                         }
                     }
                     updateEverythingKeyboardHighlight();
@@ -8246,6 +8340,20 @@
                     if (e.ctrlKey || e.metaKey) {
                         e.preventDefault();
                         if (popup.saveBtn) popup.saveBtn.click();
+                        return;
+                    }
+
+                    // If navigating in metadata bar (Studio or Groups):
+                    if (activeColType === 'metadata') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const metaItems = getMetadataBarItems();
+                        if (metaItems.length > 0 && activeMetaIndex >= 0 && activeMetaIndex < metaItems.length) {
+                            const item = metaItems[activeMetaIndex];
+                            if (item && item.clickTarget) {
+                                item.clickTarget.click();
+                            }
+                        }
                         return;
                     }
 
