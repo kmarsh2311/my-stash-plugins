@@ -5214,7 +5214,7 @@
                     scrapeBtn.click();
                 }
             } else if (e.key === 'Enter') {
-                const scrapeAcceptBtn = form.querySelector('#fasttag-scrape-accept-btn');
+                const scrapeAcceptBtn = document.querySelector('#fasttag-scrape-accept-btn');
                 if (scrapeAcceptBtn && !scrapeAcceptBtn.disabled && scrapeAcceptBtn.offsetParent !== null) {
                     e.preventDefault();
                     scrapeAcceptBtn.click();
