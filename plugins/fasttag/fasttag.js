@@ -155,6 +155,23 @@
     const THEME_STORAGE_KEY = 'stash_fast_tag_theme';
     const SHOW_IDS_STORAGE_KEY = 'stash_fast_tag_show_ids';
     const SUGGESTIONS_STORAGE_KEY = 'stash_fast_tag_enable_suggestions';
+    const AUTO_SCRAPE_STORAGE_KEY = 'stash_fast_tag_auto_scrape_sequential';
+
+    function getAutoScrapeSequential() {
+        try {
+            const val = localStorage.getItem(AUTO_SCRAPE_STORAGE_KEY);
+            return val === null ? true : val === 'true'; // Default true (ON)
+        } catch (e) {
+            return true;
+        }
+    }
+
+    function setAutoScrapeSequential(enabled) {
+        try {
+            localStorage.setItem(AUTO_SCRAPE_STORAGE_KEY, enabled ? 'true' : 'false');
+        } catch (e) {}
+    }
+
     const recentStorageKeys = {
         tags: 'stash_fast_tag_recent_tags',
         performers: 'stash_fast_tag_recent_performers',
@@ -760,7 +777,7 @@
             toast.id = 'fasttag-native-toast';
             const bg = type === "success" ? "#059669" : (type === "info" ? "#6366f1" : "#dc2626");
             const icon = type === "success" ? "✓" : (type === "info" ? "ℹ" : "✕");
-            toast.style.cssText = `position: fixed; top: 18px; left: 50%; transform: translateX(-50%) translateY(-10px); background: ${bg}; color: #ffffff; padding: 7px 15px; border-radius: 8px; font-size: 12px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 2000000; opacity: 0; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); pointer-events: none; display: inline-flex; align-items: center; gap: 6px; font-family: system-ui, -apple-system, sans-serif;`;
+            toast.style.cssText = `position: fixed; top: 18px; left: 50%; transform: translateX(-50%) translateY(-10px); background: ${bg}; color: #ffffff; padding: 7px 15px; border-radius: 8px; font-size: 12px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 20000000; opacity: 0; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); pointer-events: none; display: inline-flex; align-items: center; gap: 6px; font-family: system-ui, -apple-system, sans-serif;`;
             toast.innerHTML = `<span style="font-size: 13px; line-height: 1;">${icon}</span><span>${escapeHtml(message)}</span>`;
             document.body.appendChild(toast);
 
@@ -1158,9 +1175,10 @@
 
     function getDetachScraper() {
         try {
-            return localStorage.getItem(DETACH_SCRAPER_STORAGE_KEY) === 'true';
+            const val = localStorage.getItem(DETACH_SCRAPER_STORAGE_KEY);
+            return val === null ? true : val === 'true'; // Default true (ON)
         } catch (e) {}
-        return false;
+        return true;
     }
 
     function setDetachScraper(enabled) {
@@ -1339,6 +1357,7 @@
         const currentPref = getThemePreference();
         const showIds = getShowIdColumns();
         const enableSug = getEnableSuggestions();
+        const autoScrape = getAutoScrapeSequential();
         const scrubSpeeds = getScrubSpeeds();
 
         const modal = document.createElement('div');
@@ -1405,6 +1424,17 @@
                             <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Automatically detect and suggest matching Performers, Tags, and Studios from filenames and titles.</div>
                         </div>
                         <input type="checkbox" id="fasttag-setting-suggestions" ${enableSug ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                    </div>
+
+                    <div style="height: 1px; background: ${border};"></div>
+
+                    <!-- Auto-Scrape in Sequential Mode setting -->
+                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; font-size: 13px;">Auto-Scrape in Sequential Mode</div>
+                            <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Automatically fetch scraper matches on scene transitions when using Edit Everything in Sequential Mode.</div>
+                        </div>
+                        <input type="checkbox" id="fasttag-setting-auto-scrape" ${autoScrape ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
                     </div>
 
                     <div style="height: 1px; background: ${border};"></div>
@@ -1498,6 +1528,14 @@
             sugToggle.addEventListener('change', (e) => {
                 setEnableSuggestions(e.target.checked);
                 showToast(`Suggestions ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
+            });
+        }
+
+        const autoScrapeToggle = modal.querySelector('#fasttag-setting-auto-scrape');
+        if (autoScrapeToggle) {
+            autoScrapeToggle.addEventListener('change', (e) => {
+                setAutoScrapeSequential(e.target.checked);
+                showToast(`Auto-Scrape in Sequential Mode ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
             });
         }
 
@@ -1814,8 +1852,9 @@
         hostContainer.style.position = 'relative';
         hostContainer.style.width = '100%';
         hostContainer.style.aspectRatio = '16 / 9';
-        hostContainer.style.maxHeight = '280px';
-        hostContainer.style.margin = '0 0 10px 0';
+        const isEverythingHost = hostContainer.id === 'everything-preview-container';
+        hostContainer.style.maxHeight = isEverythingHost ? '205px' : '280px';
+        hostContainer.style.margin = '0 0 8px 0';
         hostContainer.style.borderRadius = '8px';
         hostContainer.style.overflow = 'hidden';
         hostContainer.style.border = 'none';
@@ -2209,8 +2248,9 @@
                 hostContainer.style.width = '100%';
                 hostContainer.style.height = 'auto';
                 hostContainer.style.aspectRatio = '16 / 9';
-                hostContainer.style.maxHeight = '280px';
-                hostContainer.style.margin = '0 0 10px 0';
+                const isEvHost = hostContainer.id === 'everything-preview-container';
+                hostContainer.style.maxHeight = isEvHost ? '205px' : '280px';
+                hostContainer.style.margin = '0 0 8px 0';
                 hostContainer.style.borderRadius = '8px';
                 hostContainer.style.overflow = 'hidden';
                 hostContainer.style.border = 'none';
@@ -3214,6 +3254,7 @@
         if (resetSequential) {
             resetSequentialEditState();
             sessionScrapeCache.clear();
+            window._fastTagEverythingScraperOpen = false;
         }
     }
 
@@ -3338,16 +3379,16 @@
         const screenH = window.innerHeight || 1080;
 
         if (type === 'everything') {
-            const rawW = Math.round(screenW * 0.50);
-            const rawH = Math.round(screenH * 0.80);
-            const width = Math.max(720, Math.min(Math.min(screenW - 24, rawW), 940));
-            const height = Math.max(540, Math.min(Math.min(screenH - 24, rawH), 740));
+            const rawW = Math.round(screenW * 0.46);
+            const rawH = Math.round(screenH * 0.82);
+            const width = Math.max(760, Math.min(Math.min(screenW - 24, rawW), 880));
+            const height = Math.max(620, Math.min(Math.min(screenH - 24, rawH), 760));
             return { width, height };
         } else {
-            const rawW = Math.round(screenW * 0.20);
-            const rawH = Math.round(screenH * 0.68);
-            const width = Math.max(320, Math.min(Math.min(screenW - 24, rawW), 380));
-            const height = Math.max(460, Math.min(Math.min(screenH - 24, rawH), 540));
+            const rawW = Math.round(screenW * 0.18);
+            const rawH = Math.round(screenH * 0.74);
+            const width = Math.max(320, Math.min(Math.min(screenW - 24, rawW), 345));
+            const height = Math.max(540, Math.min(Math.min(screenH - 24, rawH), 660));
             return { width, height };
         }
     }
@@ -4332,7 +4373,7 @@
                             <!-- Top Row: Cover Thumbnail + Title & Studio (Side-by-Side) -->
                             <div style="display: flex; gap: 9px; align-items: stretch;">
                                 ${match.image ? `
-                                    <div class="fasttag-scrape-cover-thumb" style="flex-shrink: 0; width: 116px; height: 74px; border-radius: 6px; overflow: hidden; background: #000; border: 1px solid ${isDark ? 'rgba(255,255,255,0.18)' : '#cbd5e1'}; display: flex; align-items: center; justify-content: center; align-self: flex-start; cursor: pointer; position: relative; transition: border-color 0.15s ease;">
+                                    <div class="fasttag-scrape-cover-thumb" style="flex-shrink: 0; width: ${isDetached ? '148px' : '116px'}; height: ${isDetached ? '94px' : '74px'}; border-radius: 6px; overflow: hidden; background: #000; border: 1px solid ${isDark ? 'rgba(255,255,255,0.18)' : '#cbd5e1'}; display: flex; align-items: center; justify-content: center; align-self: flex-start; cursor: pointer; position: relative; transition: all 0.15s ease;" title="Hover to view full-size cover">
                                         <img src="${match.image}" alt="Cover" style="width: 100%; height: 100%; object-fit: cover; display: block;" loading="lazy" />
                                     </div>
                                 ` : ''}
@@ -6442,15 +6483,17 @@
     async function navigateSequentialEditEverything(popup, sceneId, direction, doSaveFn) {
         if (!sequentialEditState.enabled) return;
 
-        if (popup.scraperCardContainer) {
-            popup.scraperCardContainer.innerHTML = '';
-            popup.scraperCardContainer.style.display = 'none';
-        }
-        closeFloatingScraperHud();
-        if (popup.scrapeBtn) {
-            popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
-            popup.scrapeBtn.innerHTML = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
-            popup.scrapeBtn.title = 'Scrape scene metadata';
+        if (!window._fastTagEverythingScraperOpen) {
+            if (popup.scraperCardContainer) {
+                popup.scraperCardContainer.innerHTML = '';
+                popup.scraperCardContainer.style.display = 'none';
+            }
+            closeFloatingScraperHud();
+            if (popup.scrapeBtn) {
+                popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
+                popup.scrapeBtn.innerHTML = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
+                popup.scrapeBtn.title = 'Scrape scene metadata';
+            }
         }
         hideScrapeCoverTooltip();
 
@@ -6502,7 +6545,12 @@
         sequentialEditState.currentIndex = nextIndex;
         sequentialEditState.currentSceneId = nextSceneId;
 
-        await loadEditEverythingDataIntoPopup(nextSceneId, nextCard, popup);
+        popup._isNavigatingSequential = true;
+        try {
+            await loadEditEverythingDataIntoPopup(nextSceneId, nextCard, popup);
+        } finally {
+            popup._isNavigatingSequential = false;
+        }
     }
 
     function setupSequentialEditEverythingHandlers(popup, sceneId, cardElement, doSaveFn) {
@@ -6586,10 +6634,6 @@
         prevBtn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
-            if (popup.scraperCardContainer) {
-                popup.scraperCardContainer.innerHTML = '';
-                popup.scraperCardContainer.style.display = 'none';
-            }
             hideScrapeCoverTooltip();
             navigateSequentialEditEverything(popup, sceneId, -1, doSaveFn);
         };
@@ -6597,10 +6641,6 @@
         nextBtn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
-            if (popup.scraperCardContainer) {
-                popup.scraperCardContainer.innerHTML = '';
-                popup.scraperCardContainer.style.display = 'none';
-            }
             hideScrapeCoverTooltip();
             navigateSequentialEditEverything(popup, sceneId, 1, doSaveFn);
         };
@@ -6611,7 +6651,10 @@
             const ctx = popup._context;
             if (!ctx) return;
 
-            if (popup.scraperCardContainer) {
+            popup.currentSceneId = sceneId;
+            popup.currentCardElement = cardElement;
+
+            if (!window._fastTagEverythingScraperOpen && popup.scraperCardContainer) {
                 popup.scraperCardContainer.innerHTML = '';
                 popup.scraperCardContainer.style.display = 'none';
             }
@@ -6673,6 +6716,14 @@
             await ctx.renderStudioBar('');
             ctx.refreshAllUI();
 
+            if (getAutoScrapeSequential() && sequentialEditState.enabled && window._fastTagEverythingScraperOpen && popup._isNavigatingSequential) {
+                setTimeout(() => {
+                    if (typeof popup.triggerScrape === 'function') {
+                        popup.triggerScrape(true, sceneId, cardElement);
+                    }
+                }, 80);
+            }
+
             await loadUnifiedSuggestions(sceneId, cardElement, popup.suggestionsContainer, {
                 selectedTagIds: selTags,
                 selectedPerformerIds: selPerfs,
@@ -6715,6 +6766,7 @@
             }
 
             closePopup(false);
+            window._fastTagEverythingScraperOpen = false;
 
             popupAbortController = new AbortController();
             const { signal } = popupAbortController;
@@ -7254,61 +7306,71 @@
                 } catch (e) {}
             }, signal);
 
-            if (popup.scrapeBtn) {
-                popup.scrapeBtn.onclick = async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
+            const triggerScrapeAction = async (forceOpen = false, targetSceneId = null, targetCardElement = null) => {
+                const activeSceneId = targetSceneId || popup.currentSceneId || currentSceneId;
+                const activeCardElement = targetCardElement || popup.currentCardElement || cardElement;
 
-                    // If scraper card is currently open, clicking this button (which says "Hide") closes it and toggles back to "Scrape"
-                    const isScraperOpen = (popup.scraperCardContainer && popup.scraperCardContainer.style.display !== 'none' && popup.scraperCardContainer.innerHTML.trim() !== '') || (floatingScraperHudElement && document.body.contains(floatingScraperHudElement));
-                    if (isScraperOpen) {
-                        if (popup.scraperCardContainer) {
-                            popup.scraperCardContainer.style.display = 'none';
-                            popup.scraperCardContainer.innerHTML = '';
-                        }
-                        closeFloatingScraperHud();
-                        popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
-                        popup.scrapeBtn.innerHTML = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
-                        popup.scrapeBtn.title = 'Scrape scene metadata';
-                        hideScrapeCoverTooltip();
-                        return;
+                // If scraper card is currently open and not force-opening, clicking "Hide" closes it and toggles back to "Scrape"
+                const isScraperOpen = (popup.scraperCardContainer && popup.scraperCardContainer.style.display !== 'none' && popup.scraperCardContainer.innerHTML.trim() !== '') || (floatingScraperHudElement && document.body.contains(floatingScraperHudElement));
+                if (isScraperOpen && !forceOpen) {
+                    window._fastTagEverythingScraperOpen = false;
+                    if (popup.scraperCardContainer) {
+                        popup.scraperCardContainer.style.display = 'none';
+                        popup.scraperCardContainer.innerHTML = '';
                     }
+                    closeFloatingScraperHud();
+                    popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
+                    popup.scrapeBtn.innerHTML = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
+                    popup.scrapeBtn.title = 'Scrape scene metadata';
+                    hideScrapeCoverTooltip();
+                    return;
+                }
 
-                    // If already scraped for this scene during this active session, reopen instantly with 0ms lag!
-                    if (sessionScrapeCache.has(currentSceneId) && sessionScrapeCache.get(currentSceneId)?.length > 0) {
-                        const cached = sessionScrapeCache.get(currentSceneId);
-                        cached._fromCache = true;
-                        renderScraperMatchCard(popup.scraperCardContainer, cached, currentSceneId, popup._context, popup, () => {
+                window._fastTagEverythingScraperOpen = true;
+
+                // If already scraped for this scene during this active session, reopen instantly with 0ms lag!
+                if (sessionScrapeCache.has(activeSceneId) && sessionScrapeCache.get(activeSceneId)?.length > 0) {
+                    const cached = sessionScrapeCache.get(activeSceneId);
+                    cached._fromCache = true;
+                    renderScraperMatchCard(popup.scraperCardContainer, cached, activeSceneId, popup._context, popup, () => {
+                        popup.globalSearch?.focus({ preventScroll: true });
+                    });
+                    return;
+                }
+
+                const origHtml = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
+                popup.scrapeBtn.disabled = true;
+                popup.scrapeBtn.innerHTML = `<span>⏳ Scraping...</span>`;
+
+                try {
+                    const matches = await fetchScraperMatchesForScene(activeSceneId, activeCardElement);
+                    if (!matches || matches.length === 0) {
+                        popup.scrapeBtn.innerHTML = `<span>✕ No Matches</span>`;
+                        toastError('No scraper matches found on configured scrapers');
+                        setTimeout(() => {
+                            popup.scrapeBtn.disabled = false;
+                            popup.scrapeBtn.innerHTML = origHtml;
+                        }, 2500);
+                    } else {
+                        sessionScrapeCache.set(activeSceneId, matches);
+                        popup.scrapeBtn.disabled = false;
+                        renderScraperMatchCard(popup.scraperCardContainer, matches, activeSceneId, popup._context, popup, () => {
                             popup.globalSearch?.focus({ preventScroll: true });
                         });
-                        return;
                     }
+                } catch (err) {
+                    popup.scrapeBtn.disabled = false;
+                    popup.scrapeBtn.innerHTML = origHtml;
+                    toastError('Scrape error: ' + (err?.message || err));
+                }
+            };
 
-                    const origHtml = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
-                    popup.scrapeBtn.disabled = true;
-                    popup.scrapeBtn.innerHTML = `<span>⏳ Scraping...</span>`;
+            popup.triggerScrape = triggerScrapeAction;
 
-                    try {
-                        const matches = await fetchScraperMatchesForScene(currentSceneId, cardElement);
-                        if (!matches || matches.length === 0) {
-                            popup.scrapeBtn.innerHTML = `<span>✕ No Matches</span>`;
-                            toastError('No scraper matches found on configured scrapers');
-                            setTimeout(() => {
-                                popup.scrapeBtn.disabled = false;
-                                popup.scrapeBtn.innerHTML = origHtml;
-                            }, 2500);
-                        } else {
-                            sessionScrapeCache.set(currentSceneId, matches);
-                            popup.scrapeBtn.disabled = false;
-                            renderScraperMatchCard(popup.scraperCardContainer, matches, currentSceneId, popup._context, popup, () => {
-                                popup.globalSearch?.focus({ preventScroll: true });
-                            });
-                        }
-                    } catch (err) {
-                        popup.scrapeBtn.disabled = false;
-                        popup.scrapeBtn.innerHTML = origHtml;
-                        toastError('Scrape error: ' + (err?.message || err));
-                    }
+            if (popup.scrapeBtn) {
+                popup.scrapeBtn.onclick = async (e) => {
+                    if (e) { e.preventDefault(); e.stopPropagation(); }
+                    await triggerScrapeAction(false, popup.currentSceneId, popup.currentCardElement);
                 };
             }
 

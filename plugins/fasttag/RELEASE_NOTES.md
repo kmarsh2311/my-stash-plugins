@@ -1,11 +1,12 @@
-## 3.8.0 - Detachable Scraper Sidecar, 3-Pane Zero-Overlap Matrix & Offline Docker Support
+## 3.8.0 - Detachable Scraper Sidecar, Auto-Scraping, Zero-Overlap Matrix & Offline Docker Support
  
 ### Highlights & New Features
 - **Detachable Scraper Sidecar HUD**: Pop out the StashDB Scraper Match Card into its own floating, draggable, resizable sidecar window (`⤢ Pop Out`) for simultaneous multi-window scraping and video playback.
+- **Auto-Scrape in Sequential Mode (Edit Everything)**: Automatically fetches and displays StashDB/scraper matches when stepping through scenes in Sequential Mode (`Next Scene ►` / <kbd>Alt</kbd> + <kbd>→</kbd>).
 - **Smart 3-Pane Zero-Overlap Matrix**: Multi-window tiling layout with mathematical zero-overlap boundary enforcement across all grid columns (Columns 1–6).
-- **Streamlined Scraper Header**: Moved `✓ Accept` action directly into the Scraper header row, eliminating the bottom bar for maximum content preview space.
+- **Streamlined Scraper Header & Enlarged Poster**: Moved `✓ Accept` action directly into the Scraper header row, eliminating the bottom bar for maximum content preview space, with an enlarged `148×94px` poster thumbnail in the sidecar.
 - **Offline & Strict Docker CSP Support**: Bundled `tabulator.min.js` and `tabulator.min.css` locally in the plugin directory to comply with strict Content-Security-Policy (`script-src 'self'`) and support offline/air-gapped Docker instances.
-- **Native Toast Engine**: Replaced external Toastify dependency with an embedded zero-dependency notification engine.
+- **Native Toast Engine**: Replaced external Toastify dependency with an embedded zero-dependency notification engine layered above all modal backdrops.
 
 ---
 
