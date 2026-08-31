@@ -2477,6 +2477,9 @@
                         floatingHudElement.style.top = `${newTop}px`;
                         floatingHudElement.style.right = 'auto';
                         floatingHudPosition = { top: `${newTop}px`, left: `${newLeft}px` };
+                        try {
+                            localStorage.setItem('fasttag_video_hud_pos', JSON.stringify(floatingHudPosition));
+                        } catch (e) {}
                     }
                 };
 
@@ -2490,6 +2493,9 @@
                     document.body.style.userSelect = '';
                     if (isDragging && floatingHudElement) {
                         floatingHudSize = { width: `${floatingHudElement.offsetWidth}px`, height: `${floatingHudElement.offsetHeight}px` };
+                        try {
+                            localStorage.setItem('fasttag_video_hud_size', JSON.stringify(floatingHudSize));
+                        } catch (e) {}
                     }
                     setTimeout(() => { isDragging = false; hasDragged = false; }, 60);
                 };
@@ -2511,6 +2517,12 @@
                     const isScraperOpen = floatingScraperHudElement && document.body.contains(floatingScraperHudElement);
                     const scraperRect = isScraperOpen ? floatingScraperHudElement.getBoundingClientRect() : null;
                     const formRect = activeForm ? activeForm.getBoundingClientRect() : null;
+
+                    if (!floatingHudPosition) {
+                        try {
+                            floatingHudPosition = JSON.parse(localStorage.getItem('fasttag_video_hud_pos') || 'null');
+                        } catch (e) {}
+                    }
 
                     let isPositionValid = false;
                     if (floatingHudPosition && floatingHudPosition.left && floatingHudPosition.top) {
@@ -4983,6 +4995,10 @@
                     document.removeEventListener('mouseup', onMouseUp);
                     document.body.style.cursor = '';
                     document.body.style.userSelect = '';
+                    try {
+                        localStorage.setItem('fasttag_scraper_hud_pos', JSON.stringify(floatingScraperHudPosition));
+                        localStorage.setItem('fasttag_scraper_hud_size', JSON.stringify(floatingScraperHudSize));
+                    } catch (e) {}
                 };
 
                 document.addEventListener('mousemove', onMouseMove);
@@ -5026,6 +5042,12 @@
                 const videoRect = isVideoOpen ? floatingHudElement.getBoundingClientRect() : null;
                 const formRect = activeForm ? activeForm.getBoundingClientRect() : null;
 
+                if (!floatingScraperHudPosition) {
+                    try {
+                        floatingScraperHudPosition = JSON.parse(localStorage.getItem('fasttag_scraper_hud_pos') || 'null');
+                    } catch (e) {}
+                }
+
                 let isPositionValid = false;
                 if (floatingScraperHudPosition && floatingScraperHudPosition.left && floatingScraperHudPosition.top) {
                     const pLeft = parseInt(floatingScraperHudPosition.left, 10);
@@ -5060,6 +5082,9 @@
                             width: `${floatingScraperHudElement.offsetWidth}px`,
                             height: `${floatingScraperHudElement.offsetHeight}px`
                         };
+                        try {
+                            localStorage.setItem('fasttag_scraper_hud_size', JSON.stringify(floatingScraperHudSize));
+                        } catch (e) {}
                     }
                 });
                 scraperResizeObserver.observe(floatingScraperHudElement);
@@ -5468,6 +5493,9 @@
                         floatingScraperHudElement.style.top = `${newTop}px`;
                         floatingScraperHudElement.style.right = 'auto';
                         floatingScraperHudPosition = { top: `${newTop}px`, left: `${newLeft}px` };
+                        try {
+                            localStorage.setItem('fasttag_scraper_hud_pos', JSON.stringify(floatingScraperHudPosition));
+                        } catch (e) {}
                     };
                     const onMouseUp = () => {
                         isDragging = false;
@@ -6111,6 +6139,9 @@
             };
         };
 
+        const popupType = form.getAttribute('data-popup-type') || activePopup?.type;
+        const isEverythingModal = popupType === 'everything' || popupType === 'bulk-everything';
+
         if (sequentialEditState.enabled && sequentialEditState.popupPosition.left !== 0) {
             const pos = clampPos(sequentialEditState.popupPosition.left, sequentialEditState.popupPosition.top);
             form.style.left = `${pos.x}px`;
@@ -6122,6 +6153,56 @@
             return;
         }
 
+        // For Edit Everything / Bulk Edit Everything: Center in viewport by default or use saved drag position
+        if (isEverythingModal) {
+            let savedPos = null;
+            try {
+                savedPos = JSON.parse(localStorage.getItem('fasttag_everything_pos') || 'null');
+            } catch (e) {}
+
+            let posX = null;
+            let posY = null;
+            const formW = parseInt(form.style.width, 10) || form.offsetWidth || 660;
+            const formH = parseInt(form.style.height, 10) || form.offsetHeight || 520;
+
+            if (savedPos && savedPos.left && savedPos.top) {
+                const parsedX = parseInt(savedPos.left, 10);
+                const parsedY = parseInt(savedPos.top, 10);
+                if (!isNaN(parsedX) && !isNaN(parsedY)) {
+                    const pos = clampPos(parsedX, parsedY);
+                    posX = pos.x;
+                    posY = pos.y;
+                }
+            }
+
+            if (posX == null || posY == null) {
+                // Centered horizontally & comfortably near top/middle
+                posX = Math.max(minLeft, Math.round((window.innerWidth - formW) / 2));
+                posY = Math.max(minTop, Math.round(Math.max(minTop, (window.innerHeight - formH) / 2)));
+            }
+
+            form.style.left = `${posX}px`;
+            form.style.top = `${posY}px`;
+
+            requestAnimationFrame(() => {
+                const actualFormRect = form.getBoundingClientRect();
+                const pos = clampPos(actualFormRect.left, actualFormRect.top);
+                form.style.left = `${pos.x}px`;
+                form.style.top = `${pos.y}px`;
+
+                form.classList.add('popup-visible');
+
+                if (typeof form._fastTagOnResize === 'function') {
+                    form._fastTagOnResize();
+                }
+
+                const firstInput = form.querySelector('#everything-global-search, input[type="text"], input[type="search"]');
+                if (firstInput) firstInput.focus({ preventScroll: true });
+            });
+            return;
+        }
+
+        // For single-column modals: Anchor near card
         const cardRect = cardElement ? cardElement.getBoundingClientRect() : { right: 100, top: 100, left: 100 };
         let popupX = cardRect.right + 10;
         let popupY = Math.max(minTop, cardRect.top);
@@ -6368,6 +6449,19 @@
                     isDragging = false;
                     header.style.cursor = 'grab';
                     document.body.style.userSelect = '';
+                    const popupType = form.getAttribute('data-popup-type') || activePopup?.type;
+                    if (popupType === 'everything' || popupType === 'bulk-everything') {
+                        try {
+                            localStorage.setItem('fasttag_everything_pos', JSON.stringify({
+                                left: form.style.left,
+                                top: form.style.top
+                            }));
+                        } catch (e) {}
+                    }
+                    if (sequentialEditState.enabled) {
+                        const rect = form.getBoundingClientRect();
+                        sequentialEditState.popupPosition = { left: rect.left, top: rect.top };
+                    }
                 }
             }, { signal });
         }
