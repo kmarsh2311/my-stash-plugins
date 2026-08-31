@@ -976,6 +976,31 @@
         .fasttag-btn-pulse-calm {
             animation: fasttagSavePulseCalm 2.4s infinite ease-in-out !important;
         }
+        @keyframes fasttagRefreshPulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.75);
+                border-color: #6366f1 !important;
+                color: #818cf8 !important;
+                transform: scale(1);
+            }
+            50% {
+                box-shadow: 0 0 10px 3px rgba(99, 102, 241, 0.5);
+                border-color: #818cf8 !important;
+                color: #c7d2fe !important;
+                transform: scale(1.08);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+                border-color: #6366f1 !important;
+                color: #818cf8 !important;
+                transform: scale(1);
+            }
+        }
+        .fasttag-refresh-pulse {
+            animation: fasttagRefreshPulse 1.6s infinite ease-in-out !important;
+            border-color: #6366f1 !important;
+            background: rgba(99, 102, 241, 0.18) !important;
+        }
         /* Studio & Group Scroll Containers - Scrollbar Hidden (Mouse wheel & gesture scrollable) */
         #everything-studio-scroll, #everything-groups-scroll {
             scrollbar-width: none !important;
@@ -1084,12 +1109,30 @@
             filter: brightness(1.25) !important;
             transform: scale(1.04) !important;
         }
-        div[id$="-suggestions-container"] button.fasttag-keyboard-meta-focus {
-            outline: none !important;
-            border-color: #f59e0b !important;
-            box-shadow: 0 0 0 1.5px #f59e0b, 0 0 8px rgba(245, 158, 11, 0.7) !important;
-            filter: brightness(1.25) !important;
-            transform: scale(1.04) !important;
+        /* Sleek FastTag Themed Scrollbars */
+        #scenes-popup .tabulator-tableholder::-webkit-scrollbar,
+        #scenes-popup .tabulator-tableholder *::-webkit-scrollbar,
+        #scenes-popup div::-webkit-scrollbar,
+        #fasttag-floating-scraper-hud div::-webkit-scrollbar {
+            width: 5px !important;
+            height: 5px !important;
+        }
+        #scenes-popup .tabulator-tableholder::-webkit-scrollbar-track,
+        #scenes-popup div::-webkit-scrollbar-track {
+            background: transparent !important;
+        }
+        #scenes-popup .tabulator-tableholder::-webkit-scrollbar-thumb,
+        #scenes-popup div::-webkit-scrollbar-thumb {
+            background: rgba(129, 140, 248, 0.35) !important;
+            border-radius: 4px !important;
+        }
+        #scenes-popup .tabulator-tableholder::-webkit-scrollbar-thumb:hover,
+        #scenes-popup div::-webkit-scrollbar-thumb:hover {
+            background: rgba(129, 140, 248, 0.7) !important;
+        }
+        #scenes-popup .tabulator-tableholder {
+            scrollbar-width: thin !important;
+            scrollbar-color: rgba(129, 140, 248, 0.35) transparent !important;
         }
         `;
         document.head.appendChild(style);
@@ -1700,10 +1743,6 @@
             floatingHudElement = null;
         }
         isVideoPoppedOut = false;
-        if (fullReset) {
-            floatingHudPosition = null;
-            floatingHudSize = null;
-        }
     }
 
     const DETACH_SCRAPER_STORAGE_KEY = 'fasttag_detach_scraper_v1';
@@ -1741,10 +1780,6 @@
         if (floatingScraperHudElement) {
             floatingScraperHudElement.remove();
             floatingScraperHudElement = null;
-        }
-        if (fullReset) {
-            floatingScraperHudPosition = null;
-            floatingScraperHudSize = null;
         }
     }
 
@@ -3356,6 +3391,7 @@
         const iconStyle = `display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; font-size: 13px; line-height: 1; flex-shrink: 0; margin-right: 7px; user-select: none; transform: translateY(1.5px);`;
 
         const isChanged = hasSelectionChanged(selectedIds);
+        const cancelBtn = form.querySelector(`#${type}-cancel-btn`);
 
         if (!sequentialEditState.enabled) {
             if (navGroup) {
@@ -3369,20 +3405,12 @@
                 applyMarqueeAnimation(title);
             }
             if (saveBtn) {
-                saveBtn.textContent = isEasterEggActive() ? `Save ${config.pluralTitle} 🍫` : `Save ${config.pluralTitle}`;
-                if (isChanged) {
-                    saveBtn.disabled = false;
-                    saveBtn.style.opacity = '1';
-                    saveBtn.style.cursor = 'pointer';
-                    saveBtn.style.background = '#10b981';
-                    saveBtn.classList.add('fasttag-btn-pulse');
-                } else {
-                    saveBtn.disabled = true;
-                    saveBtn.style.opacity = '0.45';
-                    saveBtn.style.cursor = 'not-allowed';
-                    saveBtn.style.background = '#475569';
-                    saveBtn.classList.remove('fasttag-btn-pulse');
-                }
+                saveBtn.style.display = 'none';
+            }
+            if (cancelBtn) {
+                cancelBtn.style.flex = '1';
+                cancelBtn.style.width = '100%';
+                cancelBtn.style.fontWeight = '600';
             }
             return;
         }
@@ -3403,22 +3431,21 @@
             applyMarqueeAnimation(title);
         }
 
+        if (cancelBtn) {
+            cancelBtn.style.flex = 'none';
+            cancelBtn.style.width = 'auto';
+            cancelBtn.style.fontWeight = '500';
+        }
+
         if (saveBtn) {
+            saveBtn.style.display = 'block';
+            saveBtn.style.flex = '1';
             saveBtn.disabled = false;
             saveBtn.style.opacity = '1';
             saveBtn.style.cursor = 'pointer';
-
-            if (isChanged) {
-                const saveText = isEasterEggActive() ? 'Save & Next Scene 🍫 ►' : 'Save & Next Scene ►';
-                const closeText = isEasterEggActive() ? 'Save & Close 🍫' : 'Save & Close';
-                saveBtn.textContent = isLast ? closeText : saveText;
-                saveBtn.style.background = '#10b981';
-                saveBtn.classList.add('fasttag-btn-pulse');
-            } else {
-                saveBtn.textContent = isLast ? 'Close' : 'Next Scene ►';
-                saveBtn.style.background = '#6366f1';
-                saveBtn.classList.remove('fasttag-btn-pulse');
-            }
+            saveBtn.textContent = isLast ? (isEasterEggActive() ? 'Close 🍫' : 'Close') : (isEasterEggActive() ? 'Next Scene 🍫 ►' : 'Next Scene ►');
+            saveBtn.style.background = '#6366f1';
+            saveBtn.classList.remove('fasttag-btn-pulse');
         }
 
         if (prevBtn) {
@@ -3476,7 +3503,7 @@
         }
         hideScrapeCoverTooltip();
 
-        const currentSceneId = sequentialEditState.currentSceneId;
+        const currentSceneId = form._fastTagSceneId || sequentialEditState.currentSceneId;
         if (currentSceneId && typeof getSelectedIdsFn === 'function') {
             const currentSelectedIds = Array.from(getSelectedIdsFn());
             const hasChanged = hasSelectionChanged(currentSelectedIds);
@@ -3524,6 +3551,7 @@
 
         sequentialEditState.currentIndex = nextIndex;
         sequentialEditState.currentSceneId = nextSceneId;
+        form._fastTagSceneId = nextSceneId;
 
         await loadEntityDataIntoPopup(type, nextSceneId, nextCard, activePopup);
     }
@@ -3567,6 +3595,14 @@
 
         if (sequentialEditState.enabled) {
             newModeCheckbox.checked = true;
+            sequentialEditState.currentSceneId = sceneId;
+            if (!sequentialEditState.allSceneCards || sequentialEditState.allSceneCards.length === 0) {
+                sequentialEditState.allSceneCards = getAllVisibleSceneCards();
+            }
+            const idx = getSceneCardIndex(sceneId, sequentialEditState.allSceneCards);
+            if (idx !== -1) {
+                sequentialEditState.currentIndex = idx;
+            }
             updateSequentialEditUI(form, type);
         }
 
@@ -4230,6 +4266,8 @@
 
 
     // --- Window and Context Menu Management ---
+    let isModalClosing = false;
+
     function closeMenu() {
         if (menuAbortController) {
             menuAbortController.abort();
@@ -4242,36 +4280,65 @@
     }
 
     function closePopup(resetSequential = true) {
-        if (popupAbortController) {
-            popupAbortController.abort();
-            popupAbortController = null;
-        }
-        if (previewAbortController) {
-            previewAbortController.abort();
-            previewAbortController = null;
-        }
-        if (activeTableInstance) {
-            try { activeTableInstance.destroy(); } catch (e) {}
-            activeTableInstance = null;
-        }
-        if (activePopup && activePopup.element) {
-            activePopup.element.classList.remove('popup-visible');
-            activePopup.element.remove();
-            activePopup = null;
-        }
-        document.querySelectorAll('#scenes-popup').forEach(el => el.remove());
-        closeFloatingVideoHud(resetSequential);
-        closeFloatingScraperHud(resetSequential);
-        hidePerformerHoverCard();
-        hideScrapeCoverTooltip();
-        hideMicroTooltip();
-        hasShownScrubCueThisSession = false;
+        isModalClosing = true;
+        try {
+            if (activePopup) {
+                if (activePopup.tagsTable) {
+                    try {
+                        activePopup.tagsTable.off("rowSelected");
+                        activePopup.tagsTable.off("rowDeselected");
+                        activePopup.tagsTable.destroy();
+                    } catch (e) {}
+                    activePopup.tagsTable = null;
+                }
+                if (activePopup.performersTable) {
+                    try {
+                        activePopup.performersTable.off("rowSelected");
+                        activePopup.performersTable.off("rowDeselected");
+                        activePopup.performersTable.destroy();
+                    } catch (e) {}
+                    activePopup.performersTable = null;
+                }
+            }
+            if (activeTableInstance) {
+                try {
+                    activeTableInstance.off("rowSelected");
+                    activeTableInstance.off("rowDeselected");
+                    activeTableInstance.destroy();
+                } catch (e) {}
+                activeTableInstance = null;
+            }
+            if (popupAbortController) {
+                popupAbortController.abort();
+                popupAbortController = null;
+            }
+            if (previewAbortController) {
+                previewAbortController.abort();
+                previewAbortController = null;
+            }
+            if (activePopup && activePopup.element) {
+                activePopup.element.classList.remove('popup-visible');
+                activePopup.element.remove();
+                activePopup = null;
+            }
+            document.querySelectorAll('#scenes-popup').forEach(el => el.remove());
+            closeFloatingVideoHud(resetSequential);
+            closeFloatingScraperHud(resetSequential);
+            hidePerformerHoverCard();
+            hideScrapeCoverTooltip();
+            hideMicroTooltip();
+            hasShownScrubCueThisSession = false;
 
-        document.body.classList.remove('fasttag-modal-open');
-        if (resetSequential) {
-            resetSequentialEditState();
-            sessionScrapeCache.clear();
-            window._fastTagEverythingScraperOpen = false;
+            document.body.classList.remove('fasttag-modal-open');
+            if (resetSequential) {
+                resetSequentialEditState();
+                sessionScrapeCache.clear();
+                window._fastTagEverythingScraperOpen = false;
+            }
+        } finally {
+            setTimeout(() => {
+                isModalClosing = false;
+            }, 100);
         }
     }
 
@@ -6296,6 +6363,57 @@
     }
 
     // --- Smart Suggestions Engine ---
+    function normalizeTextForSuggestions(str) {
+        if (!str) return '';
+        let splitStr = String(str)
+            .replace(/([a-z])([A-Z])/g, '$1 $2')
+            .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+            .replace(/([a-zA-Z])([0-9])/g, '$1 $2')
+            .replace(/([0-9])([a-zA-Z])/g, '$1 $2');
+
+        try {
+            splitStr = splitStr.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        } catch (e) {}
+
+        return splitStr.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    }
+
+    function isSuggestionMatch(item, normalizedSpaced, tokenSet) {
+        if (!item) return false;
+        const namesToCheck = [];
+        if (item.name) namesToCheck.push(item.name);
+        if (item.title && item.title !== item.name) namesToCheck.push(item.title);
+        if (item.sort_name && item.sort_name !== item.name) namesToCheck.push(item.sort_name);
+
+        if (Array.isArray(item.alias_list)) {
+            item.alias_list.forEach(a => { if (a && typeof a === 'string') namesToCheck.push(a); });
+        } else if (typeof item.alias_list === 'string' && item.alias_list.trim()) {
+            item.alias_list.split(',').forEach(a => { if (a.trim()) namesToCheck.push(a.trim()); });
+        }
+
+        if (Array.isArray(item.aliases)) {
+            item.aliases.forEach(a => { if (a && typeof a === 'string') namesToCheck.push(a); });
+        } else if (typeof item.aliases === 'string' && item.aliases.trim()) {
+            item.aliases.split(',').forEach(a => { if (a.trim()) namesToCheck.push(a.trim()); });
+        }
+
+        for (const raw of namesToCheck) {
+            const clean = normalizeTextForSuggestions(raw);
+            if (!clean || clean.length < 2) continue;
+
+            if (normalizedSpaced.includes(' ' + clean + ' ')) return true;
+
+            const words = clean.split(/\s+/).filter(Boolean);
+            if (words.length > 1) {
+                const compact = clean.replace(/\s+/g, '');
+                if (compact.length >= 4 && tokenSet.has(compact)) return true;
+            } else if (words.length === 1 && clean.length >= 3) {
+                if (tokenSet.has(clean)) return true;
+            }
+        }
+        return false;
+    }
+
     async function fetchSceneSmartSuggestions(type, sceneId, allAvailableItems, existingIds, cardElement) {
         if (!getEnableSuggestions() || !sceneId || !allAvailableItems || !allAvailableItems.length) return [];
         try {
@@ -6325,23 +6443,16 @@
                 }
             } catch (e) {}
 
-            const rawCombined = `${cardText} ${title} ${details} ${fileName} ${filePath}`.toLowerCase();
-            const fullTextSpaced = ' ' + rawCombined.replace(/[^a-z0-9]+/g, ' ') + ' ';
-            if (!rawCombined.trim()) return [];
+            const rawCombined = `${cardText} ${title} ${details} ${fileName} ${filePath}`;
+            const normalizedSpaced = ' ' + normalizeTextForSuggestions(rawCombined) + ' ';
+            const tokens = normalizedSpaced.trim().split(/\s+/).filter(Boolean);
+            const tokenSet = new Set(tokens);
+            if (!tokens.length) return [];
 
             const suggestions = [];
 
             for (const item of allAvailableItems) {
-                const name = (item.name || item.title || '').trim();
-                if (!name || name.length < 2) continue;
-
-                const nameLower = name.toLowerCase();
-                const nameClean = nameLower.replace(/[^a-z0-9]+/g, ' ').trim();
-                if (!nameClean) continue;
-
-                const nameSpaced = ' ' + nameClean + ' ';
-
-                if (fullTextSpaced.includes(nameSpaced)) {
+                if (isSuggestionMatch(item, normalizedSpaced, tokenSet)) {
                     suggestions.push(item);
                     if (suggestions.length >= 20) break;
                 }
@@ -6375,15 +6486,15 @@
         form.style.padding = '8px 12px 12px 12px';
         form.style.borderRadius = '10px';
         const maxScreenW = Math.max(320, window.innerWidth - 16);
-        const maxScreenH = Math.max(380, window.innerHeight - 16);
+        const maxScreenH = Math.max(480, window.innerHeight - 16);
         const optimal = getOptimalPopupSize('single');
         const rawW = savedSize?.width && savedSize.width >= 320 ? savedSize.width : optimal.width;
-        const rawH = savedSize?.height && savedSize.height >= 380 ? savedSize.height : optimal.height;
+        const rawH = savedSize?.height && savedSize.height >= 480 ? savedSize.height : optimal.height;
         form.style.width = `${Math.min(rawW, maxScreenW)}px`;
         form.style.height = `${Math.min(rawH, maxScreenH)}px`;
         form.style.minWidth = '320px';
         form.style.maxWidth = 'calc(100vw - 16px)';
-        form.style.minHeight = '380px';
+        form.style.minHeight = '480px';
         form.style.maxHeight = 'calc(100vh - 16px)';
         form.style.boxSizing = 'border-box';
         form.style.display = 'flex';
@@ -6545,7 +6656,36 @@
             return;
         }
 
-        // For single-column modals: Anchor near card
+        // For single-column modals: Check saved position from dragging first, otherwise anchor near card
+        let savedSinglePos = null;
+        try {
+            savedSinglePos = JSON.parse(localStorage.getItem('fasttag_single_pos') || 'null');
+        } catch (e) {}
+
+        if (savedSinglePos && savedSinglePos.left && savedSinglePos.top) {
+            const parsedX = parseInt(savedSinglePos.left, 10);
+            const parsedY = parseInt(savedSinglePos.top, 10);
+            if (!isNaN(parsedX) && !isNaN(parsedY)) {
+                const pos = clampPos(parsedX, parsedY);
+                form.style.left = `${pos.x}px`;
+                form.style.top = `${pos.y}px`;
+                if (sequentialEditState.enabled) {
+                    sequentialEditState.popupPosition = { left: pos.x, top: pos.y };
+                }
+                requestAnimationFrame(() => {
+                    const actualFormRect = form.getBoundingClientRect();
+                    const p = clampPos(actualFormRect.left, actualFormRect.top);
+                    form.style.left = `${p.x}px`;
+                    form.style.top = `${p.y}px`;
+                    form.classList.add('popup-visible');
+                    if (typeof form._fastTagOnResize === 'function') form._fastTagOnResize();
+                    const firstInput = form.querySelector('input[type="text"], input[type="search"]');
+                    if (firstInput) firstInput.focus({ preventScroll: true });
+                });
+                return;
+            }
+        }
+
         const cardRect = cardElement ? cardElement.getBoundingClientRect() : { right: 100, top: 100, left: 100 };
         let popupX = cardRect.right + 10;
         let popupY = Math.max(minTop, cardRect.top);
@@ -6616,10 +6756,15 @@
                 (settingsModal && settingsModal.contains(el))
             );
 
-            // Check if mouse is over a horizontal scroll container (Studio or Groups bar)
-            const hScrollable = e.target.closest('#everything-studio-scroll, #everything-groups-scroll, #everything-studio-half, #everything-groups-half');
+            // 1. Allow video player & preview containers to handle mouse wheel freely for frame scrubbing
+            if (e.target.closest('[id$="-preview-container"], .fasttag-video-preview, video, #fasttag-floating-video-hud, #fasttag-video-container, #fasttag-video-element')) {
+                return;
+            }
+
+            // 2. Check if mouse is over a horizontal scroll container (Studio/Groups bar, Suggestion chips, Recent chips)
+            const hScrollable = e.target.closest('#everything-studio-scroll, #everything-groups-scroll, #everything-studio-half, #everything-groups-half, #everything-sugg-tags-chips, #everything-sugg-performers-chips, [id$="-suggestions-container"], .fasttag-chip-row, [id*="-chips"]');
             if (hScrollable && isInsideAllowed(hScrollable)) {
-                const target = hScrollable.closest('#everything-studio-scroll, #everything-groups-scroll') || hScrollable;
+                const target = hScrollable.closest('#everything-studio-scroll, #everything-groups-scroll, #everything-sugg-tags-chips, #everything-sugg-performers-chips, [id$="-suggestions-container"], .fasttag-chip-row, [id*="-chips"]') || hScrollable;
                 let delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
                 if (e.deltaMode === 1) delta *= 28;
                 else if (e.deltaMode === 2) delta *= 400;
@@ -6641,7 +6786,6 @@
                     e.stopPropagation();
                 }
             } else if (scraperHud && scraperHud.contains(e.target)) {
-                // If scrolling anywhere inside the detached scraper window (over photo, headers, or padding)
                 // Forward the scroll to #fasttag-scrape-items-preview so wheel scrolling works anywhere in the sidecar!
                 const preview = scraperHud.querySelector('#fasttag-scrape-items-preview');
                 if (preview) {
@@ -6670,10 +6814,26 @@
         document.addEventListener('keydown', (e) => {
             if (!document.body.contains(form)) return;
 
-            // Handle Escape to close popup
+            // Handle Escape key: 2-stage (Stage 1: clear search if text present; Stage 2: close popup)
             if (e.key === 'Escape') {
                 const subModal = document.querySelector('#fasttag-settings-modal, #fasttag-create-modal, .fasttag-create-dialog-overlay, .fasttag-bulk-confirm-overlay');
                 if (subModal && subModal.style.display !== 'none') return;
+
+                const searchBox = form.querySelector('#everything-global-search, #scenes-popup-global-filter, #scenes-popup-filter, input[type="text"], input[type="search"]');
+                if (searchBox && searchBox.value.trim().length > 0) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const clearBtn = form.querySelector('#everything-global-clear, [id$="-search-clear"]');
+                    if (clearBtn) {
+                        clearBtn.click();
+                    } else {
+                        searchBox.value = '';
+                        searchBox.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    searchBox.focus({ preventScroll: true });
+                    return;
+                }
+
                 e.preventDefault();
                 e.stopPropagation();
                 closePopup();
@@ -6720,13 +6880,15 @@
         }, { capture: true, signal });
 
         document.addEventListener('keydown', (e) => {
+            if (e.defaultPrevented) return;
             if (e.key === 'Enter') {
                 const isSearchFocused = document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
 
-                if (isSearchFocused && document.activeElement.value && document.activeElement.value.trim().length > 0 && !(e.ctrlKey || e.metaKey)) return;
+                if (isSearchFocused && !e.ctrlKey && !e.metaKey) return;
 
-                if (!isSearchFocused || e.ctrlKey || e.metaKey || (isSearchFocused && (!document.activeElement.value || !document.activeElement.value.trim()))) {
+                if (!isSearchFocused || e.ctrlKey || e.metaKey) {
                     e.preventDefault();
+                    e.stopPropagation();
                     const saveBtn = form.querySelector('button[id$="-save-btn"]');
                     if (saveBtn) {
                         saveBtn.click();
@@ -6791,6 +6953,13 @@
                                 top: form.style.top
                             }));
                         } catch (e) {}
+                    } else {
+                        try {
+                            localStorage.setItem('fasttag_single_pos', JSON.stringify({
+                                left: form.style.left,
+                                top: form.style.top
+                            }));
+                        } catch (e) {}
                     }
                     if (sequentialEditState.enabled) {
                         const rect = form.getBoundingClientRect();
@@ -6809,25 +6978,29 @@
 
             if (!isInputFocused) {
                 if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                    const searchBox = form.querySelector('#scenes-popup-global-filter, #scenes-popup-filter, input[type="text"]');
+                    const searchBox = form.querySelector('#everything-global-search, #scenes-popup-global-filter, #scenes-popup-filter, input[type="text"], input[type="search"]');
                     if (searchBox && document.body.contains(searchBox)) {
                         e.preventDefault();
                         e.stopPropagation();
                         e.stopImmediatePropagation();
-                        searchBox.focus();
+                        searchBox.focus({ preventScroll: true });
                         searchBox.value += e.key;
+                        const len = searchBox.value.length;
+                        try { searchBox.setSelectionRange(len, len); } catch (err) {}
                         searchBox.dispatchEvent(new Event('input', { bubbles: true }));
                         return;
                     }
                 } else if (e.key === 'Backspace') {
-                    const searchBox = form.querySelector('#scenes-popup-global-filter, #scenes-popup-filter, input[type="text"]');
+                    const searchBox = form.querySelector('#everything-global-search, #scenes-popup-global-filter, #scenes-popup-filter, input[type="text"], input[type="search"]');
                     if (searchBox && document.body.contains(searchBox)) {
                         e.preventDefault();
                         e.stopPropagation();
                         e.stopImmediatePropagation();
-                        searchBox.focus();
+                        searchBox.focus({ preventScroll: true });
                         if (searchBox.value.length > 0) {
                             searchBox.value = searchBox.value.slice(0, -1);
+                            const len = searchBox.value.length;
+                            try { searchBox.setSelectionRange(len, len); } catch (err) {}
                             searchBox.dispatchEvent(new Event('input', { bubbles: true }));
                         }
                         return;
@@ -7351,7 +7524,7 @@
             }
         };
 
-        activeTableInstance.on("rowSelected", (row) => {
+        activeTableInstance.on("rowSelected", async (row) => {
             if (!isRestoringSelections) {
                 const id = row.getData().id;
                 if (id) {
@@ -7362,19 +7535,40 @@
                 const rows = activeTableInstance.getRows();
                 singleNavIndex = rows.indexOf(row);
                 updateSingleKeyboardHighlight();
-                if (filterInput) filterInput.focus({ preventScroll: true });
+
+                const hasSearch = filterInput && filterInput.value.trim().length > 0;
+                if (hasSearch) {
+                    filterInput.value = '';
+                    if (searchClear) searchClear.style.display = 'none';
+                    if (form.querySelector(`#${type}-kbd-shortcut`)) form.querySelector(`#${type}-kbd-shortcut`).style.display = 'block';
+                    await fetchData('', false);
+                    const r = activeTableInstance.getRow(id);
+                    if (r) activeTableInstance.scrollToRow(r, "top", false);
+                    singleNavIndex = -1;
+                    updateSingleKeyboardHighlight();
+                    if (filterInput) filterInput.focus({ preventScroll: true });
+                } else if (filterInput) {
+                    filterInput.focus({ preventScroll: true });
+                }
                 refreshUI();
             }
         });
 
-        activeTableInstance.on("rowDeselected", (row) => {
-            if (!isRestoringSelections) {
+        activeTableInstance.on("rowDeselected", async (row) => {
+            if (!isRestoringSelections && !isModalClosing) {
                 const id = row.getData().id;
                 if (id) selectedIds.delete(String(id));
                 currentSingleSection = 'table';
-                const rows = activeTableInstance.getRows();
-                singleNavIndex = rows.indexOf(row);
+                singleNavIndex = -1;
                 updateSingleKeyboardHighlight();
+
+                const hasSearch = filterInput && filterInput.value.trim().length > 0;
+                if (hasSearch) {
+                    filterInput.value = '';
+                    if (searchClear) searchClear.style.display = 'none';
+                    if (form.querySelector(`#${type}-kbd-shortcut`)) form.querySelector(`#${type}-kbd-shortcut`).style.display = 'block';
+                }
+                await fetchData('', true);
                 if (filterInput) filterInput.focus({ preventScroll: true });
                 refreshUI();
             }
@@ -7396,11 +7590,11 @@
             if (!cachedData) return;
 
             const term = query.trim().toLowerCase();
-            let data = cachedData;
+            let data = Array.from(cachedData);
             const searchFields = config.searchFields || [config.labelKey];
             if (term) {
                 const tokens = term.split(/\s+/);
-                data = cachedData.filter(item => {
+                data = data.filter(item => {
                     const itemSearchStr = searchFields
                         .map(f => String(item[f] || '').trim().toLowerCase())
                         .filter(Boolean)
@@ -7413,14 +7607,26 @@
 
             isRestoringSelections = true;
             try {
+                if (typeof activeTableInstance.deselectRow === 'function') {
+                    activeTableInstance.deselectRow();
+                }
                 await activeTableInstance.setData(data);
+                if (typeof activeTableInstance.deselectRow === 'function') {
+                    activeTableInstance.deselectRow();
+                }
                 selectedIds.forEach(id => {
                     const r = activeTableInstance.getRow(id);
                     if (r) activeTableInstance.selectRow(r);
                 });
                 refreshUI();
                 if (resetScroll && data.length > 0) {
-                    activeTableInstance.scrollToRow(activeTableInstance.getRows()[0], "top", false);
+                    const holder = activeTableInstance.element?.querySelector('.tabulator-tableholder') || activeTableInstance.element;
+                    if (holder) {
+                        holder.scrollTop = 0;
+                        holder.scrollLeft = 0;
+                    }
+                    const firstRow = activeTableInstance.getRows()[0];
+                    if (firstRow) activeTableInstance.scrollToRow(firstRow, "top", false);
                 }
             } finally {
                 isRestoringSelections = false;
@@ -7460,7 +7666,7 @@
             }, 150);
         };
 
-        filterInput.addEventListener('keydown', async (e) => {
+        filterInput.onkeydown = async (e) => {
             const rows = activeTableInstance && typeof activeTableInstance.getRows === 'function' ? activeTableInstance.getRows() : [];
             const isBottomCreateVisible = activePopup.bottomCreateContainer && activePopup.bottomCreateContainer.style.display !== 'none';
             const suggBtns = getSingleSuggestions();
@@ -7668,7 +7874,8 @@
                     const rowData = targetRow.getData();
                     if (rowData && rowData.id) {
                         const strId = String(rowData.id);
-                        if (selectedIds.has(strId)) {
+                        const wasSelected = selectedIds.has(strId);
+                        if (wasSelected) {
                             selectedIds.delete(strId);
                             activeTableInstance.deselectRow(targetRow);
                         } else {
@@ -7679,20 +7886,25 @@
                         if (hadSearch) {
                             filterInput.value = '';
                             updateVisibility();
-                            await fetchData("", false);
-                            const r = activeTableInstance.getRow(rowData.id);
-                            if (r) activeTableInstance.scrollToRow(r, "top", false);
+                            await fetchData("", true);
+                            if (!wasSelected) {
+                                const r = activeTableInstance.getRow(rowData.id);
+                                if (r) activeTableInstance.scrollToRow(r, "top", false);
+                            }
                             currentSingleSection = 'table';
                             singleNavIndex = -1;
                         } else {
                             refreshUI();
+                            if (wasSelected) {
+                                await fetchData("", true);
+                            }
                         }
                         filterInput.focus({ preventScroll: true });
                         updateSingleKeyboardHighlight();
                     }
                 }
             }
-        });
+        };
 
         clearBtn.onclick = () => {
             filterInput.value = '';
@@ -8125,9 +8337,9 @@
 
             <!-- Dual-Column Suggestions Bar (Single Compact Row, Always Visible) -->
             <div id="everything-suggestions-container" style="display: flex; align-items: center; margin-bottom: 6px; flex-shrink: 0; width: 100%; box-sizing: border-box;">
-                <!-- Tag Suggestions (Above Tags Column) -->
+                <!-- Tag & Studio Suggestions (Above Tags Column & Studio Bar) -->
                 <div id="everything-sugg-tags-box" style="box-sizing: border-box; display: flex; align-items: center; gap: 4px; background: ${isDark ? 'rgba(99, 102, 241, 0.08)' : '#eef2ff'}; border: 1px dashed ${isDark ? 'rgba(129, 140, 248, 0.35)' : 'rgba(99, 102, 241, 0.4)'}; border-radius: 6px; padding: 2px 6px; overflow: visible; height: 26px;">
-                    <span class="fasttag-tooltip" data-tooltip="Suggested Tags" style="font-size: 11px; user-select: none; flex-shrink: 0; line-height: 1; margin-right: 2px;">💡</span>
+                    <span class="fasttag-tooltip" data-tooltip="Suggested Tags & Studios" style="font-size: 11px; user-select: none; flex-shrink: 0; line-height: 1; margin-right: 2px;">💡</span>
                     <div id="everything-sugg-tags-chips" style="display: flex; align-items: center; gap: 4px; overflow-x: auto; flex: 1; min-width: 0; padding: 1px 0;">
                         <span class="fasttag-sugg-empty" style="font-size: 10px; font-weight: 500; opacity: 0.45; font-style: italic; color: #818cf8; user-select: none; line-height: 1;">None</span>
                     </div>
@@ -8136,9 +8348,9 @@
                 <!-- 1px invisible spacer matching column splitter -->
                 <div id="everything-sugg-spacer" style="width: 1px; flex-shrink: 0; display: block;"></div>
 
-                <!-- Performer Suggestions (Above Performers Column) -->
+                <!-- Performer & Group Suggestions (Above Performers Column & Group Bar) -->
                 <div id="everything-sugg-performers-box" style="box-sizing: border-box; display: flex; align-items: center; gap: 4px; background: ${isDark ? 'rgba(14, 165, 233, 0.08)' : '#f0f9ff'}; border: 1px dashed ${isDark ? 'rgba(56, 189, 248, 0.35)' : 'rgba(14, 165, 233, 0.4)'}; border-radius: 6px; padding: 2px 6px; overflow: visible; height: 26px;">
-                    <span class="fasttag-tooltip" data-tooltip="Suggested Performers" style="font-size: 11px; user-select: none; flex-shrink: 0; line-height: 1; margin-right: 2px;">💡</span>
+                    <span class="fasttag-tooltip" data-tooltip="Suggested Performers & Groups" style="font-size: 11px; user-select: none; flex-shrink: 0; line-height: 1; margin-right: 2px;">💡</span>
                     <div id="everything-sugg-performers-chips" style="display: flex; align-items: center; gap: 4px; overflow-x: auto; flex: 1; min-width: 0; padding: 1px 0;">
                         <span class="fasttag-sugg-empty" style="font-size: 10px; font-weight: 500; opacity: 0.45; font-style: italic; color: #38bdf8; user-select: none; line-height: 1;">None</span>
                     </div>
@@ -8350,36 +8562,46 @@
             }
         } catch (e) {}
 
-        const rawCombined = `${cardText} ${title} ${details} ${fileName} ${filePath}`.toLowerCase();
-        const fullTextSpaced = ' ' + rawCombined.replace(/[^a-z0-9]+/g, ' ') + ' ';
+        const rawCombined = `${cardText} ${title} ${details} ${fileName} ${filePath}`;
+        const normalizedSpaced = ' ' + normalizeTextForSuggestions(rawCombined) + ' ';
+        const tokens = normalizedSpaced.trim().split(/\s+/).filter(Boolean);
+        const tokenSet = new Set(tokens);
+        if (!tokens.length) {
+            if (container) container.style.display = 'none';
+            return;
+        }
+
         const types = [
             { type: 'tags', icon: '🏷️' },
+            { type: 'studios', icon: '🏢' },
             { type: 'performers', icon: '⭐' },
-            { type: 'studios', icon: '🏢' }
+            { type: 'groups', icon: '📁' }
         ];
 
         const allSuggestions = [];
 
         for (const { type, icon } of types) {
             const config = ENTITY_CONFIG[type];
+            if (!config) continue;
             let cached = getCachedOrNull(type);
             if (!cached) {
-                const res = await fetchGQL(config.fetchQuery);
-                cached = config.extractList(res.data);
-                setCache(type, cached);
+                try {
+                    const res = await fetchGQL(config.fetchQuery);
+                    cached = config.extractList(res.data);
+                    if ((!cached || !cached.length) && type === 'groups') {
+                        cached = res?.data?.findGroups?.groups || res?.data?.findMovies?.movies || [];
+                    }
+                    if (cached) setCache(type, cached);
+                } catch (e) {
+                    cached = [];
+                }
             }
-            if (!cached) continue;
+            if (!cached || !Array.isArray(cached)) continue;
 
             for (const item of cached) {
-                const name = (item.name || item.title || '').trim();
-                if (!name || name.length < 2) continue;
-
-                const nameClean = name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-                if (!nameClean) continue;
-
-                if (fullTextSpaced.includes(' ' + nameClean + ' ')) {
+                if (isSuggestionMatch(item, normalizedSpaced, tokenSet)) {
                     allSuggestions.push({ type, icon, item });
-                    if (allSuggestions.length >= 25) break;
+                    if (allSuggestions.length >= 30) break;
                 }
             }
         }
@@ -8401,13 +8623,13 @@
             container.style.display = 'flex';
             if (tagsBox) {
                 tagsBox.style.display = 'flex';
-                tagsBox.style.visibility = hasRealTags ? 'visible' : 'hidden';
-                tagsBox.style.pointerEvents = hasRealTags ? 'auto' : 'none';
+                tagsBox.style.visibility = 'visible';
+                tagsBox.style.pointerEvents = 'auto';
             }
             if (perfBox) {
                 perfBox.style.display = 'flex';
-                perfBox.style.visibility = hasRealPerf ? 'visible' : 'hidden';
-                perfBox.style.pointerEvents = hasRealPerf ? 'auto' : 'none';
+                perfBox.style.visibility = 'visible';
+                perfBox.style.pointerEvents = 'auto';
             }
             syncSuggestionsAlignment(container.closest('form'));
         };
@@ -8419,7 +8641,13 @@
             } else if (sug.type === 'performers') {
                 ctx.selectedPerformerIds.add(idStr);
             } else if (sug.type === 'studios') {
-                ctx.setStudioId(idStr);
+                if (typeof ctx.setStudioId === 'function') {
+                    ctx.setStudioId(idStr);
+                }
+            } else if (sug.type === 'groups') {
+                if (typeof ctx.addGroupId === 'function') {
+                    ctx.addGroupId(idStr);
+                }
             }
             addRecentEntry(sug.type, sug.item);
 
@@ -8434,6 +8662,10 @@
                 chipBg = isDark ? 'rgba(99, 102, 241, 0.15)' : '#e0e7ff';
                 chipBorder = isDark ? '1px dashed rgba(129, 140, 248, 0.7)' : '1px dashed #6366f1';
                 chipColor = isDark ? '#c7d2fe' : '#3730a3';
+            } else if (sug.type === 'studios') {
+                chipBg = isDark ? 'rgba(99, 102, 241, 0.22)' : '#ede9fe';
+                chipBorder = isDark ? '1px dashed rgba(129, 140, 248, 0.85)' : '1px dashed #4f46e5';
+                chipColor = isDark ? '#e0e7ff' : '#312e81';
             } else if (sug.type === 'performers') {
                 chipBg = isDark ? 'rgba(14, 165, 233, 0.15)' : '#e0f2fe';
                 chipBorder = isDark ? '1px dashed rgba(56, 189, 248, 0.7)' : '1px dashed #0284c7';
@@ -8453,8 +8685,11 @@
 
             chip.addEventListener('click', async (e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 await activateSuggestion(sug);
-                ctx.refreshAllUI();
+                if (typeof ctx.refreshAllUI === 'function') {
+                    ctx.refreshAllUI();
+                }
             });
 
             if (parentChipsContainer) parentChipsContainer.appendChild(chip);
@@ -8464,15 +8699,46 @@
             if (tagsChips) tagsChips.innerHTML = '';
             if (perfChips) perfChips.innerHTML = '';
 
-            const tagSuggestions = allSuggestions.filter(s => s.type === 'tags' && !ctx.selectedTagIds.has(String(s.item.id)));
-            const perfSuggestions = allSuggestions.filter(s => {
-                if (s.type === 'performers') return !ctx.selectedPerformerIds.has(String(s.item.id));
-                if (s.type === 'studios') return ctx.selectedStudioId() !== String(s.item.id);
+            // Left side: Tags & Studios (since Studio bar and Tag column are on the left)
+            const leftSuggestions = allSuggestions.filter(s => {
+                if (s.type === 'tags') return !ctx.selectedTagIds.has(String(s.item.id));
+                if (s.type === 'studios') {
+                    const curStud = typeof ctx.selectedStudioId === 'function' ? ctx.selectedStudioId() : ctx.selectedStudioId;
+                    return String(curStud || '') !== String(s.item.id);
+                }
                 return false;
             });
 
-            tagSuggestions.forEach(s => createSuggestionChip(s, tagsChips));
-            perfSuggestions.forEach(s => createSuggestionChip(s, perfChips));
+            // Right side: Performers & Groups (since Group bar and Performer column are on the right)
+            const rightSuggestions = allSuggestions.filter(s => {
+                if (s.type === 'performers') return !ctx.selectedPerformerIds.has(String(s.item.id));
+                if (s.type === 'groups') {
+                    const grpIds = typeof ctx.selectedGroupIds === 'function' ? ctx.selectedGroupIds() : ctx.selectedGroupIds;
+                    return !grpIds || !grpIds.has(String(s.item.id));
+                }
+                return false;
+            });
+
+            if (leftSuggestions.length > 0) {
+                leftSuggestions.forEach(s => createSuggestionChip(s, tagsChips));
+            } else if (tagsChips) {
+                const emptySpan = document.createElement('span');
+                emptySpan.className = 'fasttag-sugg-empty';
+                emptySpan.textContent = 'None';
+                emptySpan.style.cssText = `font-size: 10px; font-weight: 500; opacity: 0.45; font-style: italic; color: ${isDark ? '#818cf8' : '#6366f1'}; user-select: none; line-height: 1;`;
+                tagsChips.appendChild(emptySpan);
+            }
+
+            if (rightSuggestions.length > 0) {
+                rightSuggestions.forEach(s => createSuggestionChip(s, perfChips));
+            } else if (perfChips) {
+                const emptySpan = document.createElement('span');
+                emptySpan.className = 'fasttag-sugg-empty';
+                emptySpan.textContent = 'None';
+                emptySpan.style.cssText = `font-size: 10px; font-weight: 500; opacity: 0.45; font-style: italic; color: ${isDark ? '#38bdf8' : '#0284c7'}; user-select: none; line-height: 1;`;
+                perfChips.appendChild(emptySpan);
+            }
+
             updateBoxVisibility();
         };
 
@@ -8745,17 +9011,23 @@
                 selectedTagIds: selTags,
                 selectedPerformerIds: selPerfs,
                 selectedStudioId: () => ctx.getSelectedStudio(),
+                selectedGroupIds: () => ctx.getSelectedGroups(),
                 setStudioId: (id) => { ctx.setSelectedStudio(id); },
+                addGroupId: (id) => { const grps = ctx.getSelectedGroups(); if (grps) grps.add(String(id)); },
                 tagsTable: popup.tagsTable,
                 performersTable: popup.performersTable,
                 fetchColumnData: ctx.fetchColumnData,
                 renderStudioBar: ctx.renderStudioBar,
+                renderGroupBar: ctx.renderGroupBar,
                 onSuggestionActivated: ctx.onSuggestionActivated,
                 doSave: ctx.doSave,
                 refreshAllUI: ctx.refreshAllUI
             });
 
             setTimeout(() => {
+                if (typeof ctx.resetNavState === 'function') {
+                    ctx.resetNavState();
+                }
                 if (popup.globalSearch && document.body.contains(popup.globalSearch)) {
                     popup.globalSearch.focus({ preventScroll: true });
                 }
@@ -9163,11 +9435,11 @@
                 if (!cached) return;
 
                 const term = query.trim().toLowerCase();
-                let data = cached;
+                let data = Array.from(cached);
                 const searchFields = config.searchFields || [config.labelKey];
                 if (term) {
                     const tokens = term.split(/\s+/);
-                    data = cached.filter(item => {
+                    data = data.filter(item => {
                         const itemSearchStr = searchFields
                             .map(f => String(item[f] || '').trim().toLowerCase())
                             .filter(Boolean)
@@ -9180,7 +9452,13 @@
 
                 isRestoring = true;
                 try {
+                    if (typeof tableInstance.deselectRow === 'function') {
+                        tableInstance.deselectRow();
+                    }
                     await tableInstance.setData(data);
+                    if (typeof tableInstance.deselectRow === 'function') {
+                        tableInstance.deselectRow();
+                    }
                     selIds.forEach(id => {
                         const r = tableInstance.getRow(id);
                         if (r) tableInstance.selectRow(r);
@@ -9235,7 +9513,20 @@
                 updateSaveButton();
             };
 
-            tagsTable.on("rowSelected", (row) => {
+            if (tagsTable) {
+                try {
+                    tagsTable.off("rowSelected");
+                    tagsTable.off("rowDeselected");
+                } catch (e) {}
+            }
+            if (performersTable) {
+                try {
+                    performersTable.off("rowSelected");
+                    performersTable.off("rowDeselected");
+                } catch (e) {}
+            }
+
+            tagsTable.on("rowSelected", async (row) => {
                 if (isRestoring) return;
                 const id = row.getData()?.id;
                 if (!id) return;
@@ -9248,25 +9539,57 @@
                 refreshAllUI();
                 updateEverythingKeyboardHighlight();
                 updateSaveButton();
-                popup.globalSearch.focus({ preventScroll: true });
+
+                const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
+                if (hasSearch) {
+                    popup.globalSearch.value = '';
+                    popup.globalClear.style.display = 'none';
+                    if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                    await refreshGlobalSearch('');
+                    const r = tagsTable.getRow(id);
+                    if (r) tagsTable.scrollToRow(r, "top", false);
+                    activeNavIndex = -1;
+                    refreshAllUI();
+                    updateEverythingKeyboardHighlight();
+                    popup.globalSearch.focus({ preventScroll: true });
+                } else {
+                    if (popup.refreshBtn) {
+                        popup.refreshBtn.classList.add('fasttag-refresh-pulse');
+                        popup.refreshBtn.title = 'Re-sort columns & pin selected items to top';
+                    }
+                    popup.globalSearch.focus({ preventScroll: true });
+                }
             });
 
-            tagsTable.on("rowDeselected", (row) => {
-                if (isRestoring) return;
+            tagsTable.on("rowDeselected", async (row) => {
+                if (isRestoring || isModalClosing) return;
                 const id = row.getData()?.id;
                 if (!id) return;
                 selectedTagIds.delete(String(id));
                 currentNavSection = 'tags';
-                const rows = tagsTable.getRows();
-                activeNavIndex = rows.indexOf(row);
+                activeNavIndex = -1;
                 refreshAllUI();
                 updateEverythingKeyboardHighlight();
                 updateSaveButton();
-                popup.globalSearch.focus({ preventScroll: true });
+
+                const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
+                if (hasSearch) {
+                    popup.globalSearch.value = '';
+                    popup.globalClear.style.display = 'none';
+                    if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                }
+                await refreshGlobalSearch('');
+                try {
+                    const holder = tagsTable.element?.querySelector('.tabulator-tableholder') || tagsTable.element;
+                    if (holder) holder.scrollTop = 0;
+                    const firstRow = tagsTable.getRows()[0];
+                    if (firstRow) tagsTable.scrollToRow(firstRow, "top", false);
+                } catch (e) {}
+                if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
             });
 
-            performersTable.on("rowSelected", (row) => {
-                if (isRestoring) return;
+            performersTable.on("rowSelected", async (row) => {
+                if (isRestoring || isModalClosing) return;
                 const id = row.getData()?.id;
                 if (!id) return;
                 selectedPerformerIds.add(String(id));
@@ -9278,21 +9601,53 @@
                 refreshAllUI();
                 updateEverythingKeyboardHighlight();
                 updateSaveButton();
-                popup.globalSearch.focus({ preventScroll: true });
+
+                const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
+                if (hasSearch) {
+                    popup.globalSearch.value = '';
+                    popup.globalClear.style.display = 'none';
+                    if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                    await refreshGlobalSearch('');
+                    const r = performersTable.getRow(id);
+                    if (r) performersTable.scrollToRow(r, "top", false);
+                    activeNavIndex = -1;
+                    refreshAllUI();
+                    updateEverythingKeyboardHighlight();
+                    popup.globalSearch.focus({ preventScroll: true });
+                } else {
+                    if (popup.refreshBtn) {
+                        popup.refreshBtn.classList.add('fasttag-refresh-pulse');
+                        popup.refreshBtn.title = 'Re-sort columns & pin selected items to top';
+                    }
+                    popup.globalSearch.focus({ preventScroll: true });
+                }
             });
 
-            performersTable.on("rowDeselected", (row) => {
-                if (isRestoring) return;
+            performersTable.on("rowDeselected", async (row) => {
+                if (isRestoring || isModalClosing) return;
                 const id = row.getData()?.id;
                 if (!id) return;
                 selectedPerformerIds.delete(String(id));
                 currentNavSection = 'performers';
-                const rows = performersTable.getRows();
-                activeNavIndex = rows.indexOf(row);
+                activeNavIndex = -1;
                 refreshAllUI();
                 updateEverythingKeyboardHighlight();
                 updateSaveButton();
-                popup.globalSearch.focus({ preventScroll: true });
+
+                const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
+                if (hasSearch) {
+                    popup.globalSearch.value = '';
+                    popup.globalClear.style.display = 'none';
+                    if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                }
+                await refreshGlobalSearch('');
+                try {
+                    const holder = performersTable.element?.querySelector('.tabulator-tableholder') || performersTable.element;
+                    if (holder) holder.scrollTop = 0;
+                    const firstRow = performersTable.getRows()[0];
+                    if (firstRow) performersTable.scrollToRow(firstRow, "top", false);
+                } catch (e) {}
+                if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
             });
 
             form.addEventListener('click', (e) => {
@@ -9565,15 +9920,16 @@
                 }
             };
 
-            popup.globalSearch.addEventListener('input', () => {
+            popup.globalSearch.oninput = () => {
                 const val = popup.globalSearch.value.trim();
                 const hasVal = val.length > 0;
                 popup.globalClear.style.display = hasVal ? 'block' : 'none';
                 if (popup.kbdShortcut) popup.kbdShortcut.style.display = hasVal ? 'none' : 'block';
                 clearTimeout(searchDebounce);
                 searchDebounce = setTimeout(async () => {
-                    await refreshGlobalSearch(val);
-                    if (hasVal) {
+                    const currentVal = popup.globalSearch ? popup.globalSearch.value.trim() : '';
+                    await refreshGlobalSearch(currentVal);
+                    if (currentVal.length > 0) {
                         const tagCount = tagsTable ? tagsTable.getRows().length : 0;
                         const perfCount = performersTable ? performersTable.getRows().length : 0;
                         if (tagCount > 0) {
@@ -9610,9 +9966,9 @@
                     }
                     updateEverythingKeyboardHighlight();
                 }, 100);
-            });
+            };
 
-            popup.globalSearch.addEventListener('keydown', async (e) => {
+            popup.globalSearch.onkeydown = async (e) => {
                 if (e.key === 'Tab' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
                     e.preventDefault();
                     if (currentNavSection === 'studios') {
@@ -10031,8 +10387,11 @@
                     }
                     updateEverythingKeyboardHighlight();
                 } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+
                     if (e.ctrlKey || e.metaKey) {
-                        e.preventDefault();
                         if (popup.saveBtn) popup.saveBtn.click();
                         return;
                     }
@@ -10115,8 +10474,8 @@
                         return;
                     }
 
-                    const hasSearch = popup.globalSearch.value.trim().length > 0;
-                    if (!hasSearch && activeNavIndex < 0) {
+                    const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
+                    if (!hasSearch) {
                         e.preventDefault();
                         if (popup.saveBtn) popup.saveBtn.click();
                         return;
@@ -10149,29 +10508,49 @@
                                 popup.globalClear.style.display = 'none';
                                 if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
                                 await refreshGlobalSearch('');
-                                const r = curTable.getRow(rowData.id);
-                                if (r) curTable.scrollToRow(r, "top", false);
+                                if (!isSelected) {
+                                    const r = curTable.getRow(rowData.id);
+                                    if (r) curTable.scrollToRow(r, "top", false);
+                                } else {
+                                    try {
+                                        const holder = curTable.element?.querySelector('.tabulator-tableholder') || curTable.element;
+                                        if (holder) holder.scrollTop = 0;
+                                        const firstRow = curTable.getRows()[0];
+                                        if (firstRow) curTable.scrollToRow(firstRow, "top", false);
+                                    } catch (e) {}
+                                }
                                 activeNavIndex = -1;
                                 refreshAllUI();
                                 updateEverythingKeyboardHighlight();
                                 popup.globalSearch.focus({ preventScroll: true });
                             } else {
+                                if (isSelected) {
+                                    await refreshGlobalSearch('');
+                                    try {
+                                        const holder = curTable.element?.querySelector('.tabulator-tableholder') || curTable.element;
+                                        if (holder) holder.scrollTop = 0;
+                                        const firstRow = curTable.getRows()[0];
+                                        if (firstRow) curTable.scrollToRow(firstRow, "top", false);
+                                    } catch (e) {}
+                                }
                                 updateEverythingKeyboardHighlight();
                             }
                         }
                     }
                 }
-            });
+            };
 
-            popup.globalClear.addEventListener('click', () => {
+            popup.globalClear.onclick = () => {
                 popup.globalSearch.value = '';
                 popup.globalClear.style.display = 'none';
                 if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
                 refreshGlobalSearch('');
                 popup.globalSearch.focus();
-            });
+            };
 
-            popup.refreshBtn.addEventListener('click', async () => {
+            popup.refreshBtn.onclick = async () => {
+                popup.refreshBtn.classList.remove('fasttag-refresh-pulse');
+                popup.refreshBtn.title = 'Refresh all caches';
                 invalidateCache('tags');
                 invalidateCache('performers');
                 invalidateCache('studios');
@@ -10184,7 +10563,7 @@
                 ]);
                 await renderStudioBar();
                 toastSuccess('Refreshed all caches');
-            });
+            };
 
             const handleCreateEntity = async (type) => {
                 const searchVal = (popup.globalSearch?.value || '').trim();
@@ -10309,15 +10688,14 @@
                         if (popup.globalClear) popup.globalClear.style.display = 'none';
                         if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
                     }
-                    activeColType = 'tags';
-                    activeColIndex = -1;
-                    activeMetaIndex = -1;
+                    currentNavSection = 'tags';
+                    activeNavIndex = -1;
                     await Promise.all([
                         fetchColumnData('tags', tagsTable, '', selectedTagIds),
-                        fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                        fetchColumnData('performers', performersTable, '', selectedPerformerIds),
+                        renderStudioBar(''),
+                        renderGroupBar('')
                     ]);
-                    renderStudioBar('');
-                    renderGroupBar('');
                     const holderTags = popup.tags.tableContainer?.querySelector('.tabulator-tableholder');
                     if (holderTags) holderTags.scrollTop = 0;
                     const holderPerfs = popup.performers.tableContainer?.querySelector('.tabulator-tableholder');
@@ -10349,6 +10727,11 @@
                 refreshAllUI,
                 doSave,
                 onSuggestionActivated,
+                resetNavState: () => {
+                    currentNavSection = 'tags';
+                    activeNavIndex = -1;
+                    updateEverythingKeyboardHighlight();
+                },
                 isDirty,
                 isEverything: true
             };
@@ -10556,9 +10939,6 @@
             let studioModified = false;
             let isRestoring = false;
             let searchDebounce = null;
-            let activeColType = 'tags';
-            let activeColIndex = -1;
-            let activeMetaIndex = -1;
 
             // Initialize Tabulator tables
             const tagsTable = new Tabulator(popup.tags.tableContainer, {
@@ -10776,9 +11156,8 @@
                         popup.globalSearch.value = '';
                         popup.globalClear.style.display = 'none';
                         if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-                        activeColType = 'tags';
-                        activeColIndex = -1;
-                        activeMetaIndex = -1;
+                        currentNavSection = 'tags';
+                        activeNavIndex = -1;
                         await Promise.all([
                             fetchColumnData('tags', tagsTable, '', selectedTagIds),
                             fetchColumnData('performers', performersTable, '', selectedPerformerIds)
@@ -10840,9 +11219,8 @@
                         popup.globalSearch.value = '';
                         popup.globalClear.style.display = 'none';
                         if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-                        activeColType = 'tags';
-                        activeColIndex = -1;
-                        activeMetaIndex = -1;
+                        currentNavSection = 'tags';
+                        activeNavIndex = -1;
                         await Promise.all([
                             fetchColumnData('tags', tagsTable, '', selectedTagIds),
                             fetchColumnData('performers', performersTable, '', selectedPerformerIds)
@@ -10906,9 +11284,8 @@
                         popup.globalSearch.value = '';
                         popup.globalClear.style.display = 'none';
                         if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-                        activeColType = 'tags';
-                        activeColIndex = -1;
-                        activeMetaIndex = -1;
+                        currentNavSection = 'tags';
+                        activeNavIndex = -1;
                         await Promise.all([
                             fetchColumnData('tags', tagsTable, '', selectedTagIds),
                             fetchColumnData('performers', performersTable, '', selectedPerformerIds)
@@ -10929,9 +11306,8 @@
                     popup.globalSearch.value = '';
                     popup.globalClear.style.display = 'none';
                     if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-                    activeColType = 'tags';
-                    activeColIndex = -1;
-                    activeMetaIndex = -1;
+                    currentNavSection = 'tags';
+                    activeNavIndex = -1;
                     await Promise.all([
                         fetchColumnData('tags', tagsTable, '', selectedTagIds),
                         fetchColumnData('performers', performersTable, '', selectedPerformerIds)
@@ -10953,11 +11329,11 @@
                 if (!cached) return;
 
                 const term = query.trim().toLowerCase();
-                let data = cached;
+                let data = Array.from(cached);
                 const searchFields = config.searchFields || [config.labelKey];
                 if (term) {
                     const tokens = term.split(/\s+/);
-                    data = cached.filter(item => {
+                    data = data.filter(item => {
                         const itemSearchStr = searchFields
                             .map(f => String(item[f] || '').trim().toLowerCase())
                             .filter(Boolean)
@@ -10970,7 +11346,13 @@
 
                 isRestoring = true;
                 try {
+                    if (typeof tableInstance.deselectRow === 'function') {
+                        tableInstance.deselectRow();
+                    }
                     await tableInstance.setData(data);
+                    if (typeof tableInstance.deselectRow === 'function') {
+                        tableInstance.deselectRow();
+                    }
                     selIds.forEach(id => {
                         const r = tableInstance.getRow(id);
                         if (r) tableInstance.selectRow(r);
@@ -11009,7 +11391,7 @@
                 renderGroupBar(popup.globalSearch ? popup.globalSearch.value : '');
             };
 
-            tagsTable.on("rowSelected", (row) => {
+            tagsTable.on("rowSelected", async (row) => {
                 if (!isRestoring) {
                     const id = row.getData().id;
                     if (id) {
@@ -11021,12 +11403,27 @@
                     activeNavIndex = rows.indexOf(row);
                     refreshAllUI();
                     updateEverythingKeyboardHighlight();
-                    if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
+
+                    const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
+                    if (hasSearch) {
+                        popup.globalSearch.value = '';
+                        popup.globalClear.style.display = 'none';
+                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                        await refreshGlobalSearch('');
+                        const r = tagsTable.getRow(id);
+                        if (r) tagsTable.scrollToRow(r, "top", false);
+                        activeNavIndex = -1;
+                        refreshAllUI();
+                        updateEverythingKeyboardHighlight();
+                        popup.globalSearch.focus({ preventScroll: true });
+                    } else if (popup.globalSearch) {
+                        popup.globalSearch.focus({ preventScroll: true });
+                    }
                 }
             });
 
-            tagsTable.on("rowDeselected", (row) => {
-                if (!isRestoring) {
+            tagsTable.on("rowDeselected", async (row) => {
+                if (!isRestoring && !isModalClosing) {
                     const id = row.getData().id;
                     if (id) selectedTagIds.delete(String(id));
                     currentNavSection = 'tags';
@@ -11034,12 +11431,27 @@
                     activeNavIndex = rows.indexOf(row);
                     refreshAllUI();
                     updateEverythingKeyboardHighlight();
-                    if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
+
+                    const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
+                    if (hasSearch) {
+                        popup.globalSearch.value = '';
+                        popup.globalClear.style.display = 'none';
+                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                        await refreshGlobalSearch('');
+                        const r = tagsTable.getRow(id);
+                        if (r) tagsTable.scrollToRow(r, "top", false);
+                        activeNavIndex = -1;
+                        refreshAllUI();
+                        updateEverythingKeyboardHighlight();
+                        popup.globalSearch.focus({ preventScroll: true });
+                    } else if (popup.globalSearch) {
+                        popup.globalSearch.focus({ preventScroll: true });
+                    }
                 }
             });
 
-            performersTable.on("rowSelected", (row) => {
-                if (!isRestoring) {
+            performersTable.on("rowSelected", async (row) => {
+                if (!isRestoring && !isModalClosing) {
                     const id = row.getData().id;
                     if (id) {
                         selectedPerformerIds.add(String(id));
@@ -11050,12 +11462,27 @@
                     activeNavIndex = rows.indexOf(row);
                     refreshAllUI();
                     updateEverythingKeyboardHighlight();
-                    if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
+
+                    const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
+                    if (hasSearch) {
+                        popup.globalSearch.value = '';
+                        popup.globalClear.style.display = 'none';
+                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                        await refreshGlobalSearch('');
+                        const r = performersTable.getRow(id);
+                        if (r) performersTable.scrollToRow(r, "top", false);
+                        activeNavIndex = -1;
+                        refreshAllUI();
+                        updateEverythingKeyboardHighlight();
+                        popup.globalSearch.focus({ preventScroll: true });
+                    } else if (popup.globalSearch) {
+                        popup.globalSearch.focus({ preventScroll: true });
+                    }
                 }
             });
 
-            performersTable.on("rowDeselected", (row) => {
-                if (!isRestoring) {
+            performersTable.on("rowDeselected", async (row) => {
+                if (!isRestoring && !isModalClosing) {
                     const id = row.getData().id;
                     if (id) selectedPerformerIds.delete(String(id));
                     currentNavSection = 'performers';
@@ -11063,7 +11490,22 @@
                     activeNavIndex = rows.indexOf(row);
                     refreshAllUI();
                     updateEverythingKeyboardHighlight();
-                    if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
+
+                    const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
+                    if (hasSearch) {
+                        popup.globalSearch.value = '';
+                        popup.globalClear.style.display = 'none';
+                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                        await refreshGlobalSearch('');
+                        const r = performersTable.getRow(id);
+                        if (r) performersTable.scrollToRow(r, "top", false);
+                        activeNavIndex = -1;
+                        refreshAllUI();
+                        updateEverythingKeyboardHighlight();
+                        popup.globalSearch.focus({ preventScroll: true });
+                    } else if (popup.globalSearch) {
+                        popup.globalSearch.focus({ preventScroll: true });
+                    }
                 }
             });
 
@@ -11368,15 +11810,16 @@
                 }
             });
 
-            popup.globalSearch.addEventListener('input', () => {
+            popup.globalSearch.oninput = () => {
                 const val = popup.globalSearch.value.trim();
                 const hasVal = val.length > 0;
                 popup.globalClear.style.display = hasVal ? 'block' : 'none';
                 if (popup.kbdShortcut) popup.kbdShortcut.style.display = hasVal ? 'none' : 'block';
                 clearTimeout(searchDebounce);
                 searchDebounce = setTimeout(async () => {
-                    await refreshGlobalSearch(val);
-                    if (hasVal) {
+                    const currentVal = popup.globalSearch ? popup.globalSearch.value.trim() : '';
+                    await refreshGlobalSearch(currentVal);
+                    if (currentVal.length > 0) {
                         const tagCount = tagsTable ? tagsTable.getRows().length : 0;
                         const perfCount = performersTable ? performersTable.getRows().length : 0;
                         if (tagCount > 0) {
@@ -11413,9 +11856,9 @@
                     }
                     updateEverythingKeyboardHighlight();
                 }, 100);
-            });
+            };
 
-            popup.globalSearch.addEventListener('keydown', async (e) => {
+            popup.globalSearch.onkeydown = async (e) => {
                 if (e.key === 'Tab' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
                     e.preventDefault();
                     if (currentNavSection === 'studios') {
@@ -11918,8 +12361,8 @@
                         return;
                     }
 
-                    const hasSearch = popup.globalSearch.value.trim().length > 0;
-                    if (!hasSearch && activeNavIndex < 0) {
+                    const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
+                    if (!hasSearch) {
                         e.preventDefault();
                         if (popup.saveBtn) popup.saveBtn.click();
                         return;
@@ -11961,7 +12404,7 @@
                         }
                     }
                 }
-            });
+            };
 
             if (popup.globalClear) {
                 popup.globalClear.onclick = () => {
@@ -12168,13 +12611,11 @@
         activeTableInstance = table;
 
         setupPopupListeners(form, signal, async () => {
-            if (!isTabActive) await new Promise(r => setTimeout(r, 200));
-            const selectedIds = sequentialEditState.getSelectedIdsFn ? sequentialEditState.getSelectedIdsFn() : new Set();
-            const success = await updateEntityForScene(type, sceneId, Array.from(selectedIds));
-            if (success) {
-                await refreshSceneCards();
+            const saveBtn = form.querySelector(`button[id$="-save-btn"]`);
+            if (saveBtn && !saveBtn.disabled) {
+                saveBtn.click();
+            } else {
                 closePopup();
-                toastSuccess('Scene updated');
             }
         });
 
@@ -12197,6 +12638,7 @@
         }
         hideScrapeCoverTooltip();
 
+        sequentialEditState.currentSceneId = sceneId;
         form._fastTagSceneId = sceneId;
         form._fastTagSceneCard = cardElement;
         attachScenePreview(popup.previewContainer, sceneId, cardElement);
@@ -12207,8 +12649,29 @@
         const selectedIds = new Set(existingIds.map(id => String(id)));
         sequentialEditState.initialSelectedIds = new Set(selectedIds);
         let isRestoringSelections = false;
-
         setupSequentialEditHandlers(form, type, sceneId, cardElement, () => selectedIds);
+
+        const saveBtn = popup.saveBtn || form.querySelector(`#${type}-save-btn`);
+        if (saveBtn) {
+            saveBtn.onclick = async (e) => {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                if (sequentialEditState.enabled) {
+                    const currentNum = sequentialEditState.currentIndex + 1;
+                    const totalNum = sequentialEditState.allSceneCards.length;
+                    const isLast = currentNum >= totalNum;
+                    if (isLast) {
+                        closePopup();
+                    } else {
+                        await navigateToNextScene(form, type, 1, () => selectedIds);
+                    }
+                } else {
+                    closePopup();
+                }
+            };
+        }
 
         const filterInput = popup.searchInput;
         const clearBtn = popup.searchClear;
@@ -12267,44 +12730,63 @@
             return success;
         };
 
-        activeTableInstance.on("rowSelected", (row) => {
-            if (!isRestoringSelections) {
-                const id = row.getData().id;
-                if (id) {
-                    selectedIds.add(String(id));
-                    addRecentEntry(type, row.getData());
-                    saveWithoutReload(sceneId, selectedIds);
+        if (activeTableInstance) {
+            try {
+                activeTableInstance.off("rowClick");
+                activeTableInstance.off("rowSelected");
+                activeTableInstance.off("rowDeselected");
+            } catch (e) {}
+        }
+
+        activeTableInstance.on("rowClick", async (e, row) => {
+            const rowData = row.getData();
+            if (!rowData || !rowData.id) return;
+            const strId = String(rowData.id);
+            const wasSelected = selectedIds.has(strId);
+
+            if (wasSelected) {
+                selectedIds.delete(strId);
+                activeTableInstance.deselectRow(row);
+            } else {
+                selectedIds.add(strId);
+                activeTableInstance.selectRow(row);
+                addRecentEntry(type, rowData);
+            }
+
+            await saveWithoutReload(sceneId, selectedIds);
+
+            const hasSearch = filterInput && filterInput.value.trim().length > 0;
+            if (hasSearch) {
+                filterInput.value = '';
+                if (searchClear) searchClear.style.display = 'none';
+                if (form.querySelector(`#${type}-kbd-shortcut`)) form.querySelector(`#${type}-kbd-shortcut`).style.display = 'block';
+                await fetchData('', true);
+                if (!wasSelected) {
+                    const r = activeTableInstance.getRow(rowData.id);
+                    if (r) activeTableInstance.scrollToRow(r, "top", false);
                 }
-                currentSingleSection = 'table';
-                const rows = activeTableInstance.getRows();
-                singleNavIndex = rows.indexOf(row);
+                singleNavIndex = -1;
                 updateSingleKeyboardHighlight();
+                if (filterInput) filterInput.focus({ preventScroll: true });
+            } else {
+                if (!wasSelected) {
+                    if (refreshBtn) {
+                        refreshBtn.classList.add('fasttag-refresh-pulse');
+                        refreshBtn.title = 'Re-sort list & pin selected tags to top';
+                    }
+                } else {
+                    await fetchData('', true);
+                }
                 if (filterInput) filterInput.focus({ preventScroll: true });
             }
             refreshUI();
         });
 
-        activeTableInstance.on("rowDeselected", (row) => {
-            if (!isRestoringSelections) {
-                const id = row.getData().id;
-                if (id) {
-                    selectedIds.delete(String(id));
-                    saveWithoutReload(sceneId, selectedIds);
-                }
-                currentSingleSection = 'table';
-                const rows = activeTableInstance.getRows();
-                singleNavIndex = rows.indexOf(row);
-                updateSingleKeyboardHighlight();
-                if (filterInput) filterInput.focus({ preventScroll: true });
-            }
-            refreshUI();
-        });
-
-        form.addEventListener('click', (e) => {
+        form.onclick = (e) => {
             if (!e.target.closest('input, textarea')) {
                 if (filterInput) filterInput.focus({ preventScroll: true });
             }
-        });
+        };
 
         async function fetchData(query, resetScroll = true) {
             let cachedData = getCachedOrNull(type);
@@ -12316,11 +12798,11 @@
             if (!cachedData) return;
 
             const term = query.trim().toLowerCase();
-            let data = cachedData;
+            let data = Array.from(cachedData);
             const searchFields = config.searchFields || [config.labelKey];
             if (term) {
                 const tokens = term.split(/\s+/);
-                data = cachedData.filter(item => {
+                data = data.filter(item => {
                     const itemSearchStr = searchFields
                         .map(f => String(item[f] || '').trim().toLowerCase())
                         .filter(Boolean)
@@ -12333,7 +12815,13 @@
 
             isRestoringSelections = true;
             try {
+                if (typeof activeTableInstance.deselectRow === 'function') {
+                    activeTableInstance.deselectRow();
+                }
                 await activeTableInstance.setData(data);
+                if (typeof activeTableInstance.deselectRow === 'function') {
+                    activeTableInstance.deselectRow();
+                }
                 selectedIds.forEach(id => {
                     const r = activeTableInstance.getRow(id);
                     if (r) activeTableInstance.selectRow(r);
@@ -12342,8 +12830,17 @@
                 renderSmartSuggestions(form, type, filterInput, selectedIds, smartSuggestions, onRecentChipSelect);
                 updateSequentialEditUI(form, type, selectedIds);
                 updateVisibility();
+                if (typeof activeTableInstance.redraw === 'function') {
+                    activeTableInstance.redraw(true);
+                }
                 if (resetScroll && data.length > 0) {
-                    activeTableInstance.scrollToRow(activeTableInstance.getRows()[0], "top", false);
+                    const holder = activeTableInstance.element?.querySelector('.tabulator-tableholder') || activeTableInstance.element;
+                    if (holder) {
+                        holder.scrollTop = 0;
+                        holder.scrollLeft = 0;
+                    }
+                    const firstRow = activeTableInstance.getRows()[0];
+                    if (firstRow) activeTableInstance.scrollToRow(firstRow, "top", false);
                 }
             } finally {
                 isRestoringSelections = false;
@@ -12485,7 +12982,7 @@
             }, 150);
         };
 
-        filterInput.addEventListener('keydown', async (e) => {
+        filterInput.onkeydown = async (e) => {
             const rows = activeTableInstance && typeof activeTableInstance.getRows === 'function' ? activeTableInstance.getRows() : [];
             const isBottomCreateVisible = popup.bottomCreateContainer && popup.bottomCreateContainer.style.display !== 'none';
             const suggBtns = getSingleSuggestions();
@@ -12635,16 +13132,17 @@
                 }
                 updateSingleKeyboardHighlight();
             } else if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+
                 if (e.ctrlKey || e.metaKey) {
-                    e.preventDefault();
                     const saveBtn = form.querySelector('button[id$="-save-btn"]');
                     if (saveBtn) saveBtn.click();
                     return;
                 }
 
                 if (currentSingleSection === 'suggestions') {
-                    e.preventDefault();
-                    e.stopPropagation();
                     if (suggBtns.length > 0 && singleNavIndex >= 0 && singleNavIndex < suggBtns.length) {
                         suggBtns[singleNavIndex].click();
                         if (filterInput.value.trim().length > 0) {
@@ -12658,8 +13156,6 @@
                 }
 
                 if (currentSingleSection === 'recent') {
-                    e.preventDefault();
-                    e.stopPropagation();
                     if (recentChips.length > 0 && singleNavIndex >= 0 && singleNavIndex < recentChips.length) {
                         recentChips[singleNavIndex].click();
                         if (filterInput.value.trim().length > 0) {
@@ -12673,15 +13169,12 @@
                 }
 
                 if (currentSingleSection === 'create' && isBottomCreateVisible) {
-                    e.preventDefault();
-                    e.stopPropagation();
                     createBtn.click();
                     return;
                 }
 
                 const hadSearch = filterInput.value.trim().length > 0;
                 if (!hadSearch && singleNavIndex < 0) {
-                    e.preventDefault();
                     const saveBtn = form.querySelector('button[id$="-save-btn"]');
                     if (saveBtn) saveBtn.click();
                     return;
@@ -12689,13 +13182,12 @@
 
                 const targetIdx = singleNavIndex >= 0 ? singleNavIndex : 0;
                 if (rows.length > 0 && rows[targetIdx]) {
-                    e.preventDefault();
-                    e.stopPropagation();
                     const targetRow = rows[targetIdx];
                     const rowData = targetRow.getData();
                     if (rowData && rowData.id) {
                         const strId = String(rowData.id);
-                        if (selectedIds.has(strId)) {
+                        const wasSelected = selectedIds.has(strId);
+                        if (wasSelected) {
                             selectedIds.delete(strId);
                             activeTableInstance.deselectRow(targetRow);
                         } else {
@@ -12707,21 +13199,26 @@
                             filterInput.value = '';
                             updateVisibility();
                             await saveWithoutReload(sceneId, selectedIds);
-                            await fetchData("", false);
-                            const r = activeTableInstance.getRow(rowData.id);
-                            if (r) activeTableInstance.scrollToRow(r, "top", false);
+                            await fetchData("", true);
+                            if (!wasSelected) {
+                                const r = activeTableInstance.getRow(rowData.id);
+                                if (r) activeTableInstance.scrollToRow(r, "top", false);
+                            }
                             currentSingleSection = 'table';
                             singleNavIndex = -1;
                         } else {
                             refreshUI();
                             await saveWithoutReload(sceneId, selectedIds);
+                            if (wasSelected) {
+                                await fetchData("", true);
+                            }
                         }
                         filterInput.focus({ preventScroll: true });
                         updateSingleKeyboardHighlight();
                     }
                 }
             }
-        });
+        };
 
         clearBtn.onclick = () => {
             filterInput.value = '';
@@ -12731,8 +13228,10 @@
         };
 
         refreshBtn.onclick = async () => {
+            refreshBtn.classList.remove('fasttag-refresh-pulse');
+            refreshBtn.title = 'Refresh cache';
             invalidateCache(type);
-            await fetchData(filterInput.value.trim(), false);
+            await fetchData(filterInput.value.trim(), true);
         };
 
         if (popup.scrapeBtn) {

@@ -4,6 +4,24 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [3.9.3] - 2026-08-31
+
+### Critical Bug Fixes & Stability Hardening
+- **Decoupled Database Saves from Tabulator Lifecycle Events**:
+  - Eliminated phantom tag wipes during scene transitions and DOM teardowns by moving database save triggers strictly to genuine user interactions (`rowClick` and <kbd>Enter</kbd> keypress). Tabulator's internal `setData()`, `deselectRow()`, and sorting operations can no longer trigger accidental background saves.
+- **Sequential Navigation Scene Target Isolation**:
+  - Fixed a critical scene ID target mismatch in sequential mode where navigating to the next scene could overwrite the preceding scene's tags.
+  - Scene IDs are now dynamically resolved from the active modal form and strictly synchronized on every scene transition.
+- **Event Listener Stacking Elimination Across Scenes**:
+  - Replaced `addEventListener` with direct property assignments (`filterInput.onkeydown`, `globalSearch.onkeydown`, `form.onclick`) so advancing through scenes never stacks duplicate event listeners or executes stale closures holding previous scenes' data.
+- **Single Edit Modal Viewport & Table Auto-Recalculation**:
+  - Added explicit Tabulator `redraw(true)` calls to ensure tables immediately claim 100% of available flex container height when suggestions and recent chip containers expand.
+  - Increased minimum modal height to 480px (with optimal height 580–680px) for comfortable multi-row visibility.
+- **Search Deselection Scroll Reset**:
+  - Deselecting an item from search now clears keyboard row navigation indexes and cleanly resets the scroll container directly to the top (`scrollTop = 0`).
+
+---
+
 ## [3.9.2] - 2026-08-31
 
 ### Fixed & Improved
