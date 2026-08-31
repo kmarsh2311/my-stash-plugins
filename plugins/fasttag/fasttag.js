@@ -2701,6 +2701,8 @@
         const togglePopout = (enable) => {
             if (enable) {
                 isVideoPoppedOut = true;
+                setVideoHudPersistedOpen(true);
+                ftLog('ACTION', 'HUD', 'Video HUD popped out');
 
                 let isDragging = false;
                 let hasDragged = false;
