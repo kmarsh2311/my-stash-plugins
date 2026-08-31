@@ -5734,9 +5734,10 @@
                     const idx = getSceneCardIndex(sceneId, cards);
                     if (idx !== -1 && idx < cards.length - 1) {
                         // Put scraper container into a clean seamless loading state
-                        if (targetContainer) {
+                        const targetCont = container || popup?.scraperCardContainer || (floatingScraperHudElement ? floatingScraperHudElement.querySelector('#fasttag-scraper-hud-content') : null);
+                        if (targetCont) {
                             const isDarkTheme = getEffectiveTheme() === 'dark';
-                            targetContainer.innerHTML = `
+                            targetCont.innerHTML = `
                                 <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; min-height: 180px; gap: 10px; color: ${isDarkTheme ? '#94a3b8' : '#64748b'}; font-size: 13px; font-weight: 600;">
                                     <div style="font-size: 22px; animation: spin 1s linear infinite;">⏳</div>
                                     <div>Scraping next scene...</div>
