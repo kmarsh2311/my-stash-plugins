@@ -2835,7 +2835,6 @@
 
                 // Smoothly swap content inside floating window
                 floatingHudElement.innerHTML = '';
-                floatingHudElement.appendChild(dragPill);
                 mediaContainer.style.cursor = 'default';
                 mediaContainer.title = '';
                 floatingHudElement.appendChild(mediaContainer);
@@ -2935,12 +2934,6 @@
             e.preventDefault();
             togglePopout(!isVideoPoppedOut);
         };
-
-        if (isVideoHudPersistedOpen()) {
-            setTimeout(() => {
-                togglePopout(true);
-            }, 30);
-        }
 
         const detachWheel = () => {
             if (wheelListenerAttached) {
@@ -3253,7 +3246,7 @@
         renderMedia('preview');
 
         // Initial Popout State sync
-        if (isVideoPoppedOut) {
+        if (isVideoPoppedOut || isVideoHudPersistedOpen()) {
             togglePopout(true);
         } else {
             hostContainer.appendChild(mediaContainer);
