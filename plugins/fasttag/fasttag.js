@@ -849,6 +849,24 @@
         #fasttag-inline-dock-btn:hover, .fasttag-dock-pulse:hover {
             animation-play-state: paused !important;
         }
+        @keyframes fasttagMatchBadgePulse {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.35);
+                background: rgba(99, 102, 241, 0.18);
+                border-color: rgba(129, 140, 248, 0.55);
+            }
+            50% {
+                box-shadow: 0 0 8px 1px rgba(99, 102, 241, 0.55);
+                background: rgba(99, 102, 241, 0.35);
+                border-color: rgba(165, 180, 252, 0.95);
+            }
+        }
+        .fasttag-match-counter-pulse {
+            animation: fasttagMatchBadgePulse 2.8s infinite ease-in-out !important;
+        }
+        .fasttag-match-counter-pulse:hover {
+            animation-play-state: paused !important;
+        }
         .tabulator-placeholder {
             pointer-events: auto !important;
             user-select: auto !important;
@@ -4853,6 +4871,127 @@
         return null;
     }
 
+    function attachScraperHudResizeHandles(hudElement) {
+        if (!hudElement) return;
+        hudElement.querySelectorAll('.fasttag-scraper-resize-handle').forEach(el => el.remove());
+
+        const minW = 300;
+        const minH = 220;
+        const maxW = Math.max(minW, window.innerWidth - 16);
+        const maxH = Math.max(minH, window.innerHeight - 16);
+
+        const handles = [
+            { dir: 'n', style: 'top: -5px; left: 12px; right: 12px; height: 10px; cursor: ns-resize; z-index: 100;' },
+            { dir: 's', style: 'bottom: -5px; left: 12px; right: 12px; height: 10px; cursor: ns-resize; z-index: 100;' },
+            { dir: 'e', style: 'right: -5px; top: 12px; bottom: 12px; width: 10px; cursor: ew-resize; z-index: 100;' },
+            { dir: 'w', style: 'left: -5px; top: 12px; bottom: 12px; width: 10px; cursor: ew-resize; z-index: 100;' },
+            { dir: 'ne', style: 'top: -5px; right: -5px; width: 16px; height: 16px; cursor: nesw-resize; z-index: 101;' },
+            { dir: 'nw', style: 'top: -5px; left: -5px; width: 16px; height: 16px; cursor: nwse-resize; z-index: 101;' },
+            { dir: 'se', style: 'bottom: -5px; right: -5px; width: 16px; height: 16px; cursor: nwse-resize; z-index: 101;' },
+            { dir: 'sw', style: 'bottom: -5px; left: -5px; width: 16px; height: 16px; cursor: nesw-resize; z-index: 101;' }
+        ];
+
+        handles.forEach(({ dir, style }) => {
+            const handle = document.createElement('div');
+            handle.className = 'fasttag-scraper-resize-handle';
+            handle.setAttribute('data-dir', dir);
+            handle.style.cssText = `position: absolute; ${style} user-select: none; touch-action: none;`;
+
+            handle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                hudElement._isDragging = true;
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const rect = hudElement.getBoundingClientRect();
+                const startL = rect.left;
+                const startT = rect.top;
+                const startW = hudElement.offsetWidth;
+                const startH = hudElement.offsetHeight;
+
+                document.body.style.cursor = handle.style.cursor;
+                document.body.style.userSelect = 'none';
+
+                const onMouseMove = (ev) => {
+                    const dx = ev.clientX - startX;
+                    const dy = ev.clientY - startY;
+
+                    let newW = startW;
+                    let newH = startH;
+                    let newL = startL;
+                    let newT = startT;
+
+                    if (dir.includes('e')) newW = startW + dx;
+                    if (dir.includes('w')) {
+                        newW = startW - dx;
+                        newL = startL + dx;
+                    }
+                    if (dir.includes('s')) newH = startH + dy;
+                    if (dir.includes('n')) {
+                        newH = startH - dy;
+                        newT = startT + dy;
+                    }
+
+                    // Bounds Clamping
+                    if (newW < minW) {
+                        if (dir.includes('w')) newL = startL + (startW - minW);
+                        newW = minW;
+                    }
+                    if (newW > maxW) {
+                        if (dir.includes('w')) newL = startL + (startW - maxW);
+                        newW = maxW;
+                    }
+                    if (newL < 8) {
+                        if (dir.includes('w')) newW = startW + (startL - 8);
+                        newL = 8;
+                    }
+
+                    if (newH < minH) {
+                        if (dir.includes('n')) newT = startT + (startH - minH);
+                        newH = minH;
+                    }
+                    if (newH > maxH) {
+                        if (dir.includes('n')) newT = startT + (startH - maxH);
+                        newH = maxH;
+                    }
+                    if (newT < 8) {
+                        if (dir.includes('n')) newH = startH + (startT - 8);
+                        newT = 8;
+                    }
+                    if (newT + newH > window.innerHeight - 8) {
+                        if (dir.includes('s')) newH = window.innerHeight - 8 - newT;
+                    }
+                    if (newL + newW > window.innerWidth - 8) {
+                        if (dir.includes('e')) newW = window.innerWidth - 8 - newL;
+                    }
+
+                    hudElement.style.width = `${Math.round(newW)}px`;
+                    hudElement.style.height = `${Math.round(newH)}px`;
+                    hudElement.style.left = `${Math.round(newL)}px`;
+                    hudElement.style.top = `${Math.round(newT)}px`;
+                    hudElement.style.right = 'auto';
+
+                    floatingScraperHudSize = { width: `${Math.round(newW)}px`, height: `${Math.round(newH)}px` };
+                    floatingScraperHudPosition = { top: `${Math.round(newT)}px`, left: `${Math.round(newL)}px` };
+                };
+
+                const onMouseUp = () => {
+                    hudElement._isDragging = false;
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                };
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+
+            hudElement.appendChild(handle);
+        });
+    }
+
     async function renderScraperMatchCard(container, results, sceneId, ctx, popup, onDismiss) {
         if (!results || results.length === 0) {
             if (container) {
@@ -4911,7 +5050,7 @@
                     floatingScraperHudPosition = null;
                 }
                 const isDarkTheme = getEffectiveTheme() === 'dark';
-                floatingScraperHudElement.style.cssText = `position: fixed; top: ${finalTop}; ${finalLeft ? `left: ${finalLeft};` : `right: ${finalRight};`} width: ${finalWidth}; height: ${finalHeight}; min-width: 300px; min-height: 220px; max-width: 92vw; max-height: 92vh; z-index: 1000000; background: ${isDarkTheme ? '#1e293b' : '#ffffff'}; border: 1.5px solid ${isDarkTheme ? '#4338ca' : '#a5b4fc'}; border-radius: 10px; box-shadow: 0 20px 50px rgba(0,0,0,0.85); overflow: hidden; resize: both; display: flex; flex-direction: column;`;
+                floatingScraperHudElement.style.cssText = `position: fixed; top: ${finalTop}; ${finalLeft ? `left: ${finalLeft};` : `right: ${finalRight};`} width: ${finalWidth}; height: ${finalHeight}; min-width: 300px; min-height: 220px; max-width: 92vw; max-height: 92vh; z-index: 1000000; background: ${isDarkTheme ? '#1e293b' : '#ffffff'}; border: 1.5px solid ${isDarkTheme ? '#4338ca' : '#a5b4fc'}; border-radius: 10px; box-shadow: 0 20px 50px rgba(0,0,0,0.85); overflow: visible; display: flex; flex-direction: column;`;
                 document.body.appendChild(floatingScraperHudElement);
 
                 const scraperResizeObserver = new ResizeObserver(() => {
@@ -5055,32 +5194,32 @@
             targetContainer.innerHTML = `
                 <div style="background: ${isDark ? 'rgba(15, 23, 42, 0.95)' : '#f8fafc'}; border: ${isDetached ? 'none' : (isDark ? '1px solid rgba(99, 102, 241, 0.5)' : '1px solid #818cf8')}; border-radius: 8px; box-shadow: ${isDetached ? 'none' : '0 10px 25px rgba(0,0,0,0.5)'}, inset 0 0 0 1px rgba(255,255,255,0.06); padding: 9px 12px 6px 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 7px; ${isDetached ? 'height: 100%; min-height: 0; flex: 1 1 auto;' : 'height: auto;'} font-family: system-ui, -apple-system, sans-serif; transition: all 0.2s ease;">
                     <!-- Top Navigation & Link Header -->
-                    <div id="fasttag-scrape-header" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; user-select: none;">
-                        <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: ${isDark ? '#e0e7ff' : '#312e81'};">
-                            <span style="font-size: 13px; line-height: 1;">⚡</span>
-                            <span>${escapeHtml(match._sourceName || 'StashDB')} Match</span>
+                    <div id="fasttag-scrape-header" style="display: flex; align-items: center; justify-content: space-between; gap: 6px; user-select: none; white-space: nowrap; overflow: visible; min-height: 26px; padding: 1px 0;">
+                        <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: ${isDark ? '#e0e7ff' : '#312e81'}; min-width: 0; flex: 1; overflow: visible;">
+                            <span style="font-size: 13px; line-height: 1; flex-shrink: 0;">⚡</span>
+                            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1;">${escapeHtml(match._sourceName || 'StashDB')} Match</span>
                             ${results.length > 1 ? `
-                                <div style="display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; color: ${isDark ? '#cbd5e1' : '#475569'}; margin-left: 4px;">
-                                    <button type="button" id="fasttag-scrape-prev" style="background: none; border: 1px solid rgba(148,163,184,0.3); border-radius: 3px; cursor: pointer; color: inherit; padding: 1px 5px; font-size: 9px;" ${currentIndex === 0 ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''}>◀</button>
-                                    <span>${currentIndex + 1}/${results.length}</span>
-                                    <button type="button" id="fasttag-scrape-next" style="background: none; border: 1px solid rgba(148,163,184,0.3); border-radius: 3px; cursor: pointer; color: inherit; padding: 1px 5px; font-size: 9px;" ${currentIndex === results.length - 1 ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''}>▶</button>
+                                <div class="fasttag-match-counter-pulse" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: ${isDark ? '#e0e7ff' : '#312e81'}; background: ${isDark ? 'rgba(99, 102, 241, 0.25)' : 'rgba(99, 102, 241, 0.12)'}; border: 1px solid ${isDark ? 'rgba(129, 140, 248, 0.75)' : '#818cf8'}; padding: 2px 6px; border-radius: 5px; margin-left: 2px; user-select: none; flex-shrink: 0; white-space: nowrap; line-height: 1;">
+                                    <button type="button" id="fasttag-scrape-prev" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(148,163,184,0.4); border-radius: 3px; cursor: pointer; color: inherit; padding: 1px 5px; font-size: 9.5px; line-height: 1; transition: all 0.15s ease;" ${currentIndex === 0 ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''} title="Previous match (Left Arrow)">◀</button>
+                                    <span style="letter-spacing: 0.2px; font-size: 11px; font-weight: 700; white-space: nowrap;">${currentIndex + 1}/${results.length}</span>
+                                    <button type="button" id="fasttag-scrape-next" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(148,163,184,0.4); border-radius: 3px; cursor: pointer; color: inherit; padding: 1px 5px; font-size: 9.5px; line-height: 1; transition: all 0.15s ease;" ${currentIndex === results.length - 1 ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''} title="Next match (Right Arrow)">▶</button>
                                 </div>
                             ` : ''}
                         </div>
-                        <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
+                        <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0; white-space: nowrap;">
                             ${stashDbUrl ? `
-                                <a href="${stashDbUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; color: #818cf8; text-decoration: none; padding: 2px 6px; border-radius: 4px; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.35); transition: background 0.15s ease;" title="Open in StashDB in new tab">
-                                    <span>🔗 StashDB</span><span style="font-size: 9px;">↗</span>
+                                <a href="${stashDbUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 600; color: #818cf8; text-decoration: none; padding: 2.5px 6px; border-radius: 4px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); transition: background 0.15s ease; white-space: nowrap; line-height: 1;" title="Open in StashDB in new tab">
+                                    <span>🔗</span><span>↗</span>
                                 </a>
                             ` : ''}
-                            <button type="button" id="fasttag-scrape-popout-toggle" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700; color: #818cf8; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 4px; line-height: 1; transition: all 0.15s ease;" data-micro-tooltip="${isDetached ? 'Dock scraper inside popup' : 'Pop out scraper into floating window'}">
-                                <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: block; pointer-events: none;">
+                            <button type="button" id="fasttag-scrape-popout-toggle" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 4px; padding: 2.5px 6px; font-size: 10px; font-weight: 700; color: #818cf8; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 3px; line-height: 1; transition: all 0.15s ease; white-space: nowrap;" data-micro-tooltip="${isDetached ? 'Dock scraper inside popup' : 'Pop out scraper into floating window'}">
+                                <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: block; pointer-events: none;">
                                     <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" fill="none" stroke-width="2"></rect>
                                     <rect x="12" y="11" width="8" height="7" rx="1.5" fill="currentColor" stroke="none"></rect>
                                 </svg>
                                 <span>${isDetached ? 'Dock' : 'Pop Out'}</span>
                             </button>
-                            <button type="button" id="fasttag-scrape-accept-btn" style="background: #059669; border: 1px solid #10b981; color: #ffffff; padding: 2.5px 8px; border-radius: 4px; font-size: 10.5px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 3px; box-shadow: 0 1px 4px rgba(5,150,105,0.4); line-height: 1.2; transition: all 0.15s ease;" title="Accept match and save metadata (Enter)">
+                            <button type="button" id="fasttag-scrape-accept-btn" style="background: #059669; border: 1px solid #10b981; color: #ffffff; padding: 2.5px 7px; border-radius: 4px; font-size: 10px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 2px; box-shadow: 0 1px 4px rgba(5,150,105,0.4); line-height: 1.2; transition: all 0.15s ease; white-space: nowrap; flex-shrink: 0;" title="Accept match and save metadata (Enter)">
                                 <span>✓ Accept</span>
                             </button>
                         </div>
@@ -5104,17 +5243,19 @@
                     <!-- Items Preview Box with Relative Wrapper for Scroll Indicator -->
                     <div style="position: relative; border-radius: 6px; overflow: hidden; ${isDetached ? 'flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;' : 'height: auto;'}">
                         <div id="fasttag-scrape-items-preview" style="display: flex; flex-direction: column; gap: 7px; background: ${isDark ? 'rgba(0,0,0,0.25)' : 'rgba(0,0,0,0.03)'}; padding: 7px 9px 10px 9px; border-radius: 6px; font-size: 11px; box-sizing: border-box; overflow-y: auto; overflow-x: hidden; ${isDetached ? 'flex: 1 1 auto; min-height: 80px; max-height: none;' : `height: ${savedEmbeddedH}px; min-height: 50px; max-height: 520px;`} scrollbar-width: thin; scrollbar-color: ${isDark ? 'rgba(129, 140, 248, 0.65) rgba(0,0,0,0.25)' : '#a5b4fc #f1f5f9'}; transition: opacity 0.1s ease;">
-                            <!-- Top Row: Cover Thumbnail + Title & Studio (Side-by-Side) -->
-                            <div style="display: flex; gap: 9px; align-items: stretch;">
+                            ${isDetached ? `
+                                <!-- Detached Hero Cover Banner (On its own dedicated line) -->
                                 ${match.image ? `
-                                    <div class="fasttag-scrape-cover-thumb" style="flex-shrink: 0; width: ${isDetached ? '148px' : '116px'}; height: ${isDetached ? '94px' : '74px'}; border-radius: 6px; overflow: hidden; background: #000; border: 1px solid ${isDark ? 'rgba(255,255,255,0.18)' : '#cbd5e1'}; display: flex; align-items: center; justify-content: center; align-self: flex-start; cursor: pointer; position: relative; transition: all 0.15s ease;" title="Hover to view full-size cover">
+                                    <div class="fasttag-scrape-cover-thumb" style="width: 100%; max-height: clamp(160px, 35vh, 320px); aspect-ratio: 16/9; border-radius: 6px; overflow: hidden; background: #000; border: 1px solid ${isDark ? 'rgba(255,255,255,0.18)' : '#cbd5e1'}; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; transition: all 0.15s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.3); flex-shrink: 0;" title="Hover to view full-size cover">
                                         <img src="${match.image}" alt="Cover" style="width: 100%; height: 100%; object-fit: cover; display: block;" loading="lazy" />
                                     </div>
                                 ` : ''}
-                                <div style="display: flex; flex-direction: column; gap: 6px; justify-content: center; flex: 1; min-width: 0;">
+
+                                <!-- Title & Studio (Clean stacked rows directly below hero cover) -->
+                                <div style="display: flex; flex-direction: column; gap: 6px;">
                                     <!-- Title Row -->
                                     <div style="display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;">
-                                        <label style="display: inline-flex; align-items: baseline; gap: 4px; min-width: 60px; flex-shrink: 0; cursor: pointer; user-select: none; font-weight: 600; color: ${isDark ? '#e0e7ff' : '#312e81'}; font-size: 11px;" title="Check to update scene title">
+                                        <label style="display: inline-flex; align-items: baseline; gap: 4px; min-width: 55px; flex-shrink: 0; cursor: pointer; user-select: none; font-weight: 600; color: ${isDark ? '#e0e7ff' : '#312e81'}; font-size: 11px;" title="Check to update scene title">
                                             <input type="checkbox" id="fasttag-scrape-chk-title" style="cursor: pointer; width: 12px; height: 12px; accent-color: #6366f1; margin: 0; position: relative; top: 1.5px;">
                                             <span style="font-size: 11px;">✏️</span>
                                             <span>Title:</span>
@@ -5125,7 +5266,7 @@
 
                                     ${studioName ? `
                                         <div style="display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;">
-                                            <label style="display: inline-flex; align-items: baseline; gap: 4px; min-width: 60px; flex-shrink: 0; cursor: pointer; user-select: none; font-weight: 600; color: ${isDark ? '#a5b4fc' : '#4f46e5'}; font-size: 11px;">
+                                            <label style="display: inline-flex; align-items: baseline; gap: 4px; min-width: 55px; flex-shrink: 0; cursor: pointer; user-select: none; font-weight: 600; color: ${isDark ? '#a5b4fc' : '#4f46e5'}; font-size: 11px;">
                                                 <input type="checkbox" id="fasttag-scrape-chk-studio" checked style="cursor: pointer; width: 12px; height: 12px; accent-color: ${isStudioNew ? '#f59e0b' : '#6366f1'}; margin: 0; position: relative; top: 1.5px;">
                                                 <span style="font-size: 11px;">🏢</span>
                                                 <span>Studio:</span>
@@ -5141,7 +5282,46 @@
                                         </div>
                                     ` : ''}
                                 </div>
-                            </div>
+                            ` : `
+                                <!-- Docked Mode: Compact Side-by-Side -->
+                                <div style="display: flex; gap: 9px; align-items: stretch;">
+                                    ${match.image ? `
+                                        <div class="fasttag-scrape-cover-thumb" style="flex-shrink: 0; width: 116px; height: 74px; border-radius: 6px; overflow: hidden; background: #000; border: 1px solid ${isDark ? 'rgba(255,255,255,0.18)' : '#cbd5e1'}; display: flex; align-items: center; justify-content: center; align-self: flex-start; cursor: pointer; position: relative; transition: all 0.15s ease;" title="Hover to view full-size cover">
+                                            <img src="${match.image}" alt="Cover" style="width: 100%; height: 100%; object-fit: cover; display: block;" loading="lazy" />
+                                        </div>
+                                    ` : ''}
+                                    <div style="display: flex; flex-direction: column; gap: 6px; justify-content: center; flex: 1; min-width: 0;">
+                                        <!-- Title Row -->
+                                        <div style="display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;">
+                                            <label style="display: inline-flex; align-items: baseline; gap: 4px; min-width: 60px; flex-shrink: 0; cursor: pointer; user-select: none; font-weight: 600; color: ${isDark ? '#e0e7ff' : '#312e81'}; font-size: 11px;" title="Check to update scene title">
+                                                <input type="checkbox" id="fasttag-scrape-chk-title" style="cursor: pointer; width: 12px; height: 12px; accent-color: #6366f1; margin: 0; position: relative; top: 1.5px;">
+                                                <span style="font-size: 11px;">✏️</span>
+                                                <span>Title:</span>
+                                            </label>
+                                            <span style="display: inline-block; background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#e0e7ff' : '#312e81'}; padding: 2px 7px; border-radius: 4px; font-weight: 700; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(match.title || '')}">${escapeHtml(match.title || 'Untitled Match')}</span>
+                                            ${match.date ? `<span style="font-size: 10.5px; color: ${isDark ? '#94a3b8' : '#64748b'}; font-weight: 500;">(${match.date})</span>` : ''}
+                                        </div>
+
+                                        ${studioName ? `
+                                            <div style="display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;">
+                                                <label style="display: inline-flex; align-items: baseline; gap: 4px; min-width: 60px; flex-shrink: 0; cursor: pointer; user-select: none; font-weight: 600; color: ${isDark ? '#a5b4fc' : '#4f46e5'}; font-size: 11px;">
+                                                    <input type="checkbox" id="fasttag-scrape-chk-studio" checked style="cursor: pointer; width: 12px; height: 12px; accent-color: ${isStudioNew ? '#f59e0b' : '#6366f1'}; margin: 0; position: relative; top: 1.5px;">
+                                                    <span style="font-size: 11px;">🏢</span>
+                                                    <span>Studio:</span>
+                                                </label>
+                                                ${isStudioNew ? `
+                                                    <span style="display: inline-flex; align-items: baseline; gap: 4px; background: ${isDark ? 'rgba(245, 158, 11, 0.12)' : '#fef3c7'}; color: ${isDark ? '#fde68a' : '#92400e'}; border: 1px dashed ${isDark ? 'rgba(245, 158, 11, 0.55)' : '#f59e0b'}; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 11px;" title="Not in your local library — will create new studio upon saving">
+                                                        <span>${escapeHtml(studioName)}</span>
+                                                        <span style="font-size: 8.5px; font-weight: 700; background: ${isDark ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.25)'}; padding: 0.5px 3.5px; border-radius: 3px; color: ${isDark ? '#fef08a' : '#78350f'};">+ New</span>
+                                                    </span>
+                                                ` : `
+                                                    <span style="display: inline-block; background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#e0e7ff' : '#312e81'}; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 11px;" title="Exists in your local library">${escapeHtml(studioName)}</span>
+                                                `}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            `}
 
                             <!-- Full-Width Performers, Tags, Details Sections -->
                             <div style="display: flex; flex-direction: column; gap: 5px; border-top: 1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}; padding-top: 5px;">
@@ -5525,6 +5705,10 @@
                     popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
                 }
             }
+
+            if (isDetached && floatingScraperHudElement) {
+                attachScraperHudResizeHandles(floatingScraperHudElement);
+            }
         };
 
         updateCardView();
@@ -5649,20 +5833,24 @@
                 if (typeof ctx.setSelectedStudio === 'function' && studioIdToSet) {
                     ctx.setSelectedStudio(studioIdToSet);
                 }
+
+                let currentPerfs = typeof ctx.getSelectedPerformers === 'function' ? ctx.getSelectedPerformers() : new Set();
+                if (!(currentPerfs instanceof Set)) currentPerfs = new Set(currentPerfs || []);
+                performerIdsToAdd.forEach(id => currentPerfs.add(id));
                 if (typeof ctx.setSelectedPerformers === 'function') {
-                    const currentPerfs = ctx.getSelectedPerformers ? ctx.getSelectedPerformers() : new Set();
-                    performerIdsToAdd.forEach(id => currentPerfs.add(id));
                     ctx.setSelectedPerformers(currentPerfs);
                 }
+
+                let currentTags = typeof ctx.getSelectedTags === 'function' ? ctx.getSelectedTags() : new Set();
+                if (!(currentTags instanceof Set)) currentTags = new Set(currentTags || []);
+                tagIdsToAdd.forEach(id => currentTags.add(id));
                 if (typeof ctx.setSelectedTags === 'function') {
-                    const currentTags = ctx.getSelectedTags ? ctx.getSelectedTags() : new Set();
-                    tagIdsToAdd.forEach(id => currentTags.add(id));
                     ctx.setSelectedTags(currentTags);
                 }
 
                 if (typeof ctx.fetchColumnData === 'function' && popup) {
-                    if (popup.tagsTable) await ctx.fetchColumnData('tags', popup.tagsTable, '', ctx.getSelectedTags());
-                    if (popup.performersTable) await ctx.fetchColumnData('performers', popup.performersTable, '', ctx.getSelectedPerformers());
+                    if (popup.tagsTable) await ctx.fetchColumnData('tags', popup.tagsTable, '', currentTags);
+                    if (popup.performersTable) await ctx.fetchColumnData('performers', popup.performersTable, '', currentPerfs);
                 }
                 if (typeof ctx.renderStudioBar === 'function') {
                     await ctx.renderStudioBar('');
@@ -5988,14 +6176,24 @@
         document.body.classList.add('fasttag-modal-open');
 
         // Global Wheel Trap for FastTag Modal:
-        // Completely locks background Stash page from scrolling, while allowing popup scroll containers to scroll
+        // Completely locks background Stash page from scrolling, while allowing popup & sidecar scroll containers to scroll
         window.addEventListener('wheel', (e) => {
             const popup = document.querySelector('#scenes-popup');
             if (!popup || popup.style.display === 'none') return;
 
+            const scraperHud = document.querySelector('#fasttag-floating-scraper-hud');
+            const videoHud = document.querySelector('#fasttag-floating-video-hud');
+            const settingsModal = document.querySelector('#fasttag-settings-modal');
+            const isInsideAllowed = (el) => Boolean(
+                (popup && popup.contains(el)) ||
+                (scraperHud && scraperHud.contains(el)) ||
+                (videoHud && videoHud.contains(el)) ||
+                (settingsModal && settingsModal.contains(el))
+            );
+
             // Check if mouse is over a horizontal scroll container (Studio or Groups bar)
             const hScrollable = e.target.closest('#everything-studio-scroll, #everything-groups-scroll, #everything-studio-half, #everything-groups-half');
-            if (hScrollable && popup.contains(hScrollable)) {
+            if (hScrollable && isInsideAllowed(hScrollable)) {
                 const target = hScrollable.closest('#everything-studio-scroll, #everything-groups-scroll') || hScrollable;
                 let delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
                 if (e.deltaMode === 1) delta *= 28;
@@ -6009,11 +6207,23 @@
             }
 
             const scrollable = e.target.closest('.tabulator-tableholder, #fasttag-scrape-items-preview, [id$="-quick-actions"], [id*="-chips"], .fasttag-chip-row, textarea');
-            if (scrollable && popup.contains(scrollable)) {
+            if (scrollable && isInsideAllowed(scrollable)) {
                 const hasScrollableY = scrollable.scrollHeight > scrollable.clientHeight;
                 const atTop = scrollable.scrollTop <= 0 && e.deltaY < 0;
                 const atBottom = (scrollable.scrollTop + scrollable.clientHeight >= scrollable.scrollHeight - 1) && e.deltaY > 0;
                 if (atTop || atBottom || !hasScrollableY) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            } else if (scraperHud && scraperHud.contains(e.target)) {
+                // If scrolling anywhere inside the detached scraper window (over photo, headers, or padding)
+                // Forward the scroll to #fasttag-scrape-items-preview so wheel scrolling works anywhere in the sidecar!
+                const preview = scraperHud.querySelector('#fasttag-scrape-items-preview');
+                if (preview) {
+                    let delta = e.deltaY;
+                    if (e.deltaMode === 1) delta *= 28;
+                    else if (e.deltaMode === 2) delta *= 400;
+                    preview.scrollTop += delta;
                     e.preventDefault();
                     e.stopPropagation();
                 }
@@ -6084,14 +6294,17 @@
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
-                const scrapeAcceptBtn = document.querySelector('#fasttag-scrape-accept-btn');
-                if (scrapeAcceptBtn && !scrapeAcceptBtn.disabled && scrapeAcceptBtn.offsetParent !== null) {
-                    e.preventDefault();
-                    scrapeAcceptBtn.click();
-                    return;
+                const isSearchFocused = document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+
+                if (!isSearchFocused) {
+                    const scrapeAcceptBtn = document.querySelector('#fasttag-scrape-accept-btn');
+                    if (scrapeAcceptBtn && !scrapeAcceptBtn.disabled && scrapeAcceptBtn.offsetParent !== null) {
+                        e.preventDefault();
+                        scrapeAcceptBtn.click();
+                        return;
+                    }
                 }
 
-                const isSearchFocused = document.activeElement && document.activeElement.tagName === 'INPUT';
                 if (isSearchFocused && document.activeElement.value && document.activeElement.value.trim().length > 0 && !(e.ctrlKey || e.metaKey)) return;
 
                 if (!isSearchFocused || e.ctrlKey || e.metaKey || (isSearchFocused && (!document.activeElement.value || !document.activeElement.value.trim()))) {
@@ -8347,7 +8560,7 @@
                         ]);
                         refreshAllUI();
                         updateEverythingKeyboardHighlight();
-                        await doSave();
+                        updateSaveButton();
                         popup.globalSearch.focus({ preventScroll: true });
                     };
 
@@ -8413,7 +8626,7 @@
                         ]);
                         refreshAllUI();
                         updateEverythingKeyboardHighlight();
-                        await doSave();
+                        updateSaveButton();
                         popup.globalSearch.focus({ preventScroll: true });
                     };
                     groupsBar.selectedContainer.appendChild(pill);
@@ -8481,7 +8694,7 @@
                         ]);
                         refreshAllUI();
                         updateEverythingKeyboardHighlight();
-                        await doSave();
+                        updateSaveButton();
                         popup.globalSearch.focus({ preventScroll: true });
                     };
                     groupsBar.recentContainer.appendChild(chip);
@@ -8504,7 +8717,7 @@
                     ]);
                     refreshAllUI();
                     updateEverythingKeyboardHighlight();
-                    await doSave();
+                    updateSaveButton();
                     popup.globalSearch.focus({ preventScroll: true });
                 };
             }
@@ -8573,39 +8786,30 @@
             popup.performersFetchData = () => fetchColumnData('performers', performersTable, popup.globalSearch?.value || '', selectedPerformerIds);
 
             const onTagChipSelect = async () => {
-                popup.globalSearch.value = '';
-                popup.globalClear.style.display = 'none';
-                if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                const query = popup.globalSearch?.value || '';
                 await Promise.all([
-                    fetchColumnData('tags', tagsTable, '', selectedTagIds),
-                    fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                    fetchColumnData('tags', tagsTable, query, selectedTagIds),
+                    fetchColumnData('performers', performersTable, query, selectedPerformerIds)
                 ]);
-                const holder = popup.tags.tableContainer?.querySelector('.tabulator-tableholder');
-                if (holder) holder.scrollTop = 0;
                 refreshAllUI();
-                await doSave();
+                updateSaveButton();
             };
 
             const onPerformerChipSelect = async () => {
-                popup.globalSearch.value = '';
-                popup.globalClear.style.display = 'none';
-                if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                const query = popup.globalSearch?.value || '';
                 await Promise.all([
-                    fetchColumnData('tags', tagsTable, '', selectedTagIds),
-                    fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                    fetchColumnData('tags', tagsTable, query, selectedTagIds),
+                    fetchColumnData('performers', performersTable, query, selectedPerformerIds)
                 ]);
-                const holder = popup.performers.tableContainer?.querySelector('.tabulator-tableholder');
-                if (holder) holder.scrollTop = 0;
                 refreshAllUI();
-                await doSave();
+                updateSaveButton();
             };
 
-            tagsTable.on("rowSelected", async (row) => {
+            tagsTable.on("rowSelected", (row) => {
                 if (isRestoring) return;
                 const id = row.getData()?.id;
                 if (!id) return;
-                const strId = String(id);
-                selectedTagIds.add(strId);
+                selectedTagIds.add(String(id));
                 addRecentEntry('tags', row.getData());
 
                 currentNavSection = 'tags';
@@ -8613,27 +8817,8 @@
                 activeNavIndex = rows.indexOf(row);
                 refreshAllUI();
                 updateEverythingKeyboardHighlight();
-
-                const isSearching = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
-                if (isSearching) {
-                    popup.globalSearch.value = '';
-                    popup.globalClear.style.display = 'none';
-                    if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-                    await Promise.all([
-                        fetchColumnData('tags', tagsTable, '', selectedTagIds),
-                        fetchColumnData('performers', performersTable, '', selectedPerformerIds)
-                    ]);
-                    const r = tagsTable.getRow(id);
-                    if (r) tagsTable.scrollToRow(r, "top", false);
-                    renderStudioBar('');
-                    renderGroupBar('');
-                    activeNavIndex = -1;
-                    updateEverythingKeyboardHighlight();
-                    popup.globalSearch.focus({ preventScroll: true });
-                    doSave();
-                } else {
-                    popup.globalSearch.focus({ preventScroll: true });
-                }
+                updateSaveButton();
+                popup.globalSearch.focus({ preventScroll: true });
             });
 
             tagsTable.on("rowDeselected", (row) => {
@@ -8646,15 +8831,15 @@
                 activeNavIndex = rows.indexOf(row);
                 refreshAllUI();
                 updateEverythingKeyboardHighlight();
+                updateSaveButton();
                 popup.globalSearch.focus({ preventScroll: true });
             });
 
-            performersTable.on("rowSelected", async (row) => {
+            performersTable.on("rowSelected", (row) => {
                 if (isRestoring) return;
                 const id = row.getData()?.id;
                 if (!id) return;
-                const strId = String(id);
-                selectedPerformerIds.add(strId);
+                selectedPerformerIds.add(String(id));
                 addRecentEntry('performers', row.getData());
 
                 currentNavSection = 'performers';
@@ -8662,27 +8847,8 @@
                 activeNavIndex = rows.indexOf(row);
                 refreshAllUI();
                 updateEverythingKeyboardHighlight();
-
-                const isSearching = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
-                if (isSearching) {
-                    popup.globalSearch.value = '';
-                    popup.globalClear.style.display = 'none';
-                    if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-                    await Promise.all([
-                        fetchColumnData('tags', tagsTable, '', selectedTagIds),
-                        fetchColumnData('performers', performersTable, '', selectedPerformerIds)
-                    ]);
-                    const r = performersTable.getRow(id);
-                    if (r) performersTable.scrollToRow(r, "top", false);
-                    renderStudioBar('');
-                    renderGroupBar('');
-                    activeNavIndex = -1;
-                    updateEverythingKeyboardHighlight();
-                    popup.globalSearch.focus({ preventScroll: true });
-                    doSave();
-                } else {
-                    popup.globalSearch.focus({ preventScroll: true });
-                }
+                updateSaveButton();
+                popup.globalSearch.focus({ preventScroll: true });
             });
 
             performersTable.on("rowDeselected", (row) => {
@@ -8695,6 +8861,7 @@
                 activeNavIndex = rows.indexOf(row);
                 refreshAllUI();
                 updateEverythingKeyboardHighlight();
+                updateSaveButton();
                 popup.globalSearch.focus({ preventScroll: true });
             });
 
@@ -9541,7 +9708,7 @@
                             }
 
                             refreshAllUI();
-                            await doSave();
+                            updateSaveButton();
 
                             if (hasSearch) {
                                 popup.globalSearch.value = '';
@@ -9716,7 +9883,7 @@
                         renderGroupBar(query);
                     }
                     refreshAllUI();
-                    await doSave();
+                    updateSaveButton();
                 };
 
             makeColumnResizable(popup.columnsContainer, popup.colTags, popup.colPerformers, popup.colResizer, () => {
@@ -9823,6 +9990,8 @@
                 setSelectedPerformers: (s) => { selectedPerformerIds = s; },
                 setSelectedStudio: (s) => { selectedStudioId = s; },
                 setSelectedGroups: (s) => { selectedGroupIds = s; },
+                getSelectedTags: () => selectedTagIds,
+                getSelectedPerformers: () => selectedPerformerIds,
                 getSelectedStudio: () => selectedStudioId,
                 getSelectedGroups: () => selectedGroupIds,
                 setInitialTags: (s) => { initialTagIds = s; },

@@ -2,7 +2,28 @@
 
 All notable changes to the **FastTag** Stash plugin will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+## [3.9.2] - 2026-08-31
+
+### Fixed & Improved
+- **Search Input Bug Fix (Disappearing Letters)**:
+  - Fixed an issue where typing queries (such as `l` or `I`) would wipe search text 100ms after typing due to automatic re-selection triggering legacy search-clearing handlers.
+  - Table row selections and deselections now preserve search input state smoothly.
+- **Edit Everything Save & Selection Workflow**:
+  - Selecting/deselecting tags, performers, studios, or groups updates selection state and marks the **Save Scene** button dirty without prematurely firing `doSave()` GraphQL mutations or premature toasts.
+- **Scraper Accept Hotkey Input Guard**:
+  - Global <kbd>Enter</kbd> key listener now guards against capturing <kbd>Enter</kbd> while the user is actively typing in a search box or text input.
+- **Scraper Sidecar 8-Direction Resizing**:
+  - Added 8-directional edge and corner resize handles (N, S, E, W, NE, NW, SE, SW) to the floating scraper HUD with coordinate clamping and size persistence.
+- **Scraper Header & Match Badge Visual Polish**:
+  - Locked scraper header to a single flex row to prevent button clipping.
+  - Sized match counter badge with breathing violet glow animation and clean rounded corners with no border clipping.
+- **Edit Everything Scraper Compatibility**:
+  - Added context getters to support accepting and saving scraped metadata directly within the Edit Everything modal.
+
+---
+
 ## [3.9.1] - 2026-08-31
 
 ### Fixed & Improved
