@@ -6044,17 +6044,6 @@
         const popupType = form.getAttribute('data-popup-type') || activePopup?.type;
         const isEverythingModal = popupType === 'everything' || popupType === 'bulk-everything';
 
-        if (sequentialEditState.enabled && sequentialEditState.popupPosition.left !== 0) {
-            const pos = clampPos(sequentialEditState.popupPosition.left, sequentialEditState.popupPosition.top);
-            form.style.left = `${pos.x}px`;
-            form.style.top = `${pos.y}px`;
-
-            requestAnimationFrame(() => form.classList.add('popup-visible'));
-            const firstInput = form.querySelector('#everything-global-search, input[type="text"], input[type="search"]');
-            if (firstInput) firstInput.focus({ preventScroll: true });
-            return;
-        }
-
         // For Edit Everything / Bulk Edit Everything: Center in viewport by default or use saved drag position
         if (isEverythingModal) {
             let savedPos = null;
@@ -6086,6 +6075,10 @@
             form.style.left = `${posX}px`;
             form.style.top = `${posY}px`;
 
+            if (sequentialEditState.enabled) {
+                sequentialEditState.popupPosition = { left: posX, top: posY };
+            }
+
             requestAnimationFrame(() => {
                 const actualFormRect = form.getBoundingClientRect();
                 const pos = clampPos(actualFormRect.left, actualFormRect.top);
@@ -6099,8 +6092,21 @@
                 }
 
                 const firstInput = form.querySelector('#everything-global-search, input[type="text"], input[type="search"]');
-                if (firstInput) firstInput.focus({ preventScroll: true });
+                if (firstInput) {
+                    firstInput.focus({ preventScroll: true });
+                }
             });
+            return;
+        }
+
+        if (sequentialEditState.enabled && sequentialEditState.popupPosition.left !== 0) {
+            const pos = clampPos(sequentialEditState.popupPosition.left, sequentialEditState.popupPosition.top);
+            form.style.left = `${pos.x}px`;
+            form.style.top = `${pos.y}px`;
+
+            requestAnimationFrame(() => form.classList.add('popup-visible'));
+            const firstInput = form.querySelector('#everything-global-search, input[type="text"], input[type="search"]');
+            if (firstInput) firstInput.focus({ preventScroll: true });
             return;
         }
 
