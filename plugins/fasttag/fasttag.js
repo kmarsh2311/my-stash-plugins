@@ -1648,7 +1648,14 @@
         const scraperRect = isScraperOpen ? floatingScraperHudElement.getBoundingClientRect() : null;
 
         if (activeForm) {
-            const rect = activeForm.getBoundingClientRect();
+            let rect = activeForm.getBoundingClientRect();
+            if (!rect || rect.width <= 0 || rect.left <= 0) {
+                const formW = parseInt(activeForm.style.width, 10) || 760;
+                const formH = parseInt(activeForm.style.height, 10) || 760;
+                const defPos = getDefaultEverythingPosition(formW, formH);
+                rect = { left: defPos.x, right: defPos.x + formW, top: defPos.y, bottom: defPos.y + formH, width: formW, height: formH };
+            }
+
             const spaceLeft = Math.max(0, rect.left - margin);
             const spaceRight = Math.max(0, screenWidth - rect.right - margin);
 
@@ -1751,7 +1758,14 @@
         const videoRect = isVideoOpen ? floatingHudElement.getBoundingClientRect() : null;
 
         if (activeForm) {
-            const rect = activeForm.getBoundingClientRect();
+            let rect = activeForm.getBoundingClientRect();
+            if (!rect || rect.width <= 0 || rect.left <= 0) {
+                const formW = parseInt(activeForm.style.width, 10) || 760;
+                const formH = parseInt(activeForm.style.height, 10) || 760;
+                const defPos = getDefaultEverythingPosition(formW, formH);
+                rect = { left: defPos.x, right: defPos.x + formW, top: defPos.y, bottom: defPos.y + formH, width: formW, height: formH };
+            }
+
             const spaceRight = Math.max(0, screenWidth - rect.right - margin);
             const spaceLeft = Math.max(0, rect.left - margin);
 
@@ -8778,6 +8792,7 @@
             popup.type = 'everything';
             activePopup = popup;
             const form = popup.element;
+            positionPopupNearCard(form, cardElement);
 
             let selectedTagIds = new Set();
             let selectedPerformerIds = new Set();
