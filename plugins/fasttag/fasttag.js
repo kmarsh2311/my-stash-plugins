@@ -3582,8 +3582,9 @@
     // --- Search, Sorting, and Quick Selection ---
     function getSmartSortComparator(term, selectedIds, labelKey, searchFields = [labelKey], sortKey = 'name_asc') {
         return (a, b) => {
-            const aSel = selectedIds.has(String(a.id));
-            const bSel = selectedIds.has(String(b.id));
+            const hasSet = selectedIds && typeof selectedIds.has === 'function';
+            const aSel = hasSet && selectedIds.has(String(a.id));
+            const bSel = hasSet && selectedIds.has(String(b.id));
             if (aSel && !bSel) return -1;
             if (!aSel && bSel) return 1;
 
@@ -6247,6 +6248,8 @@
 
             // Handle Escape to close popup
             if (e.key === 'Escape') {
+                const subModal = document.querySelector('#fasttag-settings-modal, #fasttag-create-modal, .fasttag-create-dialog-overlay, .fasttag-bulk-confirm-overlay');
+                if (subModal && subModal.style.display !== 'none') return;
                 e.preventDefault();
                 e.stopPropagation();
                 closePopup();
@@ -6920,31 +6923,19 @@
             }
         };
 
-        activeTableInstance.on("rowSelected", async (row) => {
+        activeTableInstance.on("rowSelected", (row) => {
             if (!isRestoringSelections) {
                 const id = row.getData().id;
                 if (id) {
                     selectedIds.add(String(id));
                     addRecentEntry(type, row.getData());
                 }
-                const isSearching = filterInput && filterInput.value.trim().length > 0;
-                if (isSearching) {
-                    filterInput.value = '';
-                    updateVisibility();
-                    await fetchData('', false);
-                    const r = activeTableInstance.getRow(id);
-                    if (r) activeTableInstance.scrollToRow(r, "top", false);
-                    currentSingleSection = 'table';
-                    singleNavIndex = -1;
-                    filterInput.focus({ preventScroll: true });
-                } else {
-                    currentSingleSection = 'table';
-                    const rows = activeTableInstance.getRows();
-                    singleNavIndex = rows.indexOf(row);
-                    updateSingleKeyboardHighlight();
-                    if (filterInput) filterInput.focus({ preventScroll: true });
-                    refreshUI();
-                }
+                currentSingleSection = 'table';
+                const rows = activeTableInstance.getRows();
+                singleNavIndex = rows.indexOf(row);
+                updateSingleKeyboardHighlight();
+                if (filterInput) filterInput.focus({ preventScroll: true });
+                refreshUI();
             }
         });
 
@@ -10562,33 +10553,19 @@
                 renderGroupBar(popup.globalSearch ? popup.globalSearch.value : '');
             };
 
-            tagsTable.on("rowSelected", async (row) => {
+            tagsTable.on("rowSelected", (row) => {
                 if (!isRestoring) {
                     const id = row.getData().id;
                     if (id) {
                         selectedTagIds.add(String(id));
                         addRecentEntry('tags', row.getData());
                     }
-                    const isSearching = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
-                    if (isSearching) {
-                        popup.globalSearch.value = '';
-                        popup.globalClear.style.display = 'none';
-                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-                        await refreshGlobalSearch('');
-                        const r = tagsTable.getRow(id);
-                        if (r) tagsTable.scrollToRow(r, "top", false);
-                        activeNavIndex = -1;
-                        refreshAllUI();
-                        updateEverythingKeyboardHighlight();
-                        popup.globalSearch.focus({ preventScroll: true });
-                    } else {
-                        currentNavSection = 'tags';
-                        const rows = tagsTable.getRows();
-                        activeNavIndex = rows.indexOf(row);
-                        refreshAllUI();
-                        updateEverythingKeyboardHighlight();
-                        if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
-                    }
+                    currentNavSection = 'tags';
+                    const rows = tagsTable.getRows();
+                    activeNavIndex = rows.indexOf(row);
+                    refreshAllUI();
+                    updateEverythingKeyboardHighlight();
+                    if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
                 }
             });
 
@@ -10605,33 +10582,19 @@
                 }
             });
 
-            performersTable.on("rowSelected", async (row) => {
+            performersTable.on("rowSelected", (row) => {
                 if (!isRestoring) {
                     const id = row.getData().id;
                     if (id) {
                         selectedPerformerIds.add(String(id));
                         addRecentEntry('performers', row.getData());
                     }
-                    const isSearching = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
-                    if (isSearching) {
-                        popup.globalSearch.value = '';
-                        popup.globalClear.style.display = 'none';
-                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-                        await refreshGlobalSearch('');
-                        const r = performersTable.getRow(id);
-                        if (r) performersTable.scrollToRow(r, "top", false);
-                        activeNavIndex = -1;
-                        refreshAllUI();
-                        updateEverythingKeyboardHighlight();
-                        popup.globalSearch.focus({ preventScroll: true });
-                    } else {
-                        currentNavSection = 'performers';
-                        const rows = performersTable.getRows();
-                        activeNavIndex = rows.indexOf(row);
-                        refreshAllUI();
-                        updateEverythingKeyboardHighlight();
-                        if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
-                    }
+                    currentNavSection = 'performers';
+                    const rows = performersTable.getRows();
+                    activeNavIndex = rows.indexOf(row);
+                    refreshAllUI();
+                    updateEverythingKeyboardHighlight();
+                    if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
                 }
             });
 
