@@ -1095,8 +1095,165 @@
         document.head.appendChild(style);
     }
 
+    // --- FastTag Comprehensive Diagnostics & Logging Engine ---
+    const DEBUG_STORAGE_KEY = 'fasttag_debug_mode';
+    const DEBUG_LOGS_STORAGE_KEY = 'fasttag_debug_logs_buffer';
+    const MAX_DEBUG_LOGS = 600;
+    let inMemoryDebugLogs = [];
+
+    function getDebugMode() {
+        return localStorage.getItem(DEBUG_STORAGE_KEY) === 'true';
+    }
+    function setDebugMode(enabled) {
+        localStorage.setItem(DEBUG_STORAGE_KEY, enabled ? 'true' : 'false');
+        ftLog('INFO', 'CONFIG', `Debug Mode turned ${enabled ? 'ON' : 'OFF'}`);
+    }
+
+    try {
+        const savedLogs = localStorage.getItem(DEBUG_LOGS_STORAGE_KEY);
+        if (savedLogs) inMemoryDebugLogs = JSON.parse(savedLogs) || [];
+    } catch (e) {
+        inMemoryDebugLogs = [];
+    }
+
+    function getCircularReplacer() {
+        const seen = new WeakSet();
+        return (key, value) => {
+            if (typeof value === "object" && value !== null) {
+                if (seen.has(value) || value instanceof HTMLElement || value instanceof Node) {
+                    return '[DOM/Circular]';
+                }
+                seen.add(value);
+            }
+            return value;
+        };
+    }
+
+    let saveLogsTimeout = null;
+    function scheduleSaveLogsBuffer() {
+        if (saveLogsTimeout) return;
+        saveLogsTimeout = setTimeout(() => {
+            saveLogsTimeout = null;
+            try {
+                localStorage.setItem(DEBUG_LOGS_STORAGE_KEY, JSON.stringify(inMemoryDebugLogs.slice(-250)));
+            } catch (e) {}
+        }, 1000);
+    }
+
+    function ftLog(level, category, message, data = null) {
+        const now = new Date();
+        const timeStr = now.toISOString().replace('T', ' ').replace('Z', '');
+        const entry = {
+            time: timeStr,
+            level: String(level).toUpperCase(),
+            category: String(category).toUpperCase(),
+            message: String(message),
+            data: data ? (typeof data === 'object' ? JSON.parse(JSON.stringify(data, getCircularReplacer())) : data) : null
+        };
+
+        inMemoryDebugLogs.push(entry);
+        if (inMemoryDebugLogs.length > MAX_DEBUG_LOGS) {
+            inMemoryDebugLogs.shift();
+        }
+
+        scheduleSaveLogsBuffer();
+
+        if (getDebugMode() || level === 'ERROR' || level === 'WARN') {
+            const prefix = `[FastTag][${entry.category}]`;
+            if (level === 'ERROR') {
+                console.error(prefix, message, data || '');
+            } else if (level === 'WARN') {
+                console.warn(prefix, message, data || '');
+            } else {
+                console.log(prefix, message, data || '');
+            }
+        }
+    }
+
+    function getLogBufferSize() {
+        return inMemoryDebugLogs.length;
+    }
+
+    function clearDebugLogs() {
+        inMemoryDebugLogs = [];
+        try { localStorage.removeItem(DEBUG_LOGS_STORAGE_KEY); } catch (e) {}
+        ftLog('INFO', 'LOG', 'Debug logs cleared by user');
+    }
+
+    function exportDebugLogsAsText() {
+        const screenInfo = `Screen: ${window.innerWidth}x${window.innerHeight}, DPR: ${window.devicePixelRatio || 1}, UserAgent: ${navigator.userAgent}`;
+        const header = `=== FastTag Diagnostics Log ===\nExported: ${new Date().toISOString()}\n${screenInfo}\nUsage Count: ${getUsageCount()}\n===============================\n\n`;
+        const body = inMemoryDebugLogs.map(e => {
+            let dataStr = '';
+            if (e.data !== null && e.data !== undefined) {
+                try {
+                    dataStr = '\n  ' + JSON.stringify(e.data, null, 2).replace(/\n/g, '\n  ');
+                } catch (err) {
+                    dataStr = '\n  [Non-serializable data]';
+                }
+            }
+            return `[${e.time}] [${e.level}] [${e.category}] ${e.message}${dataStr}`;
+        }).join('\n');
+        return header + body;
+    }
+
+    function downloadDebugLogFile() {
+        const text = exportDebugLogsAsText();
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const d = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = `fasttag-debug-${d}.log`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 500);
+    }
+
+    function copyDebugLogsToClipboard() {
+        const text = exportDebugLogsAsText();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(text);
+        } else {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            ta.remove();
+            return Promise.resolve();
+        }
+    }
+
+    // Global Error & Promise Rejection Interceptor for FastTag Diagnostics
+    if (!window._fastTagErrorListenersAttached) {
+        window._fastTagErrorListenersAttached = true;
+        window.addEventListener('error', (event) => {
+            if (event?.filename && event.filename.includes('fasttag')) {
+                ftLog('ERROR', 'RUNTIME', `Uncaught error in ${event.filename}:${event.lineno}:${event.colno} - ${event.message}`, {
+                    message: event.message,
+                    filename: event.filename,
+                    lineno: event.lineno,
+                    colno: event.colno,
+                    stack: event.error?.stack || null
+                });
+            }
+        });
+        window.addEventListener('unhandledrejection', (event) => {
+            const reason = event.reason;
+            const str = String(reason?.message || reason);
+            if (str.includes('fasttag') || (reason?.stack && reason.stack.includes('fasttag'))) {
+                ftLog('ERROR', 'PROMISE', `Unhandled Promise Rejection: ${str}`, {
+                    message: str,
+                    stack: reason?.stack || null
+                });
+            }
+        });
+    }
+
     // --- Core GraphQL Network Operations ---
     const fetchGQL = async (query, variables = {}) => {
+        const queryName = (query.match(/(query|mutation)\s+([A-Za-z0-9_]+)/) || [])[2] || 'GQL';
         try {
             const res = await fetch('/graphql', {
                 method: 'POST',
@@ -1105,23 +1262,39 @@
             });
 
             if (!res.ok) {
-                return { errors: [{ message: `GraphQL request failed: ${res.status} ${res.statusText}` }] };
+                const errPayload = { errors: [{ message: `GraphQL request failed: ${res.status} ${res.statusText}` }] };
+                ftLog('ERROR', 'GQL', `${queryName} failed with HTTP ${res.status}`, { queryName, variables, error: errPayload });
+                return errPayload;
             }
 
             const payload = await res.json();
             if (!payload || typeof payload !== 'object') {
-                return { errors: [{ message: 'GraphQL response was not valid JSON.' }] };
+                const errPayload = { errors: [{ message: 'GraphQL response was not valid JSON.' }] };
+                ftLog('ERROR', 'GQL', `${queryName} invalid JSON response`, { queryName, error: errPayload });
+                return errPayload;
+            }
+
+            if (payload.errors && payload.errors.length > 0) {
+                ftLog('WARN', 'GQL', `${queryName} returned GraphQL errors`, { queryName, variables, errors: payload.errors });
+            } else if (getDebugMode()) {
+                ftLog('DEBUG', 'GQL', `${queryName} success`, { queryName, variables });
             }
 
             return payload;
         } catch (err) {
+            ftLog('ERROR', 'GQL', `${queryName} network exception: ${err.message || err}`, { queryName, variables, error: String(err) });
             console.error('Stash Scene Manager: Network error', err);
             return { errors: [{ message: err.message || 'Unknown network error' }] };
         }
     };
 
-    function showToast(message, type = "success", duration = 3000) {
+    function showToast(message, type = "success", duration = 3000, debugPayload = null) {
         try {
+            const isDebug = getDebugMode();
+            const effectiveDuration = isDebug ? Math.max(duration, 15000) : duration;
+
+            ftLog(type === 'error' ? 'ERROR' : (type === 'info' ? 'INFO' : 'ACTION'), 'TOAST', message, debugPayload);
+
             const existing = document.getElementById('fasttag-native-toast');
             if (existing) existing.remove();
 
@@ -1129,32 +1302,114 @@
             toast.id = 'fasttag-native-toast';
             const bg = type === "success" ? "#059669" : (type === "info" ? "#6366f1" : "#dc2626");
             const icon = type === "success" ? "✓" : (type === "info" ? "ℹ" : "✕");
-            toast.style.cssText = `position: fixed; top: 18px; left: 50%; transform: translateX(-50%) translateY(-10px); background: ${bg}; color: #ffffff; padding: 7px 15px; border-radius: 8px; font-size: 12px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 20000000; opacity: 0; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); pointer-events: none; display: inline-flex; align-items: center; gap: 6px; font-family: system-ui, -apple-system, sans-serif;`;
-            toast.innerHTML = `<span style="font-size: 13px; line-height: 1;">${icon}</span><span>${escapeHtml(message)}</span>`;
+
+            toast.style.cssText = `
+                position: fixed;
+                top: 18px;
+                left: 50%;
+                transform: translateX(-50%) translateY(-10px);
+                background: ${bg};
+                color: #ffffff;
+                padding: 8px 16px;
+                border-radius: 8px;
+                font-size: 12px;
+                font-weight: 600;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                z-index: 20000000;
+                opacity: 0;
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                pointer-events: auto;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                max-width: 90vw;
+                font-family: system-ui, -apple-system, sans-serif;
+            `;
+
+            let copyBtnHtml = '';
+            if (type === 'error' || debugPayload || isDebug) {
+                copyBtnHtml = `<button id="fasttag-toast-copy-btn" type="button" style="background: rgba(255,255,255,0.22); border: 1px solid rgba(255,255,255,0.35); color: #ffffff; padding: 2px 7px; border-radius: 4px; font-size: 10.5px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; line-height: 1.3;" title="Copy details to clipboard">📋 Copy</button>`;
+            }
+
+            let closeBtnHtml = '';
+            if (isDebug || type === 'error') {
+                closeBtnHtml = `<button id="fasttag-toast-close-btn" type="button" style="background: none; border: none; color: rgba(255,255,255,0.85); padding: 0 0 0 4px; font-size: 14px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center;" title="Dismiss">✕</button>`;
+            }
+
+            toast.innerHTML = `
+                <span style="font-size: 13px; line-height: 1; flex-shrink: 0;">${icon}</span>
+                <span style="word-break: break-word; max-width: 600px;">${escapeHtml(message)}</span>
+                ${copyBtnHtml}
+                ${closeBtnHtml}
+            `;
             document.body.appendChild(toast);
+
+            const copyBtn = toast.querySelector('#fasttag-toast-copy-btn');
+            if (copyBtn) {
+                copyBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    let copyText = `[FastTag Toast ${type.toUpperCase()}]\n${message}`;
+                    if (debugPayload) {
+                        try {
+                            copyText += '\n\nDetails:\n' + (typeof debugPayload === 'object' ? JSON.stringify(debugPayload, null, 2) : String(debugPayload));
+                        } catch (err) {
+                            copyText += '\n\nDetails:\n' + String(debugPayload);
+                        }
+                    }
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(copyText);
+                    }
+                    copyBtn.textContent = '✓ Copied!';
+                    setTimeout(() => { if (copyBtn) copyBtn.textContent = '📋 Copy'; }, 2000);
+                };
+            }
+
+            let dismissTimer = null;
+            const startDismiss = (time) => {
+                dismissTimer = setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateX(-50%) translateY(-10px)';
+                    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 220);
+                }, time);
+            };
+
+            const closeBtn = toast.querySelector('#fasttag-toast-close-btn');
+            if (closeBtn) {
+                closeBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (dismissTimer) clearTimeout(dismissTimer);
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateX(-50%) translateY(-10px)';
+                    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 220);
+                };
+            }
+
+            // Pause on hover
+            toast.addEventListener('mouseenter', () => {
+                if (dismissTimer) clearTimeout(dismissTimer);
+            });
+            toast.addEventListener('mouseleave', () => {
+                startDismiss(Math.min(effectiveDuration, 5000));
+            });
 
             requestAnimationFrame(() => {
                 toast.style.opacity = '1';
                 toast.style.transform = 'translateX(-50%) translateY(0)';
             });
 
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateX(-50%) translateY(-10px)';
-                setTimeout(() => { if (toast.parentNode) toast.remove(); }, 220);
-            }, duration);
+            startDismiss(effectiveDuration);
         } catch (e) {
             console.log(`[Toast ${type}]: ${message}`);
         }
     }
 
     const toastSuccess = (message, debug) => {
-        showToast(message, 'success');
+        showToast(message, 'success', 3000, debug);
         if (debug) console.log(debug);
     };
 
     const toastError = (message, debug) => {
-        showToast(message, 'error');
+        showToast(message, 'error', 3000, debug);
         if (debug) {
             console.error(debug);
         } else {
@@ -1653,6 +1908,31 @@
                             <button type="button" id="fasttag-setting-reset-layouts" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); color: #818cf8; font-size: 11.5px; font-weight: 600; padding: 5px 10px; border-radius: 6px; cursor: pointer; transition: all 0.15s ease; white-space: nowrap;">↺ Reset Layouts</button>
                         </div>
                     </div>
+
+                    <div style="height: 1px; background: ${border};"></div>
+
+                    <!-- Developer & Diagnostics / Debug Mode -->
+                    <div style="display: flex; flex-direction: column; gap: 10px; background: ${cardBg}; padding: 12px; border-radius: 8px; border: 1px solid ${border};">
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 5px;">
+                                    <span>🛠️</span> Debug Mode
+                                </div>
+                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Extends toast display time to 15 seconds (with pause-on-hover & copy buttons) and records continuous diagnostics.</div>
+                            </div>
+                            <input type="checkbox" id="fasttag-setting-debug-mode" ${getDebugMode() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px dashed ${border}; padding-top: 8px; margin-top: 2px;">
+                            <div style="font-size: 11px; color: ${textMuted}; display: flex; align-items: center; gap: 4px;">
+                                <span>📋</span> Logs: <strong id="fasttag-log-count" style="color: ${text};">${getLogBufferSize()} entries</strong>
+                            </div>
+                            <div style="display: flex; gap: 6px;">
+                                <button type="button" id="fasttag-btn-copy-log" style="background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.35); color: #818cf8; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 5px; cursor: pointer;">📋 Copy Log</button>
+                                <button type="button" id="fasttag-btn-export-log" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 5px; cursor: pointer;">📥 Download Log</button>
+                                <button type="button" id="fasttag-btn-clear-log" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); color: #f87171; font-size: 11px; font-weight: 600; padding: 4px 7px; border-radius: 5px; cursor: pointer;" title="Clear log buffer">🗑️</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div style="padding: 12px 18px; background: ${cardBg}; border-top: 1px solid ${border}; display: flex; justify-content: flex-end;">
                     <button id="fasttag-settings-done" style="background: #6366f1; color: white; border: none; padding: 7px 18px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer;">Done</button>
@@ -1747,6 +2027,45 @@
             resetLayoutsBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 resetAllLayoutsToDefault();
+            });
+        }
+
+        const debugToggle = modal.querySelector('#fasttag-setting-debug-mode');
+        if (debugToggle) {
+            debugToggle.addEventListener('change', (e) => {
+                setDebugMode(e.target.checked);
+                showToast(`Debug Mode ${e.target.checked ? 'ENABLED (15s toasts active)' : 'disabled'}`, 'info');
+            });
+        }
+
+        const copyLogBtn = modal.querySelector('#fasttag-btn-copy-log');
+        if (copyLogBtn) {
+            copyLogBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                await copyDebugLogsToClipboard();
+                copyLogBtn.textContent = '✓ Copied!';
+                setTimeout(() => { if (copyLogBtn) copyLogBtn.textContent = '📋 Copy Log'; }, 2000);
+                showToast('Copied FastTag debug log to clipboard', 'success');
+            });
+        }
+
+        const exportLogBtn = modal.querySelector('#fasttag-btn-export-log');
+        if (exportLogBtn) {
+            exportLogBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                downloadDebugLogFile();
+                showToast('Downloaded FastTag debug log file', 'success');
+            });
+        }
+
+        const clearLogBtn = modal.querySelector('#fasttag-btn-clear-log');
+        if (clearLogBtn) {
+            clearLogBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                clearDebugLogs();
+                const countEl = modal.querySelector('#fasttag-log-count');
+                if (countEl) countEl.textContent = '0 entries';
+                showToast('FastTag debug logs cleared', 'info');
             });
         }
 
@@ -3990,6 +4309,10 @@
         posX = Math.max(minLeft, Math.min(maxAllowedLeft, posX));
         posY = Math.max(minTop, Math.min(maxAllowedTop, Math.round((screenH - formH) / 2)));
 
+        ftLog('DEBUG', 'LAYOUT', `Default workstation position calculated: (${posX}, ${posY}) on ${screenW}x${screenH}`, {
+            screenW, screenH, formW, formH, videoW, scraperW, margin, posX, posY
+        });
+
         return { x: posX, y: posY };
     }
 
@@ -5577,6 +5900,15 @@
 
     async function handleAcceptScrapeMatch(match, container, sceneId, ctx, popup) {
         try {
+            ftLog('ACTION', 'SCRAPE', `Accept match clicked for scene ${sceneId}: "${match.title || ''}"`, {
+                sceneId,
+                title: match.title,
+                studio: match.studio?.name,
+                performersCount: match.performers?.length,
+                tagsCount: match.tags?.length,
+                date: match.date
+            });
+
             const isStudioChecked = container.querySelector('#fasttag-scrape-chk-studio')?.checked ?? false;
             const isTitleChecked = container.querySelector('#fasttag-scrape-chk-title')?.checked ?? false;
             const isDetailsChecked = container.querySelector('#fasttag-scrape-chk-details')?.checked ?? false;
@@ -8065,6 +8397,14 @@
 
         sequentialEditState.currentIndex = nextIndex;
         sequentialEditState.currentSceneId = nextSceneId;
+
+        ftLog('ACTION', 'NAV', `Sequential navigation: Scene ${sceneId} -> Scene ${nextSceneId} (Index ${nextIndex + 1}/${cards.length}, direction ${direction > 0 ? '+1' : '-1'})`, {
+            fromSceneId: sceneId,
+            toSceneId: nextSceneId,
+            nextIndex,
+            totalCards: cards.length,
+            direction
+        });
 
         popup._isNavigatingSequential = true;
         try {
