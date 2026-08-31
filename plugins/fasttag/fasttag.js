@@ -1675,22 +1675,47 @@
         return { left: '20px', top: '70px', width: `${hudWidth}px`, height: `${hudHeight}px` };
     }
 
+    const VIDEO_HUD_OPEN_KEY = 'fasttag_video_hud_open_state';
+    function isVideoHudPersistedOpen() {
+        try {
+            return localStorage.getItem(VIDEO_HUD_OPEN_KEY) === 'true';
+        } catch (e) { return false; }
+    }
+    function setVideoHudPersistedOpen(val) {
+        try {
+            localStorage.setItem(VIDEO_HUD_OPEN_KEY, val ? 'true' : 'false');
+        } catch (e) {}
+    }
+
     function closeFloatingVideoHud(fullReset = false) {
+        if (floatingHudElement) {
+            floatingHudElement.remove();
+            floatingHudElement = null;
+        }
+        isVideoPoppedOut = false;
         if (fullReset) {
-            if (floatingHudElement) {
-                floatingHudElement.remove();
-                floatingHudElement = null;
-            }
-            isVideoPoppedOut = false;
             floatingHudPosition = null;
             floatingHudSize = null;
+            setVideoHudPersistedOpen(false);
         }
     }
 
     const DETACH_SCRAPER_STORAGE_KEY = 'fasttag_detach_scraper_v1';
+    const SCRAPER_HUD_OPEN_KEY = 'fasttag_scraper_hud_open_state';
     let floatingScraperHudElement = null;
     let floatingScraperHudPosition = null;
     let floatingScraperHudSize = null;
+
+    function isScraperHudPersistedOpen() {
+        try {
+            return localStorage.getItem(SCRAPER_HUD_OPEN_KEY) === 'true';
+        } catch (e) { return false; }
+    }
+    function setScraperHudPersistedOpen(val) {
+        try {
+            localStorage.setItem(SCRAPER_HUD_OPEN_KEY, val ? 'true' : 'false');
+        } catch (e) {}
+    }
 
     function getDetachScraper() {
         try {
@@ -1714,6 +1739,7 @@
         if (fullReset) {
             floatingScraperHudPosition = null;
             floatingScraperHudSize = null;
+            setScraperHudPersistedOpen(false);
         }
     }
 
@@ -2783,20 +2809,25 @@
                             return;
                         }
 
-                        isDragging = false;
-                        hasDragged = false;
                         dragStartX = e.clientX;
                         dragStartY = e.clientY;
-                        startLeft = rect.left;
-                        startTop = rect.top;
+                        startLeft = floatingHudElement.offsetLeft;
+                        startTop = floatingHudElement.offsetTop;
+                        isDragging = false;
                         document.addEventListener('mousemove', onHudMouseMove);
                         document.addEventListener('mouseup', onHudMouseUp);
                     };
 
-                    // Resize tracking
-                    const resizeObserver = new ResizeObserver(() => {
-                        if (floatingHudElement && !isDragging) {
-                            floatingHudSize = { width: `${floatingHudElement.offsetWidth}px`, height: `${floatingHudElement.offsetHeight}px` };
+                    document.body.appendChild(floatingHudElement);
+
+                    const resizeObserver = new ResizeObserver((entries) => {
+                        for (let entry of entries) {
+                            if (floatingHudElement && isVideoPoppedOut) {
+                                floatingHudSize = { width: `${floatingHudElement.offsetWidth}px`, height: `${floatingHudElement.offsetHeight}px` };
+                                try {
+                                    localStorage.setItem('fasttag_video_hud_size', JSON.stringify(floatingHudSize));
+                                } catch (e) {}
+                            }
                         }
                     });
                     resizeObserver.observe(floatingHudElement);
@@ -2804,6 +2835,7 @@
 
                 // Smoothly swap content inside floating window
                 floatingHudElement.innerHTML = '';
+                floatingHudElement.appendChild(dragPill);
                 mediaContainer.style.cursor = 'default';
                 mediaContainer.title = '';
                 floatingHudElement.appendChild(mediaContainer);
@@ -2853,6 +2885,8 @@
                 hostContainer.onclick = null;
             } else {
                 isVideoPoppedOut = false;
+                setVideoHudPersistedOpen(false);
+                ftLog('ACTION', 'HUD', 'Video HUD docked back into popup');
                 controlsRow.style.transition = 'all 0.15s ease';
                 controlsRow.style.opacity = '0.9';
                 controlsRow.onmouseenter = null;
@@ -2901,6 +2935,12 @@
             e.preventDefault();
             togglePopout(!isVideoPoppedOut);
         };
+
+        if (isVideoHudPersistedOpen()) {
+            setTimeout(() => {
+                togglePopout(true);
+            }, 30);
+        }
 
         const detachWheel = () => {
             if (wheelListenerAttached) {
@@ -4432,8 +4472,10 @@
             localStorage.removeItem('fasttag_everything_pos');
             localStorage.removeItem('fasttag_video_hud_pos');
             localStorage.removeItem('fasttag_video_hud_size');
+            localStorage.removeItem('fasttag_video_hud_open_state');
             localStorage.removeItem('fasttag_scraper_hud_pos');
             localStorage.removeItem('fasttag_scraper_hud_size');
+            localStorage.removeItem('fasttag_scraper_hud_open_state');
             localStorage.removeItem('fasttag_embedded_scraper_h');
 
             // 2. Remove all custom column widths and splitters
@@ -8691,7 +8733,9 @@
             ]);
             ctx.refreshAllUI();
 
-            if (getAutoScrapeSequential() && sequentialEditState.enabled && window._fastTagEverythingScraperOpen && popup._isNavigatingSequential) {
+            const shouldAutoOpenScraper = (isScraperHudPersistedOpen() || (getAutoScrapeSequential() && sequentialEditState.enabled && window._fastTagEverythingScraperOpen));
+            if (shouldAutoOpenScraper) {
+                window._fastTagEverythingScraperOpen = true;
                 setTimeout(() => {
                     if (typeof popup.triggerScrape === 'function') {
                         popup.triggerScrape(true, sceneId, cardElement);
@@ -10327,6 +10371,8 @@
                 const isScraperOpen = (popup.scraperCardContainer && popup.scraperCardContainer.style.display !== 'none' && popup.scraperCardContainer.innerHTML.trim() !== '') || (floatingScraperHudElement && document.body.contains(floatingScraperHudElement));
                 if (isScraperOpen && !forceOpen) {
                     window._fastTagEverythingScraperOpen = false;
+                    setScraperHudPersistedOpen(false);
+                    ftLog('ACTION', 'SCRAPER', 'Scraper HUD closed by user');
                     if (popup.scraperCardContainer) {
                         popup.scraperCardContainer.style.display = 'none';
                         popup.scraperCardContainer.innerHTML = '';
@@ -10340,6 +10386,8 @@
                 }
 
                 window._fastTagEverythingScraperOpen = true;
+                setScraperHudPersistedOpen(true);
+                ftLog('ACTION', 'SCRAPER', 'Scraper HUD opened');
 
                 // If already scraped for this scene during this active session, reopen instantly with 0ms lag!
                 if (sessionScrapeCache.has(activeSceneId) && sessionScrapeCache.get(activeSceneId)?.length > 0) {
