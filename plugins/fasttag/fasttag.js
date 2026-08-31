@@ -5723,9 +5723,32 @@
                     effectiveCtx.refreshAllUI();
                 }
                 if (typeof effectiveCtx.doSave === 'function') {
-                    await effectiveCtx.doSave('Matched & Saved from StashDB!');
+                    await effectiveCtx.doSave('Matched & Saved from StashDB!', false);
                 }
 
+                sessionScrapeCache.delete(sceneId);
+
+                // If in sequential edit mode in Edit Everything, navigate in-place to next scene while keeping Scraper open
+                if (sequentialEditState.enabled && popup && popup.element) {
+                    const cards = sequentialEditState.allSceneCards || getAllVisibleSceneCards();
+                    const idx = getSceneCardIndex(sceneId, cards);
+                    if (idx !== -1 && idx < cards.length - 1) {
+                        // Put scraper container into a clean seamless loading state
+                        if (targetContainer) {
+                            const isDarkTheme = getEffectiveTheme() === 'dark';
+                            targetContainer.innerHTML = `
+                                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; min-height: 180px; gap: 10px; color: ${isDarkTheme ? '#94a3b8' : '#64748b'}; font-size: 13px; font-weight: 600;">
+                                    <div style="font-size: 22px; animation: spin 1s linear infinite;">⏳</div>
+                                    <div>Scraping next scene...</div>
+                                </div>
+                            `;
+                        }
+                        navigateSequentialEditEverything(popup, sceneId, 1, null);
+                        return;
+                    }
+                }
+
+                // If not sequential or last card, close scraper HUD cleanly
                 closeFloatingScraperHud();
                 container.innerHTML = '';
                 container.style.display = 'none';
@@ -5733,16 +5756,6 @@
                     popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
                     popup.scrapeBtn.innerHTML = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
                     popup.scrapeBtn.title = 'Scrape scene metadata';
-                }
-                sessionScrapeCache.delete(sceneId);
-
-                // If in sequential edit mode in Edit Everything, navigate in-place to next scene
-                if (sequentialEditState.enabled && popup && popup.element) {
-                    const cards = sequentialEditState.allSceneCards || getAllVisibleSceneCards();
-                    const idx = getSceneCardIndex(sceneId, cards);
-                    if (idx !== -1 && idx < cards.length - 1) {
-                        navigateSequentialEditEverything(popup, sceneId, 1, null);
-                    }
                 }
                 return;
             } else {
@@ -9753,12 +9766,14 @@
                     } catch (e) {}
                 };
 
-                const doSave = async (customSuccessMessage = null) => {
-                    if (popup.scraperCardContainer) {
-                        popup.scraperCardContainer.innerHTML = '';
-                        popup.scraperCardContainer.style.display = 'none';
+                const doSave = async (customSuccessMessage = null, shouldCloseScraper = false) => {
+                    if (shouldCloseScraper && !window._fastTagEverythingScraperOpen) {
+                        if (popup.scraperCardContainer) {
+                            popup.scraperCardContainer.innerHTML = '';
+                            popup.scraperCardContainer.style.display = 'none';
+                        }
+                        hideScrapeCoverTooltip();
                     }
-                    hideScrapeCoverTooltip();
 
                     const mutation = `
                         mutation SceneUpdateEverything($id: ID!, $tag_ids: [ID!], $performer_ids: [ID!], $studio_id: ID, $groups: [SceneGroupInput!]) {
