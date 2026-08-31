@@ -5723,33 +5723,12 @@
                     effectiveCtx.refreshAllUI();
                 }
                 if (typeof effectiveCtx.doSave === 'function') {
-                    await effectiveCtx.doSave('Matched & Saved from StashDB!', false);
+                    await effectiveCtx.doSave('Matched & Saved from StashDB!');
                 }
 
                 sessionScrapeCache.delete(sceneId);
 
-                // If in sequential edit mode in Edit Everything, navigate in-place to next scene while keeping Scraper open
-                if (sequentialEditState.enabled && popup && popup.element) {
-                    const cards = sequentialEditState.allSceneCards || getAllVisibleSceneCards();
-                    const idx = getSceneCardIndex(sceneId, cards);
-                    if (idx !== -1 && idx < cards.length - 1) {
-                        // Put scraper container into a clean seamless loading state
-                        const targetCont = container || popup?.scraperCardContainer || (floatingScraperHudElement ? floatingScraperHudElement.querySelector('#fasttag-scraper-hud-content') : null);
-                        if (targetCont) {
-                            const isDarkTheme = getEffectiveTheme() === 'dark';
-                            targetCont.innerHTML = `
-                                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; min-height: 180px; gap: 10px; color: ${isDarkTheme ? '#94a3b8' : '#64748b'}; font-size: 13px; font-weight: 600;">
-                                    <div style="font-size: 22px; animation: spin 1s linear infinite;">⏳</div>
-                                    <div>Scraping next scene...</div>
-                                </div>
-                            `;
-                        }
-                        navigateSequentialEditEverything(popup, sceneId, 1, null);
-                        return;
-                    }
-                }
-
-                // If not sequential or last card, close scraper HUD cleanly
+                // Close scraper HUD cleanly for the current scene
                 closeFloatingScraperHud();
                 container.innerHTML = '';
                 container.style.display = 'none';
