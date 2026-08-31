@@ -7972,12 +7972,14 @@
 
             container.style.display = 'flex';
             if (tagsBox) {
-                tagsBox.style.display = hasRealTags ? 'flex' : 'none';
+                tagsBox.style.display = 'flex';
                 tagsBox.style.visibility = hasRealTags ? 'visible' : 'hidden';
+                tagsBox.style.pointerEvents = hasRealTags ? 'auto' : 'none';
             }
             if (perfBox) {
-                perfBox.style.display = hasRealPerf ? 'flex' : 'none';
+                perfBox.style.display = 'flex';
                 perfBox.style.visibility = hasRealPerf ? 'visible' : 'hidden';
+                perfBox.style.pointerEvents = hasRealPerf ? 'auto' : 'none';
             }
             syncSuggestionsAlignment(container.closest('form'));
         };
@@ -8921,6 +8923,8 @@
 
             const getTagSuggestionItems = () => {
                 const items = [];
+                const box = form.querySelector('#everything-sugg-tags-box');
+                if (box && box.style.visibility === 'hidden') return items;
                 const container = form.querySelector('#everything-sugg-tags-chips');
                 if (container && container.offsetParent !== null) {
                     container.querySelectorAll('.fasttag-suggestion-chip').forEach(btn => {
@@ -8932,6 +8936,8 @@
 
             const getPerformerSuggestionItems = () => {
                 const items = [];
+                const box = form.querySelector('#everything-sugg-performers-box');
+                if (box && box.style.visibility === 'hidden') return items;
                 const container = form.querySelector('#everything-sugg-performers-chips');
                 if (container && container.offsetParent !== null) {
                     container.querySelectorAll('.fasttag-suggestion-chip').forEach(btn => {
@@ -10662,6 +10668,8 @@
 
             const getTagSuggestionItems = () => {
                 const items = [];
+                const box = form.querySelector('#everything-sugg-tags-box');
+                if (box && box.style.visibility === 'hidden') return items;
                 const container = form.querySelector('#everything-sugg-tags-chips');
                 if (container && container.offsetParent !== null) {
                     container.querySelectorAll('.fasttag-suggestion-chip').forEach(btn => {
@@ -10673,6 +10681,8 @@
 
             const getPerformerSuggestionItems = () => {
                 const items = [];
+                const box = form.querySelector('#everything-sugg-performers-box');
+                if (box && box.style.visibility === 'hidden') return items;
                 const container = form.querySelector('#everything-sugg-performers-chips');
                 if (container && container.offsetParent !== null) {
                     container.querySelectorAll('.fasttag-suggestion-chip').forEach(btn => {
