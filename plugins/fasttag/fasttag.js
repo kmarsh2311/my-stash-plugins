@@ -1461,66 +1461,31 @@
                 }
             }
 
-            // 2. Main popup is near the LEFT (Columns 1, 2) -> Place on the RIGHT of popup
+            // 2. Main popup is near the LEFT -> Place on the RIGHT of popup
             if (spaceRight >= spaceLeft && spaceRight >= hudWidth + margin) {
                 const left = Math.round(rect.right + margin);
                 const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
                 return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
             }
 
-            // 3. Main popup is near the RIGHT (Columns 5, 6) -> Place on the LEFT of popup
-            if (spaceLeft > spaceRight && spaceLeft >= hudWidth + margin) {
-                const left = Math.round(rect.left - hudWidth - margin);
-                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
-            }
-
-            // 4. Either side fits without nudging
-            if (spaceRight >= hudWidth + margin) {
-                const left = Math.round(rect.right + margin);
-                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
-            }
+            // 3. Main popup is centered or near RIGHT -> Place on the LEFT of popup
             if (spaceLeft >= hudWidth + margin) {
                 const left = Math.round(rect.left - hudWidth - margin);
                 const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
                 return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
             }
 
-            // 5. Coordinated Shift
-            if (screenWidth >= rect.width + hudWidth + (margin * 3)) {
-                if (spaceLeft >= spaceRight) {
-                    const newFormLeft = Math.round(screenWidth - rect.width - margin);
-                    activeForm.style.left = `${newFormLeft}px`;
-                    if (sequentialEditState.enabled) {
-                        sequentialEditState.popupPosition = { left: newFormLeft, top: rect.top };
-                    }
-                    const left = Math.round(newFormLeft - hudWidth - margin);
-                    const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                    return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
-                } else {
-                    const newFormLeft = margin;
-                    activeForm.style.left = `${newFormLeft}px`;
-                    if (sequentialEditState.enabled) {
-                        sequentialEditState.popupPosition = { left: newFormLeft, top: rect.top };
-                    }
-                    const left = Math.round(newFormLeft + rect.width + margin);
-                    const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                    return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
-                }
+            // 4. Fallback to right side if space permits
+            if (spaceRight >= hudWidth + margin) {
+                const left = Math.round(rect.right + margin);
+                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
             }
 
-            // 6. Vertical Stacking fallback
-            if (screenHeight - rect.bottom >= hudHeight + margin) {
-                const top = Math.round(rect.bottom + margin);
-                const left = Math.max(margin, Math.min(screenWidth - hudWidth - margin, Math.round(rect.left)));
-                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
-            }
-            if (rect.top >= hudHeight + margin) {
-                const top = Math.round(rect.top - hudHeight - margin);
-                const left = Math.max(margin, Math.min(screenWidth - hudWidth - margin, Math.round(rect.left)));
-                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
-            }
+            // 5. General viewport clamp fallback
+            const left = Math.max(margin, Math.min(screenWidth - hudWidth - margin, Math.round(rect.left - hudWidth - margin)));
+            const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+            return { left: `${left}px`, top: `${top}px`, width: `${hudWidth}px`, height: `${hudHeight}px` };
         }
 
         return { right: '30px', top: '70px', width: `${hudWidth}px`, height: `${hudHeight}px` };
@@ -1588,112 +1553,52 @@
                 const videoIsOnLeft = videoRect.right <= rect.left + 50;
 
                 if (videoIsOnRight) {
-                    // Option A: 3-Pane Row - Place Scraper to the RIGHT of Video HUD
-                    if (screenWidth - videoRect.right >= hudWidth + margin) {
-                        const left = Math.round(videoRect.right + margin);
-                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
-                    }
-                    // Option B: Flank Opposite Side - Place Scraper on the LEFT of Main Popup
+                    // Place Scraper on the LEFT of Main Popup
                     if (spaceLeft >= hudWidth + margin) {
                         const left = Math.round(rect.left - hudWidth - margin);
                         const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
                         return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
                     }
-                    // Option C: Place Scraper between Popup and Video HUD
-                    if (videoRect.left - rect.right >= hudWidth + (margin * 2)) {
-                        const left = Math.round(rect.right + margin);
+                    // Or place Scraper to the RIGHT of Video HUD
+                    if (screenWidth - videoRect.right >= hudWidth + margin) {
+                        const left = Math.round(videoRect.right + margin);
                         const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
-                    }
-                    // Option D: Vertical Stacking (under Video HUD)
-                    if (screenHeight >= videoRect.height + hudHeight + (margin * 3)) {
-                        if (videoRect.top > margin + 20 && floatingHudElement) {
-                            floatingHudElement.style.top = `${margin}px`;
-                        }
-                        const top = Math.round(margin + (floatingHudElement ? floatingHudElement.offsetHeight : videoRect.height) + margin);
-                        const left = Math.round(videoRect.left);
                         return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
                     }
                 } else if (videoIsOnLeft) {
-                    // Option A: 3-Pane Row - Place Scraper to the LEFT of Video HUD
-                    if (videoRect.left >= hudWidth + margin) {
-                        const left = Math.round(videoRect.left - hudWidth - margin);
-                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
-                    }
-                    // Option B: Flank Opposite Side - Place Scraper on the RIGHT of Main Popup
+                    // Place Scraper on the RIGHT of Main Popup
                     if (spaceRight >= hudWidth + margin) {
                         const left = Math.round(rect.right + margin);
                         const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
                         return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
                     }
-                    // Option C: Place Scraper between Video HUD and Popup
-                    if (rect.left - videoRect.right >= hudWidth + (margin * 2)) {
-                        const left = Math.round(videoRect.right + margin);
+                    // Or place Scraper to the LEFT of Video HUD
+                    if (videoRect.left >= hudWidth + margin) {
+                        const left = Math.round(videoRect.left - hudWidth - margin);
                         const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
-                    }
-                    // Option D: Vertical Stacking (under Video HUD)
-                    if (screenHeight >= videoRect.height + hudHeight + (margin * 3)) {
-                        if (videoRect.top > margin + 20 && floatingHudElement) {
-                            floatingHudElement.style.top = `${margin}px`;
-                        }
-                        const top = Math.round(margin + (floatingHudElement ? floatingHudElement.offsetHeight : videoRect.height) + margin);
-                        const left = Math.round(videoRect.left);
                         return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
                     }
                 }
             }
 
-            // 2. Main popup is near the LEFT (Columns 1, 2) -> Prefer RIGHT
-            if (spaceRight >= spaceLeft && spaceRight >= hudWidth + margin) {
-                const left = Math.round(rect.right + margin);
-                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
-            }
-
-            // 3. Main popup is near the RIGHT (Columns 5, 6) -> Prefer LEFT
-            if (spaceLeft > spaceRight && spaceLeft >= hudWidth + margin) {
-                const left = Math.round(rect.left - hudWidth - margin);
-                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
-            }
-
-            // 4. Either side fallback
+            // 2. Default: Place on the RIGHT of the main popup
             if (spaceRight >= hudWidth + margin) {
                 const left = Math.round(rect.right + margin);
                 const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
                 return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
             }
+
+            // 3. Fallback: Place on the LEFT of the main popup
             if (spaceLeft >= hudWidth + margin) {
                 const left = Math.round(rect.left - hudWidth - margin);
                 const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
                 return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
             }
 
-            // 5. Coordinated Shift
-            if (screenWidth >= rect.width + hudWidth + (margin * 3)) {
-                if (spaceLeft >= spaceRight) {
-                    const newFormLeft = Math.round(screenWidth - rect.width - margin);
-                    activeForm.style.left = `${newFormLeft}px`;
-                    if (sequentialEditState.enabled) {
-                        sequentialEditState.popupPosition = { left: newFormLeft, top: rect.top };
-                    }
-                    const left = Math.round(newFormLeft - hudWidth - margin);
-                    const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                    return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
-                } else {
-                    const newFormLeft = margin;
-                    activeForm.style.left = `${newFormLeft}px`;
-                    if (sequentialEditState.enabled) {
-                        sequentialEditState.popupPosition = { left: newFormLeft, top: rect.top };
-                    }
-                    const left = Math.round(newFormLeft + rect.width + margin);
-                    const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                    return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
-                }
-            }
+            // 4. Viewport clamp fallback
+            const left = Math.max(margin, Math.min(screenWidth - hudWidth - margin, Math.round(rect.right + margin)));
+            const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
+            return { left: `${left}px`, top: `${top}px`, width: `${hudWidth}px`, height: `${hudHeight}px` };
         }
 
         return { right: '20px', top: '70px', width: `${hudWidth}px`, height: `${hudHeight}px` };
@@ -2512,41 +2417,33 @@
                     let finalTop = defaultPos.top;
                     let finalRight = defaultPos.right;
 
-                    // Check if user's remembered floatingHudPosition is valid and strictly non-overlapping
-                    const activeForm = activePopup?.element || document.querySelector('#scenes-popup');
-                    const isScraperOpen = floatingScraperHudElement && document.body.contains(floatingScraperHudElement);
-                    const scraperRect = isScraperOpen ? floatingScraperHudElement.getBoundingClientRect() : null;
-                    const formRect = activeForm ? activeForm.getBoundingClientRect() : null;
-
-                    if (!floatingHudPosition) {
+                    let savedPos = floatingHudPosition;
+                    if (!savedPos) {
                         try {
-                            floatingHudPosition = JSON.parse(localStorage.getItem('fasttag_video_hud_pos') || 'null');
+                            savedPos = JSON.parse(localStorage.getItem('fasttag_video_hud_pos') || 'null');
+                        } catch (e) {}
+                    }
+                    let savedSize = floatingHudSize;
+                    if (!savedSize) {
+                        try {
+                            savedSize = JSON.parse(localStorage.getItem('fasttag_video_hud_size') || 'null');
                         } catch (e) {}
                     }
 
-                    let isPositionValid = false;
-                    if (floatingHudPosition && floatingHudPosition.left && floatingHudPosition.top) {
-                        const pLeft = parseInt(floatingHudPosition.left, 10);
-                        const pTop = parseInt(floatingHudPosition.top, 10);
-                        const pW = floatingHudSize?.width ? parseInt(floatingHudSize.width, 10) : parseInt(finalWidth, 10);
-                        const pH = floatingHudSize?.height ? parseInt(floatingHudSize.height, 10) : parseInt(finalHeight, 10);
-
-                        const collidesWithForm = formRect && !(pLeft + pW <= formRect.left + 5 || pLeft >= formRect.right - 5 || pTop + pH <= formRect.top + 5 || pTop >= formRect.bottom - 5);
-                        const collidesWithScraper = scraperRect && !(pLeft + pW <= scraperRect.left + 5 || pLeft >= scraperRect.right - 5 || pTop + pH <= scraperRect.top + 5 || pTop >= scraperRect.bottom - 5);
-
-                        if (!collidesWithForm && !collidesWithScraper) {
-                            finalLeft = floatingHudPosition.left;
-                            finalTop = floatingHudPosition.top;
+                    if (savedPos && savedPos.left && savedPos.top) {
+                        const pLeft = parseInt(savedPos.left, 10);
+                        const pTop = parseInt(savedPos.top, 10);
+                        const pW = savedSize?.width ? parseInt(savedSize.width, 10) : (parseInt(defaultSize.width, 10) || 600);
+                        const pH = savedSize?.height ? parseInt(savedSize.height, 10) : (parseInt(defaultSize.height, 10) || 338);
+                        if (!isNaN(pLeft) && !isNaN(pTop)) {
+                            finalLeft = `${Math.max(8, Math.min(window.innerWidth - pW - 8, pLeft))}px`;
+                            finalTop = `${Math.max(8, Math.min(window.innerHeight - pH - 8, pTop))}px`;
                             finalRight = null;
-                            if (floatingHudSize) {
-                                finalWidth = floatingHudSize.width;
-                                finalHeight = floatingHudSize.height;
-                            }
-                            isPositionValid = true;
+                            finalWidth = `${pW}px`;
+                            finalHeight = `${pH}px`;
+                            floatingHudPosition = { left: finalLeft, top: finalTop };
+                            if (savedSize) floatingHudSize = savedSize;
                         }
-                    }
-                    if (!isPositionValid) {
-                        floatingHudPosition = null;
                     }
 
                     floatingHudElement.style.cssText = `position: fixed; top: ${finalTop}; ${finalLeft ? `left: ${finalLeft};` : `right: ${finalRight};`} width: ${finalWidth}; height: ${finalHeight}; min-width: 260px; min-height: 150px; max-width: 90vw; max-height: 85vh; z-index: 1000000; background: #0f172a; border: 2px solid #000000; border-radius: 10px; box-shadow: 0 20px 50px rgba(0,0,0,0.85); overflow: hidden; resize: both; cursor: default;`;
@@ -5049,40 +4946,33 @@
                 let finalTop = defaultPos.top;
                 let finalRight = defaultPos.right;
 
-                const activeForm = activePopup?.element || document.querySelector('#scenes-popup');
-                const isVideoOpen = isVideoPoppedOut && floatingHudElement && document.body.contains(floatingHudElement);
-                const videoRect = isVideoOpen ? floatingHudElement.getBoundingClientRect() : null;
-                const formRect = activeForm ? activeForm.getBoundingClientRect() : null;
-
-                if (!floatingScraperHudPosition) {
+                let savedPos = floatingScraperHudPosition;
+                if (!savedPos) {
                     try {
-                        floatingScraperHudPosition = JSON.parse(localStorage.getItem('fasttag_scraper_hud_pos') || 'null');
+                        savedPos = JSON.parse(localStorage.getItem('fasttag_scraper_hud_pos') || 'null');
+                    } catch (e) {}
+                }
+                let savedSize = floatingScraperHudSize;
+                if (!savedSize) {
+                    try {
+                        savedSize = JSON.parse(localStorage.getItem('fasttag_scraper_hud_size') || 'null');
                     } catch (e) {}
                 }
 
-                let isPositionValid = false;
-                if (floatingScraperHudPosition && floatingScraperHudPosition.left && floatingScraperHudPosition.top) {
-                    const pLeft = parseInt(floatingScraperHudPosition.left, 10);
-                    const pTop = parseInt(floatingScraperHudPosition.top, 10);
-                    const pW = floatingScraperHudSize?.width ? parseInt(floatingScraperHudSize.width, 10) : parseInt(finalWidth, 10);
-                    const pH = floatingScraperHudSize?.height ? parseInt(floatingScraperHudSize.height, 10) : parseInt(finalHeight, 10);
-
-                    const collidesWithForm = formRect && !(pLeft + pW <= formRect.left + 5 || pLeft >= formRect.right - 5 || pTop + pH <= formRect.top + 5 || pTop >= formRect.bottom - 5);
-                    const collidesWithVideo = videoRect && !(pLeft + pW <= videoRect.left + 5 || pLeft >= videoRect.right - 5 || pTop + pH <= videoRect.top + 5 || pTop >= videoRect.bottom - 5);
-
-                    if (!collidesWithForm && !collidesWithVideo) {
-                        finalLeft = floatingScraperHudPosition.left;
-                        finalTop = floatingScraperHudPosition.top;
+                if (savedPos && savedPos.left && savedPos.top) {
+                    const pLeft = parseInt(savedPos.left, 10);
+                    const pTop = parseInt(savedPos.top, 10);
+                    const pW = savedSize?.width ? parseInt(savedSize.width, 10) : (parseInt(defaultPos.width, 10) || 390);
+                    const pH = savedSize?.height ? parseInt(savedSize.height, 10) : (parseInt(defaultPos.height, 10) || 480);
+                    if (!isNaN(pLeft) && !isNaN(pTop)) {
+                        finalLeft = `${Math.max(8, Math.min(window.innerWidth - pW - 8, pLeft))}px`;
+                        finalTop = `${Math.max(8, Math.min(window.innerHeight - pH - 8, pTop))}px`;
                         finalRight = null;
-                        if (floatingScraperHudSize) {
-                            finalWidth = floatingScraperHudSize.width;
-                            finalHeight = floatingScraperHudSize.height;
-                        }
-                        isPositionValid = true;
+                        finalWidth = `${pW}px`;
+                        finalHeight = `${pH}px`;
+                        floatingScraperHudPosition = { left: finalLeft, top: finalTop };
+                        if (savedSize) floatingScraperHudSize = savedSize;
                     }
-                }
-                if (!isPositionValid) {
-                    floatingScraperHudPosition = null;
                 }
                 const isDarkTheme = getEffectiveTheme() === 'dark';
                 floatingScraperHudElement.style.cssText = `position: fixed; top: ${finalTop}; ${finalLeft ? `left: ${finalLeft};` : `right: ${finalRight};`} width: ${finalWidth}; height: ${finalHeight}; min-width: 300px; min-height: 220px; max-width: 92vw; max-height: 92vh; z-index: 1000000; background: ${isDarkTheme ? '#1e293b' : '#ffffff'}; border: 1.5px solid ${isDarkTheme ? '#4338ca' : '#a5b4fc'}; border-radius: 10px; box-shadow: 0 20px 50px rgba(0,0,0,0.85); overflow: visible; display: flex; flex-direction: column;`;
