@@ -6363,6 +6363,22 @@
     }
 
     // --- Smart Suggestions Engine ---
+    const SUGGESTION_STOP_WORDS = new Set([
+        'a', 'an', 'and', 'the', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
+        'from', 'as', 'is', 'it', 'or', 'be', 'are', 'was', 'were', 'not', 'no',
+        'he', 'she', 'his', 'her', 'my', 'me', 'you', 'your', 'we', 'our', 'they',
+        'them', 'their', 'this', 'that', 'these', 'those', 'all', 'any', 'some',
+        'new', 'top', 'hot', 'big', 'get', 'set', 'out', 'up', 'down', 'man', 'men',
+        'full', 'clip', 'part', 'scene', 'video', 'best', 'good', 'raw', 'free', 'one', 'two'
+    ]);
+
+    function cleanFilenameForSuggestions(rawName) {
+        if (!rawName) return '';
+        let name = rawName.replace(/\.[^/.]+$/, '');
+        name = name.replace(/\b(1080p|720p|2160p|4k|uhd|fhd|hd|sd|x264|x265|h264|h265|hevc|aac|mp4|mkv|avi|wmv|60fps|120fps|fps|xxx|rip|webrip|bluray|dvdrip|sdh)\b/gi, ' ');
+        return name;
+    }
+
     function normalizeTextForSuggestions(str) {
         if (!str) return '';
         let splitStr = String(str)
@@ -6381,25 +6397,29 @@
     function isSuggestionMatch(item, normalizedSpaced, tokenSet) {
         if (!item) return false;
         const namesToCheck = [];
-        if (item.name) namesToCheck.push(item.name);
-        if (item.title && item.title !== item.name) namesToCheck.push(item.title);
-        if (item.sort_name && item.sort_name !== item.name) namesToCheck.push(item.sort_name);
+        if (item.name) namesToCheck.push({ name: item.name, isPrimary: true });
+        if (item.title && item.title !== item.name) namesToCheck.push({ name: item.title, isPrimary: true });
+        if (item.sort_name && item.sort_name !== item.name) namesToCheck.push({ name: item.sort_name, isPrimary: false });
 
         if (Array.isArray(item.alias_list)) {
-            item.alias_list.forEach(a => { if (a && typeof a === 'string') namesToCheck.push(a); });
+            item.alias_list.forEach(a => { if (a && typeof a === 'string') namesToCheck.push({ name: a, isPrimary: false }); });
         } else if (typeof item.alias_list === 'string' && item.alias_list.trim()) {
-            item.alias_list.split(',').forEach(a => { if (a.trim()) namesToCheck.push(a.trim()); });
+            item.alias_list.split(',').forEach(a => { if (a.trim()) namesToCheck.push({ name: a.trim(), isPrimary: false }); });
         }
 
         if (Array.isArray(item.aliases)) {
-            item.aliases.forEach(a => { if (a && typeof a === 'string') namesToCheck.push(a); });
+            item.aliases.forEach(a => { if (a && typeof a === 'string') namesToCheck.push({ name: a, isPrimary: false }); });
         } else if (typeof item.aliases === 'string' && item.aliases.trim()) {
-            item.aliases.split(',').forEach(a => { if (a.trim()) namesToCheck.push(a.trim()); });
+            item.aliases.split(',').forEach(a => { if (a.trim()) namesToCheck.push({ name: a.trim(), isPrimary: false }); });
         }
 
-        for (const raw of namesToCheck) {
+        for (const { name: raw, isPrimary } of namesToCheck) {
             const clean = normalizeTextForSuggestions(raw);
             if (!clean || clean.length < 2) continue;
+
+            if (!isPrimary && (clean.length <= 3 || SUGGESTION_STOP_WORDS.has(clean))) {
+                continue;
+            }
 
             if (normalizedSpaced.includes(' ' + clean + ' ')) return true;
 
@@ -6407,7 +6427,7 @@
             if (words.length > 1) {
                 const compact = clean.replace(/\s+/g, '');
                 if (compact.length >= 4 && tokenSet.has(compact)) return true;
-            } else if (words.length === 1 && clean.length >= 3) {
+            } else if (words.length === 1 && clean.length >= 3 && !SUGGESTION_STOP_WORDS.has(clean)) {
                 if (tokenSet.has(clean)) return true;
             }
         }
@@ -6417,15 +6437,9 @@
     async function fetchSceneSmartSuggestions(type, sceneId, allAvailableItems, existingIds, cardElement) {
         if (!getEnableSuggestions() || !sceneId || !allAvailableItems || !allAvailableItems.length) return [];
         try {
-            let cardText = '';
             let title = '';
             let details = '';
-            let filePath = '';
             let fileName = '';
-
-            if (cardElement) {
-                cardText = cardElement.innerText || cardElement.textContent || '';
-            }
 
             try {
                 const query = `query ($id: ID!) { findScene(id: $id) { title details files { path } } }`;
@@ -6435,23 +6449,29 @@
                     if (scene.title) title = scene.title;
                     if (scene.details) details = scene.details;
                     if (scene.files && scene.files.length > 0 && scene.files[0]?.path) {
-                        filePath = scene.files[0].path;
+                        const filePath = scene.files[0].path;
                         const parts = filePath.split(/[/\\]/);
                         const lastPart = parts.length > 0 ? parts[parts.length - 1] : filePath;
-                        fileName = lastPart.replace(/\.[^/.]+$/, '');
+                        fileName = cleanFilenameForSuggestions(lastPart);
                     }
                 }
             } catch (e) {}
 
-            const rawCombined = `${cardText} ${title} ${details} ${fileName} ${filePath}`;
+            const rawCombined = `${title} ${fileName} ${details}`.trim();
+            if (!rawCombined) return [];
+
             const normalizedSpaced = ' ' + normalizeTextForSuggestions(rawCombined) + ' ';
             const tokens = normalizedSpaced.trim().split(/\s+/).filter(Boolean);
             const tokenSet = new Set(tokens);
             if (!tokens.length) return [];
 
+            const existingSet = existingIds ? new Set(Array.from(existingIds).map(String)) : new Set();
             const suggestions = [];
 
             for (const item of allAvailableItems) {
+                if (!item || !item.id) continue;
+                if (existingSet.has(String(item.id))) continue;
+
                 if (isSuggestionMatch(item, normalizedSpaced, tokenSet)) {
                     suggestions.push(item);
                     if (suggestions.length >= 20) break;
@@ -8540,10 +8560,8 @@
         }
 
         const isDark = getEffectiveTheme() === 'dark';
-        let cardText = cardElement ? (cardElement.innerText || cardElement.textContent || '') : '';
         let title = '';
         let details = '';
-        let filePath = '';
         let fileName = '';
 
         try {
@@ -8554,15 +8572,20 @@
                 if (scene.title) title = scene.title;
                 if (scene.details) details = scene.details;
                 if (scene.files && scene.files.length > 0 && scene.files[0]?.path) {
-                    filePath = scene.files[0].path;
+                    const filePath = scene.files[0].path;
                     const parts = filePath.split(/[/\\]/);
                     const lastPart = parts.length > 0 ? parts[parts.length - 1] : filePath;
-                    fileName = lastPart.replace(/\.[^/.]+$/, '');
+                    fileName = cleanFilenameForSuggestions(lastPart);
                 }
             }
         } catch (e) {}
 
-        const rawCombined = `${cardText} ${title} ${details} ${fileName} ${filePath}`;
+        const rawCombined = `${title} ${fileName} ${details}`.trim();
+        if (!rawCombined) {
+            if (container) container.style.display = 'none';
+            return;
+        }
+
         const normalizedSpaced = ' ' + normalizeTextForSuggestions(rawCombined) + ' ';
         const tokens = normalizedSpaced.trim().split(/\s+/).filter(Boolean);
         const tokenSet = new Set(tokens);
@@ -8598,7 +8621,12 @@
             }
             if (!cached || !Array.isArray(cached)) continue;
 
+            const existingSet = (ctx && typeof ctx.getSelectedIds === 'function') ? ctx.getSelectedIds(type) : null;
+
             for (const item of cached) {
+                if (!item || !item.id) continue;
+                if (existingSet && (existingSet.has(String(item.id)) || existingSet.has(Number(item.id)))) continue;
+
                 if (isSuggestionMatch(item, normalizedSpaced, tokenSet)) {
                     allSuggestions.push({ type, icon, item });
                     if (allSuggestions.length >= 30) break;
@@ -9515,23 +9543,33 @@
 
             if (tagsTable) {
                 try {
+                    tagsTable.off("rowClick");
                     tagsTable.off("rowSelected");
                     tagsTable.off("rowDeselected");
                 } catch (e) {}
             }
             if (performersTable) {
                 try {
+                    performersTable.off("rowClick");
                     performersTable.off("rowSelected");
                     performersTable.off("rowDeselected");
                 } catch (e) {}
             }
 
-            tagsTable.on("rowSelected", async (row) => {
-                if (isRestoring) return;
-                const id = row.getData()?.id;
-                if (!id) return;
-                selectedTagIds.add(String(id));
-                addRecentEntry('tags', row.getData());
+            tagsTable.on("rowClick", async (e, row) => {
+                const rowData = row.getData();
+                if (!rowData || !rowData.id) return;
+                const strId = String(rowData.id);
+                const wasSelected = selectedTagIds.has(strId);
+
+                if (wasSelected) {
+                    selectedTagIds.delete(strId);
+                    tagsTable.deselectRow(row);
+                } else {
+                    selectedTagIds.add(strId);
+                    tagsTable.selectRow(row);
+                    addRecentEntry('tags', rowData);
+                }
 
                 currentNavSection = 'tags';
                 const rows = tagsTable.getRows();
@@ -9546,54 +9584,48 @@
                     popup.globalClear.style.display = 'none';
                     if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
                     await refreshGlobalSearch('');
-                    const r = tagsTable.getRow(id);
-                    if (r) tagsTable.scrollToRow(r, "top", false);
+                    if (!wasSelected) {
+                        const r = tagsTable.getRow(rowData.id);
+                        if (r) tagsTable.scrollToRow(r, "top", false);
+                    } else {
+                        try {
+                            const holder = tagsTable.element?.querySelector('.tabulator-tableholder') || tagsTable.element;
+                            if (holder) holder.scrollTop = 0;
+                            const firstRow = tagsTable.getRows()[0];
+                            if (firstRow) tagsTable.scrollToRow(firstRow, "top", false);
+                        } catch (err) {}
+                    }
                     activeNavIndex = -1;
                     refreshAllUI();
                     updateEverythingKeyboardHighlight();
                     popup.globalSearch.focus({ preventScroll: true });
                 } else {
-                    if (popup.refreshBtn) {
-                        popup.refreshBtn.classList.add('fasttag-refresh-pulse');
-                        popup.refreshBtn.title = 'Re-sort columns & pin selected items to top';
+                    if (!wasSelected) {
+                        if (popup.refreshBtn) {
+                            popup.refreshBtn.classList.add('fasttag-refresh-pulse');
+                            popup.refreshBtn.title = 'Re-sort columns & pin selected items to top';
+                        }
+                    } else {
+                        await refreshGlobalSearch('');
                     }
                     popup.globalSearch.focus({ preventScroll: true });
                 }
             });
 
-            tagsTable.on("rowDeselected", async (row) => {
-                if (isRestoring || isModalClosing) return;
-                const id = row.getData()?.id;
-                if (!id) return;
-                selectedTagIds.delete(String(id));
-                currentNavSection = 'tags';
-                activeNavIndex = -1;
-                refreshAllUI();
-                updateEverythingKeyboardHighlight();
-                updateSaveButton();
+            performersTable.on("rowClick", async (e, row) => {
+                const rowData = row.getData();
+                if (!rowData || !rowData.id) return;
+                const strId = String(rowData.id);
+                const wasSelected = selectedPerformerIds.has(strId);
 
-                const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
-                if (hasSearch) {
-                    popup.globalSearch.value = '';
-                    popup.globalClear.style.display = 'none';
-                    if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                if (wasSelected) {
+                    selectedPerformerIds.delete(strId);
+                    performersTable.deselectRow(row);
+                } else {
+                    selectedPerformerIds.add(strId);
+                    performersTable.selectRow(row);
+                    addRecentEntry('performers', rowData);
                 }
-                await refreshGlobalSearch('');
-                try {
-                    const holder = tagsTable.element?.querySelector('.tabulator-tableholder') || tagsTable.element;
-                    if (holder) holder.scrollTop = 0;
-                    const firstRow = tagsTable.getRows()[0];
-                    if (firstRow) tagsTable.scrollToRow(firstRow, "top", false);
-                } catch (e) {}
-                if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
-            });
-
-            performersTable.on("rowSelected", async (row) => {
-                if (isRestoring || isModalClosing) return;
-                const id = row.getData()?.id;
-                if (!id) return;
-                selectedPerformerIds.add(String(id));
-                addRecentEntry('performers', row.getData());
 
                 currentNavSection = 'performers';
                 const rows = performersTable.getRows();
@@ -9608,46 +9640,32 @@
                     popup.globalClear.style.display = 'none';
                     if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
                     await refreshGlobalSearch('');
-                    const r = performersTable.getRow(id);
-                    if (r) performersTable.scrollToRow(r, "top", false);
+                    if (!wasSelected) {
+                        const r = performersTable.getRow(rowData.id);
+                        if (r) performersTable.scrollToRow(r, "top", false);
+                    } else {
+                        try {
+                            const holder = performersTable.element?.querySelector('.tabulator-tableholder') || performersTable.element;
+                            if (holder) holder.scrollTop = 0;
+                            const firstRow = performersTable.getRows()[0];
+                            if (firstRow) performersTable.scrollToRow(firstRow, "top", false);
+                        } catch (err) {}
+                    }
                     activeNavIndex = -1;
                     refreshAllUI();
                     updateEverythingKeyboardHighlight();
                     popup.globalSearch.focus({ preventScroll: true });
                 } else {
-                    if (popup.refreshBtn) {
-                        popup.refreshBtn.classList.add('fasttag-refresh-pulse');
-                        popup.refreshBtn.title = 'Re-sort columns & pin selected items to top';
+                    if (!wasSelected) {
+                        if (popup.refreshBtn) {
+                            popup.refreshBtn.classList.add('fasttag-refresh-pulse');
+                            popup.refreshBtn.title = 'Re-sort columns & pin selected items to top';
+                        }
+                    } else {
+                        await refreshGlobalSearch('');
                     }
                     popup.globalSearch.focus({ preventScroll: true });
                 }
-            });
-
-            performersTable.on("rowDeselected", async (row) => {
-                if (isRestoring || isModalClosing) return;
-                const id = row.getData()?.id;
-                if (!id) return;
-                selectedPerformerIds.delete(String(id));
-                currentNavSection = 'performers';
-                activeNavIndex = -1;
-                refreshAllUI();
-                updateEverythingKeyboardHighlight();
-                updateSaveButton();
-
-                const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
-                if (hasSearch) {
-                    popup.globalSearch.value = '';
-                    popup.globalClear.style.display = 'none';
-                    if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-                }
-                await refreshGlobalSearch('');
-                try {
-                    const holder = performersTable.element?.querySelector('.tabulator-tableholder') || performersTable.element;
-                    if (holder) holder.scrollTop = 0;
-                    const firstRow = performersTable.getRows()[0];
-                    if (firstRow) performersTable.scrollToRow(firstRow, "top", false);
-                } catch (e) {}
-                if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
             });
 
             form.addEventListener('click', (e) => {
@@ -11391,121 +11409,118 @@
                 renderGroupBar(popup.globalSearch ? popup.globalSearch.value : '');
             };
 
-            tagsTable.on("rowSelected", async (row) => {
-                if (!isRestoring) {
-                    const id = row.getData().id;
-                    if (id) {
-                        selectedTagIds.add(String(id));
-                        addRecentEntry('tags', row.getData());
-                    }
-                    currentNavSection = 'tags';
-                    const rows = tagsTable.getRows();
-                    activeNavIndex = rows.indexOf(row);
-                    refreshAllUI();
-                    updateEverythingKeyboardHighlight();
+            if (tagsTable) {
+                try {
+                    tagsTable.off("rowClick");
+                    tagsTable.off("rowSelected");
+                    tagsTable.off("rowDeselected");
+                } catch (e) {}
+            }
+            if (performersTable) {
+                try {
+                    performersTable.off("rowClick");
+                    performersTable.off("rowSelected");
+                    performersTable.off("rowDeselected");
+                } catch (e) {}
+            }
 
-                    const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
-                    if (hasSearch) {
-                        popup.globalSearch.value = '';
-                        popup.globalClear.style.display = 'none';
-                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-                        await refreshGlobalSearch('');
-                        const r = tagsTable.getRow(id);
+            tagsTable.on("rowClick", async (e, row) => {
+                const rowData = row.getData();
+                if (!rowData || !rowData.id) return;
+                const strId = String(rowData.id);
+                const wasSelected = selectedTagIds.has(strId);
+
+                if (wasSelected) {
+                    selectedTagIds.delete(strId);
+                    tagsTable.deselectRow(row);
+                } else {
+                    selectedTagIds.add(strId);
+                    tagsTable.selectRow(row);
+                    addRecentEntry('tags', rowData);
+                }
+
+                currentNavSection = 'tags';
+                const rows = tagsTable.getRows();
+                activeNavIndex = rows.indexOf(row);
+                refreshAllUI();
+                updateEverythingKeyboardHighlight();
+
+                const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
+                if (hasSearch) {
+                    popup.globalSearch.value = '';
+                    popup.globalClear.style.display = 'none';
+                    if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                    await refreshGlobalSearch('');
+                    if (!wasSelected) {
+                        const r = tagsTable.getRow(rowData.id);
                         if (r) tagsTable.scrollToRow(r, "top", false);
-                        activeNavIndex = -1;
-                        refreshAllUI();
-                        updateEverythingKeyboardHighlight();
-                        popup.globalSearch.focus({ preventScroll: true });
-                    } else if (popup.globalSearch) {
-                        popup.globalSearch.focus({ preventScroll: true });
+                    } else {
+                        try {
+                            const holder = tagsTable.element?.querySelector('.tabulator-tableholder') || tagsTable.element;
+                            if (holder) holder.scrollTop = 0;
+                            const firstRow = tagsTable.getRows()[0];
+                            if (firstRow) tagsTable.scrollToRow(firstRow, "top", false);
+                        } catch (err) {}
                     }
+                    activeNavIndex = -1;
+                    refreshAllUI();
+                    updateEverythingKeyboardHighlight();
+                    popup.globalSearch.focus({ preventScroll: true });
+                } else {
+                    if (wasSelected) {
+                        await refreshGlobalSearch('');
+                    }
+                    if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
                 }
             });
 
-            tagsTable.on("rowDeselected", async (row) => {
-                if (!isRestoring && !isModalClosing) {
-                    const id = row.getData().id;
-                    if (id) selectedTagIds.delete(String(id));
-                    currentNavSection = 'tags';
-                    const rows = tagsTable.getRows();
-                    activeNavIndex = rows.indexOf(row);
-                    refreshAllUI();
-                    updateEverythingKeyboardHighlight();
+            performersTable.on("rowClick", async (e, row) => {
+                const rowData = row.getData();
+                if (!rowData || !rowData.id) return;
+                const strId = String(rowData.id);
+                const wasSelected = selectedPerformerIds.has(strId);
 
-                    const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
-                    if (hasSearch) {
-                        popup.globalSearch.value = '';
-                        popup.globalClear.style.display = 'none';
-                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-                        await refreshGlobalSearch('');
-                        const r = tagsTable.getRow(id);
-                        if (r) tagsTable.scrollToRow(r, "top", false);
-                        activeNavIndex = -1;
-                        refreshAllUI();
-                        updateEverythingKeyboardHighlight();
-                        popup.globalSearch.focus({ preventScroll: true });
-                    } else if (popup.globalSearch) {
-                        popup.globalSearch.focus({ preventScroll: true });
-                    }
+                if (wasSelected) {
+                    selectedPerformerIds.delete(strId);
+                    performersTable.deselectRow(row);
+                } else {
+                    selectedPerformerIds.add(strId);
+                    performersTable.selectRow(row);
+                    addRecentEntry('performers', rowData);
                 }
-            });
 
-            performersTable.on("rowSelected", async (row) => {
-                if (!isRestoring && !isModalClosing) {
-                    const id = row.getData().id;
-                    if (id) {
-                        selectedPerformerIds.add(String(id));
-                        addRecentEntry('performers', row.getData());
-                    }
-                    currentNavSection = 'performers';
-                    const rows = performersTable.getRows();
-                    activeNavIndex = rows.indexOf(row);
-                    refreshAllUI();
-                    updateEverythingKeyboardHighlight();
+                currentNavSection = 'performers';
+                const rows = performersTable.getRows();
+                activeNavIndex = rows.indexOf(row);
+                refreshAllUI();
+                updateEverythingKeyboardHighlight();
 
-                    const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
-                    if (hasSearch) {
-                        popup.globalSearch.value = '';
-                        popup.globalClear.style.display = 'none';
-                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-                        await refreshGlobalSearch('');
-                        const r = performersTable.getRow(id);
+                const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
+                if (hasSearch) {
+                    popup.globalSearch.value = '';
+                    popup.globalClear.style.display = 'none';
+                    if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                    await refreshGlobalSearch('');
+                    if (!wasSelected) {
+                        const r = performersTable.getRow(rowData.id);
                         if (r) performersTable.scrollToRow(r, "top", false);
-                        activeNavIndex = -1;
-                        refreshAllUI();
-                        updateEverythingKeyboardHighlight();
-                        popup.globalSearch.focus({ preventScroll: true });
-                    } else if (popup.globalSearch) {
-                        popup.globalSearch.focus({ preventScroll: true });
+                    } else {
+                        try {
+                            const holder = performersTable.element?.querySelector('.tabulator-tableholder') || performersTable.element;
+                            if (holder) holder.scrollTop = 0;
+                            const firstRow = performersTable.getRows()[0];
+                            if (firstRow) performersTable.scrollToRow(firstRow, "top", false);
+                        } catch (err) {}
                     }
-                }
-            });
-
-            performersTable.on("rowDeselected", async (row) => {
-                if (!isRestoring && !isModalClosing) {
-                    const id = row.getData().id;
-                    if (id) selectedPerformerIds.delete(String(id));
-                    currentNavSection = 'performers';
-                    const rows = performersTable.getRows();
-                    activeNavIndex = rows.indexOf(row);
+                    activeNavIndex = -1;
                     refreshAllUI();
                     updateEverythingKeyboardHighlight();
-
-                    const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
-                    if (hasSearch) {
-                        popup.globalSearch.value = '';
-                        popup.globalClear.style.display = 'none';
-                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                    popup.globalSearch.focus({ preventScroll: true });
+                } else {
+                    if (wasSelected) {
                         await refreshGlobalSearch('');
-                        const r = performersTable.getRow(id);
-                        if (r) performersTable.scrollToRow(r, "top", false);
-                        activeNavIndex = -1;
-                        refreshAllUI();
-                        updateEverythingKeyboardHighlight();
-                        popup.globalSearch.focus({ preventScroll: true });
-                    } else if (popup.globalSearch) {
-                        popup.globalSearch.focus({ preventScroll: true });
                     }
+                    if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
                 }
             });
 

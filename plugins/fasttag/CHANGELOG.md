@@ -4,6 +4,20 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [3.9.4] - 2026-08-31
+
+### Fixed & Improved
+- **Smart Suggestions Accuracy & False-Positive Elimination**:
+  - Eliminated parent directory bleed: Suggestions are now strictly derived from the scene file's basename, excluding all parent folder paths.
+  - Eliminated scene card DOM scraping: Stopped parsing raw HTML from card elements (avoiding resolution, codec, duration, and hover preview text contamination).
+  - Added video release noise filtering (stripping `1080p`, `4k`, `hevc`, `x264`, `x265`, `aac`, `webrip`, `bluray`, etc.).
+  - Added stop-word guard to prevent short common English words in secondary performer/tag aliases from generating spurious suggestions.
+  - Excluded already-assigned items from appearing in the suggestions container.
+- **Edit Everything & Bulk Everything Search Input Stability**:
+  - Replaced Tabulator `rowSelected` / `rowDeselected` events with direct human `rowClick` handlers. Programmatic row selection and background column filtering during fast typing can no longer clear the search console.
+
+---
+
 ## [3.9.3] - 2026-08-31
 
 ### Critical Bug Fixes & Stability Hardening
