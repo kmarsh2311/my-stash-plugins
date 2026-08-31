@@ -5674,7 +5674,10 @@
             }
 
             // 4. Update Scene & Synchronize Context
-            if (ctx) {
+            const effectiveCtx = ctx || popup?._context || activePopup?._context;
+            const isEverythingModal = popup?.element?.getAttribute('data-popup-type') === 'everything' || popup?.element?.getAttribute('data-popup-type') === 'bulk-everything' || activePopup?.type === 'everything' || Boolean(effectiveCtx);
+
+            if (isEverythingModal && effectiveCtx) {
                 // In Edit Everything Popup: Update metadata first, then merge into context and trigger doSave()
                 const metaInput = { id: sceneId };
                 if (match.date) metaInput.date = match.date;
@@ -5691,37 +5694,57 @@
                     await fetchGQL(metaUpdate, { input: metaInput });
                 }
 
-                if (typeof ctx.setSelectedStudio === 'function' && studioIdToSet) {
-                    ctx.setSelectedStudio(studioIdToSet);
+                if (typeof effectiveCtx.setSelectedStudio === 'function' && studioIdToSet) {
+                    effectiveCtx.setSelectedStudio(studioIdToSet);
                 }
 
-                let currentPerfs = typeof ctx.getSelectedPerformers === 'function' ? ctx.getSelectedPerformers() : new Set();
+                let currentPerfs = typeof effectiveCtx.getSelectedPerformers === 'function' ? effectiveCtx.getSelectedPerformers() : new Set();
                 if (!(currentPerfs instanceof Set)) currentPerfs = new Set(currentPerfs || []);
                 performerIdsToAdd.forEach(id => currentPerfs.add(id));
-                if (typeof ctx.setSelectedPerformers === 'function') {
-                    ctx.setSelectedPerformers(currentPerfs);
+                if (typeof effectiveCtx.setSelectedPerformers === 'function') {
+                    effectiveCtx.setSelectedPerformers(currentPerfs);
                 }
 
-                let currentTags = typeof ctx.getSelectedTags === 'function' ? ctx.getSelectedTags() : new Set();
+                let currentTags = typeof effectiveCtx.getSelectedTags === 'function' ? effectiveCtx.getSelectedTags() : new Set();
                 if (!(currentTags instanceof Set)) currentTags = new Set(currentTags || []);
                 tagIdsToAdd.forEach(id => currentTags.add(id));
-                if (typeof ctx.setSelectedTags === 'function') {
-                    ctx.setSelectedTags(currentTags);
+                if (typeof effectiveCtx.setSelectedTags === 'function') {
+                    effectiveCtx.setSelectedTags(currentTags);
                 }
 
-                if (typeof ctx.fetchColumnData === 'function' && popup) {
-                    if (popup.tagsTable) await ctx.fetchColumnData('tags', popup.tagsTable, '', currentTags);
-                    if (popup.performersTable) await ctx.fetchColumnData('performers', popup.performersTable, '', currentPerfs);
+                if (typeof effectiveCtx.fetchColumnData === 'function' && popup) {
+                    if (popup.tagsTable) await effectiveCtx.fetchColumnData('tags', popup.tagsTable, '', currentTags);
+                    if (popup.performersTable) await effectiveCtx.fetchColumnData('performers', popup.performersTable, '', currentPerfs);
                 }
-                if (typeof ctx.renderStudioBar === 'function') {
-                    await ctx.renderStudioBar('');
+                if (typeof effectiveCtx.renderStudioBar === 'function') {
+                    await effectiveCtx.renderStudioBar('');
                 }
-                if (typeof ctx.refreshAllUI === 'function') {
-                    ctx.refreshAllUI();
+                if (typeof effectiveCtx.refreshAllUI === 'function') {
+                    effectiveCtx.refreshAllUI();
                 }
-                if (typeof ctx.doSave === 'function') {
-                    await ctx.doSave('Matched & Saved from StashDB!');
+                if (typeof effectiveCtx.doSave === 'function') {
+                    await effectiveCtx.doSave('Matched & Saved from StashDB!');
                 }
+
+                closeFloatingScraperHud();
+                container.innerHTML = '';
+                container.style.display = 'none';
+                if (popup && popup.scrapeBtn) {
+                    popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
+                    popup.scrapeBtn.innerHTML = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
+                    popup.scrapeBtn.title = 'Scrape scene metadata';
+                }
+                sessionScrapeCache.delete(sceneId);
+
+                // If in sequential edit mode in Edit Everything, navigate in-place to next scene
+                if (sequentialEditState.enabled && popup && popup.element) {
+                    const cards = sequentialEditState.allSceneCards || getAllVisibleSceneCards();
+                    const idx = getSceneCardIndex(sceneId, cards);
+                    if (idx !== -1 && idx < cards.length - 1) {
+                        navigateSequentialEditEverything(popup, sceneId, 1, null);
+                    }
+                }
+                return;
             } else {
                 // In Single-Column Popup (Edit Tags, Edit Performers, Edit Studio):
                 // Fetch current scene tags and performers first to safely MERGE without overwriting existing data
@@ -9821,6 +9844,31 @@
                     if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
                 };
 
+            // Store context methods on popup instance for in-place sequential updates & scraper matches
+            popup._context = {
+                setCurrentSceneId: (id) => { currentSceneId = id; },
+                setSelectedTags: (s) => { selectedTagIds = s; },
+                setSelectedPerformers: (s) => { selectedPerformerIds = s; },
+                setSelectedStudio: (s) => { selectedStudioId = s; },
+                setSelectedGroups: (s) => { selectedGroupIds = s; },
+                getSelectedTags: () => selectedTagIds,
+                getSelectedPerformers: () => selectedPerformerIds,
+                getSelectedStudio: () => selectedStudioId,
+                getSelectedGroups: () => selectedGroupIds,
+                setInitialTags: (s) => { initialTagIds = s; },
+                setInitialPerformers: (s) => { initialPerformerIds = s; },
+                setInitialStudio: (s) => { initialStudioId = s; },
+                setInitialGroups: (s) => { initialGroupIds = s; },
+                fetchColumnData,
+                renderStudioBar,
+                renderGroupBar,
+                refreshAllUI,
+                doSave,
+                onSuggestionActivated,
+                isDirty,
+                isEverything: true
+            };
+
             makeColumnResizable(popup.columnsContainer, popup.colTags, popup.colPerformers, popup.colResizer, () => {
                 try {
                     tagsTable.redraw(false);
@@ -9917,30 +9965,6 @@
             };
 
             popup.cancelBtn.onclick = () => closePopup();
-
-            // Store context methods on popup instance for in-place sequential updates
-            popup._context = {
-                setCurrentSceneId: (id) => { currentSceneId = id; },
-                setSelectedTags: (s) => { selectedTagIds = s; },
-                setSelectedPerformers: (s) => { selectedPerformerIds = s; },
-                setSelectedStudio: (s) => { selectedStudioId = s; },
-                setSelectedGroups: (s) => { selectedGroupIds = s; },
-                getSelectedTags: () => selectedTagIds,
-                getSelectedPerformers: () => selectedPerformerIds,
-                getSelectedStudio: () => selectedStudioId,
-                getSelectedGroups: () => selectedGroupIds,
-                setInitialTags: (s) => { initialTagIds = s; },
-                setInitialPerformers: (s) => { initialPerformerIds = s; },
-                setInitialStudio: (s) => { initialStudioId = s; },
-                setInitialGroups: (s) => { initialGroupIds = s; },
-                fetchColumnData,
-                renderStudioBar,
-                renderGroupBar,
-                refreshAllUI,
-                doSave,
-                onSuggestionActivated,
-                isDirty
-            };
 
             const enableHScroll = (containerEl, scrollTargetEl) => {
                 if (!containerEl) return;
