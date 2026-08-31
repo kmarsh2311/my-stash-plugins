@@ -1009,14 +1009,29 @@
         .fasttag-quick-chip:active {
             transform: translateY(0px) scale(0.97) !important;
         }
-        /* Keyboard Focus Indicator for Studio & Group Chips */
+        /* Keyboard Focus Indicator for Studio & Group Chips (Curved Pill-Conforming Ring) */
         .fasttag-keyboard-meta-focus {
-            outline: 2px solid #38bdf8 !important;
-            outline-offset: 1px !important;
-            box-shadow: 0 0 10px rgba(56, 189, 248, 0.7) !important;
-            transform: scale(1.06) translateY(-1px) !important;
-            filter: brightness(1.25) !important;
-            z-index: 10 !important;
+            outline: none !important;
+            border-radius: 999px !important;
+            box-shadow: 0 0 0 1.5px #818cf8, 0 0 8px rgba(129, 140, 248, 0.55) !important;
+            color: #ffffff !important;
+            transition: all 0.12s ease !important;
+        }
+        .fasttag-studio-pill.fasttag-keyboard-meta-focus,
+        .chip-studio.fasttag-keyboard-meta-focus {
+            border: 1px solid #818cf8 !important;
+            box-shadow: 0 0 0 1.5px #818cf8, 0 0 8px rgba(129, 140, 248, 0.6) !important;
+            background: rgba(99, 102, 241, 0.28) !important;
+            color: #ffffff !important;
+            filter: brightness(1.2) !important;
+        }
+        .fasttag-group-pill.fasttag-keyboard-meta-focus,
+        .chip-group.fasttag-keyboard-meta-focus {
+            border: 1px solid #c084fc !important;
+            box-shadow: 0 0 0 1.5px #c084fc, 0 0 8px rgba(192, 132, 252, 0.6) !important;
+            background: rgba(168, 85, 247, 0.28) !important;
+            color: #ffffff !important;
+            filter: brightness(1.2) !important;
         }
         `;
         document.head.appendChild(style);
@@ -3625,6 +3640,11 @@
                 const bFullInc = bFull.includes(term) ? 1 : 0;
                 if (aFullInc !== bFullInc) return bFullInc - aFullInc;
             }
+
+            // Priority Tiebreaker: Higher scene_count (tag/usage count) first
+            const aCount = Number(a.scene_count) || 0;
+            const bCount = Number(b.scene_count) || 0;
+            if (aCount !== bCount) return bCount - aCount;
 
             return aName.localeCompare(bName);
         };
@@ -6885,9 +6905,9 @@
 
             <!-- Split Metadata Bar: Studio (Left) | Group (Right) -->
             <div id="everything-metadata-bar" style="display: flex; gap: 6px; margin-bottom: 5px; flex-shrink: 0; min-height: 25px; box-sizing: border-box;">
-                <!-- Left Half: Studio (Pinned Label + Smooth Horizontal Scroll) -->
-                <div id="everything-studio-half" style="display: flex; align-items: center; gap: 5px; flex: 1 1 0px; min-width: 0; padding: 2.5px 6px; background: ${studioBarBg}; border: ${studioBarBorder}; border-radius: 7px; box-sizing: border-box; overflow: hidden;">
-                    <span style="font-weight: 700; color: ${isDark ? '#a5b4fc' : '#4f46e5'}; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 3px; flex-shrink: 0; user-select: none;">📁 Studio:</span>
+                <!-- Left Half: Studio (Compact Icon Prefix + Smooth Horizontal Scroll) -->
+                <div id="everything-studio-half" style="display: flex; align-items: center; gap: 5px; flex: 1 1 0px; min-width: 0; padding: 2.5px 6px; background: ${studioBarBg}; border: ${studioBarBorder}; border-radius: 7px; box-sizing: border-box; overflow: hidden;" title="Studio">
+                    <span style="font-size: 11px; display: flex; align-items: center; flex-shrink: 0; user-select: none; opacity: 0.9;" title="Studio">🏢</span>
                     <div id="everything-studio-scroll" style="display: flex; align-items: center; gap: 3.5px; flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none;">
                         <div id="everything-selected-studio-chip" class="fasttag-studio-pill" style="display: none; align-items: center; gap: 4px; font-weight: 700; padding: 1.5px 6px; border-radius: 999px; font-size: 10px; white-space: nowrap; flex-shrink: 0; cursor: default;">
                             <span style="font-weight: 800; font-size: 9.5px; opacity: 0.95;">✓</span>
@@ -6898,9 +6918,9 @@
                     </div>
                 </div>
 
-                <!-- Right Half: Groups (Pinned Label on Left + Smooth Horizontal Scroll) -->
-                <div id="everything-groups-half" style="display: flex; align-items: center; gap: 5px; flex: 1 1 0px; min-width: 0; padding: 2.5px 6px; background: ${studioBarBg}; border: ${studioBarBorder}; border-radius: 7px; box-sizing: border-box; overflow: hidden;">
-                    <span style="font-weight: 700; color: ${isDark ? '#c084fc' : '#9333ea'}; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 3px; flex-shrink: 0; user-select: none;">🎬 Group:</span>
+                <!-- Right Half: Groups (Compact Folder Icon Prefix + Smooth Horizontal Scroll) -->
+                <div id="everything-groups-half" style="display: flex; align-items: center; gap: 5px; flex: 1 1 0px; min-width: 0; padding: 2.5px 6px; background: ${studioBarBg}; border: ${studioBarBorder}; border-radius: 7px; box-sizing: border-box; overflow: hidden;" title="Group">
+                    <span style="font-size: 11px; display: flex; align-items: center; flex-shrink: 0; user-select: none; opacity: 0.9;" title="Group">📁</span>
                     <div id="everything-groups-scroll" style="display: flex; align-items: center; gap: 3.5px; flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none;">
                         <div id="everything-selected-groups-container" style="display: flex; gap: 3.5px; align-items: center; flex-shrink: 0;"></div>
                         <div id="everything-recent-groups" style="display: flex; gap: 3.5px; align-items: center; flex-shrink: 0;"></div>
@@ -7720,8 +7740,8 @@
                 if (!term) {
                     if (!selectedStudioId) {
                         const emptySpan = document.createElement('span');
-                        emptySpan.textContent = '(None)';
-                        emptySpan.style.cssText = `font-size: 10px; opacity: 0.6; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'};`;
+                        emptySpan.textContent = 'Studio';
+                        emptySpan.style.cssText = `font-size: 10px; opacity: 0.45; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'}; letter-spacing: 0.3px; user-select: none;`;
                         studioBar.recentContainer.appendChild(emptySpan);
                     }
                     return;
@@ -7729,7 +7749,29 @@
 
                 const matchingStudios = allStudios
                     .filter(s => (s.name || '').toLowerCase().includes(term) && String(s.id) !== String(selectedStudioId))
+                    .sort((a, b) => {
+                        const aName = (a.name || '').toLowerCase();
+                        const bName = (b.name || '').toLowerCase();
+                        const aExact = aName === term ? 1 : 0;
+                        const bExact = bName === term ? 1 : 0;
+                        if (aExact !== bExact) return bExact - aExact;
+                        const aStarts = aName.startsWith(term) ? 1 : 0;
+                        const bStarts = bName.startsWith(term) ? 1 : 0;
+                        if (aStarts !== bStarts) return bStarts - aStarts;
+                        const aCount = Number(a.scene_count) || 0;
+                        const bCount = Number(b.scene_count) || 0;
+                        if (aCount !== bCount) return bCount - aCount;
+                        return aName.localeCompare(bName);
+                    })
                     .slice(0, 8);
+
+                if (!matchingStudios.length && !selectedStudioId) {
+                    const emptySpan = document.createElement('span');
+                    emptySpan.textContent = 'No matching studio';
+                    emptySpan.style.cssText = `font-size: 10px; opacity: 0.6; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'};`;
+                    studioBar.recentContainer.appendChild(emptySpan);
+                    return;
+                }
 
                 matchingStudios.forEach(st => {
                     const chip = document.createElement('button');
@@ -7747,8 +7789,20 @@
                             selectedStudioId = String(st.id);
                             addRecentEntry('studios', st);
                         }
+                        popup.globalSearch.value = '';
+                        popup.globalClear.style.display = 'none';
+                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                        activeColType = 'tags';
+                        activeColIndex = -1;
+                        activeMetaIndex = -1;
+                        await Promise.all([
+                            fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                            fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                        ]);
                         refreshAllUI();
+                        updateEverythingKeyboardHighlight();
                         await doSave();
+                        popup.globalSearch.focus({ preventScroll: true });
                     };
 
                     studioBar.recentContainer.appendChild(chip);
@@ -7792,7 +7846,7 @@
                     pill.className = 'fasttag-group-pill';
                     pill.style.cssText = `display: inline-flex; align-items: center; gap: 3.5px; font-weight: 700; padding: 1.5px 6px; border-radius: 999px; font-size: 10px; white-space: nowrap; flex-shrink: 0; cursor: default;`;
                     pill.innerHTML = `
-                        <span style="font-weight: 800; font-size: 9.5px; opacity: 0.95;">🎬</span>
+                        <span style="font-weight: 800; font-size: 9.5px; opacity: 0.95;">📁</span>
                         <span>${escapeHtml(name)}</span>
                         <button type="button" class="fasttag-pill-clear-btn" style="background: none; border: none; cursor: pointer; color: #ffffff; font-weight: 700; font-size: 12px; padding: 0 0 0 2.5px; line-height: 1; opacity: 0.85;" title="Remove Group">&times;</button>
                     `;
@@ -7801,9 +7855,20 @@
                         e.preventDefault();
                         e.stopPropagation();
                         selectedGroupIds.delete(String(id));
-                        renderGroupBar(popup.globalSearch ? popup.globalSearch.value : '');
-                        updateSaveButton();
+                        popup.globalSearch.value = '';
+                        popup.globalClear.style.display = 'none';
+                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                        activeColType = 'tags';
+                        activeColIndex = -1;
+                        activeMetaIndex = -1;
+                        await Promise.all([
+                            fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                            fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                        ]);
+                        refreshAllUI();
+                        updateEverythingKeyboardHighlight();
                         await doSave();
+                        popup.globalSearch.focus({ preventScroll: true });
                     };
                     groupsBar.selectedContainer.appendChild(pill);
                 });
@@ -7812,8 +7877,8 @@
                 if (!term) {
                     if (selectedGroupIds.size === 0) {
                         const emptySpan = document.createElement('span');
-                        emptySpan.textContent = '(None)';
-                        emptySpan.style.cssText = `font-size: 10px; opacity: 0.6; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'};`;
+                        emptySpan.textContent = 'Group';
+                        emptySpan.style.cssText = `font-size: 10px; opacity: 0.45; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'}; letter-spacing: 0.3px; user-select: none;`;
                         groupsBar.recentContainer.appendChild(emptySpan);
                     }
                     return;
@@ -7822,6 +7887,20 @@
                 // When searching: match groups
                 const matchingGroups = allGroups
                     .filter(g => (g.name || '').toLowerCase().includes(term) && !selectedGroupIds.has(String(g.id)))
+                    .sort((a, b) => {
+                        const aName = (a.name || '').toLowerCase();
+                        const bName = (b.name || '').toLowerCase();
+                        const aExact = aName === term ? 1 : 0;
+                        const bExact = bName === term ? 1 : 0;
+                        if (aExact !== bExact) return bExact - aExact;
+                        const aStarts = aName.startsWith(term) ? 1 : 0;
+                        const bStarts = bName.startsWith(term) ? 1 : 0;
+                        if (aStarts !== bStarts) return bStarts - aStarts;
+                        const aCount = Number(a.scene_count) || 0;
+                        const bCount = Number(b.scene_count) || 0;
+                        if (aCount !== bCount) return bCount - aCount;
+                        return (a.name || '').localeCompare(b.name || '');
+                    })
                     .slice(0, 8);
 
                 if (!matchingGroups.length && selectedGroupIds.size === 0) {
@@ -7844,9 +7923,20 @@
                         e.preventDefault();
                         selectedGroupIds.add(String(grp.id));
                         addRecentEntry('groups', grp);
-                        renderGroupBar(popup.globalSearch ? popup.globalSearch.value : '');
-                        updateSaveButton();
+                        popup.globalSearch.value = '';
+                        popup.globalClear.style.display = 'none';
+                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                        activeColType = 'tags';
+                        activeColIndex = -1;
+                        activeMetaIndex = -1;
+                        await Promise.all([
+                            fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                            fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                        ]);
+                        refreshAllUI();
+                        updateEverythingKeyboardHighlight();
                         await doSave();
+                        popup.globalSearch.focus({ preventScroll: true });
                     };
                     groupsBar.recentContainer.appendChild(chip);
                 });
@@ -7856,8 +7946,20 @@
                 popup.studioBar.clearBtn.onclick = async (e) => {
                     e.preventDefault();
                     selectedStudioId = null;
+                    popup.globalSearch.value = '';
+                    popup.globalClear.style.display = 'none';
+                    if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                    activeColType = 'tags';
+                    activeColIndex = -1;
+                    activeMetaIndex = -1;
+                    await Promise.all([
+                        fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                        fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                    ]);
                     refreshAllUI();
+                    updateEverythingKeyboardHighlight();
                     await doSave();
+                    popup.globalSearch.focus({ preventScroll: true });
                 };
             }
 

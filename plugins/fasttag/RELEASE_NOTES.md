@@ -1,3 +1,21 @@
+## 3.9.0 - Split Studio & Group Bar, Full Keyboard Navigation & Scene-Count Search Ranking
+
+### Highlights & New Features
+- **Split Studio & Group Metadata Bar**:
+  - Pinned Studio (`🏢`) and Group (`📁`) icon prefixes with horizontal scrolling and subtle watermark names when empty.
+  - Symmetrical `No matching studio` / `No matching group` feedback on search misses.
+  - Solid gradient selected pills with one-click `✕` remove vs ghost dashed suggestion chips with accented `+` prefix.
+  - Hidden scrollbar tracks for clean, full-height pill clicking and smooth mouse-wheel / trackpad horizontal scrolling.
+- **Full Keyboard Navigation (<kbd>↑</kbd> Up Arrow)**:
+  - Press <kbd>↑</kbd> to jump focus straight into Studio & Group chips from the search box or table top.
+  - Navigate between chips using <kbd>←</kbd> / <kbd>→</kbd> / <kbd>Tab</kbd> with curved, entity-matched glowing focus rings.
+  - Press <kbd>Enter</kbd> to select or remove chips with instant scene auto-save, search reset, and focus return.
+- **Smart Scene-Count Search Ranking**:
+  - Filtered search results automatically rank matches by usage frequency (`scene_count` descending), bringing your most frequently assigned tags and performers to the top.
+  - Full compatibility with all custom browsing sort options when search is cleared.
+
+---
+
 ## 3.8.1 - Auto-Scraping for Edit Everything, Sizing Optimizations & UI Polish
  
 ### Highlights & New Features
