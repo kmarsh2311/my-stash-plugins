@@ -9865,22 +9865,28 @@
                 };
 
                 const onSuggestionActivated = async (sug) => {
-                    const query = popup.globalSearch?.value || '';
-                    if (sug.type === 'tags') {
-                        await fetchColumnData('tags', tagsTable, query, selectedTagIds);
-                        const holder = popup.tags.tableContainer?.querySelector('.tabulator-tableholder');
-                        if (holder) holder.scrollTop = 0;
-                    } else if (sug.type === 'performers') {
-                        await fetchColumnData('performers', performersTable, query, selectedPerformerIds);
-                        const holder = popup.performers.tableContainer?.querySelector('.tabulator-tableholder');
-                        if (holder) holder.scrollTop = 0;
-                    } else if (sug.type === 'studios') {
-                        renderStudioBar(query);
-                    } else if (sug.type === 'groups') {
-                        renderGroupBar(query);
+                    if (popup.globalSearch && popup.globalSearch.value) {
+                        popup.globalSearch.value = '';
+                        if (popup.globalClear) popup.globalClear.style.display = 'none';
+                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
                     }
+                    activeColType = 'tags';
+                    activeColIndex = -1;
+                    activeMetaIndex = -1;
+                    await Promise.all([
+                        fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                        fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                    ]);
+                    renderStudioBar('');
+                    renderGroupBar('');
+                    const holderTags = popup.tags.tableContainer?.querySelector('.tabulator-tableholder');
+                    if (holderTags) holderTags.scrollTop = 0;
+                    const holderPerfs = popup.performers.tableContainer?.querySelector('.tabulator-tableholder');
+                    if (holderPerfs) holderPerfs.scrollTop = 0;
                     refreshAllUI();
+                    updateEverythingKeyboardHighlight();
                     updateSaveButton();
+                    if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
                 };
 
             makeColumnResizable(popup.columnsContainer, popup.colTags, popup.colPerformers, popup.colResizer, () => {
