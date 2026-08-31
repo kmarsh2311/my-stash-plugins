@@ -1758,6 +1758,102 @@
         localStorage.setItem(SCRUB_SPEEDS_STORAGE_KEY, JSON.stringify(speeds));
     }
 
+    function promptDebugModeWarningDialog() {
+        return new Promise((resolve) => {
+            const theme = getEffectiveTheme();
+            const isDark = theme === 'dark';
+
+            const overlay = document.createElement('div');
+            overlay.className = 'fasttag-confirm-dialog-overlay';
+            overlay.style.cssText = `
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.72);
+                backdrop-filter: blur(2.5px);
+                z-index: 100000000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 16px;
+                box-sizing: border-box;
+                animation: fasttagFadeIn 0.12s ease-out;
+            `;
+
+            const dialog = document.createElement('div');
+            dialog.className = 'fasttag-confirm-dialog-card';
+            const cardBg = isDark ? '#1e293b' : '#ffffff';
+            const cardBorder = isDark ? '1px solid rgba(245, 158, 11, 0.45)' : '1px solid rgba(245, 158, 11, 0.6)';
+            const textColor = isDark ? '#f8fafc' : '#0f172a';
+            const textMuted = isDark ? '#94a3b8' : '#64748b';
+
+            dialog.style.cssText = `
+                background: ${cardBg};
+                border: ${cardBorder};
+                border-radius: 10px;
+                padding: 18px 20px;
+                width: 100%;
+                max-width: 400px;
+                box-shadow: 0 20px 30px rgba(0, 0, 0, 0.6);
+                display: flex;
+                flex-direction: column;
+                gap: 13px;
+                color: ${textColor};
+                font-family: inherit;
+            `;
+
+            dialog.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: #f59e0b;">
+                    <span style="font-size: 18px; line-height: 1;">⚠️</span>
+                    <span>Enable Debug Mode?</span>
+                </div>
+                <div style="font-size: 12px; line-height: 1.45; color: ${textColor};">
+                    FastTag will operate differently in Debug Mode:
+                    <ul style="margin: 8px 0 8px 18px; padding: 0; font-size: 11.5px; color: ${textMuted}; display: flex; flex-direction: column; gap: 4px;">
+                        <li>Toasts will remain on screen for <strong>15 seconds</strong> (with pause-on-hover & copy buttons) to allow screenshots.</li>
+                        <li>Detailed network queries and state diagnostics will be logged.</li>
+                    </ul>
+                    <span style="font-size: 11px; color: #fbbf24; font-weight: 600;">Keep disabled during normal fast tagging.</span>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;">
+                    <button type="button" id="fasttag-debug-dialog-cancel" style="background: ${isDark ? 'rgba(148, 163, 184, 0.15)' : '#e2e8f0'}; border: 1px solid ${isDark ? 'rgba(148, 163, 184, 0.3)' : '#cbd5e1'}; color: ${textColor}; font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 6px; cursor: pointer; transition: all 0.15s ease;">Cancel</button>
+                    <button type="button" id="fasttag-debug-dialog-continue" style="background: #f59e0b; border: 1px solid #d97706; color: #000000; font-size: 12px; font-weight: 700; padding: 6px 14px; border-radius: 6px; cursor: pointer; transition: all 0.15s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.3);">Continue</button>
+                </div>
+            `;
+
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+
+            const cleanup = (result) => {
+                document.removeEventListener('keydown', onKeyDown);
+                overlay.remove();
+                resolve(result);
+            };
+
+            const onKeyDown = (e) => {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cleanup(false);
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cleanup(true);
+                }
+            };
+            document.addEventListener('keydown', onKeyDown);
+
+            const cancelBtn = dialog.querySelector('#fasttag-debug-dialog-cancel');
+            if (cancelBtn) cancelBtn.onclick = () => cleanup(false);
+
+            const continueBtn = dialog.querySelector('#fasttag-debug-dialog-continue');
+            if (continueBtn) continueBtn.onclick = () => cleanup(true);
+
+            overlay.onclick = (e) => {
+                if (e.target === overlay) cleanup(false);
+            };
+        });
+    }
+
     function openSettingsModal() {
         const existing = document.getElementById('fasttag-settings-modal');
         if (existing) existing.remove();
@@ -1919,10 +2015,6 @@
                                     <span>🛠️</span> Debug Mode
                                 </div>
                                 <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Extends toast display time to 15 seconds (with pause-on-hover & copy buttons) and records continuous diagnostics.</div>
-                                <div style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 6px; padding: 6px 9px; font-size: 11px; color: #fbbf24; display: flex; align-items: flex-start; gap: 6px; line-height: 1.35; margin-top: 6px;">
-                                    <span style="font-size: 12px; line-height: 1; flex-shrink: 0;">⚠️</span>
-                                    <span><strong>Notice:</strong> FastTag will operate differently in Debug Mode (toasts stay for 15s so you can screenshot them, and full diagnostics stream to console/log buffer). Keep unchecked during normal fast tagging.</span>
-                                </div>
                             </div>
                             <input type="checkbox" id="fasttag-setting-debug-mode" ${getDebugMode() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
                         </div>
@@ -2036,9 +2128,20 @@
 
         const debugToggle = modal.querySelector('#fasttag-setting-debug-mode');
         if (debugToggle) {
-            debugToggle.addEventListener('change', (e) => {
-                setDebugMode(e.target.checked);
-                showToast(`Debug Mode ${e.target.checked ? 'ENABLED (15s toasts active)' : 'disabled'}`, 'info');
+            debugToggle.addEventListener('click', async (e) => {
+                const wantsEnable = debugToggle.checked;
+                if (wantsEnable) {
+                    debugToggle.checked = false;
+                    const confirmed = await promptDebugModeWarningDialog();
+                    if (confirmed) {
+                        debugToggle.checked = true;
+                        setDebugMode(true);
+                        showToast('Debug Mode ENABLED (15s toasts active)', 'info');
+                    }
+                } else {
+                    setDebugMode(false);
+                    showToast('Debug Mode disabled', 'info');
+                }
             });
         }
 
