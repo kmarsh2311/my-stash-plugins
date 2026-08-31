@@ -511,19 +511,38 @@
         #scenes-popup .tabulator .tabulator-row.fasttag-keyboard-active,
         #scenes-popup .tabulator .tabulator-row.fasttag-keyboard-active.tabulator-row-even,
         #scenes-popup .tabulator .tabulator-row.fasttag-keyboard-active.tabulator-row-odd,
-        #scenes-popup .tabulator .tabulator-row.fasttag-keyboard-active .tabulator-cell,
         .tabulator .tabulator-row.fasttag-keyboard-active {
-            outline: 2px dashed #f43f5e !important;
+            outline: 2px solid #f43f5e !important;
             outline-offset: -2px !important;
-            box-shadow: inset 0 0 0 1px #f43f5e, 0 0 8px rgba(244, 63, 94, 0.4) !important;
+            box-shadow: 0 0 10px rgba(244, 63, 94, 0.45) !important;
             background-color: rgba(244, 63, 94, 0.15) !important;
+            position: relative !important;
+            z-index: 5 !important;
         }
-        #scenes-popup.theme-light .tabulator .tabulator-row.fasttag-keyboard-active,
-        #scenes-popup.theme-light .tabulator .tabulator-row.fasttag-keyboard-active .tabulator-cell {
-            outline: 2px dashed #e11d48 !important;
+        #scenes-popup .tabulator .tabulator-row.fasttag-keyboard-active .tabulator-cell {
+            outline: none !important;
+            border-left: none !important;
+            border-right: none !important;
+        }
+        #scenes-popup.theme-dark .tabulator .tabulator-row.fasttag-keyboard-active.tabulator-selected {
+            background-color: #3730a3 !important;
+            outline: 2px solid #38bdf8 !important;
             outline-offset: -2px !important;
-            box-shadow: inset 0 0 0 1px #e11d48, 0 0 8px rgba(225, 29, 72, 0.3) !important;
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.2) !important;
+        }
+        #scenes-popup.theme-light .tabulator .tabulator-row.fasttag-keyboard-active {
+            outline: 2px solid #e11d48 !important;
+            outline-offset: -2px !important;
+            box-shadow: 0 0 8px rgba(225, 29, 72, 0.3) !important;
             background-color: rgba(225, 29, 72, 0.12) !important;
+            position: relative !important;
+            z-index: 5 !important;
+        }
+        #scenes-popup.theme-light .tabulator .tabulator-row.fasttag-keyboard-active.tabulator-selected {
+            background-color: #93c5fd !important;
+            outline: 2px solid #2563eb !important;
+            outline-offset: -2px !important;
+            box-shadow: 0 0 10px rgba(37, 99, 235, 0.4) !important;
         }
         #scenes-popup.theme-dark .tabulator .tabulator-placeholder { color: #64748b !important; }
         #scenes-popup.theme-dark .tabulator-tableholder {
@@ -1032,6 +1051,27 @@
             background: rgba(168, 85, 247, 0.28) !important;
             color: #ffffff !important;
             filter: brightness(1.2) !important;
+        }
+        .fasttag-suggestion-chip.fasttag-keyboard-meta-focus {
+            outline: none !important;
+            border-style: solid !important;
+            box-shadow: 0 0 0 1.5px #38bdf8, 0 0 8px rgba(56, 189, 248, 0.6) !important;
+            filter: brightness(1.25) !important;
+            transform: scale(1.04) !important;
+        }
+        .fasttag-quick-chip.fasttag-keyboard-meta-focus {
+            outline: none !important;
+            border-color: #818cf8 !important;
+            box-shadow: 0 0 0 1.5px #818cf8, 0 0 8px rgba(129, 140, 248, 0.6) !important;
+            filter: brightness(1.25) !important;
+            transform: scale(1.04) !important;
+        }
+        div[id$="-suggestions-container"] button.fasttag-keyboard-meta-focus {
+            outline: none !important;
+            border-color: #f59e0b !important;
+            box-shadow: 0 0 0 1.5px #f59e0b, 0 0 8px rgba(245, 158, 11, 0.7) !important;
+            filter: brightness(1.25) !important;
+            transform: scale(1.04) !important;
         }
         `;
         document.head.appendChild(style);
@@ -3980,6 +4020,8 @@
             createMenuItem(`🏷️ Bulk Tags (${bulkScenes.length})`, () => openBulkEntityPopup('tags', bulkScenes));
             createMenuItem(`⭐ Bulk Performers (${bulkScenes.length})`, () => openBulkEntityPopup('performers', bulkScenes));
             createMenuItem(`🏢 Bulk Studio (${bulkScenes.length})`, () => openBulkEntityPopup('studios', bulkScenes));
+            createMenuItem(`📁 Bulk Groups (${bulkScenes.length})`, () => openBulkEntityPopup('groups', bulkScenes));
+            createMenuItem(`⚡ Bulk Edit Everything (${bulkScenes.length})`, () => openBulkEverythingPopup(bulkScenes));
         }
 
         createMenuItem('⚙️ FastTag Settings', () => openSettingsModal());
@@ -6460,6 +6502,8 @@
         if (prevBtn) prevBtn.style.display = 'none';
         const nextBtn = form.querySelector(`#${type}-next-btn`);
         if (nextBtn) nextBtn.style.display = 'none';
+        if (activePopup.scrapeBtn) activePopup.scrapeBtn.style.display = 'none';
+        if (activePopup.scraperCardContainer) activePopup.scraperCardContainer.style.display = 'none';
 
         if (activePopup.previewContainer) {
             activePopup.previewContainer.innerHTML = `
@@ -6561,11 +6605,133 @@
         };
         form._fastTagOnResize = refreshUI;
 
-        activeTableInstance.on("rowSelected", (row) => {
+        let debounceTimer = null;
+        let currentSingleSection = 'table'; // 'table' | 'recent' | 'suggestions' | 'create'
+        let singleNavIndex = -1;
+
+        const getSingleSuggestions = () => {
+            const container = form.querySelector(`#${type}-suggestions-container`);
+            if (!container || container.style.display === 'none' || container.offsetParent === null) return [];
+            return Array.from(container.querySelectorAll('button'));
+        };
+
+        const getSingleRecentChips = () => {
+            const container = form.querySelector(`#${type}-quick-actions`);
+            if (!container || container.style.display === 'none' || container.offsetParent === null) return [];
+            return Array.from(container.querySelectorAll('.fasttag-quick-chip'));
+        };
+
+        const scrollSingleRowIntoViewIfNeeded = (row) => {
+            if (!activeTableInstance || !row) return;
+            const el = typeof row.getElement === 'function' ? row.getElement() : null;
+            const holder = activeTableInstance.element?.querySelector('.tabulator-tableholder');
+            if (holder && el) {
+                const holderRect = holder.getBoundingClientRect();
+                const elRect = el.getBoundingClientRect();
+                if (elRect.bottom > holderRect.bottom) {
+                    holder.scrollTop += (elRect.bottom - holderRect.bottom + 4);
+                } else if (elRect.top < holderRect.top) {
+                    holder.scrollTop -= (holderRect.top - elRect.top + 4);
+                }
+            } else if (typeof row.scrollTo === 'function') {
+                row.scrollTo('nearest', false);
+            }
+        };
+
+        const updateSingleKeyboardHighlight = () => {
+            if (!activeTableInstance || typeof activeTableInstance.getRows !== 'function') return;
+            const rows = activeTableInstance.getRows();
+            const isBottomCreateVisible = activePopup.bottomCreateContainer && activePopup.bottomCreateContainer.style.display !== 'none';
+
+            rows.forEach(r => {
+                const el = r.getElement();
+                if (el) el.classList.remove('fasttag-keyboard-active');
+            });
+            form.querySelectorAll('.fasttag-keyboard-meta-focus').forEach(el => el.classList.remove('fasttag-keyboard-meta-focus'));
+
+            if (createBtn) {
+                createBtn.classList.remove('fasttag-create-btn-active');
+                createBtn.style.boxShadow = '0 2px 5px rgba(5,150,105,0.3)';
+                createBtn.style.transform = 'none';
+                createBtn.style.filter = 'none';
+            }
+
+            if (currentSingleSection === 'suggestions') {
+                const suggBtns = getSingleSuggestions();
+                if (suggBtns.length > 0) {
+                    if (singleNavIndex < 0) singleNavIndex = 0;
+                    if (singleNavIndex >= suggBtns.length) singleNavIndex = suggBtns.length - 1;
+                    const btn = suggBtns[singleNavIndex];
+                    if (btn) {
+                        btn.classList.add('fasttag-keyboard-meta-focus');
+                        if (typeof btn.scrollIntoView === 'function') {
+                            btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                        }
+                    }
+                }
+                return;
+            }
+
+            if (currentSingleSection === 'recent') {
+                const recentChips = getSingleRecentChips();
+                if (recentChips.length > 0) {
+                    if (singleNavIndex < 0) singleNavIndex = 0;
+                    if (singleNavIndex >= recentChips.length) singleNavIndex = recentChips.length - 1;
+                    const chip = recentChips[singleNavIndex];
+                    if (chip) {
+                        chip.classList.add('fasttag-keyboard-meta-focus');
+                        if (typeof chip.scrollIntoView === 'function') {
+                            chip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                        }
+                    }
+                }
+                return;
+            }
+
+            if (currentSingleSection === 'create') {
+                if (createBtn && isBottomCreateVisible) {
+                    createBtn.classList.add('fasttag-create-btn-active');
+                    createBtn.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.5), 0 2px 8px rgba(0,0,0,0.3)';
+                    createBtn.style.transform = 'scale(1.02)';
+                    createBtn.style.filter = 'brightness(1.15)';
+                }
+                return;
+            }
+
+            if (currentSingleSection === 'table') {
+                if (singleNavIndex >= 0 && singleNavIndex < rows.length && rows[singleNavIndex]) {
+                    const el = rows[singleNavIndex].getElement();
+                    if (el) el.classList.add('fasttag-keyboard-active');
+                    scrollSingleRowIntoViewIfNeeded(rows[singleNavIndex]);
+                }
+            }
+        };
+
+        activeTableInstance.on("rowSelected", async (row) => {
             if (!isRestoringSelections) {
                 const id = row.getData().id;
-                if (id) selectedIds.add(String(id));
-                refreshUI();
+                if (id) {
+                    selectedIds.add(String(id));
+                    addRecentEntry(type, row.getData());
+                }
+                const isSearching = filterInput && filterInput.value.trim().length > 0;
+                if (isSearching) {
+                    filterInput.value = '';
+                    updateVisibility();
+                    await fetchData('', false);
+                    const r = activeTableInstance.getRow(id);
+                    if (r) activeTableInstance.scrollToRow(r, "top", false);
+                    currentSingleSection = 'table';
+                    singleNavIndex = -1;
+                    filterInput.focus({ preventScroll: true });
+                } else {
+                    currentSingleSection = 'table';
+                    const rows = activeTableInstance.getRows();
+                    singleNavIndex = rows.indexOf(row);
+                    updateSingleKeyboardHighlight();
+                    if (filterInput) filterInput.focus({ preventScroll: true });
+                    refreshUI();
+                }
             }
         });
 
@@ -6573,7 +6739,18 @@
             if (!isRestoringSelections) {
                 const id = row.getData().id;
                 if (id) selectedIds.delete(String(id));
+                currentSingleSection = 'table';
+                const rows = activeTableInstance.getRows();
+                singleNavIndex = rows.indexOf(row);
+                updateSingleKeyboardHighlight();
+                if (filterInput) filterInput.focus({ preventScroll: true });
                 refreshUI();
+            }
+        });
+
+        form.addEventListener('click', (e) => {
+            if (!e.target.closest('input, textarea')) {
+                if (filterInput) filterInput.focus({ preventScroll: true });
             }
         });
 
@@ -6619,12 +6796,271 @@
         }
         activePopup._fastTagFetchData = fetchData;
 
-        let debounceTimer = null;
         filterInput.oninput = (e) => {
             updateVisibility();
             clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => fetchData(e.target.value, true), 150);
+            const val = e.target.value.trim();
+            debounceTimer = setTimeout(async () => {
+                await fetchData(e.target.value, true);
+                if (val.length > 0) {
+                    const rows = activeTableInstance && typeof activeTableInstance.getRows === 'function' ? activeTableInstance.getRows() : [];
+                    if (rows.length > 0) {
+                        currentSingleSection = 'table';
+                        singleNavIndex = 0;
+                    } else if (activePopup.bottomCreateContainer && activePopup.bottomCreateContainer.style.display !== 'none') {
+                        currentSingleSection = 'create';
+                        singleNavIndex = 0;
+                    } else if (getSingleRecentChips().length > 0) {
+                        currentSingleSection = 'recent';
+                        singleNavIndex = 0;
+                    } else if (getSingleSuggestions().length > 0) {
+                        currentSingleSection = 'suggestions';
+                        singleNavIndex = 0;
+                    } else {
+                        currentSingleSection = 'table';
+                        singleNavIndex = -1;
+                    }
+                } else {
+                    currentSingleSection = 'table';
+                    singleNavIndex = -1;
+                }
+                updateSingleKeyboardHighlight();
+            }, 150);
         };
+
+        filterInput.addEventListener('keydown', async (e) => {
+            const rows = activeTableInstance && typeof activeTableInstance.getRows === 'function' ? activeTableInstance.getRows() : [];
+            const isBottomCreateVisible = activePopup.bottomCreateContainer && activePopup.bottomCreateContainer.style.display !== 'none';
+            const suggBtns = getSingleSuggestions();
+            const recentChips = getSingleRecentChips();
+
+            if (e.key === 'Tab' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                if (currentSingleSection === 'suggestions' && suggBtns.length > 0) {
+                    e.preventDefault();
+                    if (e.key === 'ArrowLeft') {
+                        if (singleNavIndex > 0) singleNavIndex--;
+                        else singleNavIndex = suggBtns.length - 1;
+                    } else {
+                        if (singleNavIndex < suggBtns.length - 1) singleNavIndex++;
+                        else singleNavIndex = 0;
+                    }
+                    updateSingleKeyboardHighlight();
+                    return;
+                } else if (currentSingleSection === 'recent' && recentChips.length > 0) {
+                    e.preventDefault();
+                    if (e.key === 'ArrowLeft') {
+                        if (singleNavIndex > 0) singleNavIndex--;
+                        else singleNavIndex = recentChips.length - 1;
+                    } else {
+                        if (singleNavIndex < recentChips.length - 1) singleNavIndex++;
+                        else singleNavIndex = 0;
+                    }
+                    updateSingleKeyboardHighlight();
+                    return;
+                }
+            }
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (singleNavIndex < 0) {
+                    const hasVal = (popup.searchInput?.value || '').trim().length > 0;
+                    if (!hasVal) {
+                        if (suggBtns.length > 0) {
+                            currentSingleSection = 'suggestions';
+                            singleNavIndex = 0;
+                        } else if (recentChips.length > 0) {
+                            currentSingleSection = 'recent';
+                            singleNavIndex = 0;
+                        } else if (rows.length > 0) {
+                            currentSingleSection = 'table';
+                            singleNavIndex = 0;
+                        } else if (isBottomCreateVisible) {
+                            currentSingleSection = 'create';
+                            singleNavIndex = 0;
+                        }
+                    } else {
+                        if (rows.length > 0) {
+                            currentSingleSection = 'table';
+                            singleNavIndex = 0;
+                        } else if (isBottomCreateVisible) {
+                            currentSingleSection = 'create';
+                            singleNavIndex = 0;
+                        } else if (suggBtns.length > 0) {
+                            currentSingleSection = 'suggestions';
+                            singleNavIndex = 0;
+                        } else if (recentChips.length > 0) {
+                            currentSingleSection = 'recent';
+                            singleNavIndex = 0;
+                        }
+                    }
+                    updateSingleKeyboardHighlight();
+                    return;
+                }
+
+                if (currentSingleSection === 'suggestions') {
+                    if (recentChips.length > 0) {
+                        currentSingleSection = 'recent';
+                        singleNavIndex = 0;
+                    } else if (rows.length > 0) {
+                        currentSingleSection = 'table';
+                        singleNavIndex = 0;
+                    } else if (isBottomCreateVisible) {
+                        currentSingleSection = 'create';
+                        singleNavIndex = 0;
+                    }
+                } else if (currentSingleSection === 'recent') {
+                    if (rows.length > 0) {
+                        currentSingleSection = 'table';
+                        singleNavIndex = 0;
+                    } else if (isBottomCreateVisible) {
+                        currentSingleSection = 'create';
+                        singleNavIndex = 0;
+                    }
+                } else if (currentSingleSection === 'table') {
+                    if (rows.length > 0) {
+                        if (singleNavIndex < 0) {
+                            singleNavIndex = 0;
+                        } else if (singleNavIndex < rows.length - 1) {
+                            singleNavIndex++;
+                        } else if (singleNavIndex === rows.length - 1 && isBottomCreateVisible) {
+                            currentSingleSection = 'create';
+                            singleNavIndex = 0;
+                        }
+                    } else if (isBottomCreateVisible) {
+                        currentSingleSection = 'create';
+                        singleNavIndex = 0;
+                    }
+                }
+                updateSingleKeyboardHighlight();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (singleNavIndex < 0) {
+                    if (recentChips.length > 0) {
+                        currentSingleSection = 'recent';
+                        singleNavIndex = 0;
+                    } else if (suggBtns.length > 0) {
+                        currentSingleSection = 'suggestions';
+                        singleNavIndex = 0;
+                    }
+                    updateSingleKeyboardHighlight();
+                    return;
+                }
+                if (currentSingleSection === 'create') {
+                    if (rows.length > 0) {
+                        currentSingleSection = 'table';
+                        singleNavIndex = rows.length - 1;
+                    } else if (recentChips.length > 0) {
+                        currentSingleSection = 'recent';
+                        singleNavIndex = 0;
+                    } else if (suggBtns.length > 0) {
+                        currentSingleSection = 'suggestions';
+                        singleNavIndex = 0;
+                    }
+                } else if (currentSingleSection === 'table') {
+                    if (singleNavIndex > 0) {
+                        singleNavIndex--;
+                    } else {
+                        if (recentChips.length > 0) {
+                            currentSingleSection = 'recent';
+                            singleNavIndex = 0;
+                        } else if (suggBtns.length > 0) {
+                            currentSingleSection = 'suggestions';
+                            singleNavIndex = 0;
+                        } else {
+                            singleNavIndex = -1;
+                        }
+                    }
+                } else if (currentSingleSection === 'recent') {
+                    if (suggBtns.length > 0) {
+                        currentSingleSection = 'suggestions';
+                        singleNavIndex = 0;
+                    }
+                }
+                updateSingleKeyboardHighlight();
+            } else if (e.key === 'Enter') {
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    if (saveBtn) saveBtn.click();
+                    return;
+                }
+
+                if (currentSingleSection === 'suggestions') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (suggBtns.length > 0 && singleNavIndex >= 0 && singleNavIndex < suggBtns.length) {
+                        suggBtns[singleNavIndex].click();
+                        if (filterInput.value.trim().length > 0) {
+                            filterInput.value = '';
+                            updateVisibility();
+                            await fetchData("", false);
+                            filterInput.focus({ preventScroll: true });
+                        }
+                    }
+                    return;
+                }
+
+                if (currentSingleSection === 'recent') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (recentChips.length > 0 && singleNavIndex >= 0 && singleNavIndex < recentChips.length) {
+                        recentChips[singleNavIndex].click();
+                        if (filterInput.value.trim().length > 0) {
+                            filterInput.value = '';
+                            updateVisibility();
+                            await fetchData("", false);
+                            filterInput.focus({ preventScroll: true });
+                        }
+                    }
+                    return;
+                }
+
+                if (currentSingleSection === 'create' && isBottomCreateVisible) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    createBtn.click();
+                    return;
+                }
+
+                const hadSearch = filterInput.value.trim().length > 0;
+                if (!hadSearch && singleNavIndex < 0) {
+                    e.preventDefault();
+                    if (saveBtn) saveBtn.click();
+                    return;
+                }
+
+                const targetIdx = singleNavIndex >= 0 ? singleNavIndex : 0;
+                if (rows.length > 0 && rows[targetIdx]) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const targetRow = rows[targetIdx];
+                    const rowData = targetRow.getData();
+                    if (rowData && rowData.id) {
+                        const strId = String(rowData.id);
+                        if (selectedIds.has(strId)) {
+                            selectedIds.delete(strId);
+                            activeTableInstance.deselectRow(targetRow);
+                        } else {
+                            selectedIds.add(strId);
+                            activeTableInstance.selectRow(targetRow);
+                            addRecentEntry(type, rowData);
+                        }
+                        if (hadSearch) {
+                            filterInput.value = '';
+                            updateVisibility();
+                            await fetchData("", false);
+                            const r = activeTableInstance.getRow(rowData.id);
+                            if (r) activeTableInstance.scrollToRow(r, "top", false);
+                            currentSingleSection = 'table';
+                            singleNavIndex = -1;
+                        } else {
+                            refreshUI();
+                        }
+                        filterInput.focus({ preventScroll: true });
+                        updateSingleKeyboardHighlight();
+                    }
+                }
+            }
+        });
 
         clearBtn.onclick = () => {
             filterInput.value = '';
@@ -6675,6 +7111,13 @@
                 return;
             }
 
+            const confirmed = await promptBulkConfirmationDialog(
+                `Are you sure you want to apply these changes to ${bulkScenes.length} selected scenes?`,
+                form,
+                `Yes, Apply to ${bulkScenes.length} Scenes`
+            );
+            if (!confirmed) return;
+
             const removedIds = new Set(Array.from(initialCommonIds).filter(id => !selectedIds.has(id)));
             const addedIds = Array.from(selectedIds).filter(id => !initialCommonIds.has(id));
 
@@ -6716,6 +7159,109 @@
                 filterInput.focus({ preventScroll: true });
             }
         }, 80);
+    }
+
+    function promptBulkConfirmationDialog(message, parentForm, confirmText = 'Yes, Apply Changes') {
+        return new Promise((resolve) => {
+            const theme = getEffectiveTheme();
+            const isDark = theme === 'dark';
+
+            const overlay = document.createElement('div');
+            overlay.className = 'fasttag-create-dialog-overlay';
+            overlay.style.cssText = `
+                position: absolute;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0, 0, 0, 0.65);
+                backdrop-filter: blur(2px);
+                z-index: 1000100;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 10px;
+                padding: 16px;
+                box-sizing: border-box;
+                animation: fasttagFadeInDialog 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+            `;
+
+            const dialog = document.createElement('div');
+            dialog.className = 'fasttag-create-dialog-card';
+            const cardBg = isDark ? '#1e293b' : '#ffffff';
+            const cardBorder = isDark ? '1px solid rgba(148, 163, 184, 0.25)' : '1px solid #cbd5e1';
+            const textColor = isDark ? '#f8fafc' : '#0f172a';
+            const inputBorder = isDark ? '1px solid rgba(148, 163, 184, 0.3)' : '1px solid #cbd5e1';
+
+            dialog.style.cssText = `
+                background: ${cardBg};
+                border: ${cardBorder};
+                border-radius: 8px;
+                padding: 18px 20px;
+                width: 100%;
+                max-width: 360px;
+                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+                display: flex;
+                flex-direction: column;
+                gap: 14px;
+                color: ${textColor};
+                box-sizing: border-box;
+            `;
+
+            dialog.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div style="font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; gap: 7px; color: ${isDark ? '#f8fafc' : '#0f172a'};">
+                        <span>📦</span>
+                        <span>Confirm Bulk Changes</span>
+                    </div>
+                    <button type="button" class="fasttag-dialog-close-btn" style="background: none; border: none; font-size: 18px; line-height: 1; cursor: pointer; color: inherit; opacity: 0.6; padding: 0 4px;" title="Cancel">&times;</button>
+                </div>
+                <div style="font-size: 12.5px; font-weight: 500; opacity: 0.9; line-height: 1.45; color: ${textColor};">
+                    ${escapeHtml(message)}
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px;">
+                    <button type="button" class="fasttag-dialog-cancel-btn" style="padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; background: transparent; border: ${inputBorder}; color: inherit; transition: all 0.15s ease;">No, Cancel</button>
+                    <button type="button" class="fasttag-dialog-confirm-btn" style="padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; background: #10b981; border: none; color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: all 0.15s ease;">${escapeHtml(confirmText)}</button>
+                </div>
+            `;
+
+            overlay.appendChild(dialog);
+            parentForm.appendChild(overlay);
+
+            const confirmBtn = dialog.querySelector('.fasttag-dialog-confirm-btn');
+            const cancelBtn = dialog.querySelector('.fasttag-dialog-cancel-btn');
+            const closeBtn = dialog.querySelector('.fasttag-dialog-close-btn');
+
+            const cleanup = (val) => {
+                if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                resolve(val);
+            };
+
+            confirmBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); cleanup(true); };
+            cancelBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); cleanup(false); };
+            closeBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); cleanup(false); };
+
+            dialog.onkeydown = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cleanup(true);
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cleanup(false);
+                }
+            };
+
+            overlay.onclick = (e) => {
+                if (e.target === overlay) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cleanup(false);
+                }
+            };
+
+            setTimeout(() => {
+                confirmBtn.focus();
+            }, 50);
+        });
     }
 
     function promptCreateEntityDialog(type, initialValue, parentForm) {
@@ -8061,7 +8607,12 @@
                 const strId = String(id);
                 selectedTagIds.add(strId);
                 addRecentEntry('tags', row.getData());
+
+                currentNavSection = 'tags';
+                const rows = tagsTable.getRows();
+                activeNavIndex = rows.indexOf(row);
                 refreshAllUI();
+                updateEverythingKeyboardHighlight();
 
                 const isSearching = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
                 if (isSearching) {
@@ -8076,8 +8627,12 @@
                     if (r) tagsTable.scrollToRow(r, "top", false);
                     renderStudioBar('');
                     renderGroupBar('');
+                    activeNavIndex = -1;
+                    updateEverythingKeyboardHighlight();
                     popup.globalSearch.focus({ preventScroll: true });
                     doSave();
+                } else {
+                    popup.globalSearch.focus({ preventScroll: true });
                 }
             });
 
@@ -8086,7 +8641,12 @@
                 const id = row.getData()?.id;
                 if (!id) return;
                 selectedTagIds.delete(String(id));
+                currentNavSection = 'tags';
+                const rows = tagsTable.getRows();
+                activeNavIndex = rows.indexOf(row);
                 refreshAllUI();
+                updateEverythingKeyboardHighlight();
+                popup.globalSearch.focus({ preventScroll: true });
             });
 
             performersTable.on("rowSelected", async (row) => {
@@ -8096,7 +8656,12 @@
                 const strId = String(id);
                 selectedPerformerIds.add(strId);
                 addRecentEntry('performers', row.getData());
+
+                currentNavSection = 'performers';
+                const rows = performersTable.getRows();
+                activeNavIndex = rows.indexOf(row);
                 refreshAllUI();
+                updateEverythingKeyboardHighlight();
 
                 const isSearching = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
                 if (isSearching) {
@@ -8111,8 +8676,12 @@
                     if (r) performersTable.scrollToRow(r, "top", false);
                     renderStudioBar('');
                     renderGroupBar('');
+                    activeNavIndex = -1;
+                    updateEverythingKeyboardHighlight();
                     popup.globalSearch.focus({ preventScroll: true });
                     doSave();
+                } else {
+                    popup.globalSearch.focus({ preventScroll: true });
                 }
             });
 
@@ -8121,7 +8690,20 @@
                 const id = row.getData()?.id;
                 if (!id) return;
                 selectedPerformerIds.delete(String(id));
+                currentNavSection = 'performers';
+                const rows = performersTable.getRows();
+                activeNavIndex = rows.indexOf(row);
                 refreshAllUI();
+                updateEverythingKeyboardHighlight();
+                popup.globalSearch.focus({ preventScroll: true });
+            });
+
+            form.addEventListener('click', (e) => {
+                if (!e.target.closest('input, textarea')) {
+                    if (popup.globalSearch) {
+                        popup.globalSearch.focus({ preventScroll: true });
+                    }
+                }
             });
 
             const refreshGlobalSearch = async (val) => {
@@ -8147,33 +8729,77 @@
             }
 
             let searchDebounce = null;
-            let activeColType = 'tags';
-            let activeColIndex = -1;
-            let activeMetaIndex = -1;
+            let currentNavSection = 'tags'; // 'tags' | 'performers' | 'studios' | 'groups' | 'tag-suggestions' | 'perf-suggestions'
+            let activeNavIndex = -1;
 
-            const getMetadataBarItems = () => {
+            const getStudioBarItems = () => {
                 const items = [];
-                // 1. Selected Studio pill (if visible)
                 if (popup.studioBar?.chip && popup.studioBar.chip.style.display !== 'none') {
                     items.push({ type: 'studio-selected', el: popup.studioBar.chip, clickTarget: popup.studioBar.clearBtn });
                 }
-                // 2. Studio quick chips
                 if (popup.studioBar?.recentContainer) {
-                    popup.studioBar.recentContainer.querySelectorAll('.fasttag-quick-chip').forEach(btn => {
+                    popup.studioBar.recentContainer.querySelectorAll('.fasttag-quick-chip, .chip-studio').forEach(btn => {
                         items.push({ type: 'studio-chip', el: btn, clickTarget: btn });
                     });
                 }
-                // 3. Selected Group pills
+                return items;
+            };
+
+            const getGroupBarItems = () => {
+                const items = [];
                 if (popup.groupsBar?.selectedContainer) {
                     popup.groupsBar.selectedContainer.querySelectorAll('.fasttag-group-pill').forEach(pill => {
                         const btn = pill.querySelector('button');
                         items.push({ type: 'group-selected', el: pill, clickTarget: btn || pill });
                     });
                 }
-                // 4. Group quick chips
                 if (popup.groupsBar?.recentContainer) {
-                    popup.groupsBar.recentContainer.querySelectorAll('.fasttag-quick-chip').forEach(btn => {
+                    popup.groupsBar.recentContainer.querySelectorAll('.fasttag-quick-chip, .chip-group').forEach(btn => {
                         items.push({ type: 'group-chip', el: btn, clickTarget: btn });
+                    });
+                }
+                return items;
+            };
+
+            const getTagSuggestionItems = () => {
+                const items = [];
+                const container = form.querySelector('#everything-sugg-tags-chips');
+                if (container && container.offsetParent !== null) {
+                    container.querySelectorAll('.fasttag-suggestion-chip').forEach(btn => {
+                        items.push({ type: 'tag-sugg', el: btn, clickTarget: btn });
+                    });
+                }
+                return items;
+            };
+
+            const getPerformerSuggestionItems = () => {
+                const items = [];
+                const container = form.querySelector('#everything-sugg-performers-chips');
+                if (container && container.offsetParent !== null) {
+                    container.querySelectorAll('.fasttag-suggestion-chip').forEach(btn => {
+                        items.push({ type: 'perf-sugg', el: btn, clickTarget: btn });
+                    });
+                }
+                return items;
+            };
+
+            const getTagRecentItems = () => {
+                const items = [];
+                const container = popup.tags?.chipsContainer;
+                if (container && container.style.display !== 'none' && container.offsetParent !== null) {
+                    container.querySelectorAll('.fasttag-quick-chip').forEach(btn => {
+                        items.push({ type: 'tag-recent', el: btn, clickTarget: btn });
+                    });
+                }
+                return items;
+            };
+
+            const getPerformerRecentItems = () => {
+                const items = [];
+                const container = popup.performers?.chipsContainer;
+                if (container && container.style.display !== 'none' && container.offsetParent !== null) {
+                    container.querySelectorAll('.fasttag-quick-chip').forEach(btn => {
+                        items.push({ type: 'perf-recent', el: btn, clickTarget: btn });
                     });
                 }
                 return items;
@@ -8197,11 +8823,9 @@
             };
 
             const updateEverythingKeyboardHighlight = () => {
-                // Remove highlight classes across both tables and metadata bar
                 form.querySelectorAll('.tabulator-row.fasttag-keyboard-active').forEach(el => el.classList.remove('fasttag-keyboard-active'));
                 form.querySelectorAll('.fasttag-keyboard-meta-focus').forEach(el => el.classList.remove('fasttag-keyboard-meta-focus'));
 
-                // Reset button highlights
                 form.querySelectorAll('.fasttag-create-empty-btn').forEach(btn => {
                     btn.classList.remove('fasttag-create-btn-active');
                     btn.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
@@ -8209,45 +8833,119 @@
                     btn.style.filter = 'none';
                 });
 
-                // If in metadata bar navigation mode:
-                if (activeColType === 'metadata') {
-                    const metaItems = getMetadataBarItems();
-                    if (metaItems.length > 0) {
-                        if (activeMetaIndex < 0) activeMetaIndex = 0;
-                        if (activeMetaIndex >= metaItems.length) activeMetaIndex = metaItems.length - 1;
-                        const item = metaItems[activeMetaIndex];
+                const tagsHeader = form.querySelector('#everything-col-tags span');
+                const perfHeader = form.querySelector('#everything-col-performers span');
+                if (tagsHeader) {
+                    tagsHeader.style.textDecoration = (currentNavSection === 'tags' && activeNavIndex >= 0) ? 'underline 2px #818cf8' : 'none';
+                }
+                if (perfHeader) {
+                    perfHeader.style.textDecoration = (currentNavSection === 'performers' && activeNavIndex >= 0) ? 'underline 2px #38bdf8' : 'none';
+                }
+
+                if (currentNavSection === 'studios') {
+                    const items = getStudioBarItems();
+                    if (items.length > 0) {
+                        if (activeNavIndex < 0) activeNavIndex = 0;
+                        if (activeNavIndex >= items.length) activeNavIndex = items.length - 1;
+                        const item = items[activeNavIndex];
                         if (item && item.el) {
                             item.el.classList.add('fasttag-keyboard-meta-focus');
                             if (typeof item.el.scrollIntoView === 'function') {
                                 item.el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
                             }
                         }
-                    } else {
-                        activeColType = 'tags';
-                        activeColIndex = 0;
                     }
+                    return;
                 }
 
-                const isSearching = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
-                const isNavigating = activeColIndex >= 0 && activeColType !== 'metadata';
-
-                const tagsHeader = form.querySelector('#everything-col-tags span');
-                const perfHeader = form.querySelector('#everything-col-performers span');
-                if (tagsHeader) {
-                    tagsHeader.style.textDecoration = (isSearching || isNavigating) && (activeColType === 'tags') ? 'underline 2px #818cf8' : 'none';
+                if (currentNavSection === 'groups') {
+                    const items = getGroupBarItems();
+                    if (items.length > 0) {
+                        if (activeNavIndex < 0) activeNavIndex = 0;
+                        if (activeNavIndex >= items.length) activeNavIndex = items.length - 1;
+                        const item = items[activeNavIndex];
+                        if (item && item.el) {
+                            item.el.classList.add('fasttag-keyboard-meta-focus');
+                            if (typeof item.el.scrollIntoView === 'function') {
+                                item.el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                            }
+                        }
+                    }
+                    return;
                 }
-                if (perfHeader) {
-                    perfHeader.style.textDecoration = (isSearching || isNavigating) && (activeColType === 'performers') ? 'underline 2px #38bdf8' : 'none';
+
+                if (currentNavSection === 'tag-suggestions') {
+                    const items = getTagSuggestionItems();
+                    if (items.length > 0) {
+                        if (activeNavIndex < 0) activeNavIndex = 0;
+                        if (activeNavIndex >= items.length) activeNavIndex = items.length - 1;
+                        const item = items[activeNavIndex];
+                        if (item && item.el) {
+                            item.el.classList.add('fasttag-keyboard-meta-focus');
+                            if (typeof item.el.scrollIntoView === 'function') {
+                                item.el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                            }
+                        }
+                    }
+                    return;
                 }
 
-                if (activeColType === 'metadata' || activeColIndex < 0) return;
+                if (currentNavSection === 'perf-suggestions') {
+                    const items = getPerformerSuggestionItems();
+                    if (items.length > 0) {
+                        if (activeNavIndex < 0) activeNavIndex = 0;
+                        if (activeNavIndex >= items.length) activeNavIndex = items.length - 1;
+                        const item = items[activeNavIndex];
+                        if (item && item.el) {
+                            item.el.classList.add('fasttag-keyboard-meta-focus');
+                            if (typeof item.el.scrollIntoView === 'function') {
+                                item.el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                            }
+                        }
+                    }
+                    return;
+                }
 
-                const curTable = activeColType === 'tags' ? tagsTable : performersTable;
-                const curCreateBtn = form.querySelector(`.fasttag-create-empty-btn[data-type="${activeColType}"]`);
+                if (currentNavSection === 'tag-recent') {
+                    const items = getTagRecentItems();
+                    if (items.length > 0) {
+                        if (activeNavIndex < 0) activeNavIndex = 0;
+                        if (activeNavIndex >= items.length) activeNavIndex = items.length - 1;
+                        const item = items[activeNavIndex];
+                        if (item && item.el) {
+                            item.el.classList.add('fasttag-keyboard-meta-focus');
+                            if (typeof item.el.scrollIntoView === 'function') {
+                                item.el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                if (currentNavSection === 'perf-recent') {
+                    const items = getPerformerRecentItems();
+                    if (items.length > 0) {
+                        if (activeNavIndex < 0) activeNavIndex = 0;
+                        if (activeNavIndex >= items.length) activeNavIndex = items.length - 1;
+                        const item = items[activeNavIndex];
+                        if (item && item.el) {
+                            item.el.classList.add('fasttag-keyboard-meta-focus');
+                            if (typeof item.el.scrollIntoView === 'function') {
+                                item.el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                if (activeNavIndex < 0) return;
+
+                const curTable = currentNavSection === 'tags' ? tagsTable : performersTable;
+                const curCreateBtn = form.querySelector(`.fasttag-create-empty-btn[data-type="${currentNavSection}"]`);
                 const isCreateVisible = curCreateBtn && curCreateBtn.parentElement && curCreateBtn.parentElement.style.display !== 'none';
                 const rows = curTable && typeof curTable.getRows === 'function' ? curTable.getRows() : [];
 
-                if (isCreateVisible && activeColIndex === rows.length) {
+                if (isCreateVisible && activeNavIndex === rows.length) {
                     curCreateBtn.classList.add('fasttag-create-btn-active');
                     curCreateBtn.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.5), 0 2px 8px rgba(0,0,0,0.3)';
                     curCreateBtn.style.transform = 'scale(1.02)';
@@ -8256,15 +8954,12 @@
                 }
 
                 if (rows.length === 0) return;
+                if (activeNavIndex >= rows.length) activeNavIndex = rows.length - 1;
 
-                if (activeColIndex >= rows.length) activeColIndex = rows.length - 1;
-
-                const targetRow = rows[activeColIndex];
+                const targetRow = rows[activeNavIndex];
                 if (targetRow) {
                     const el = targetRow.getElement();
-                    if (el) {
-                        el.classList.add('fasttag-keyboard-active');
-                    }
+                    if (el) el.classList.add('fasttag-keyboard-active');
                     scrollRowIntoViewIfNeeded(curTable, targetRow);
                 }
             };
@@ -8278,162 +8973,458 @@
                 searchDebounce = setTimeout(async () => {
                     await refreshGlobalSearch(val);
                     if (hasVal) {
-                        activeColIndex = 0;
                         const tagCount = tagsTable ? tagsTable.getRows().length : 0;
                         const perfCount = performersTable ? performersTable.getRows().length : 0;
-                        if (tagCount === 0 && perfCount > 0) {
-                            activeColType = 'performers';
+                        if (tagCount > 0) {
+                            currentNavSection = 'tags';
+                            activeNavIndex = 0;
+                        } else if (perfCount > 0) {
+                            currentNavSection = 'performers';
+                            activeNavIndex = 0;
+                        } else if (getTagSuggestionItems().length > 0) {
+                            currentNavSection = 'tag-suggestions';
+                            activeNavIndex = 0;
+                        } else if (getPerformerSuggestionItems().length > 0) {
+                            currentNavSection = 'perf-suggestions';
+                            activeNavIndex = 0;
+                        } else if (getTagRecentItems().length > 0) {
+                            currentNavSection = 'tag-recent';
+                            activeNavIndex = 0;
+                        } else if (getPerformerRecentItems().length > 0) {
+                            currentNavSection = 'perf-recent';
+                            activeNavIndex = 0;
+                        } else if (getStudioBarItems().length > 0) {
+                            currentNavSection = 'studios';
+                            activeNavIndex = 0;
+                        } else if (getGroupBarItems().length > 0) {
+                            currentNavSection = 'groups';
+                            activeNavIndex = 0;
                         } else {
-                            activeColType = 'tags';
+                            currentNavSection = 'tags';
+                            activeNavIndex = -1;
                         }
                     } else {
-                        activeColIndex = -1;
-                        activeColType = 'tags';
+                        currentNavSection = 'tags';
+                        activeNavIndex = -1;
                     }
                     updateEverythingKeyboardHighlight();
                 }, 100);
             });
 
-            const rolloverToColumn = (targetType, position = 'top') => {
-                const targetTable = targetType === 'tags' ? tagsTable : performersTable;
-                const targetRows = targetTable && typeof targetTable.getRows === 'function' ? targetTable.getRows() : [];
-                const targetCreateBtn = form.querySelector(`.fasttag-create-empty-btn[data-type="${targetType}"]`);
-                const isTargetCreateVisible = targetCreateBtn && targetCreateBtn.parentElement && targetCreateBtn.parentElement.style.display !== 'none';
-
-                activeColType = targetType;
-                if (position === 'top') {
-                    if (targetRows.length > 0) {
-                        activeColIndex = 0;
-                        if (targetRows[0] && typeof targetRows[0].scrollTo === 'function') targetRows[0].scrollTo("top", false);
-                    } else if (isTargetCreateVisible) {
-                        activeColIndex = 0; // Focus Create button
-                    } else {
-                        activeColIndex = -1;
-                    }
-                } else {
-                    // position === 'bottom'
-                    if (isTargetCreateVisible) {
-                        activeColIndex = targetRows.length; // Focus Create button at bottom
-                    } else if (targetRows.length > 0) {
-                        activeColIndex = targetRows.length - 1;
-                        const lastRow = targetRows[targetRows.length - 1];
-                        if (lastRow && typeof lastRow.scrollTo === 'function') lastRow.scrollTo("bottom", false);
-                    } else {
-                        activeColIndex = -1;
-                    }
-                }
-            };
-
             popup.globalSearch.addEventListener('keydown', async (e) => {
                 if (e.key === 'Tab' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-                    if (activeColType === 'metadata') {
-                        e.preventDefault();
-                        const metaItems = getMetadataBarItems();
-                        if (metaItems.length > 0) {
-                            if (e.key === 'ArrowLeft') {
-                                activeMetaIndex = (activeMetaIndex - 1 + metaItems.length) % metaItems.length;
-                            } else {
-                                activeMetaIndex = (activeMetaIndex + 1) % metaItems.length;
-                            }
-                            updateEverythingKeyboardHighlight();
-                        }
-                        return;
-                    }
                     e.preventDefault();
-                    const other = activeColType === 'tags' ? 'performers' : 'tags';
-                    rolloverToColumn(other, 'top');
+                    if (currentNavSection === 'studios') {
+                        const studioItems = getStudioBarItems();
+                        if (e.key === 'ArrowLeft') {
+                            if (activeNavIndex > 0) activeNavIndex--;
+                            else {
+                                const groupItems = getGroupBarItems();
+                                if (groupItems.length > 0) {
+                                    currentNavSection = 'groups';
+                                    activeNavIndex = groupItems.length - 1;
+                                }
+                            }
+                        } else {
+                            if (activeNavIndex < studioItems.length - 1) activeNavIndex++;
+                            else {
+                                const groupItems = getGroupBarItems();
+                                if (groupItems.length > 0) {
+                                    currentNavSection = 'groups';
+                                    activeNavIndex = 0;
+                                }
+                            }
+                        }
+                    } else if (currentNavSection === 'groups') {
+                        const groupItems = getGroupBarItems();
+                        if (e.key === 'ArrowLeft') {
+                            if (activeNavIndex > 0) activeNavIndex--;
+                            else {
+                                const studioItems = getStudioBarItems();
+                                if (studioItems.length > 0) {
+                                    currentNavSection = 'studios';
+                                    activeNavIndex = studioItems.length - 1;
+                                }
+                            }
+                        } else {
+                            if (activeNavIndex < groupItems.length - 1) activeNavIndex++;
+                            else {
+                                const studioItems = getStudioBarItems();
+                                if (studioItems.length > 0) {
+                                    currentNavSection = 'studios';
+                                    activeNavIndex = 0;
+                                }
+                            }
+                        }
+                    } else if (currentNavSection === 'tag-suggestions') {
+                        const tagSuggs = getTagSuggestionItems();
+                        if (e.key === 'ArrowLeft') {
+                            if (activeNavIndex > 0) activeNavIndex--;
+                            else {
+                                const perfSuggs = getPerformerSuggestionItems();
+                                if (perfSuggs.length > 0) {
+                                    currentNavSection = 'perf-suggestions';
+                                    activeNavIndex = perfSuggs.length - 1;
+                                }
+                            }
+                        } else {
+                            if (activeNavIndex < tagSuggs.length - 1) activeNavIndex++;
+                            else {
+                                const perfSuggs = getPerformerSuggestionItems();
+                                if (perfSuggs.length > 0) {
+                                    currentNavSection = 'perf-suggestions';
+                                    activeNavIndex = 0;
+                                }
+                            }
+                        }
+                    } else if (currentNavSection === 'perf-suggestions') {
+                        const perfSuggs = getPerformerSuggestionItems();
+                        if (e.key === 'ArrowLeft') {
+                            if (activeNavIndex > 0) activeNavIndex--;
+                            else {
+                                const tagSuggs = getTagSuggestionItems();
+                                if (tagSuggs.length > 0) {
+                                    currentNavSection = 'tag-suggestions';
+                                    activeNavIndex = tagSuggs.length - 1;
+                                }
+                            }
+                        } else {
+                            if (activeNavIndex < perfSuggs.length - 1) activeNavIndex++;
+                            else {
+                                const tagSuggs = getTagSuggestionItems();
+                                if (tagSuggs.length > 0) {
+                                    currentNavSection = 'tag-suggestions';
+                                    activeNavIndex = 0;
+                                }
+                            }
+                        }
+                    } else if (currentNavSection === 'tag-recent') {
+                        const tagRecents = getTagRecentItems();
+                        if (e.key === 'ArrowLeft') {
+                            if (activeNavIndex > 0) activeNavIndex--;
+                            else {
+                                const perfRecents = getPerformerRecentItems();
+                                if (perfRecents.length > 0) {
+                                    currentNavSection = 'perf-recent';
+                                    activeNavIndex = perfRecents.length - 1;
+                                }
+                            }
+                        } else {
+                            if (activeNavIndex < tagRecents.length - 1) activeNavIndex++;
+                            else {
+                                const perfRecents = getPerformerRecentItems();
+                                if (perfRecents.length > 0) {
+                                    currentNavSection = 'perf-recent';
+                                    activeNavIndex = 0;
+                                }
+                            }
+                        }
+                    } else if (currentNavSection === 'perf-recent') {
+                        const perfRecents = getPerformerRecentItems();
+                        if (e.key === 'ArrowLeft') {
+                            if (activeNavIndex > 0) activeNavIndex--;
+                            else {
+                                const tagRecents = getTagRecentItems();
+                                if (tagRecents.length > 0) {
+                                    currentNavSection = 'tag-recent';
+                                    activeNavIndex = tagRecents.length - 1;
+                                }
+                            }
+                        } else {
+                            if (activeNavIndex < perfRecents.length - 1) activeNavIndex++;
+                            else {
+                                const tagRecents = getTagRecentItems();
+                                if (tagRecents.length > 0) {
+                                    currentNavSection = 'tag-recent';
+                                    activeNavIndex = 0;
+                                }
+                            }
+                        }
+                    } else if (currentNavSection === 'tags') {
+                        currentNavSection = 'performers';
+                        const perfRows = performersTable ? performersTable.getRows() : [];
+                        activeNavIndex = perfRows.length > 0 ? Math.min(Math.max(0, activeNavIndex), perfRows.length - 1) : 0;
+                    } else if (currentNavSection === 'performers') {
+                        currentNavSection = 'tags';
+                        const tagRows = tagsTable ? tagsTable.getRows() : [];
+                        activeNavIndex = tagRows.length > 0 ? Math.min(Math.max(0, activeNavIndex), tagRows.length - 1) : 0;
+                    }
                     updateEverythingKeyboardHighlight();
                 } else if (e.key === 'ArrowDown') {
                     e.preventDefault();
-                    if (activeColType === 'metadata') {
-                        activeColType = 'tags';
-                        activeColIndex = 0;
+                    if (activeNavIndex < 0) {
+                        const hasVal = (popup.globalSearch?.value || '').trim().length > 0;
+                        if (!hasVal) {
+                            const tagSuggs = getTagSuggestionItems();
+                            const perfSuggs = getPerformerSuggestionItems();
+                            const tagRecents = getTagRecentItems();
+                            const perfRecents = getPerformerRecentItems();
+                            const tagRows = tagsTable ? tagsTable.getRows() : [];
+                            const perfRows = performersTable ? performersTable.getRows() : [];
+                            const tagCreate = form.querySelector('.fasttag-create-empty-btn[data-type="tags"]');
+                            const isTagCreate = tagCreate && tagCreate.parentElement && tagCreate.parentElement.style.display !== 'none';
+                            const perfCreate = form.querySelector('.fasttag-create-empty-btn[data-type="performers"]');
+                            const isPerfCreate = perfCreate && perfCreate.parentElement && perfCreate.parentElement.style.display !== 'none';
+
+                            if (tagSuggs.length > 0) {
+                                currentNavSection = 'tag-suggestions';
+                                activeNavIndex = 0;
+                            } else if (perfSuggs.length > 0) {
+                                currentNavSection = 'perf-suggestions';
+                                activeNavIndex = 0;
+                            } else if (tagRecents.length > 0) {
+                                currentNavSection = 'tag-recent';
+                                activeNavIndex = 0;
+                            } else if (perfRecents.length > 0) {
+                                currentNavSection = 'perf-recent';
+                                activeNavIndex = 0;
+                            } else if (tagRows.length > 0) {
+                                currentNavSection = 'tags';
+                                activeNavIndex = 0;
+                            } else if (perfRows.length > 0) {
+                                currentNavSection = 'performers';
+                                activeNavIndex = 0;
+                            } else if (isTagCreate) {
+                                currentNavSection = 'tags';
+                                activeNavIndex = tagRows.length;
+                            } else if (isPerfCreate) {
+                                currentNavSection = 'performers';
+                                activeNavIndex = perfRows.length;
+                            }
+                        } else {
+                            const tagRows = tagsTable ? tagsTable.getRows() : [];
+                            const perfRows = performersTable ? performersTable.getRows() : [];
+                            const tagCreate = form.querySelector('.fasttag-create-empty-btn[data-type="tags"]');
+                            const isTagCreate = tagCreate && tagCreate.parentElement && tagCreate.parentElement.style.display !== 'none';
+                            const perfCreate = form.querySelector('.fasttag-create-empty-btn[data-type="performers"]');
+                            const isPerfCreate = perfCreate && perfCreate.parentElement && perfCreate.parentElement.style.display !== 'none';
+
+                            if (tagRows.length > 0) {
+                                currentNavSection = 'tags';
+                                activeNavIndex = 0;
+                            } else if (perfRows.length > 0) {
+                                currentNavSection = 'performers';
+                                activeNavIndex = 0;
+                            } else if (isTagCreate) {
+                                currentNavSection = 'tags';
+                                activeNavIndex = tagRows.length;
+                            } else if (isPerfCreate) {
+                                currentNavSection = 'performers';
+                                activeNavIndex = perfRows.length;
+                            } else if (getTagSuggestionItems().length > 0) {
+                                currentNavSection = 'tag-suggestions';
+                                activeNavIndex = 0;
+                            } else if (getPerformerSuggestionItems().length > 0) {
+                                currentNavSection = 'perf-suggestions';
+                                activeNavIndex = 0;
+                            }
+                        }
                         updateEverythingKeyboardHighlight();
                         return;
                     }
-                    const curTable = activeColType === 'tags' ? tagsTable : performersTable;
-                    const rows = curTable ? curTable.getRows() : [];
-                    const curCreateBtn = form.querySelector(`.fasttag-create-empty-btn[data-type="${activeColType}"]`);
-                    const isCreateVisible = curCreateBtn && curCreateBtn.parentElement && curCreateBtn.parentElement.style.display !== 'none';
 
-                    if (activeColType === 'tags') {
-                        if (rows.length > 0) {
-                            if (activeColIndex < 0) {
-                                activeColIndex = 0;
-                            } else if (activeColIndex < rows.length - 1) {
-                                activeColIndex++;
-                            } else if (activeColIndex === rows.length - 1 && isCreateVisible) {
-                                activeColIndex = rows.length; // Move onto Tag Create button!
-                            } else {
-                                // Rollover from bottom of Tags to Performers!
-                                rolloverToColumn('performers', 'top');
-                            }
-                        } else if (isCreateVisible && activeColIndex < rows.length) {
-                            activeColIndex = rows.length; // Move onto Tag Create button!
+                    if (currentNavSection === 'studios') {
+                        const tagSuggs = getTagSuggestionItems();
+                        const tagRecents = getTagRecentItems();
+                        if (tagSuggs.length > 0) {
+                            currentNavSection = 'tag-suggestions';
+                            activeNavIndex = 0;
+                        } else if (tagRecents.length > 0) {
+                            currentNavSection = 'tag-recent';
+                            activeNavIndex = 0;
                         } else {
-                            // Rollover from empty Tags to Performers!
-                            rolloverToColumn('performers', 'top');
+                            currentNavSection = 'tags';
+                            activeNavIndex = 0;
                         }
-                    } else {
-                        // In Performers
+                    } else if (currentNavSection === 'groups') {
+                        const perfSuggs = getPerformerSuggestionItems();
+                        const perfRecents = getPerformerRecentItems();
+                        if (perfSuggs.length > 0) {
+                            currentNavSection = 'perf-suggestions';
+                            activeNavIndex = 0;
+                        } else if (perfRecents.length > 0) {
+                            currentNavSection = 'perf-recent';
+                            activeNavIndex = 0;
+                        } else {
+                            currentNavSection = 'performers';
+                            activeNavIndex = 0;
+                        }
+                    } else if (currentNavSection === 'tag-suggestions') {
+                        const tagRecents = getTagRecentItems();
+                        if (tagRecents.length > 0) {
+                            currentNavSection = 'tag-recent';
+                            activeNavIndex = 0;
+                        } else {
+                            currentNavSection = 'tags';
+                            activeNavIndex = 0;
+                        }
+                    } else if (currentNavSection === 'perf-suggestions') {
+                        const perfRecents = getPerformerRecentItems();
+                        if (perfRecents.length > 0) {
+                            currentNavSection = 'perf-recent';
+                            activeNavIndex = 0;
+                        } else {
+                            currentNavSection = 'performers';
+                            activeNavIndex = 0;
+                        }
+                    } else if (currentNavSection === 'tag-recent') {
+                        currentNavSection = 'tags';
+                        activeNavIndex = 0;
+                    } else if (currentNavSection === 'perf-recent') {
+                        currentNavSection = 'performers';
+                        activeNavIndex = 0;
+                    } else if (currentNavSection === 'tags') {
+                        const rows = tagsTable ? tagsTable.getRows() : [];
+                        const curCreateBtn = form.querySelector('.fasttag-create-empty-btn[data-type="tags"]');
+                        const isCreate = curCreateBtn && curCreateBtn.parentElement && curCreateBtn.parentElement.style.display !== 'none';
                         if (rows.length > 0) {
-                            if (activeColIndex < 0) {
-                                activeColIndex = 0;
-                            } else if (activeColIndex < rows.length - 1) {
-                                activeColIndex++;
-                            } else if (activeColIndex === rows.length - 1 && isCreateVisible) {
-                                activeColIndex = rows.length; // Move onto Performer Create button!
+                            if (activeNavIndex < 0) activeNavIndex = 0;
+                            else if (activeNavIndex < rows.length - 1) activeNavIndex++;
+                            else if (activeNavIndex === rows.length - 1 && isCreate) activeNavIndex = rows.length;
+                            else {
+                                currentNavSection = 'performers';
+                                activeNavIndex = 0;
                             }
-                        } else if (isCreateVisible) {
-                            activeColIndex = rows.length; // Move onto Performer Create button when 0 rows!
+                        } else if (isCreate && activeNavIndex < rows.length) {
+                            activeNavIndex = rows.length;
+                        } else {
+                            currentNavSection = 'performers';
+                            activeNavIndex = 0;
+                        }
+                    } else if (currentNavSection === 'performers') {
+                        const rows = performersTable ? performersTable.getRows() : [];
+                        const curCreateBtn = form.querySelector('.fasttag-create-empty-btn[data-type="performers"]');
+                        const isCreate = curCreateBtn && curCreateBtn.parentElement && curCreateBtn.parentElement.style.display !== 'none';
+                        if (rows.length > 0) {
+                            if (activeNavIndex < 0) activeNavIndex = 0;
+                            else if (activeNavIndex < rows.length - 1) activeNavIndex++;
+                            else if (activeNavIndex === rows.length - 1 && isCreate) activeNavIndex = rows.length;
+                        } else if (isCreate) {
+                            activeNavIndex = rows.length;
                         }
                     }
                     updateEverythingKeyboardHighlight();
                 } else if (e.key === 'ArrowUp') {
                     e.preventDefault();
-                    if (activeColType === 'metadata') {
-                        // Already in metadata, cycle left
-                        const metaItems = getMetadataBarItems();
-                        if (metaItems.length > 0) {
-                            activeMetaIndex = (activeMetaIndex - 1 + metaItems.length) % metaItems.length;
-                            updateEverythingKeyboardHighlight();
+                    if (activeNavIndex < 0) {
+                        const studioItems = getStudioBarItems();
+                        const groupItems = getGroupBarItems();
+                        if (studioItems.length > 0) {
+                            currentNavSection = 'studios';
+                            activeNavIndex = 0;
+                        } else if (groupItems.length > 0) {
+                            currentNavSection = 'groups';
+                            activeNavIndex = 0;
                         }
+                        updateEverythingKeyboardHighlight();
                         return;
                     }
-
-                    const curTable = activeColType === 'tags' ? tagsTable : performersTable;
-                    const rows = curTable ? curTable.getRows() : [];
-
-                    if (activeColType === 'performers') {
-                        if (activeColIndex === rows.length) {
-                            if (rows.length > 0) {
-                                activeColIndex = rows.length - 1;
-                            } else {
-                                // Roll back up to Tags!
-                                rolloverToColumn('tags', 'bottom');
+                    if (currentNavSection === 'studios') {
+                        // Stay in studio bar
+                    } else if (currentNavSection === 'groups') {
+                        // Stay in group bar
+                    } else if (currentNavSection === 'tag-suggestions') {
+                        const studioItems = getStudioBarItems();
+                        if (studioItems.length > 0) {
+                            currentNavSection = 'studios';
+                            activeNavIndex = 0;
+                        } else {
+                            const groupItems = getGroupBarItems();
+                            if (groupItems.length > 0) {
+                                currentNavSection = 'groups';
+                                activeNavIndex = 0;
                             }
-                        } else if (activeColIndex > 0) {
-                            activeColIndex = Math.max(0, activeColIndex - 1);
-                        } else if (activeColIndex === 0) {
-                            // Roll back up to Tags!
-                            rolloverToColumn('tags', 'bottom');
-                        } else {
-                            activeColIndex = -1;
                         }
-                    } else {
-                        // In Tags
-                        if (activeColIndex === rows.length) {
-                            activeColIndex = rows.length > 0 ? rows.length - 1 : -1;
-                        } else if (activeColIndex > 0) {
-                            activeColIndex = Math.max(0, activeColIndex - 1);
+                    } else if (currentNavSection === 'perf-suggestions') {
+                        const groupItems = getGroupBarItems();
+                        if (groupItems.length > 0) {
+                            currentNavSection = 'groups';
+                            activeNavIndex = 0;
                         } else {
-                            // At top of Tags or search input -> Jump up into Studio & Group metadata bar!
-                            const metaItems = getMetadataBarItems();
-                            if (metaItems.length > 0) {
-                                activeColType = 'metadata';
-                                activeMetaIndex = 0;
+                            const studioItems = getStudioBarItems();
+                            if (studioItems.length > 0) {
+                                currentNavSection = 'studios';
+                                activeNavIndex = 0;
+                            }
+                        }
+                    } else if (currentNavSection === 'tag-recent') {
+                        const tagSuggs = getTagSuggestionItems();
+                        const studioItems = getStudioBarItems();
+                        const groupItems = getGroupBarItems();
+                        if (tagSuggs.length > 0) {
+                            currentNavSection = 'tag-suggestions';
+                            activeNavIndex = 0;
+                        } else if (studioItems.length > 0) {
+                            currentNavSection = 'studios';
+                            activeNavIndex = 0;
+                        } else if (groupItems.length > 0) {
+                            currentNavSection = 'groups';
+                            activeNavIndex = 0;
+                        }
+                    } else if (currentNavSection === 'perf-recent') {
+                        const perfSuggs = getPerformerSuggestionItems();
+                        const groupItems = getGroupBarItems();
+                        const studioItems = getStudioBarItems();
+                        if (perfSuggs.length > 0) {
+                            currentNavSection = 'perf-suggestions';
+                            activeNavIndex = 0;
+                        } else if (groupItems.length > 0) {
+                            currentNavSection = 'groups';
+                            activeNavIndex = 0;
+                        } else if (studioItems.length > 0) {
+                            currentNavSection = 'studios';
+                            activeNavIndex = 0;
+                        }
+                    } else if (currentNavSection === 'tags') {
+                        const rows = tagsTable ? tagsTable.getRows() : [];
+                        if (activeNavIndex > 0) {
+                            activeNavIndex--;
+                        } else {
+                            const tagRecents = getTagRecentItems();
+                            const tagSuggs = getTagSuggestionItems();
+                            const studioItems = getStudioBarItems();
+                            const groupItems = getGroupBarItems();
+                            if (tagRecents.length > 0) {
+                                currentNavSection = 'tag-recent';
+                                activeNavIndex = 0;
+                            } else if (tagSuggs.length > 0) {
+                                currentNavSection = 'tag-suggestions';
+                                activeNavIndex = 0;
+                            } else if (studioItems.length > 0) {
+                                currentNavSection = 'studios';
+                                activeNavIndex = 0;
+                            } else if (groupItems.length > 0) {
+                                currentNavSection = 'groups';
+                                activeNavIndex = 0;
                             } else {
-                                activeColIndex = -1;
+                                activeNavIndex = -1;
+                            }
+                        }
+                    } else if (currentNavSection === 'performers') {
+                        const rows = performersTable ? performersTable.getRows() : [];
+                        if (activeNavIndex > 0) {
+                            activeNavIndex--;
+                        } else {
+                            const perfRecents = getPerformerRecentItems();
+                            const perfSuggs = getPerformerSuggestionItems();
+                            const groupItems = getGroupBarItems();
+                            const studioItems = getStudioBarItems();
+                            if (perfRecents.length > 0) {
+                                currentNavSection = 'perf-recent';
+                                activeNavIndex = 0;
+                            } else if (perfSuggs.length > 0) {
+                                currentNavSection = 'perf-suggestions';
+                                activeNavIndex = 0;
+                            } else if (groupItems.length > 0) {
+                                currentNavSection = 'groups';
+                                activeNavIndex = 0;
+                            } else if (studioItems.length > 0) {
+                                currentNavSection = 'studios';
+                                activeNavIndex = 0;
+                            } else {
+                                currentNavSection = 'tags';
+                                const tagRows = tagsTable ? tagsTable.getRows() : [];
+                                activeNavIndex = tagRows.length > 0 ? tagRows.length - 1 : -1;
                             }
                         }
                     }
@@ -8445,98 +9436,127 @@
                         return;
                     }
 
-                    // If navigating in metadata bar (Studio or Groups):
-                    if (activeColType === 'metadata') {
+                    if (currentNavSection === 'studios') {
                         e.preventDefault();
                         e.stopPropagation();
-                        const metaItems = getMetadataBarItems();
-                        if (metaItems.length > 0 && activeMetaIndex >= 0 && activeMetaIndex < metaItems.length) {
-                            const item = metaItems[activeMetaIndex];
-                            if (item && item.clickTarget) {
-                                item.clickTarget.click();
-                            }
+                        const items = getStudioBarItems();
+                        if (items.length > 0 && activeNavIndex >= 0 && activeNavIndex < items.length) {
+                            const item = items[activeNavIndex];
+                            if (item && item.clickTarget) item.clickTarget.click();
                         }
                         return;
                     }
 
-                    const curCreateBtn = form.querySelector(`.fasttag-create-empty-btn[data-type="${activeColType}"]`);
-                    const isCreateVisible = curCreateBtn && curCreateBtn.parentElement && curCreateBtn.parentElement.style.display !== 'none';
-                    const curTable = activeColType === 'tags' ? tagsTable : performersTable;
-                    const rows = curTable ? curTable.getRows() : [];
-
-                    // If user navigated onto the Create button:
-                    if (isCreateVisible && activeColIndex === rows.length) {
+                    if (currentNavSection === 'groups') {
                         e.preventDefault();
                         e.stopPropagation();
-                        handleCreateEntity(activeColType);
+                        const items = getGroupBarItems();
+                        if (items.length > 0 && activeNavIndex >= 0 && activeNavIndex < items.length) {
+                            const item = items[activeNavIndex];
+                            if (item && item.clickTarget) item.clickTarget.click();
+                        }
+                        return;
+                    }
+
+                    if (currentNavSection === 'tag-suggestions') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const items = getTagSuggestionItems();
+                        if (items.length > 0 && activeNavIndex >= 0 && activeNavIndex < items.length) {
+                            const item = items[activeNavIndex];
+                            if (item && item.clickTarget) item.clickTarget.click();
+                        }
+                        return;
+                    }
+
+                    if (currentNavSection === 'perf-suggestions') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const items = getPerformerSuggestionItems();
+                        if (items.length > 0 && activeNavIndex >= 0 && activeNavIndex < items.length) {
+                            const item = items[activeNavIndex];
+                            if (item && item.clickTarget) item.clickTarget.click();
+                        }
+                        return;
+                    }
+
+                    if (currentNavSection === 'tag-recent') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const items = getTagRecentItems();
+                        if (items.length > 0 && activeNavIndex >= 0 && activeNavIndex < items.length) {
+                            const item = items[activeNavIndex];
+                            if (item && item.clickTarget) item.clickTarget.click();
+                        }
+                        return;
+                    }
+
+                    if (currentNavSection === 'perf-recent') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const items = getPerformerRecentItems();
+                        if (items.length > 0 && activeNavIndex >= 0 && activeNavIndex < items.length) {
+                            const item = items[activeNavIndex];
+                            if (item && item.clickTarget) item.clickTarget.click();
+                        }
+                        return;
+                    }
+
+                    const curCreateBtn = form.querySelector(`.fasttag-create-empty-btn[data-type="${currentNavSection}"]`);
+                    const isCreateVisible = curCreateBtn && curCreateBtn.parentElement && curCreateBtn.parentElement.style.display !== 'none';
+                    const curTable = currentNavSection === 'tags' ? tagsTable : performersTable;
+                    const rows = curTable ? curTable.getRows() : [];
+
+                    if (isCreateVisible && activeNavIndex === rows.length) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleCreateEntity(currentNavSection);
                         return;
                     }
 
                     const hasSearch = popup.globalSearch.value.trim().length > 0;
-                    if (!hasSearch && activeColIndex < 0) {
-                        // Empty search and no row navigated with arrows -> Save & Next Scene
+                    if (!hasSearch && activeNavIndex < 0) {
                         e.preventDefault();
                         if (popup.saveBtn) popup.saveBtn.click();
                         return;
                     }
 
-                    let selCol = activeColType;
-                    let targetRows = rows;
-                    let targetTable = curTable;
-
-                    if (targetRows.length === 0) {
-                        const other = activeColType === 'tags' ? 'performers' : 'tags';
-                        const otherTable = other === 'tags' ? tagsTable : performersTable;
-                        if (otherTable && otherTable.getRows().length > 0) {
-                            targetRows = otherTable.getRows();
-                            selCol = other;
-                            activeColIndex = 0;
-                            targetTable = otherTable;
-                        }
-                    }
-
-                    const targetIdx = activeColIndex >= 0 ? activeColIndex : 0;
-                    if (targetRows.length > 0 && targetRows[targetIdx]) {
+                    if (rows.length > 0) {
                         e.preventDefault();
-                        e.stopPropagation();
-                        const targetRow = targetRows[targetIdx];
-                        const rowData = targetRow.getData();
-                        if (rowData && rowData.id) {
-                            const strId = String(rowData.id);
-                            if (selCol === 'tags') {
-                                if (selectedTagIds.has(strId)) {
-                                    selectedTagIds.delete(strId);
-                                    tagsTable.deselectRow(targetRow);
-                                } else {
-                                    selectedTagIds.add(strId);
-                                    tagsTable.selectRow(targetRow);
-                                    addRecentEntry('tags', rowData);
-                                }
+                        const targetIdx = Math.max(0, Math.min(activeNavIndex, rows.length - 1));
+                        const selectedRow = rows[targetIdx];
+                        if (selectedRow) {
+                            const rowData = selectedRow.getData();
+                            const isSelected = selectedRow.isSelected();
+                            const idStr = String(rowData.id);
+                            if (isSelected) {
+                                selectedRow.deselect();
+                                if (currentNavSection === 'tags') selectedTagIds.delete(idStr);
+                                else selectedPerformerIds.delete(idStr);
                             } else {
-                                if (selectedPerformerIds.has(strId)) {
-                                    selectedPerformerIds.delete(strId);
-                                    performersTable.deselectRow(targetRow);
-                                } else {
-                                    selectedPerformerIds.add(strId);
-                                    performersTable.selectRow(targetRow);
-                                    addRecentEntry('performers', rowData);
-                                }
+                                selectedRow.select();
+                                if (currentNavSection === 'tags') selectedTagIds.add(idStr);
+                                else selectedPerformerIds.add(idStr);
+                                addRecentEntry(currentNavSection, rowData);
                             }
+
+                            refreshAllUI();
+                            await doSave();
+
                             if (hasSearch) {
                                 popup.globalSearch.value = '';
                                 popup.globalClear.style.display = 'none';
                                 if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-                                await Promise.all([
-                                    fetchColumnData('tags', tagsTable, '', selectedTagIds),
-                                    fetchColumnData('performers', performersTable, '', selectedPerformerIds)
-                                ]);
-                                renderStudioBar('');
-                                activeColIndex = -1;
+                                await refreshGlobalSearch('');
+                                const r = curTable.getRow(rowData.id);
+                                if (r) curTable.scrollToRow(r, "top", false);
+                                activeNavIndex = -1;
+                                refreshAllUI();
+                                updateEverythingKeyboardHighlight();
+                                popup.globalSearch.focus({ preventScroll: true });
+                            } else {
+                                updateEverythingKeyboardHighlight();
                             }
-                            refreshAllUI();
-                            await doSave();
-                            popup.globalSearch.focus({ preventScroll: true });
-                            updateEverythingKeyboardHighlight();
                         }
                     }
                 }
@@ -8863,6 +9883,1657 @@
         }
     }
 
+    async function openBulkEverythingPopup(bulkScenes) {
+        try {
+            if (!Array.isArray(bulkScenes) || bulkScenes.length === 0) return;
+
+            if (!isTabulatorLoaded()) {
+                await ensureDependenciesLoaded();
+            }
+            if (!isTabulatorLoaded()) {
+                toastError("Tabulator library failed to load. Please check your internet connection or adblocker.");
+                return;
+            }
+
+            closeMenu();
+            closePopup(false);
+            window._fastTagEverythingScraperOpen = false;
+
+            popupAbortController = new AbortController();
+            const { signal } = popupAbortController;
+
+            const popup = createEditEverythingPopupShell();
+            popup.type = 'bulk-everything';
+            activePopup = popup;
+            const form = popup.element;
+
+            // Set Title
+            if (popup.titleSpan) {
+                popup.titleSpan.textContent = `📦 Bulk Edit Everything (${bulkScenes.length} scenes)`;
+            }
+
+            // Hide sequential elements
+            const seqLabel = form.querySelector('.popup-seq-label');
+            if (seqLabel) seqLabel.style.display = 'none';
+            if (popup.navGroup) popup.navGroup.style.display = 'none';
+            if (popup.scrapeBtn) popup.scrapeBtn.style.display = 'none';
+            if (popup.suggestionsContainer) popup.suggestionsContainer.style.display = 'none';
+            if (popup.scraperCardContainer) popup.scraperCardContainer.style.display = 'none';
+
+            // Display bulk status banner in preview container
+            if (popup.previewContainer) {
+                popup.previewContainer.innerHTML = `
+                    <div style="padding: 6px 12px; background: rgba(99, 102, 241, 0.12); border: 1px dashed #6366f1; border-radius: 6px; margin-bottom: 6px; font-size: 11px; font-weight: 600; color: #818cf8; text-align: center; user-select: none;">
+                        📦 Applying changes across <strong>${bulkScenes.length}</strong> selected scenes
+                    </div>
+                `;
+            }
+
+            let selectedTagIds = new Set();
+            let selectedPerformerIds = new Set();
+            let selectedStudioId = null;
+            let selectedGroupIds = new Set();
+            let initialCommonTagIds = new Set();
+            let initialCommonPerformerIds = new Set();
+            let initialCommonStudioId = null;
+            let initialCommonGroupIds = new Set();
+            let studioModified = false;
+            let isRestoring = false;
+            let searchDebounce = null;
+            let activeColType = 'tags';
+            let activeColIndex = -1;
+            let activeMetaIndex = -1;
+
+            // Initialize Tabulator tables
+            const tagsTable = new Tabulator(popup.tags.tableContainer, {
+                data: [],
+                layout: "fitColumns",
+                columnResizeMode: "fit",
+                height: "100%",
+                placeholder: "No Tags Found",
+                selectable: true,
+                index: "id",
+                columnDefaults: { headerSort: false },
+                columns: getColumnsWithSavedWidths('tags', 'bulk-everything', () => {
+                    if (popup.tagsFetchData) popup.tagsFetchData();
+                })
+            });
+            attachColumnWidthSaver(tagsTable, 'tags', 'bulk-everything');
+
+            const performersTable = new Tabulator(popup.performers.tableContainer, {
+                data: [],
+                layout: "fitColumns",
+                columnResizeMode: "fit",
+                height: "100%",
+                placeholder: "No Performers Found",
+                selectable: true,
+                index: "id",
+                columnDefaults: { headerSort: false },
+                columns: getColumnsWithSavedWidths('performers', 'bulk-everything', () => {
+                    if (popup.performersFetchData) popup.performersFetchData();
+                })
+            });
+            attachColumnWidthSaver(performersTable, 'performers', 'bulk-everything');
+            attachPerformerHoverCard(performersTable, popup.performers.tableContainer);
+
+            popup.tagsTable = tagsTable;
+            popup.performersTable = performersTable;
+
+            // Pre-fetch common entities across selected scenes in parallel
+            const bulkSceneQuery = `
+                query FindSceneBulkEverything($id: ID!) {
+                    findScene(id: $id) {
+                        id
+                        tags { id }
+                        performers { id }
+                        studio { id }
+                        groups { group { id } }
+                    }
+                }
+            `;
+
+            try {
+                const sceneResults = await Promise.all(
+                    bulkScenes.map(s => fetchGQL(bulkSceneQuery, { id: s.id }))
+                );
+                const validScenes = sceneResults.map(r => r?.data?.findScene).filter(Boolean);
+
+                if (validScenes.length > 0) {
+                    // Common Tags
+                    const tagSets = validScenes.map(s => new Set((s.tags || []).map(t => String(t.id))));
+                    if (tagSets.length > 0 && tagSets[0].size > 0) {
+                        for (const tid of tagSets[0]) {
+                            if (tagSets.every(ts => ts.has(tid))) {
+                                initialCommonTagIds.add(tid);
+                                selectedTagIds.add(tid);
+                            }
+                        }
+                    }
+
+                    // Common Performers
+                    const perfSets = validScenes.map(s => new Set((s.performers || []).map(p => String(p.id))));
+                    if (perfSets.length > 0 && perfSets[0].size > 0) {
+                        for (const pid of perfSets[0]) {
+                            if (perfSets.every(ps => ps.has(pid))) {
+                                initialCommonPerformerIds.add(pid);
+                                selectedPerformerIds.add(pid);
+                            }
+                        }
+                    }
+
+                    // Common Groups
+                    const groupSets = validScenes.map(s => new Set((s.groups || []).map(g => g.group?.id ? String(g.group.id) : '').filter(Boolean)));
+                    if (groupSets.length > 0 && groupSets[0].size > 0) {
+                        for (const gid of groupSets[0]) {
+                            if (groupSets.every(gs => gs.has(gid))) {
+                                initialCommonGroupIds.add(gid);
+                                selectedGroupIds.add(gid);
+                            }
+                        }
+                    }
+
+                    // Common Studio
+                    const firstStudio = validScenes[0]?.studio?.id ? String(validScenes[0].studio.id) : null;
+                    if (firstStudio && validScenes.every(s => String(s?.studio?.id) === firstStudio)) {
+                        initialCommonStudioId = firstStudio;
+                        selectedStudioId = firstStudio;
+                    }
+                }
+            } catch (e) {
+                console.error('[FastTag Bulk Everything] Error pre-fetching common metadata:', e);
+            }
+
+            const updateBadges = () => {
+                popup.tags.badge.textContent = `${selectedTagIds.size} selected`;
+                popup.performers.badge.textContent = `${selectedPerformerIds.size} selected`;
+            };
+
+            const updateSaveButton = () => {
+                const addedTagsCount = Array.from(selectedTagIds).filter(id => !initialCommonTagIds.has(id)).length;
+                const removedTagsCount = Array.from(initialCommonTagIds).filter(id => !selectedTagIds.has(id)).length;
+                const addedPerfsCount = Array.from(selectedPerformerIds).filter(id => !initialCommonPerformerIds.has(id)).length;
+                const removedPerfsCount = Array.from(initialCommonPerformerIds).filter(id => !selectedPerformerIds.has(id)).length;
+                const addedGroupsCount = Array.from(selectedGroupIds).filter(id => !initialCommonGroupIds.has(id)).length;
+                const removedGroupsCount = Array.from(initialCommonGroupIds).filter(id => !selectedGroupIds.has(id)).length;
+                const hasStudioChange = studioModified || (selectedStudioId !== initialCommonStudioId);
+
+                const totalChanges = addedTagsCount + removedTagsCount + addedPerfsCount + removedPerfsCount + addedGroupsCount + removedGroupsCount + (hasStudioChange ? 1 : 0);
+
+                if (totalChanges > 0 || selectedTagIds.size > 0 || selectedPerformerIds.size > 0 || selectedStudioId || selectedGroupIds.size > 0) {
+                    popup.saveBtn.textContent = `Apply Changes to ${bulkScenes.length} Scenes`;
+                    popup.saveBtn.disabled = false;
+                    popup.saveBtn.style.opacity = '1';
+                    popup.saveBtn.style.cursor = 'pointer';
+                    popup.saveBtn.style.background = '#10b981';
+                    popup.saveBtn.classList.add('fasttag-btn-pulse-calm');
+                } else {
+                    popup.saveBtn.textContent = `Apply to ${bulkScenes.length} Scenes`;
+                    popup.saveBtn.disabled = false;
+                    popup.saveBtn.style.opacity = '1';
+                    popup.saveBtn.style.cursor = 'pointer';
+                    popup.saveBtn.style.background = '#6366f1';
+                    popup.saveBtn.classList.remove('fasttag-btn-pulse-calm');
+                }
+            };
+
+            const renderStudioBar = async (searchQuery = '') => {
+                const studioBar = popup.studioBar;
+                if (!studioBar) return;
+
+                let allStudios = getCachedOrNull('studios');
+                if (!allStudios) {
+                    const res = await fetchGQL(ENTITY_CONFIG.studios.fetchQuery);
+                    allStudios = ENTITY_CONFIG.studios.extractList(res.data);
+                    setCache('studios', allStudios);
+                }
+                if (!allStudios) return;
+
+                if (selectedStudioId) {
+                    const curStudio = allStudios.find(s => String(s.id) === String(selectedStudioId));
+                    if (curStudio) {
+                        studioBar.chipName.textContent = curStudio.name;
+                        studioBar.chip.style.display = 'inline-flex';
+                    } else {
+                        studioBar.chip.style.display = 'none';
+                    }
+                } else {
+                    studioBar.chip.style.display = 'none';
+                }
+
+                const term = searchQuery ? searchQuery.trim().toLowerCase() : '';
+                studioBar.recentContainer.innerHTML = '';
+                const isDark = getEffectiveTheme() === 'dark';
+
+                if (!term) {
+                    if (!selectedStudioId) {
+                        const emptySpan = document.createElement('span');
+                        emptySpan.textContent = 'Studio';
+                        emptySpan.style.cssText = `font-size: 10px; opacity: 0.45; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'}; letter-spacing: 0.3px; user-select: none;`;
+                        studioBar.recentContainer.appendChild(emptySpan);
+                    }
+                    return;
+                }
+
+                const matchingStudios = allStudios
+                    .filter(s => (s.name || '').toLowerCase().includes(term) && String(s.id) !== String(selectedStudioId))
+                    .sort((a, b) => {
+                        const aName = (a.name || '').toLowerCase();
+                        const bName = (b.name || '').toLowerCase();
+                        const aExact = aName === term ? 1 : 0;
+                        const bExact = bName === term ? 1 : 0;
+                        if (aExact !== bExact) return bExact - aExact;
+                        const aStarts = aName.startsWith(term) ? 1 : 0;
+                        const bStarts = bName.startsWith(term) ? 1 : 0;
+                        if (aStarts !== bStarts) return bStarts - aStarts;
+                        const aCount = Number(a.scene_count) || 0;
+                        const bCount = Number(b.scene_count) || 0;
+                        if (aCount !== bCount) return bCount - aCount;
+                        return aName.localeCompare(bName);
+                    })
+                    .slice(0, 8);
+
+                if (!matchingStudios.length && !selectedStudioId) {
+                    const emptySpan = document.createElement('span');
+                    emptySpan.textContent = 'No matching studio';
+                    emptySpan.style.cssText = `font-size: 10px; opacity: 0.6; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'};`;
+                    studioBar.recentContainer.appendChild(emptySpan);
+                    return;
+                }
+
+                matchingStudios.forEach(st => {
+                    const chip = document.createElement('button');
+                    chip.type = 'button';
+                    chip.className = 'fasttag-quick-chip chip-studio';
+                    chip.title = `Click to set studio to "${st.name}" across all selected scenes`;
+                    chip.innerHTML = `<span style="color: ${isDark ? '#818cf8' : '#4f46e5'}; font-weight: 700; margin-right: 2px;">+</span> ${escapeHtml(st.name)}`;
+                    chip.style.cssText = `padding: 1.5px 6px; border-radius: 999px; font-size: 10px; cursor: pointer; flex-shrink: 0; line-height: 1.2;`;
+
+                    chip.onclick = async (e) => {
+                        e.preventDefault();
+                        studioModified = true;
+                        if (selectedStudioId === String(st.id)) {
+                            selectedStudioId = null;
+                        } else {
+                            selectedStudioId = String(st.id);
+                            addRecentEntry('studios', st);
+                        }
+                        popup.globalSearch.value = '';
+                        popup.globalClear.style.display = 'none';
+                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                        activeColType = 'tags';
+                        activeColIndex = -1;
+                        activeMetaIndex = -1;
+                        await Promise.all([
+                            fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                            fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                        ]);
+                        refreshAllUI();
+                        updateEverythingKeyboardHighlight();
+                        popup.globalSearch.focus({ preventScroll: true });
+                    };
+
+                    studioBar.recentContainer.appendChild(chip);
+                });
+            };
+
+            const renderGroupBar = async (searchQuery = '') => {
+                const groupsBar = popup.groupsBar;
+                if (!groupsBar) return;
+
+                let allGroups = getCachedOrNull('groups');
+                if (!allGroups) {
+                    try {
+                        const res = await fetchGQL(ENTITY_CONFIG.groups.fetchQuery);
+                        allGroups = ENTITY_CONFIG.groups.extractList(res?.data);
+                        if (!allGroups || !allGroups.length) {
+                            allGroups = res?.data?.findGroups?.groups || res?.data?.findMovies?.movies || [];
+                        }
+                    } catch (e) {
+                        try {
+                            const fallbackRes = await fetchGQL(`query { findMovies(filter: { per_page: -1 }) { movies { id name } } }`);
+                            allGroups = fallbackRes?.data?.findMovies?.movies || [];
+                        } catch (e2) {
+                            console.error('[FastTag Bulk Everything] Failed to fetch groups:', e, e2);
+                        }
+                    }
+                    if (allGroups && allGroups.length) setCache('groups', allGroups);
+                }
+                if (!allGroups) allGroups = [];
+
+                const isDark = getEffectiveTheme() === 'dark';
+                groupsBar.selectedContainer.innerHTML = '';
+                groupsBar.recentContainer.innerHTML = '';
+
+                selectedGroupIds.forEach(id => {
+                    const grp = allGroups.find(g => String(g.id) === String(id));
+                    const name = grp ? grp.name : `Group #${id}`;
+
+                    const pill = document.createElement('div');
+                    pill.className = 'fasttag-group-pill';
+                    pill.style.cssText = `display: inline-flex; align-items: center; gap: 3.5px; font-weight: 700; padding: 1.5px 6px; border-radius: 999px; font-size: 10px; white-space: nowrap; flex-shrink: 0; cursor: default;`;
+                    pill.innerHTML = `
+                        <span style="font-weight: 800; font-size: 9.5px; opacity: 0.95;">📁</span>
+                        <span>${escapeHtml(name)}</span>
+                        <button type="button" class="fasttag-pill-clear-btn" style="background: none; border: none; cursor: pointer; color: #ffffff; font-weight: 700; font-size: 12px; padding: 0 0 0 2.5px; line-height: 1; opacity: 0.85;" title="Remove Group">&times;</button>
+                    `;
+
+                    pill.querySelector('button').onclick = async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        selectedGroupIds.delete(String(id));
+                        popup.globalSearch.value = '';
+                        popup.globalClear.style.display = 'none';
+                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                        activeColType = 'tags';
+                        activeColIndex = -1;
+                        activeMetaIndex = -1;
+                        await Promise.all([
+                            fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                            fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                        ]);
+                        refreshAllUI();
+                        updateEverythingKeyboardHighlight();
+                        popup.globalSearch.focus({ preventScroll: true });
+                    };
+                    groupsBar.selectedContainer.appendChild(pill);
+                });
+
+                const term = searchQuery ? searchQuery.trim().toLowerCase() : '';
+                if (!term) {
+                    if (selectedGroupIds.size === 0) {
+                        const emptySpan = document.createElement('span');
+                        emptySpan.textContent = 'Group';
+                        emptySpan.style.cssText = `font-size: 10px; opacity: 0.45; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'}; letter-spacing: 0.3px; user-select: none;`;
+                        groupsBar.recentContainer.appendChild(emptySpan);
+                    }
+                    return;
+                }
+
+                const matchingGroups = allGroups
+                    .filter(g => (g.name || '').toLowerCase().includes(term) && !selectedGroupIds.has(String(g.id)))
+                    .sort((a, b) => {
+                        const aName = (a.name || '').toLowerCase();
+                        const bName = (b.name || '').toLowerCase();
+                        const aExact = aName === term ? 1 : 0;
+                        const bExact = bName === term ? 1 : 0;
+                        if (aExact !== bExact) return bExact - aExact;
+                        const aStarts = aName.startsWith(term) ? 1 : 0;
+                        const bStarts = bName.startsWith(term) ? 1 : 0;
+                        if (aStarts !== bStarts) return bStarts - aStarts;
+                        const aCount = Number(a.scene_count) || 0;
+                        const bCount = Number(b.scene_count) || 0;
+                        if (aCount !== bCount) return bCount - aCount;
+                        return (a.name || '').localeCompare(b.name || '');
+                    })
+                    .slice(0, 8);
+
+                if (!matchingGroups.length && selectedGroupIds.size === 0) {
+                    const emptySpan = document.createElement('span');
+                    emptySpan.textContent = 'No matching group';
+                    emptySpan.style.cssText = `font-size: 10px; opacity: 0.6; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'};`;
+                    groupsBar.recentContainer.appendChild(emptySpan);
+                    return;
+                }
+
+                matchingGroups.forEach(grp => {
+                    const chip = document.createElement('button');
+                    chip.type = 'button';
+                    chip.className = 'fasttag-quick-chip chip-group';
+                    chip.title = `Click to add to group "${grp.name}" across all selected scenes`;
+                    chip.innerHTML = `<span style="color: ${isDark ? '#c084fc' : '#9333ea'}; font-weight: 700; margin-right: 2px;">+</span> ${escapeHtml(grp.name)}`;
+                    chip.style.cssText = `padding: 1.5px 6px; border-radius: 999px; font-size: 10px; cursor: pointer; flex-shrink: 0; line-height: 1.2;`;
+
+                    chip.onclick = async (e) => {
+                        e.preventDefault();
+                        selectedGroupIds.add(String(grp.id));
+                        addRecentEntry('groups', grp);
+                        popup.globalSearch.value = '';
+                        popup.globalClear.style.display = 'none';
+                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                        activeColType = 'tags';
+                        activeColIndex = -1;
+                        activeMetaIndex = -1;
+                        await Promise.all([
+                            fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                            fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                        ]);
+                        refreshAllUI();
+                        updateEverythingKeyboardHighlight();
+                        popup.globalSearch.focus({ preventScroll: true });
+                    };
+                    groupsBar.recentContainer.appendChild(chip);
+                });
+            };
+
+            if (popup.studioBar?.clearBtn) {
+                popup.studioBar.clearBtn.onclick = async (e) => {
+                    e.preventDefault();
+                    studioModified = true;
+                    selectedStudioId = null;
+                    popup.globalSearch.value = '';
+                    popup.globalClear.style.display = 'none';
+                    if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                    activeColType = 'tags';
+                    activeColIndex = -1;
+                    activeMetaIndex = -1;
+                    await Promise.all([
+                        fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                        fetchColumnData('performers', performersTable, '', selectedPerformerIds)
+                    ]);
+                    refreshAllUI();
+                    updateEverythingKeyboardHighlight();
+                    popup.globalSearch.focus({ preventScroll: true });
+                };
+            }
+
+            async function fetchColumnData(type, tableInstance, query, selIds) {
+                const config = ENTITY_CONFIG[type];
+                let cached = getCachedOrNull(type);
+                if (!cached) {
+                    const res = await fetchGQL(config.fetchQuery);
+                    cached = config.extractList(res.data);
+                    setCache(type, cached);
+                }
+                if (!cached) return;
+
+                const term = query.trim().toLowerCase();
+                let data = cached;
+                const searchFields = config.searchFields || [config.labelKey];
+                if (term) {
+                    const tokens = term.split(/\s+/);
+                    data = cached.filter(item => {
+                        const itemSearchStr = searchFields
+                            .map(f => String(item[f] || '').trim().toLowerCase())
+                            .filter(Boolean)
+                            .join(' ');
+                        return tokens.every(t => itemSearchStr.includes(t));
+                    });
+                }
+
+                data.sort(getSmartSortComparator(term, selIds, config.labelKey, searchFields, getSavedSortKey(type)));
+
+                isRestoring = true;
+                try {
+                    await tableInstance.setData(data);
+                    selIds.forEach(id => {
+                        const r = tableInstance.getRow(id);
+                        if (r) tableInstance.selectRow(r);
+                    });
+                    tableInstance.redraw(true);
+
+                    const rawTerm = (popup.globalSearch?.value || '').trim();
+                    const bottomCreateEl = popup[type]?.bottomCreateContainer;
+
+                    if (rawTerm && bottomCreateEl) {
+                        const hasExactMatch = data.some(item => (item[config.labelKey] || '').toLowerCase() === rawTerm.toLowerCase());
+                        if (!hasExactMatch) {
+                            const btnBg = type === 'tags' ? '#059669' : '#0284c7';
+                            const icon = type === 'tags' ? '🏷️' : '⭐';
+                            bottomCreateEl.innerHTML = `
+                                <button type="button" class="fasttag-create-empty-btn" data-type="${type}" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 16px; background: ${btnBg}; color: #ffffff; border: none; border-radius: 6px; font-size: 11.5px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: all 0.15s ease;">${icon} Create ${config.title} "${escapeHtml(rawTerm)}"</button>
+                            `;
+                            bottomCreateEl.style.display = 'flex';
+                        } else {
+                            bottomCreateEl.innerHTML = '';
+                            bottomCreateEl.style.display = 'none';
+                        }
+                    } else if (bottomCreateEl) {
+                        bottomCreateEl.innerHTML = '';
+                        bottomCreateEl.style.display = 'none';
+                    }
+                } finally {
+                    isRestoring = false;
+                }
+            }
+
+            const refreshAllUI = () => {
+                updateBadges();
+                updateSaveButton();
+                renderStudioBar(popup.globalSearch ? popup.globalSearch.value : '');
+                renderGroupBar(popup.globalSearch ? popup.globalSearch.value : '');
+            };
+
+            tagsTable.on("rowSelected", async (row) => {
+                if (!isRestoring) {
+                    const id = row.getData().id;
+                    if (id) {
+                        selectedTagIds.add(String(id));
+                        addRecentEntry('tags', row.getData());
+                    }
+                    const isSearching = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
+                    if (isSearching) {
+                        popup.globalSearch.value = '';
+                        popup.globalClear.style.display = 'none';
+                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                        await refreshGlobalSearch('');
+                        const r = tagsTable.getRow(id);
+                        if (r) tagsTable.scrollToRow(r, "top", false);
+                        activeNavIndex = -1;
+                        refreshAllUI();
+                        updateEverythingKeyboardHighlight();
+                        popup.globalSearch.focus({ preventScroll: true });
+                    } else {
+                        currentNavSection = 'tags';
+                        const rows = tagsTable.getRows();
+                        activeNavIndex = rows.indexOf(row);
+                        refreshAllUI();
+                        updateEverythingKeyboardHighlight();
+                        if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
+                    }
+                }
+            });
+
+            tagsTable.on("rowDeselected", (row) => {
+                if (!isRestoring) {
+                    const id = row.getData().id;
+                    if (id) selectedTagIds.delete(String(id));
+                    currentNavSection = 'tags';
+                    const rows = tagsTable.getRows();
+                    activeNavIndex = rows.indexOf(row);
+                    refreshAllUI();
+                    updateEverythingKeyboardHighlight();
+                    if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
+                }
+            });
+
+            performersTable.on("rowSelected", async (row) => {
+                if (!isRestoring) {
+                    const id = row.getData().id;
+                    if (id) {
+                        selectedPerformerIds.add(String(id));
+                        addRecentEntry('performers', row.getData());
+                    }
+                    const isSearching = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
+                    if (isSearching) {
+                        popup.globalSearch.value = '';
+                        popup.globalClear.style.display = 'none';
+                        if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                        await refreshGlobalSearch('');
+                        const r = performersTable.getRow(id);
+                        if (r) performersTable.scrollToRow(r, "top", false);
+                        activeNavIndex = -1;
+                        refreshAllUI();
+                        updateEverythingKeyboardHighlight();
+                        popup.globalSearch.focus({ preventScroll: true });
+                    } else {
+                        currentNavSection = 'performers';
+                        const rows = performersTable.getRows();
+                        activeNavIndex = rows.indexOf(row);
+                        refreshAllUI();
+                        updateEverythingKeyboardHighlight();
+                        if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
+                    }
+                }
+            });
+
+            performersTable.on("rowDeselected", (row) => {
+                if (!isRestoring) {
+                    const id = row.getData().id;
+                    if (id) selectedPerformerIds.delete(String(id));
+                    currentNavSection = 'performers';
+                    const rows = performersTable.getRows();
+                    activeNavIndex = rows.indexOf(row);
+                    refreshAllUI();
+                    updateEverythingKeyboardHighlight();
+                    if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
+                }
+            });
+
+            form.addEventListener('click', (e) => {
+                if (!e.target.closest('input, textarea')) {
+                    if (popup.globalSearch) {
+                        popup.globalSearch.focus({ preventScroll: true });
+                    }
+                }
+            });
+
+            const refreshGlobalSearch = async (val) => {
+                await Promise.all([
+                    fetchColumnData('tags', tagsTable, val, selectedTagIds),
+                    fetchColumnData('performers', performersTable, val, selectedPerformerIds)
+                ]);
+                await renderStudioBar(val);
+                await renderGroupBar(val);
+            };
+
+            let currentNavSection = 'tags'; // 'tags' | 'performers' | 'studios' | 'groups' | 'tag-suggestions' | 'perf-suggestions'
+            let activeNavIndex = -1;
+
+            const getStudioBarItems = () => {
+                const items = [];
+                if (popup.studioBar?.chip && popup.studioBar.chip.style.display !== 'none') {
+                    items.push({ type: 'studio-selected', el: popup.studioBar.chip, clickTarget: popup.studioBar.clearBtn });
+                }
+                if (popup.studioBar?.recentContainer) {
+                    popup.studioBar.recentContainer.querySelectorAll('.fasttag-quick-chip, .chip-studio').forEach(btn => {
+                        items.push({ type: 'studio-chip', el: btn, clickTarget: btn });
+                    });
+                }
+                return items;
+            };
+
+            const getGroupBarItems = () => {
+                const items = [];
+                if (popup.groupsBar?.selectedContainer) {
+                    popup.groupsBar.selectedContainer.querySelectorAll('.fasttag-group-pill').forEach(pill => {
+                        const btn = pill.querySelector('button');
+                        items.push({ type: 'group-selected', el: pill, clickTarget: btn || pill });
+                    });
+                }
+                if (popup.groupsBar?.recentContainer) {
+                    popup.groupsBar.recentContainer.querySelectorAll('.fasttag-quick-chip, .chip-group').forEach(btn => {
+                        items.push({ type: 'group-chip', el: btn, clickTarget: btn });
+                    });
+                }
+                return items;
+            };
+
+            const getTagSuggestionItems = () => {
+                const items = [];
+                const container = form.querySelector('#everything-sugg-tags-chips');
+                if (container && container.offsetParent !== null) {
+                    container.querySelectorAll('.fasttag-suggestion-chip').forEach(btn => {
+                        items.push({ type: 'tag-sugg', el: btn, clickTarget: btn });
+                    });
+                }
+                return items;
+            };
+
+            const getPerformerSuggestionItems = () => {
+                const items = [];
+                const container = form.querySelector('#everything-sugg-performers-chips');
+                if (container && container.offsetParent !== null) {
+                    container.querySelectorAll('.fasttag-suggestion-chip').forEach(btn => {
+                        items.push({ type: 'perf-sugg', el: btn, clickTarget: btn });
+                    });
+                }
+                return items;
+            };
+
+            const getTagRecentItems = () => {
+                const items = [];
+                const container = popup.tags?.chipsContainer;
+                if (container && container.style.display !== 'none' && container.offsetParent !== null) {
+                    container.querySelectorAll('.fasttag-quick-chip').forEach(btn => {
+                        items.push({ type: 'tag-recent', el: btn, clickTarget: btn });
+                    });
+                }
+                return items;
+            };
+
+            const getPerformerRecentItems = () => {
+                const items = [];
+                const container = popup.performers?.chipsContainer;
+                if (container && container.style.display !== 'none' && container.offsetParent !== null) {
+                    container.querySelectorAll('.fasttag-quick-chip').forEach(btn => {
+                        items.push({ type: 'perf-recent', el: btn, clickTarget: btn });
+                    });
+                }
+                return items;
+            };
+
+            const scrollRowIntoViewIfNeeded = (table, row) => {
+                if (!table || !row) return;
+                const el = typeof row.getElement === 'function' ? row.getElement() : null;
+                const holder = table.element?.querySelector('.tabulator-tableholder');
+                if (holder && el) {
+                    const holderRect = holder.getBoundingClientRect();
+                    const elRect = el.getBoundingClientRect();
+                    if (elRect.bottom > holderRect.bottom) {
+                        holder.scrollTop += (elRect.bottom - holderRect.bottom + 4);
+                    } else if (elRect.top < holderRect.top) {
+                        holder.scrollTop -= (holderRect.top - elRect.top + 4);
+                    }
+                } else if (typeof row.scrollTo === 'function') {
+                    row.scrollTo('nearest', false);
+                }
+            };
+
+            const updateEverythingKeyboardHighlight = () => {
+                form.querySelectorAll('.tabulator-row.fasttag-keyboard-active').forEach(el => el.classList.remove('fasttag-keyboard-active'));
+                form.querySelectorAll('.fasttag-keyboard-meta-focus').forEach(el => el.classList.remove('fasttag-keyboard-meta-focus'));
+
+                form.querySelectorAll('.fasttag-create-empty-btn').forEach(btn => {
+                    btn.classList.remove('fasttag-create-btn-active');
+                    btn.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+                    btn.style.transform = 'none';
+                    btn.style.filter = 'none';
+                });
+
+                const tagsHeader = form.querySelector('#everything-col-tags span');
+                const perfHeader = form.querySelector('#everything-col-performers span');
+                if (tagsHeader) {
+                    tagsHeader.style.textDecoration = (currentNavSection === 'tags' && activeNavIndex >= 0) ? 'underline 2px #818cf8' : 'none';
+                }
+                if (perfHeader) {
+                    perfHeader.style.textDecoration = (currentNavSection === 'performers' && activeNavIndex >= 0) ? 'underline 2px #38bdf8' : 'none';
+                }
+
+                if (currentNavSection === 'studios') {
+                    const items = getStudioBarItems();
+                    if (items.length > 0) {
+                        if (activeNavIndex < 0) activeNavIndex = 0;
+                        if (activeNavIndex >= items.length) activeNavIndex = items.length - 1;
+                        const item = items[activeNavIndex];
+                        if (item && item.el) {
+                            item.el.classList.add('fasttag-keyboard-meta-focus');
+                            if (typeof item.el.scrollIntoView === 'function') {
+                                item.el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                if (currentNavSection === 'groups') {
+                    const items = getGroupBarItems();
+                    if (items.length > 0) {
+                        if (activeNavIndex < 0) activeNavIndex = 0;
+                        if (activeNavIndex >= items.length) activeNavIndex = items.length - 1;
+                        const item = items[activeNavIndex];
+                        if (item && item.el) {
+                            item.el.classList.add('fasttag-keyboard-meta-focus');
+                            if (typeof item.el.scrollIntoView === 'function') {
+                                item.el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                if (currentNavSection === 'tag-suggestions') {
+                    const items = getTagSuggestionItems();
+                    if (items.length > 0) {
+                        if (activeNavIndex < 0) activeNavIndex = 0;
+                        if (activeNavIndex >= items.length) activeNavIndex = items.length - 1;
+                        const item = items[activeNavIndex];
+                        if (item && item.el) {
+                            item.el.classList.add('fasttag-keyboard-meta-focus');
+                            if (typeof item.el.scrollIntoView === 'function') {
+                                item.el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                if (currentNavSection === 'perf-suggestions') {
+                    const items = getPerformerSuggestionItems();
+                    if (items.length > 0) {
+                        if (activeNavIndex < 0) activeNavIndex = 0;
+                        if (activeNavIndex >= items.length) activeNavIndex = items.length - 1;
+                        const item = items[activeNavIndex];
+                        if (item && item.el) {
+                            item.el.classList.add('fasttag-keyboard-meta-focus');
+                            if (typeof item.el.scrollIntoView === 'function') {
+                                item.el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                if (currentNavSection === 'tag-recent') {
+                    const items = getTagRecentItems();
+                    if (items.length > 0) {
+                        if (activeNavIndex < 0) activeNavIndex = 0;
+                        if (activeNavIndex >= items.length) activeNavIndex = items.length - 1;
+                        const item = items[activeNavIndex];
+                        if (item && item.el) {
+                            item.el.classList.add('fasttag-keyboard-meta-focus');
+                            if (typeof item.el.scrollIntoView === 'function') {
+                                item.el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                if (currentNavSection === 'perf-recent') {
+                    const items = getPerformerRecentItems();
+                    if (items.length > 0) {
+                        if (activeNavIndex < 0) activeNavIndex = 0;
+                        if (activeNavIndex >= items.length) activeNavIndex = items.length - 1;
+                        const item = items[activeNavIndex];
+                        if (item && item.el) {
+                            item.el.classList.add('fasttag-keyboard-meta-focus');
+                            if (typeof item.el.scrollIntoView === 'function') {
+                                item.el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                if (activeNavIndex < 0) return;
+
+                const curTable = currentNavSection === 'tags' ? tagsTable : performersTable;
+                const curCreateBtn = form.querySelector(`.fasttag-create-empty-btn[data-type="${currentNavSection}"]`);
+                const isCreateVisible = curCreateBtn && curCreateBtn.parentElement && curCreateBtn.parentElement.style.display !== 'none';
+                const rows = curTable && typeof curTable.getRows === 'function' ? curTable.getRows() : [];
+
+                if (isCreateVisible && activeNavIndex === rows.length) {
+                    curCreateBtn.classList.add('fasttag-create-btn-active');
+                    curCreateBtn.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.5), 0 2px 8px rgba(0,0,0,0.3)';
+                    curCreateBtn.style.transform = 'scale(1.02)';
+                    curCreateBtn.style.filter = 'brightness(1.15)';
+                    return;
+                }
+
+                if (rows.length === 0) return;
+                if (activeNavIndex >= rows.length) activeNavIndex = rows.length - 1;
+
+                const targetRow = rows[activeNavIndex];
+                if (targetRow) {
+                    const el = targetRow.getElement();
+                    if (el) el.classList.add('fasttag-keyboard-active');
+                    scrollRowIntoViewIfNeeded(curTable, targetRow);
+                }
+            };
+
+            const handleCreateEntity = async (targetType) => {
+                const val = (popup.globalSearch?.value || '').trim();
+                if (!val) return;
+
+                const config = ENTITY_CONFIG[targetType];
+                const confirmedName = await promptCreateEntityDialog(targetType, val, form);
+                if (!confirmedName) {
+                    if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
+                    return;
+                }
+
+                const res = await fetchGQL(config.createQuery, config.createVariables(confirmedName));
+                const newId = config.createExtract(res.data);
+
+                if (newId) {
+                    toastSuccess(`${config.title} "${confirmedName}" created successfully`);
+                    invalidateCache(targetType);
+                    if (targetType === 'tags') {
+                        selectedTagIds.add(String(newId));
+                    } else {
+                        selectedPerformerIds.add(String(newId));
+                    }
+                    addRecentEntry(targetType, { id: newId, [config.labelKey]: confirmedName });
+                    popup.globalSearch.value = '';
+                    popup.globalClear.style.display = 'none';
+                    if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                    currentNavSection = targetType;
+                    activeNavIndex = 0;
+                    await refreshGlobalSearch('');
+                    refreshAllUI();
+                    updateEverythingKeyboardHighlight();
+                    if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
+                } else {
+                    toastError(`Failed to create ${config.title.toLowerCase()}`, res.errors);
+                }
+            };
+
+            form.addEventListener('click', (e) => {
+                const createBtn = e.target.closest('.fasttag-create-empty-btn');
+                if (createBtn) {
+                    const targetType = createBtn.getAttribute('data-type');
+                    if (targetType) handleCreateEntity(targetType);
+                }
+            });
+
+            popup.globalSearch.addEventListener('input', () => {
+                const val = popup.globalSearch.value.trim();
+                const hasVal = val.length > 0;
+                popup.globalClear.style.display = hasVal ? 'block' : 'none';
+                if (popup.kbdShortcut) popup.kbdShortcut.style.display = hasVal ? 'none' : 'block';
+                clearTimeout(searchDebounce);
+                searchDebounce = setTimeout(async () => {
+                    await refreshGlobalSearch(val);
+                    if (hasVal) {
+                        const tagCount = tagsTable ? tagsTable.getRows().length : 0;
+                        const perfCount = performersTable ? performersTable.getRows().length : 0;
+                        if (tagCount > 0) {
+                            currentNavSection = 'tags';
+                            activeNavIndex = 0;
+                        } else if (perfCount > 0) {
+                            currentNavSection = 'performers';
+                            activeNavIndex = 0;
+                        } else if (getTagSuggestionItems().length > 0) {
+                            currentNavSection = 'tag-suggestions';
+                            activeNavIndex = 0;
+                        } else if (getPerformerSuggestionItems().length > 0) {
+                            currentNavSection = 'perf-suggestions';
+                            activeNavIndex = 0;
+                        } else if (getTagRecentItems().length > 0) {
+                            currentNavSection = 'tag-recent';
+                            activeNavIndex = 0;
+                        } else if (getPerformerRecentItems().length > 0) {
+                            currentNavSection = 'perf-recent';
+                            activeNavIndex = 0;
+                        } else if (getStudioBarItems().length > 0) {
+                            currentNavSection = 'studios';
+                            activeNavIndex = 0;
+                        } else if (getGroupBarItems().length > 0) {
+                            currentNavSection = 'groups';
+                            activeNavIndex = 0;
+                        } else {
+                            currentNavSection = 'tags';
+                            activeNavIndex = -1;
+                        }
+                    } else {
+                        currentNavSection = 'tags';
+                        activeNavIndex = -1;
+                    }
+                    updateEverythingKeyboardHighlight();
+                }, 100);
+            });
+
+            popup.globalSearch.addEventListener('keydown', async (e) => {
+                if (e.key === 'Tab' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    if (currentNavSection === 'studios') {
+                        const studioItems = getStudioBarItems();
+                        if (e.key === 'ArrowLeft') {
+                            if (activeNavIndex > 0) activeNavIndex--;
+                            else {
+                                const groupItems = getGroupBarItems();
+                                if (groupItems.length > 0) {
+                                    currentNavSection = 'groups';
+                                    activeNavIndex = groupItems.length - 1;
+                                }
+                            }
+                        } else {
+                            if (activeNavIndex < studioItems.length - 1) activeNavIndex++;
+                            else {
+                                const groupItems = getGroupBarItems();
+                                if (groupItems.length > 0) {
+                                    currentNavSection = 'groups';
+                                    activeNavIndex = 0;
+                                }
+                            }
+                        }
+                    } else if (currentNavSection === 'groups') {
+                        const groupItems = getGroupBarItems();
+                        if (e.key === 'ArrowLeft') {
+                            if (activeNavIndex > 0) activeNavIndex--;
+                            else {
+                                const studioItems = getStudioBarItems();
+                                if (studioItems.length > 0) {
+                                    currentNavSection = 'studios';
+                                    activeNavIndex = studioItems.length - 1;
+                                }
+                            }
+                        } else {
+                            if (activeNavIndex < groupItems.length - 1) activeNavIndex++;
+                            else {
+                                const studioItems = getStudioBarItems();
+                                if (studioItems.length > 0) {
+                                    currentNavSection = 'studios';
+                                    activeNavIndex = 0;
+                                }
+                            }
+                        }
+                    } else if (currentNavSection === 'tag-suggestions') {
+                        const tagSuggs = getTagSuggestionItems();
+                        if (e.key === 'ArrowLeft') {
+                            if (activeNavIndex > 0) activeNavIndex--;
+                            else {
+                                const perfSuggs = getPerformerSuggestionItems();
+                                if (perfSuggs.length > 0) {
+                                    currentNavSection = 'perf-suggestions';
+                                    activeNavIndex = perfSuggs.length - 1;
+                                }
+                            }
+                        } else {
+                            if (activeNavIndex < tagSuggs.length - 1) activeNavIndex++;
+                            else {
+                                const perfSuggs = getPerformerSuggestionItems();
+                                if (perfSuggs.length > 0) {
+                                    currentNavSection = 'perf-suggestions';
+                                    activeNavIndex = 0;
+                                }
+                            }
+                        }
+                    } else if (currentNavSection === 'perf-suggestions') {
+                        const perfSuggs = getPerformerSuggestionItems();
+                        if (e.key === 'ArrowLeft') {
+                            if (activeNavIndex > 0) activeNavIndex--;
+                            else {
+                                const tagSuggs = getTagSuggestionItems();
+                                if (tagSuggs.length > 0) {
+                                    currentNavSection = 'tag-suggestions';
+                                    activeNavIndex = tagSuggs.length - 1;
+                                }
+                            }
+                        } else {
+                            if (activeNavIndex < perfSuggs.length - 1) activeNavIndex++;
+                            else {
+                                const tagSuggs = getTagSuggestionItems();
+                                if (tagSuggs.length > 0) {
+                                    currentNavSection = 'tag-suggestions';
+                                    activeNavIndex = 0;
+                                }
+                            }
+                        }
+                    } else if (currentNavSection === 'tag-recent') {
+                        const tagRecents = getTagRecentItems();
+                        if (e.key === 'ArrowLeft') {
+                            if (activeNavIndex > 0) activeNavIndex--;
+                            else {
+                                const perfRecents = getPerformerRecentItems();
+                                if (perfRecents.length > 0) {
+                                    currentNavSection = 'perf-recent';
+                                    activeNavIndex = perfRecents.length - 1;
+                                }
+                            }
+                        } else {
+                            if (activeNavIndex < tagRecents.length - 1) activeNavIndex++;
+                            else {
+                                const perfRecents = getPerformerRecentItems();
+                                if (perfRecents.length > 0) {
+                                    currentNavSection = 'perf-recent';
+                                    activeNavIndex = 0;
+                                }
+                            }
+                        }
+                    } else if (currentNavSection === 'perf-recent') {
+                        const perfRecents = getPerformerRecentItems();
+                        if (e.key === 'ArrowLeft') {
+                            if (activeNavIndex > 0) activeNavIndex--;
+                            else {
+                                const tagRecents = getTagRecentItems();
+                                if (tagRecents.length > 0) {
+                                    currentNavSection = 'tag-recent';
+                                    activeNavIndex = tagRecents.length - 1;
+                                }
+                            }
+                        } else {
+                            if (activeNavIndex < perfRecents.length - 1) activeNavIndex++;
+                            else {
+                                const tagRecents = getTagRecentItems();
+                                if (tagRecents.length > 0) {
+                                    currentNavSection = 'tag-recent';
+                                    activeNavIndex = 0;
+                                }
+                            }
+                        }
+                    } else if (currentNavSection === 'tags') {
+                        currentNavSection = 'performers';
+                        const perfRows = performersTable ? performersTable.getRows() : [];
+                        activeNavIndex = perfRows.length > 0 ? Math.min(Math.max(0, activeNavIndex), perfRows.length - 1) : 0;
+                    } else if (currentNavSection === 'performers') {
+                        currentNavSection = 'tags';
+                        const tagRows = tagsTable ? tagsTable.getRows() : [];
+                        activeNavIndex = tagRows.length > 0 ? Math.min(Math.max(0, activeNavIndex), tagRows.length - 1) : 0;
+                    }
+                    updateEverythingKeyboardHighlight();
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (activeNavIndex < 0) {
+                        const hasVal = (popup.globalSearch?.value || '').trim().length > 0;
+                        if (!hasVal) {
+                            const tagSuggs = getTagSuggestionItems();
+                            const perfSuggs = getPerformerSuggestionItems();
+                            const tagRecents = getTagRecentItems();
+                            const perfRecents = getPerformerRecentItems();
+                            const tagRows = tagsTable ? tagsTable.getRows() : [];
+                            const perfRows = performersTable ? performersTable.getRows() : [];
+                            const tagCreate = form.querySelector('.fasttag-create-empty-btn[data-type="tags"]');
+                            const isTagCreate = tagCreate && tagCreate.parentElement && tagCreate.parentElement.style.display !== 'none';
+                            const perfCreate = form.querySelector('.fasttag-create-empty-btn[data-type="performers"]');
+                            const isPerfCreate = perfCreate && perfCreate.parentElement && perfCreate.parentElement.style.display !== 'none';
+
+                            if (tagSuggs.length > 0) {
+                                currentNavSection = 'tag-suggestions';
+                                activeNavIndex = 0;
+                            } else if (perfSuggs.length > 0) {
+                                currentNavSection = 'perf-suggestions';
+                                activeNavIndex = 0;
+                            } else if (tagRecents.length > 0) {
+                                currentNavSection = 'tag-recent';
+                                activeNavIndex = 0;
+                            } else if (perfRecents.length > 0) {
+                                currentNavSection = 'perf-recent';
+                                activeNavIndex = 0;
+                            } else if (tagRows.length > 0) {
+                                currentNavSection = 'tags';
+                                activeNavIndex = 0;
+                            } else if (perfRows.length > 0) {
+                                currentNavSection = 'performers';
+                                activeNavIndex = 0;
+                            } else if (isTagCreate) {
+                                currentNavSection = 'tags';
+                                activeNavIndex = tagRows.length;
+                            } else if (isPerfCreate) {
+                                currentNavSection = 'performers';
+                                activeNavIndex = perfRows.length;
+                            }
+                        } else {
+                            const tagRows = tagsTable ? tagsTable.getRows() : [];
+                            const perfRows = performersTable ? performersTable.getRows() : [];
+                            const tagCreate = form.querySelector('.fasttag-create-empty-btn[data-type="tags"]');
+                            const isTagCreate = tagCreate && tagCreate.parentElement && tagCreate.parentElement.style.display !== 'none';
+                            const perfCreate = form.querySelector('.fasttag-create-empty-btn[data-type="performers"]');
+                            const isPerfCreate = perfCreate && perfCreate.parentElement && perfCreate.parentElement.style.display !== 'none';
+
+                            if (tagRows.length > 0) {
+                                currentNavSection = 'tags';
+                                activeNavIndex = 0;
+                            } else if (perfRows.length > 0) {
+                                currentNavSection = 'performers';
+                                activeNavIndex = 0;
+                            } else if (isTagCreate) {
+                                currentNavSection = 'tags';
+                                activeNavIndex = tagRows.length;
+                            } else if (isPerfCreate) {
+                                currentNavSection = 'performers';
+                                activeNavIndex = perfRows.length;
+                            } else if (getTagSuggestionItems().length > 0) {
+                                currentNavSection = 'tag-suggestions';
+                                activeNavIndex = 0;
+                            } else if (getPerformerSuggestionItems().length > 0) {
+                                currentNavSection = 'perf-suggestions';
+                                activeNavIndex = 0;
+                            }
+                        }
+                        updateEverythingKeyboardHighlight();
+                        return;
+                    }
+
+                    if (currentNavSection === 'studios') {
+                        const tagSuggs = getTagSuggestionItems();
+                        const tagRecents = getTagRecentItems();
+                        if (tagSuggs.length > 0) {
+                            currentNavSection = 'tag-suggestions';
+                            activeNavIndex = 0;
+                        } else if (tagRecents.length > 0) {
+                            currentNavSection = 'tag-recent';
+                            activeNavIndex = 0;
+                        } else {
+                            currentNavSection = 'tags';
+                            activeNavIndex = 0;
+                        }
+                    } else if (currentNavSection === 'groups') {
+                        const perfSuggs = getPerformerSuggestionItems();
+                        const perfRecents = getPerformerRecentItems();
+                        if (perfSuggs.length > 0) {
+                            currentNavSection = 'perf-suggestions';
+                            activeNavIndex = 0;
+                        } else if (perfRecents.length > 0) {
+                            currentNavSection = 'perf-recent';
+                            activeNavIndex = 0;
+                        } else {
+                            currentNavSection = 'performers';
+                            activeNavIndex = 0;
+                        }
+                    } else if (currentNavSection === 'tag-suggestions') {
+                        const tagRecents = getTagRecentItems();
+                        if (tagRecents.length > 0) {
+                            currentNavSection = 'tag-recent';
+                            activeNavIndex = 0;
+                        } else {
+                            currentNavSection = 'tags';
+                            activeNavIndex = 0;
+                        }
+                    } else if (currentNavSection === 'perf-suggestions') {
+                        const perfRecents = getPerformerRecentItems();
+                        if (perfRecents.length > 0) {
+                            currentNavSection = 'perf-recent';
+                            activeNavIndex = 0;
+                        } else {
+                            currentNavSection = 'performers';
+                            activeNavIndex = 0;
+                        }
+                    } else if (currentNavSection === 'tag-recent') {
+                        currentNavSection = 'tags';
+                        activeNavIndex = 0;
+                    } else if (currentNavSection === 'perf-recent') {
+                        currentNavSection = 'performers';
+                        activeNavIndex = 0;
+                    } else if (currentNavSection === 'tags') {
+                        const rows = tagsTable ? tagsTable.getRows() : [];
+                        const curCreateBtn = form.querySelector('.fasttag-create-empty-btn[data-type="tags"]');
+                        const isCreate = curCreateBtn && curCreateBtn.parentElement && curCreateBtn.parentElement.style.display !== 'none';
+                        if (rows.length > 0) {
+                            if (activeNavIndex < 0) activeNavIndex = 0;
+                            else if (activeNavIndex < rows.length - 1) activeNavIndex++;
+                            else if (activeNavIndex === rows.length - 1 && isCreate) activeNavIndex = rows.length;
+                            else {
+                                currentNavSection = 'performers';
+                                activeNavIndex = 0;
+                            }
+                        } else if (isCreate && activeNavIndex < rows.length) {
+                            activeNavIndex = rows.length;
+                        } else {
+                            currentNavSection = 'performers';
+                            activeNavIndex = 0;
+                        }
+                    } else if (currentNavSection === 'performers') {
+                        const rows = performersTable ? performersTable.getRows() : [];
+                        const curCreateBtn = form.querySelector('.fasttag-create-empty-btn[data-type="performers"]');
+                        const isCreate = curCreateBtn && curCreateBtn.parentElement && curCreateBtn.parentElement.style.display !== 'none';
+                        if (rows.length > 0) {
+                            if (activeNavIndex < 0) activeNavIndex = 0;
+                            else if (activeNavIndex < rows.length - 1) activeNavIndex++;
+                            else if (activeNavIndex === rows.length - 1 && isCreate) activeNavIndex = rows.length;
+                        } else if (isCreate) {
+                            activeNavIndex = rows.length;
+                        }
+                    }
+                    updateEverythingKeyboardHighlight();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (activeNavIndex < 0) {
+                        const studioItems = getStudioBarItems();
+                        const groupItems = getGroupBarItems();
+                        if (studioItems.length > 0) {
+                            currentNavSection = 'studios';
+                            activeNavIndex = 0;
+                        } else if (groupItems.length > 0) {
+                            currentNavSection = 'groups';
+                            activeNavIndex = 0;
+                        }
+                        updateEverythingKeyboardHighlight();
+                        return;
+                    }
+                    if (currentNavSection === 'studios') {
+                        // Stay in studio bar
+                    } else if (currentNavSection === 'groups') {
+                        // Stay in group bar
+                    } else if (currentNavSection === 'tag-suggestions') {
+                        const studioItems = getStudioBarItems();
+                        if (studioItems.length > 0) {
+                            currentNavSection = 'studios';
+                            activeNavIndex = 0;
+                        } else {
+                            const groupItems = getGroupBarItems();
+                            if (groupItems.length > 0) {
+                                currentNavSection = 'groups';
+                                activeNavIndex = 0;
+                            }
+                        }
+                    } else if (currentNavSection === 'perf-suggestions') {
+                        const groupItems = getGroupBarItems();
+                        if (groupItems.length > 0) {
+                            currentNavSection = 'groups';
+                            activeNavIndex = 0;
+                        } else {
+                            const studioItems = getStudioBarItems();
+                            if (studioItems.length > 0) {
+                                currentNavSection = 'studios';
+                                activeNavIndex = 0;
+                            }
+                        }
+                    } else if (currentNavSection === 'tag-recent') {
+                        const tagSuggs = getTagSuggestionItems();
+                        const studioItems = getStudioBarItems();
+                        const groupItems = getGroupBarItems();
+                        if (tagSuggs.length > 0) {
+                            currentNavSection = 'tag-suggestions';
+                            activeNavIndex = 0;
+                        } else if (studioItems.length > 0) {
+                            currentNavSection = 'studios';
+                            activeNavIndex = 0;
+                        } else if (groupItems.length > 0) {
+                            currentNavSection = 'groups';
+                            activeNavIndex = 0;
+                        }
+                    } else if (currentNavSection === 'perf-recent') {
+                        const perfSuggs = getPerformerSuggestionItems();
+                        const groupItems = getGroupBarItems();
+                        const studioItems = getStudioBarItems();
+                        if (perfSuggs.length > 0) {
+                            currentNavSection = 'perf-suggestions';
+                            activeNavIndex = 0;
+                        } else if (groupItems.length > 0) {
+                            currentNavSection = 'groups';
+                            activeNavIndex = 0;
+                        } else if (studioItems.length > 0) {
+                            currentNavSection = 'studios';
+                            activeNavIndex = 0;
+                        }
+                    } else if (currentNavSection === 'tags') {
+                        const rows = tagsTable ? tagsTable.getRows() : [];
+                        if (activeNavIndex > 0) {
+                            activeNavIndex--;
+                        } else {
+                            const tagRecents = getTagRecentItems();
+                            const tagSuggs = getTagSuggestionItems();
+                            const studioItems = getStudioBarItems();
+                            const groupItems = getGroupBarItems();
+                            if (tagRecents.length > 0) {
+                                currentNavSection = 'tag-recent';
+                                activeNavIndex = 0;
+                            } else if (tagSuggs.length > 0) {
+                                currentNavSection = 'tag-suggestions';
+                                activeNavIndex = 0;
+                            } else if (studioItems.length > 0) {
+                                currentNavSection = 'studios';
+                                activeNavIndex = 0;
+                            } else if (groupItems.length > 0) {
+                                currentNavSection = 'groups';
+                                activeNavIndex = 0;
+                            } else {
+                                activeNavIndex = -1;
+                            }
+                        }
+                    } else if (currentNavSection === 'performers') {
+                        const rows = performersTable ? performersTable.getRows() : [];
+                        if (activeNavIndex > 0) {
+                            activeNavIndex--;
+                        } else {
+                            const perfRecents = getPerformerRecentItems();
+                            const perfSuggs = getPerformerSuggestionItems();
+                            const groupItems = getGroupBarItems();
+                            const studioItems = getStudioBarItems();
+                            if (perfRecents.length > 0) {
+                                currentNavSection = 'perf-recent';
+                                activeNavIndex = 0;
+                            } else if (perfSuggs.length > 0) {
+                                currentNavSection = 'perf-suggestions';
+                                activeNavIndex = 0;
+                            } else if (groupItems.length > 0) {
+                                currentNavSection = 'groups';
+                                activeNavIndex = 0;
+                            } else if (studioItems.length > 0) {
+                                currentNavSection = 'studios';
+                                activeNavIndex = 0;
+                            } else {
+                                currentNavSection = 'tags';
+                                const tagRows = tagsTable ? tagsTable.getRows() : [];
+                                activeNavIndex = tagRows.length > 0 ? tagRows.length - 1 : -1;
+                            }
+                        }
+                    }
+                    updateEverythingKeyboardHighlight();
+                } else if (e.key === 'Enter') {
+                    if (e.ctrlKey || e.metaKey) {
+                        e.preventDefault();
+                        if (popup.saveBtn) popup.saveBtn.click();
+                        return;
+                    }
+
+                    if (currentNavSection === 'studios') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const items = getStudioBarItems();
+                        if (items.length > 0 && activeNavIndex >= 0 && activeNavIndex < items.length) {
+                            const item = items[activeNavIndex];
+                            if (item && item.clickTarget) item.clickTarget.click();
+                        }
+                        return;
+                    }
+
+                    if (currentNavSection === 'groups') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const items = getGroupBarItems();
+                        if (items.length > 0 && activeNavIndex >= 0 && activeNavIndex < items.length) {
+                            const item = items[activeNavIndex];
+                            if (item && item.clickTarget) item.clickTarget.click();
+                        }
+                        return;
+                    }
+
+                    if (currentNavSection === 'tag-suggestions') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const items = getTagSuggestionItems();
+                        if (items.length > 0 && activeNavIndex >= 0 && activeNavIndex < items.length) {
+                            const item = items[activeNavIndex];
+                            if (item && item.clickTarget) item.clickTarget.click();
+                        }
+                        return;
+                    }
+
+                    if (currentNavSection === 'perf-suggestions') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const items = getPerformerSuggestionItems();
+                        if (items.length > 0 && activeNavIndex >= 0 && activeNavIndex < items.length) {
+                            const item = items[activeNavIndex];
+                            if (item && item.clickTarget) item.clickTarget.click();
+                        }
+                        return;
+                    }
+
+                    if (currentNavSection === 'tag-recent') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const items = getTagRecentItems();
+                        if (items.length > 0 && activeNavIndex >= 0 && activeNavIndex < items.length) {
+                            const item = items[activeNavIndex];
+                            if (item && item.clickTarget) item.clickTarget.click();
+                        }
+                        return;
+                    }
+
+                    if (currentNavSection === 'perf-recent') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const items = getPerformerRecentItems();
+                        if (items.length > 0 && activeNavIndex >= 0 && activeNavIndex < items.length) {
+                            const item = items[activeNavIndex];
+                            if (item && item.clickTarget) item.clickTarget.click();
+                        }
+                        return;
+                    }
+
+                    const curCreateBtn = form.querySelector(`.fasttag-create-empty-btn[data-type="${currentNavSection}"]`);
+                    const isCreateVisible = curCreateBtn && curCreateBtn.parentElement && curCreateBtn.parentElement.style.display !== 'none';
+                    const curTable = currentNavSection === 'tags' ? tagsTable : performersTable;
+                    const rows = curTable ? curTable.getRows() : [];
+
+                    if (isCreateVisible && activeNavIndex === rows.length) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleCreateEntity(currentNavSection);
+                        return;
+                    }
+
+                    const hasSearch = popup.globalSearch.value.trim().length > 0;
+                    if (!hasSearch && activeNavIndex < 0) {
+                        e.preventDefault();
+                        if (popup.saveBtn) popup.saveBtn.click();
+                        return;
+                    }
+
+                    if (rows.length > 0) {
+                        e.preventDefault();
+                        const targetIdx = Math.max(0, Math.min(activeNavIndex, rows.length - 1));
+                        const selectedRow = rows[targetIdx];
+                        if (selectedRow) {
+                            const rowData = selectedRow.getData();
+                            const isSelected = selectedRow.isSelected();
+                            const idStr = String(rowData.id);
+                            if (isSelected) {
+                                selectedRow.deselect();
+                                if (currentNavSection === 'tags') selectedTagIds.delete(idStr);
+                                else selectedPerformerIds.delete(idStr);
+                            } else {
+                                selectedRow.select();
+                                if (currentNavSection === 'tags') selectedTagIds.add(idStr);
+                                else selectedPerformerIds.add(idStr);
+                                addRecentEntry(currentNavSection, rowData);
+                            }
+
+                            if (hasSearch) {
+                                popup.globalSearch.value = '';
+                                popup.globalClear.style.display = 'none';
+                                if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                                await refreshGlobalSearch('');
+                                const r = curTable.getRow(rowData.id);
+                                if (r) curTable.scrollToRow(r, "top", false);
+                                activeNavIndex = -1;
+                                refreshAllUI();
+                                updateEverythingKeyboardHighlight();
+                                popup.globalSearch.focus({ preventScroll: true });
+                            } else {
+                                refreshAllUI();
+                            }
+                        }
+                    }
+                }
+            });
+
+            if (popup.globalClear) {
+                popup.globalClear.onclick = () => {
+                    popup.globalSearch.value = '';
+                    popup.globalClear.style.display = 'none';
+                    if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                    refreshGlobalSearch('');
+                    updateEverythingKeyboardHighlight();
+                    popup.globalSearch.focus({ preventScroll: true });
+                };
+            }
+
+            if (popup.refreshBtn) {
+                popup.refreshBtn.onclick = async () => {
+                    invalidateCache('tags');
+                    invalidateCache('performers');
+                    invalidateCache('studios');
+                    invalidateCache('groups');
+                    await refreshGlobalSearch(popup.globalSearch ? popup.globalSearch.value.trim() : '');
+                };
+            }
+
+            if (popup.cancelBtn) {
+                popup.cancelBtn.onclick = () => closePopup();
+            }
+
+            if (popup.saveBtn) {
+                popup.saveBtn.onclick = async () => {
+                const addedTagIds = Array.from(selectedTagIds).filter(id => !initialCommonTagIds.has(id));
+                const removedTagIds = new Set(Array.from(initialCommonTagIds).filter(id => !selectedTagIds.has(id)));
+                const addedPerformerIds = Array.from(selectedPerformerIds).filter(id => !initialCommonPerformerIds.has(id));
+                const removedPerformerIds = new Set(Array.from(initialCommonPerformerIds).filter(id => !selectedPerformerIds.has(id)));
+                const addedGroupIds = Array.from(selectedGroupIds).filter(id => !initialCommonGroupIds.has(id));
+                const removedGroupIds = new Set(Array.from(initialCommonGroupIds).filter(id => !selectedGroupIds.has(id)));
+                const hasStudioChange = studioModified || (selectedStudioId !== initialCommonStudioId);
+
+                const confirmed = await promptBulkConfirmationDialog(
+                    `Are you sure you want to apply these changes across ${bulkScenes.length} selected scenes?`,
+                    form,
+                    `Yes, Apply to ${bulkScenes.length} Scenes`
+                );
+                if (!confirmed) return;
+
+                popup.saveBtn.disabled = true;
+                popup.saveBtn.textContent = `Applying... 0/${bulkScenes.length}`;
+                let updatedCount = 0;
+                const CONCURRENCY = 3;
+
+                const sceneDetailQuery = `
+                    query FindSceneDetailsForBulk($id: ID!) {
+                        findScene(id: $id) {
+                            id
+                            tags { id }
+                            performers { id }
+                            studio { id }
+                            groups { group { id } }
+                        }
+                    }
+                `;
+
+                for (let i = 0; i < bulkScenes.length; i += CONCURRENCY) {
+                    const batch = bulkScenes.slice(i, i + CONCURRENCY);
+                    await Promise.all(batch.map(async (s) => {
+                        try {
+                            const res = await fetchGQL(sceneDetailQuery, { id: s.id });
+                            const scene = res?.data?.findScene;
+                            if (!scene) return;
+
+                            // Merge Tags
+                            const currentTags = (scene.tags || []).map(t => String(t.id));
+                            const targetTags = Array.from(new Set([
+                                ...currentTags.filter(id => !removedTagIds.has(id)),
+                                ...addedTagIds
+                            ]));
+
+                            // Merge Performers
+                            const currentPerfs = (scene.performers || []).map(p => String(p.id));
+                            const targetPerfs = Array.from(new Set([
+                                ...currentPerfs.filter(id => !removedPerformerIds.has(id)),
+                                ...addedPerformerIds
+                            ]));
+
+                            // Merge Groups
+                            const currentGroups = (scene.groups || []).map(g => g.group?.id ? String(g.group.id) : '').filter(Boolean);
+                            const targetGroups = Array.from(new Set([
+                                ...currentGroups.filter(id => !removedGroupIds.has(id)),
+                                ...addedGroupIds
+                            ])).map(gid => ({ group_id: String(gid) }));
+
+                            // Studio
+                            const targetStudio = hasStudioChange ? (selectedStudioId ? String(selectedStudioId) : null) : (scene.studio?.id ? String(scene.studio.id) : null);
+
+                            const updateQuery = `
+                                mutation BulkSceneUpdate(
+                                    $id: ID!,
+                                    $tag_ids: [ID!],
+                                    $performer_ids: [ID!],
+                                    $studio_id: ID,
+                                    $groups: [SceneGroupInput!]
+                                ) {
+                                    sceneUpdate(input: {
+                                        id: $id,
+                                        tag_ids: $tag_ids,
+                                        performer_ids: $performer_ids,
+                                        studio_id: $studio_id,
+                                        groups: $groups
+                                    }) {
+                                        id
+                                    }
+                                }
+                            `;
+
+                            const updateRes = await fetchGQL(updateQuery, {
+                                id: String(s.id),
+                                tag_ids: targetTags,
+                                performer_ids: targetPerfs,
+                                studio_id: targetStudio,
+                                groups: targetGroups
+                            });
+
+                            if (updateRes?.data?.sceneUpdate?.id) {
+                                updatedCount++;
+                            }
+                        } catch (err) {
+                            console.error('[FastTag Bulk Everything] Error updating scene', s.id, err);
+                        }
+                    }));
+
+                    if (popup.saveBtn) {
+                        popup.saveBtn.textContent = `Applying... ${Math.min(i + CONCURRENCY, bulkScenes.length)}/${bulkScenes.length}`;
+                    }
+                }
+
+                toastSuccess(`Successfully updated ${updatedCount} scenes!`);
+                recordSaveUsage();
+                closePopup();
+                await refreshSceneCards();
+            };
+            }
+
+            setupPopupListeners(form, signal, () => {});
+
+            await Promise.all([
+                fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                fetchColumnData('performers', performersTable, '', selectedPerformerIds),
+                renderStudioBar(''),
+                renderGroupBar('')
+            ]);
+            refreshAllUI();
+
+            const targetCard = (bulkScenes[0] && bulkScenes[0].card && document.body.contains(bulkScenes[0].card)) ? bulkScenes[0].card : null;
+            positionPopupNearCard(form, targetCard);
+
+            setTimeout(() => {
+                if (popup.globalSearch && document.body.contains(popup.globalSearch)) {
+                    popup.globalSearch.focus({ preventScroll: true });
+                }
+            }, 80);
+        } catch (err) {
+            console.error('[FastTag] Error opening Bulk Edit Everything:', err);
+            toastError(`Error opening Bulk Edit Everything: ${err?.message || err}`);
+        }
+    }
+
     async function openEntityPopup(type, sceneId, cardElement) {
         const config = ENTITY_CONFIG[type];
         if (!config) return;
@@ -9012,6 +11683,11 @@
                     addRecentEntry(type, row.getData());
                     saveWithoutReload(sceneId, selectedIds);
                 }
+                currentSingleSection = 'table';
+                const rows = activeTableInstance.getRows();
+                singleNavIndex = rows.indexOf(row);
+                updateSingleKeyboardHighlight();
+                if (filterInput) filterInput.focus({ preventScroll: true });
             }
             refreshUI();
         });
@@ -9023,8 +11699,19 @@
                     selectedIds.delete(String(id));
                     saveWithoutReload(sceneId, selectedIds);
                 }
+                currentSingleSection = 'table';
+                const rows = activeTableInstance.getRows();
+                singleNavIndex = rows.indexOf(row);
+                updateSingleKeyboardHighlight();
+                if (filterInput) filterInput.focus({ preventScroll: true });
             }
             refreshUI();
+        });
+
+        form.addEventListener('click', (e) => {
+            if (!e.target.closest('input, textarea')) {
+                if (filterInput) filterInput.focus({ preventScroll: true });
+            }
         });
 
         async function fetchData(query, resetScroll = true) {
@@ -9073,7 +11760,20 @@
         popup._fastTagFetchData = fetchData;
 
         let debounceTimer = null;
-        let singleHighlightedIndex = -1;
+        let currentSingleSection = 'table'; // 'table' | 'recent' | 'suggestions' | 'create'
+        let singleNavIndex = -1;
+
+        const getSingleSuggestions = () => {
+            const container = form.querySelector(`#${type}-suggestions-container`);
+            if (!container || container.style.display === 'none' || container.offsetParent === null) return [];
+            return Array.from(container.querySelectorAll('button'));
+        };
+
+        const getSingleRecentChips = () => {
+            const container = form.querySelector(`#${type}-quick-actions`);
+            if (!container || container.style.display === 'none' || container.offsetParent === null) return [];
+            return Array.from(container.querySelectorAll('.fasttag-quick-chip'));
+        };
 
         const scrollSingleRowIntoViewIfNeeded = (row) => {
             if (!activeTableInstance || !row) return;
@@ -9096,33 +11796,68 @@
             if (!activeTableInstance || typeof activeTableInstance.getRows !== 'function') return;
             const rows = activeTableInstance.getRows();
             const isBottomCreateVisible = popup.bottomCreateContainer && popup.bottomCreateContainer.style.display !== 'none';
-            const createBtnIndex = rows.length;
 
-            rows.forEach((r, idx) => {
+            rows.forEach(r => {
                 const el = r.getElement();
-                if (el) {
-                    if (singleHighlightedIndex >= 0 && idx === singleHighlightedIndex) {
-                        el.classList.add('fasttag-keyboard-active');
-                    } else {
-                        el.classList.remove('fasttag-keyboard-active');
-                    }
-                }
+                if (el) el.classList.remove('fasttag-keyboard-active');
             });
+            form.querySelectorAll('.fasttag-keyboard-meta-focus').forEach(el => el.classList.remove('fasttag-keyboard-meta-focus'));
 
             if (createBtn) {
-                if (isBottomCreateVisible && singleHighlightedIndex === createBtnIndex) {
+                createBtn.classList.remove('fasttag-create-btn-active');
+                createBtn.style.boxShadow = '0 2px 5px rgba(5,150,105,0.3)';
+                createBtn.style.transform = 'none';
+                createBtn.style.filter = 'none';
+            }
+
+            if (currentSingleSection === 'suggestions') {
+                const suggBtns = getSingleSuggestions();
+                if (suggBtns.length > 0) {
+                    if (singleNavIndex < 0) singleNavIndex = 0;
+                    if (singleNavIndex >= suggBtns.length) singleNavIndex = suggBtns.length - 1;
+                    const btn = suggBtns[singleNavIndex];
+                    if (btn) {
+                        btn.classList.add('fasttag-keyboard-meta-focus');
+                        if (typeof btn.scrollIntoView === 'function') {
+                            btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                        }
+                    }
+                }
+                return;
+            }
+
+            if (currentSingleSection === 'recent') {
+                const recentChips = getSingleRecentChips();
+                if (recentChips.length > 0) {
+                    if (singleNavIndex < 0) singleNavIndex = 0;
+                    if (singleNavIndex >= recentChips.length) singleNavIndex = recentChips.length - 1;
+                    const chip = recentChips[singleNavIndex];
+                    if (chip) {
+                        chip.classList.add('fasttag-keyboard-meta-focus');
+                        if (typeof chip.scrollIntoView === 'function') {
+                            chip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                        }
+                    }
+                }
+                return;
+            }
+
+            if (currentSingleSection === 'create') {
+                if (createBtn && isBottomCreateVisible) {
+                    createBtn.classList.add('fasttag-create-btn-active');
                     createBtn.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.5), 0 2px 8px rgba(0,0,0,0.3)';
                     createBtn.style.transform = 'scale(1.02)';
                     createBtn.style.filter = 'brightness(1.15)';
-                } else {
-                    createBtn.style.boxShadow = '0 2px 5px rgba(5,150,105,0.3)';
-                    createBtn.style.transform = 'none';
-                    createBtn.style.filter = 'none';
                 }
+                return;
             }
 
-            if (singleHighlightedIndex >= 0 && singleHighlightedIndex < rows.length && rows[singleHighlightedIndex]) {
-                scrollSingleRowIntoViewIfNeeded(rows[singleHighlightedIndex]);
+            if (currentSingleSection === 'table') {
+                if (singleNavIndex >= 0 && singleNavIndex < rows.length && rows[singleNavIndex]) {
+                    const el = rows[singleNavIndex].getElement();
+                    if (el) el.classList.add('fasttag-keyboard-active');
+                    scrollSingleRowIntoViewIfNeeded(rows[singleNavIndex]);
+                }
             }
         };
 
@@ -9132,7 +11867,28 @@
             const val = e.target.value.trim();
             debounceTimer = setTimeout(async () => {
                 await fetchData(e.target.value, true);
-                singleHighlightedIndex = val.length > 0 ? 0 : -1;
+                if (val.length > 0) {
+                    const rows = activeTableInstance && typeof activeTableInstance.getRows === 'function' ? activeTableInstance.getRows() : [];
+                    if (rows.length > 0) {
+                        currentSingleSection = 'table';
+                        singleNavIndex = 0;
+                    } else if (popup.bottomCreateContainer && popup.bottomCreateContainer.style.display !== 'none') {
+                        currentSingleSection = 'create';
+                        singleNavIndex = 0;
+                    } else if (getSingleRecentChips().length > 0) {
+                        currentSingleSection = 'recent';
+                        singleNavIndex = 0;
+                    } else if (getSingleSuggestions().length > 0) {
+                        currentSingleSection = 'suggestions';
+                        singleNavIndex = 0;
+                    } else {
+                        currentSingleSection = 'table';
+                        singleNavIndex = -1;
+                    }
+                } else {
+                    currentSingleSection = 'table';
+                    singleNavIndex = -1;
+                }
                 updateSingleKeyboardHighlight();
             }, 150);
         };
@@ -9140,30 +11896,150 @@
         filterInput.addEventListener('keydown', async (e) => {
             const rows = activeTableInstance && typeof activeTableInstance.getRows === 'function' ? activeTableInstance.getRows() : [];
             const isBottomCreateVisible = popup.bottomCreateContainer && popup.bottomCreateContainer.style.display !== 'none';
-            const createBtnIndex = rows.length;
+            const suggBtns = getSingleSuggestions();
+            const recentChips = getSingleRecentChips();
+
+            if (e.key === 'Tab' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                if (currentSingleSection === 'suggestions' && suggBtns.length > 0) {
+                    e.preventDefault();
+                    if (e.key === 'ArrowLeft') {
+                        if (singleNavIndex > 0) singleNavIndex--;
+                        else singleNavIndex = suggBtns.length - 1;
+                    } else {
+                        if (singleNavIndex < suggBtns.length - 1) singleNavIndex++;
+                        else singleNavIndex = 0;
+                    }
+                    updateSingleKeyboardHighlight();
+                    return;
+                } else if (currentSingleSection === 'recent' && recentChips.length > 0) {
+                    e.preventDefault();
+                    if (e.key === 'ArrowLeft') {
+                        if (singleNavIndex > 0) singleNavIndex--;
+                        else singleNavIndex = recentChips.length - 1;
+                    } else {
+                        if (singleNavIndex < recentChips.length - 1) singleNavIndex++;
+                        else singleNavIndex = 0;
+                    }
+                    updateSingleKeyboardHighlight();
+                    return;
+                }
+            }
 
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
-                if (rows.length > 0) {
-                    if (singleHighlightedIndex < 0) {
-                        singleHighlightedIndex = 0;
-                    } else if (singleHighlightedIndex < rows.length - 1) {
-                        singleHighlightedIndex++;
-                    } else if (singleHighlightedIndex === rows.length - 1 && isBottomCreateVisible) {
-                        singleHighlightedIndex = createBtnIndex; // Move highlight down onto Create button!
+                if (singleNavIndex < 0) {
+                    const hasVal = filterInput.value.trim().length > 0;
+                    if (!hasVal) {
+                        if (suggBtns.length > 0) {
+                            currentSingleSection = 'suggestions';
+                            singleNavIndex = 0;
+                        } else if (recentChips.length > 0) {
+                            currentSingleSection = 'recent';
+                            singleNavIndex = 0;
+                        } else if (rows.length > 0) {
+                            currentSingleSection = 'table';
+                            singleNavIndex = 0;
+                        } else if (isBottomCreateVisible) {
+                            currentSingleSection = 'create';
+                            singleNavIndex = 0;
+                        }
+                    } else {
+                        if (rows.length > 0) {
+                            currentSingleSection = 'table';
+                            singleNavIndex = 0;
+                        } else if (isBottomCreateVisible) {
+                            currentSingleSection = 'create';
+                            singleNavIndex = 0;
+                        } else if (suggBtns.length > 0) {
+                            currentSingleSection = 'suggestions';
+                            singleNavIndex = 0;
+                        } else if (recentChips.length > 0) {
+                            currentSingleSection = 'recent';
+                            singleNavIndex = 0;
+                        }
                     }
-                } else if (isBottomCreateVisible) {
-                    singleHighlightedIndex = createBtnIndex; // Highlight Create button directly when 0 rows!
+                    updateSingleKeyboardHighlight();
+                    return;
+                }
+
+                if (currentSingleSection === 'suggestions') {
+                    if (recentChips.length > 0) {
+                        currentSingleSection = 'recent';
+                        singleNavIndex = 0;
+                    } else if (rows.length > 0) {
+                        currentSingleSection = 'table';
+                        singleNavIndex = 0;
+                    } else if (isBottomCreateVisible) {
+                        currentSingleSection = 'create';
+                        singleNavIndex = 0;
+                    }
+                } else if (currentSingleSection === 'recent') {
+                    if (rows.length > 0) {
+                        currentSingleSection = 'table';
+                        singleNavIndex = 0;
+                    } else if (isBottomCreateVisible) {
+                        currentSingleSection = 'create';
+                        singleNavIndex = 0;
+                    }
+                } else if (currentSingleSection === 'table') {
+                    if (rows.length > 0) {
+                        if (singleNavIndex < 0) {
+                            singleNavIndex = 0;
+                        } else if (singleNavIndex < rows.length - 1) {
+                            singleNavIndex++;
+                        } else if (singleNavIndex === rows.length - 1 && isBottomCreateVisible) {
+                            currentSingleSection = 'create';
+                            singleNavIndex = 0;
+                        }
+                    } else if (isBottomCreateVisible) {
+                        currentSingleSection = 'create';
+                        singleNavIndex = 0;
+                    }
                 }
                 updateSingleKeyboardHighlight();
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
-                if (singleHighlightedIndex === createBtnIndex) {
-                    singleHighlightedIndex = rows.length > 0 ? rows.length - 1 : -1;
-                } else if (singleHighlightedIndex > 0) {
-                    singleHighlightedIndex--;
-                } else {
-                    singleHighlightedIndex = -1;
+                if (singleNavIndex < 0) {
+                    if (recentChips.length > 0) {
+                        currentSingleSection = 'recent';
+                        singleNavIndex = 0;
+                    } else if (suggBtns.length > 0) {
+                        currentSingleSection = 'suggestions';
+                        singleNavIndex = 0;
+                    }
+                    updateSingleKeyboardHighlight();
+                    return;
+                }
+                if (currentSingleSection === 'create') {
+                    if (rows.length > 0) {
+                        currentSingleSection = 'table';
+                        singleNavIndex = rows.length - 1;
+                    } else if (recentChips.length > 0) {
+                        currentSingleSection = 'recent';
+                        singleNavIndex = 0;
+                    } else if (suggBtns.length > 0) {
+                        currentSingleSection = 'suggestions';
+                        singleNavIndex = 0;
+                    }
+                } else if (currentSingleSection === 'table') {
+                    if (singleNavIndex > 0) {
+                        singleNavIndex--;
+                    } else {
+                        if (recentChips.length > 0) {
+                            currentSingleSection = 'recent';
+                            singleNavIndex = 0;
+                        } else if (suggBtns.length > 0) {
+                            currentSingleSection = 'suggestions';
+                            singleNavIndex = 0;
+                        } else {
+                            singleNavIndex = -1;
+                        }
+                    }
+                } else if (currentSingleSection === 'recent') {
+                    if (suggBtns.length > 0) {
+                        currentSingleSection = 'suggestions';
+                        singleNavIndex = 0;
+                    }
                 }
                 updateSingleKeyboardHighlight();
             } else if (e.key === 'Enter') {
@@ -9174,8 +12050,37 @@
                     return;
                 }
 
-                // If user pressed Down Arrow onto the Create button:
-                if (isBottomCreateVisible && singleHighlightedIndex === createBtnIndex) {
+                if (currentSingleSection === 'suggestions') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (suggBtns.length > 0 && singleNavIndex >= 0 && singleNavIndex < suggBtns.length) {
+                        suggBtns[singleNavIndex].click();
+                        if (filterInput.value.trim().length > 0) {
+                            filterInput.value = '';
+                            updateVisibility();
+                            await fetchData("", false);
+                            filterInput.focus({ preventScroll: true });
+                        }
+                    }
+                    return;
+                }
+
+                if (currentSingleSection === 'recent') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (recentChips.length > 0 && singleNavIndex >= 0 && singleNavIndex < recentChips.length) {
+                        recentChips[singleNavIndex].click();
+                        if (filterInput.value.trim().length > 0) {
+                            filterInput.value = '';
+                            updateVisibility();
+                            await fetchData("", false);
+                            filterInput.focus({ preventScroll: true });
+                        }
+                    }
+                    return;
+                }
+
+                if (currentSingleSection === 'create' && isBottomCreateVisible) {
                     e.preventDefault();
                     e.stopPropagation();
                     createBtn.click();
@@ -9183,14 +12088,14 @@
                 }
 
                 const hadSearch = filterInput.value.trim().length > 0;
-                if (!hadSearch && singleHighlightedIndex < 0) {
+                if (!hadSearch && singleNavIndex < 0) {
                     e.preventDefault();
                     const saveBtn = form.querySelector('button[id$="-save-btn"]');
                     if (saveBtn) saveBtn.click();
                     return;
                 }
 
-                const targetIdx = singleHighlightedIndex >= 0 ? singleHighlightedIndex : 0;
+                const targetIdx = singleNavIndex >= 0 ? singleNavIndex : 0;
                 if (rows.length > 0 && rows[targetIdx]) {
                     e.preventDefault();
                     e.stopPropagation();
@@ -9213,7 +12118,8 @@
                             await fetchData("", false);
                             const r = activeTableInstance.getRow(rowData.id);
                             if (r) activeTableInstance.scrollToRow(r, "top", false);
-                            singleHighlightedIndex = -1;
+                            currentSingleSection = 'table';
+                            singleNavIndex = -1;
                         } else {
                             refreshUI();
                             await saveWithoutReload(sceneId, selectedIds);

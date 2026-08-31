@@ -3,6 +3,23 @@
 All notable changes to the **FastTag** Stash plugin will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+## [3.9.1] - 2026-08-31
+
+### Fixed & Improved
+- **Full Keyboard Navigation Loop & Recent Chips Support**:
+  - Integrated **Recent** chips into the keyboard navigation loop for Edit Everything, Bulk Edit Everything, Single Edit, and Bulk Single Edit modals.
+  - Added full 8-section vertical/horizontal flow: Studios/Groups $\leftrightarrow$ Suggestions $\leftrightarrow$ Recent $\leftrightarrow$ Main Table rows $\leftrightarrow$ Create Button.
+- **Search-Aware Initial Navigation Landing**:
+  - When the search box is **empty**, pressing <kbd>↓</kbd> lands on **Suggestions pills** first, then **Recent chips**, then **Main Table rows**.
+  - When the search box has an active **search term**, pressing <kbd>↓</kbd> jumps directly into the **Main Table rows** for rapid search-and-select ergonomics.
+  - Pressing <kbd>↑</kbd> from an empty search box jumps straight into the Studio / Group bar.
+- **Mouse & Keyboard Focus Synchronization**:
+  - Clicking any table row immediately syncs the keyboard active row highlight (`activeNavIndex` / `singleNavIndex`).
+  - Clicking inside modal backdrops/containers automatically refocuses the search input with `{ preventScroll: true }`, ensuring arrow keys and keyboard shortcuts never lose focus.
+  - Row focus styling unified across entire row with context-aware `#38bdf8` electric blue highlight when selecting/deselecting.
+
+---
+
 ## [3.9.0] - 2026-08-31
 
 ### Added & Improved

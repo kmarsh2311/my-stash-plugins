@@ -1,3 +1,20 @@
+## 3.9.1 - Keyboard Navigation Loop Bugfixes, Recent Chips & Mouse Focus Sync
+ 
+### Bug Fixes & Refinements
+- **Full Keyboard Navigation Loop & Recent Chips**:
+  - Integrated **Recent** chips into the keyboard navigation loop for Edit Everything, Bulk Edit Everything, Single Edit, and Bulk Single Edit modals.
+  - Seamless 8-section vertical/horizontal flow across Studio/Group bars, suggestions, recent chips, tables, and create buttons.
+- **Search-Aware Initial Navigation Landing**:
+  - When the search box is **empty**, pressing <kbd>↓</kbd> lands on **Suggestions pills** first, then **Recent chips**, then **Main Table rows**.
+  - When the search box has an active **search term**, pressing <kbd>↓</kbd> jumps straight into the **Main Table rows**.
+  - Pressing <kbd>↑</kbd> from an empty search box jumps straight into the Studio / Group bar.
+- **Mouse & Keyboard Focus Synchronization**:
+  - Clicking any table row immediately syncs the keyboard active row highlight (`activeNavIndex` / `singleNavIndex`).
+  - Clicking inside modal backdrops/containers automatically refocuses the search input with `{ preventScroll: true }`, ensuring arrow keys and keyboard shortcuts never lose focus.
+  - Row focus styling unified across entire row with context-aware `#38bdf8` electric blue highlight when selecting/deselecting.
+
+---
+
 ## 3.9.0 - Split Studio & Group Bar, Full Keyboard Navigation & Scene-Count Search Ranking
 
 ### Highlights & New Features
