@@ -5728,14 +5728,15 @@
 
                 sessionScrapeCache.delete(sceneId);
 
-                // Close scraper HUD cleanly for the current scene
-                closeFloatingScraperHud();
-                container.innerHTML = '';
-                container.style.display = 'none';
-                if (popup && popup.scrapeBtn) {
-                    popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
-                    popup.scrapeBtn.innerHTML = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
-                    popup.scrapeBtn.title = 'Scrape scene metadata';
+                // Keep the Scraper HUD open and transition Accept button into Saved state
+                window._fastTagEverythingScraperOpen = true;
+                const acceptBtn = container ? container.querySelector('#fasttag-scrape-accept-btn') : null;
+                if (acceptBtn) {
+                    acceptBtn.innerHTML = '<span>✓ Saved</span>';
+                    acceptBtn.disabled = true;
+                    acceptBtn.style.opacity = '0.7';
+                    acceptBtn.style.cursor = 'default';
+                    acceptBtn.style.background = '#059669';
                 }
                 return;
             } else {
