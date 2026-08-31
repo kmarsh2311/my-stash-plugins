@@ -1696,7 +1696,6 @@
         if (fullReset) {
             floatingHudPosition = null;
             floatingHudSize = null;
-            setVideoHudPersistedOpen(false);
         }
     }
 
@@ -1739,7 +1738,6 @@
         if (fullReset) {
             floatingScraperHudPosition = null;
             floatingScraperHudSize = null;
-            setScraperHudPersistedOpen(false);
         }
     }
 
@@ -5542,7 +5540,7 @@
                                 </svg>
                                 <span>${isDetached ? 'Dock' : 'Pop Out'}</span>
                             </button>
-                            <button type="button" id="fasttag-scrape-accept-btn" style="background: #059669; border: 1px solid #10b981; color: #ffffff; padding: 2.5px 7px; border-radius: 4px; font-size: 10px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 2px; box-shadow: 0 1px 4px rgba(5,150,105,0.4); line-height: 1.2; transition: all 0.15s ease; white-space: nowrap; flex-shrink: 0;" title="Accept match and save metadata (Enter)">
+                            <button type="button" id="fasttag-scrape-accept-btn" style="background: #059669; border: 1px solid #10b981; color: #ffffff; padding: 2.5px 7px; border-radius: 4px; font-size: 10px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 2px; box-shadow: 0 1px 4px rgba(5,150,105,0.4); line-height: 1.2; transition: all 0.15s ease; white-space: nowrap; flex-shrink: 0;" title="Accept match and save metadata">
                                 <span>✓ Accept</span>
                             </button>
                         </div>
@@ -6708,15 +6706,6 @@
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 const isSearchFocused = document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
-
-                if (!isSearchFocused) {
-                    const scrapeAcceptBtn = document.querySelector('#fasttag-scrape-accept-btn');
-                    if (scrapeAcceptBtn && !scrapeAcceptBtn.disabled && scrapeAcceptBtn.offsetParent !== null) {
-                        e.preventDefault();
-                        scrapeAcceptBtn.click();
-                        return;
-                    }
-                }
 
                 if (isSearchFocused && document.activeElement.value && document.activeElement.value.trim().length > 0 && !(e.ctrlKey || e.metaKey)) return;
 
