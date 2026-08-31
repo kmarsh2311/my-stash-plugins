@@ -1394,101 +1394,30 @@
 
         if (activeForm) {
             const rect = activeForm.getBoundingClientRect();
-            const spaceRight = Math.max(0, screenWidth - rect.right - margin);
             const spaceLeft = Math.max(0, rect.left - margin);
+            const spaceRight = Math.max(0, screenWidth - rect.right - margin);
 
-            // 1. If Scraper Sidecar is open:
-            if (isScraperOpen && scraperRect) {
-                const scraperIsOnRight = scraperRect.left >= rect.right - 50;
-                const scraperIsOnLeft = scraperRect.right <= rect.left + 50;
-
-                if (scraperIsOnRight) {
-                    // Option A: 3-Pane Row - Place Video to the RIGHT of Scraper HUD
-                    if (screenWidth - scraperRect.right >= hudWidth + margin) {
-                        const left = Math.round(scraperRect.right + margin);
-                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
-                    }
-                    // Option B: Flank Opposite Side - Place Video on the LEFT of Main Popup
-                    if (spaceLeft >= hudWidth + margin) {
-                        const left = Math.round(rect.left - hudWidth - margin);
-                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
-                    }
-                    // Option C: Place Video between Popup and Scraper HUD
-                    if (scraperRect.left - rect.right >= hudWidth + (margin * 2)) {
-                        const left = Math.round(rect.right + margin);
-                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
-                    }
-                    // Option D: Vertical Stacking (under Scraper HUD)
-                    if (screenHeight >= scraperRect.height + hudHeight + (margin * 3)) {
-                        if (scraperRect.top > margin + 20 && floatingScraperHudElement) {
-                            floatingScraperHudElement.style.top = `${margin}px`;
-                        }
-                        const top = Math.round(margin + (floatingScraperHudElement ? floatingScraperHudElement.offsetHeight : scraperRect.height) + margin);
-                        const left = Math.round(scraperRect.left);
-                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
-                    }
-                } else if (scraperIsOnLeft) {
-                    // Option A: 3-Pane Row - Place Video to the LEFT of Scraper HUD
-                    if (scraperRect.left >= hudWidth + margin) {
-                        const left = Math.round(scraperRect.left - hudWidth - margin);
-                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
-                    }
-                    // Option B: Flank Opposite Side - Place Video on the RIGHT of Main Popup
-                    if (spaceRight >= hudWidth + margin) {
-                        const left = Math.round(rect.right + margin);
-                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
-                    }
-                    // Option C: Place Video between Scraper HUD and Popup
-                    if (rect.left - scraperRect.right >= hudWidth + (margin * 2)) {
-                        const left = Math.round(scraperRect.right + margin);
-                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
-                    }
-                    // Option D: Vertical Stacking (under Scraper HUD)
-                    if (screenHeight >= scraperRect.height + hudHeight + (margin * 3)) {
-                        if (scraperRect.top > margin + 20 && floatingScraperHudElement) {
-                            floatingScraperHudElement.style.top = `${margin}px`;
-                        }
-                        const top = Math.round(margin + (floatingScraperHudElement ? floatingScraperHudElement.offsetHeight : scraperRect.height) + margin);
-                        const left = Math.round(scraperRect.left);
-                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
-                    }
-                }
-            }
-
-            // 2. Main popup is near the LEFT -> Place on the RIGHT of popup
-            if (spaceRight >= spaceLeft && spaceRight >= hudWidth + margin) {
-                const left = Math.round(rect.right + margin);
-                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
-            }
-
-            // 3. Main popup is centered or near RIGHT -> Place on the LEFT of popup
+            // 1. Primary: Place Video on the LEFT flank of the main modal
             if (spaceLeft >= hudWidth + margin) {
                 const left = Math.round(rect.left - hudWidth - margin);
                 const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
+                return { left: `${left}px`, top: `${top}px`, width: `${hudWidth}px`, height: `${hudHeight}px` };
             }
 
-            // 4. Fallback to right side if space permits
-            if (spaceRight >= hudWidth + margin) {
+            // 2. Secondary: If left flank is tight, try the RIGHT flank if not occupied by scraper
+            if (spaceRight >= hudWidth + margin && (!isScraperOpen || (scraperRect && scraperRect.right <= rect.left))) {
                 const left = Math.round(rect.right + margin);
                 const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, scraperRect, screenWidth, screenHeight, margin);
+                return { left: `${left}px`, top: `${top}px`, width: `${hudWidth}px`, height: `${hudHeight}px` };
             }
 
-            // 5. General viewport clamp fallback
+            // 3. Viewport fallback (flush with left screen edge)
             const left = Math.max(margin, Math.min(screenWidth - hudWidth - margin, Math.round(rect.left - hudWidth - margin)));
             const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
             return { left: `${left}px`, top: `${top}px`, width: `${hudWidth}px`, height: `${hudHeight}px` };
         }
 
-        return { right: '30px', top: '70px', width: `${hudWidth}px`, height: `${hudHeight}px` };
+        return { left: '20px', top: '70px', width: `${hudWidth}px`, height: `${hudHeight}px` };
     }
 
     function closeFloatingVideoHud(fullReset = false) {
@@ -1547,55 +1476,21 @@
             const spaceRight = Math.max(0, screenWidth - rect.right - margin);
             const spaceLeft = Math.max(0, rect.left - margin);
 
-            // 1. If Video HUD is open:
-            if (isVideoOpen && videoRect) {
-                const videoIsOnRight = videoRect.left >= rect.right - 50;
-                const videoIsOnLeft = videoRect.right <= rect.left + 50;
-
-                if (videoIsOnRight) {
-                    // Place Scraper on the LEFT of Main Popup
-                    if (spaceLeft >= hudWidth + margin) {
-                        const left = Math.round(rect.left - hudWidth - margin);
-                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
-                    }
-                    // Or place Scraper to the RIGHT of Video HUD
-                    if (screenWidth - videoRect.right >= hudWidth + margin) {
-                        const left = Math.round(videoRect.right + margin);
-                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
-                    }
-                } else if (videoIsOnLeft) {
-                    // Place Scraper on the RIGHT of Main Popup
-                    if (spaceRight >= hudWidth + margin) {
-                        const left = Math.round(rect.right + margin);
-                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
-                    }
-                    // Or place Scraper to the LEFT of Video HUD
-                    if (videoRect.left >= hudWidth + margin) {
-                        const left = Math.round(videoRect.left - hudWidth - margin);
-                        const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                        return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
-                    }
-                }
-            }
-
-            // 2. Default: Place on the RIGHT of the main popup
+            // 1. Primary: Place Scraper on the RIGHT flank of the main modal
             if (spaceRight >= hudWidth + margin) {
                 const left = Math.round(rect.right + margin);
                 const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
+                return { left: `${left}px`, top: `${top}px`, width: `${hudWidth}px`, height: `${hudHeight}px` };
             }
 
-            // 3. Fallback: Place on the LEFT of the main popup
-            if (spaceLeft >= hudWidth + margin) {
+            // 2. Secondary: If right flank is tight, try the LEFT flank if not occupied by video
+            if (spaceLeft >= hudWidth + margin && (!isVideoOpen || (videoRect && videoRect.left >= rect.right))) {
                 const left = Math.round(rect.left - hudWidth - margin);
                 const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return enforceZeroOverlap(left, top, hudWidth, hudHeight, rect, videoRect, screenWidth, screenHeight, margin);
+                return { left: `${left}px`, top: `${top}px`, width: `${hudWidth}px`, height: `${hudHeight}px` };
             }
 
-            // 4. Viewport clamp fallback
+            // 3. Viewport fallback (flush with right screen edge)
             const left = Math.max(margin, Math.min(screenWidth - hudWidth - margin, Math.round(rect.right + margin)));
             const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
             return { left: `${left}px`, top: `${top}px`, width: `${hudWidth}px`, height: `${hudHeight}px` };
