@@ -1919,6 +1919,10 @@
                                     <span>🛠️</span> Debug Mode
                                 </div>
                                 <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Extends toast display time to 15 seconds (with pause-on-hover & copy buttons) and records continuous diagnostics.</div>
+                                <div style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 6px; padding: 6px 9px; font-size: 11px; color: #fbbf24; display: flex; align-items: flex-start; gap: 6px; line-height: 1.35; margin-top: 6px;">
+                                    <span style="font-size: 12px; line-height: 1; flex-shrink: 0;">⚠️</span>
+                                    <span><strong>Notice:</strong> FastTag will operate differently in Debug Mode (toasts stay for 15s so you can screenshot them, and full diagnostics stream to console/log buffer). Keep unchecked during normal fast tagging.</span>
+                                </div>
                             </div>
                             <input type="checkbox" id="fasttag-setting-debug-mode" ${getDebugMode() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
                         </div>
