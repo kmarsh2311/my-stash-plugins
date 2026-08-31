@@ -4,6 +4,20 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [3.9.5] - 2026-08-31
+
+### Added & Improved
+- **Real-Time Auto-Save in Edit Everything**:
+  - Tags, performers, studios, groups, suggestion pills, and recent chips now auto-save immediately to Stash GraphQL in the background on every interaction with instant toast feedback.
+- **Streamlined Action Buttons**:
+  - Unified footer buttons across single-scene modes with a clean, full-width <kbd>Done</kbd> button in normal mode and <kbd>Next Scene ►</kbd> in sequential mode.
+- **Settings Toggles for Recent & Pinned Items**:
+  - Added user preference switches in FastTag Settings to toggle **Show Recent Items** (ON/OFF) and **Show Pinned Items** (ON/OFF) across all modals.
+  - When switched off, quick history containers are hidden to maximize vertical space for table rows.
+  - Keyboard navigation seamlessly adapts and bypasses hidden chip sections.
+
+---
+
 ## [3.9.4] - 2026-08-31
 
 ### Fixed & Improved

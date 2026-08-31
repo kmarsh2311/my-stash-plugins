@@ -1584,6 +1584,27 @@
         localStorage.setItem(SUGGESTIONS_STORAGE_KEY, enabled ? 'true' : 'false');
     }
 
+    const SHOW_RECENT_STORAGE_KEY = 'fasttag_show_recent_chips';
+    const SHOW_PINNED_STORAGE_KEY = 'fasttag_show_pinned_chips';
+
+    function getShowRecentChips() {
+        const val = localStorage.getItem(SHOW_RECENT_STORAGE_KEY);
+        return val === null ? true : val === 'true'; // Default true (ON)
+    }
+
+    function setShowRecentChips(enabled) {
+        localStorage.setItem(SHOW_RECENT_STORAGE_KEY, enabled ? 'true' : 'false');
+    }
+
+    function getShowPinnedChips() {
+        const val = localStorage.getItem(SHOW_PINNED_STORAGE_KEY);
+        return val === null ? true : val === 'true'; // Default true (ON)
+    }
+
+    function setShowPinnedChips(enabled) {
+        localStorage.setItem(SHOW_PINNED_STORAGE_KEY, enabled ? 'true' : 'false');
+    }
+
     const SCRUB_SPEEDS_STORAGE_KEY = 'fasttag_scrub_speeds';
 
     const DEFAULT_SCRUB_SPEEDS = {
@@ -2006,6 +2027,28 @@
 
                     <div style="height: 1px; background: ${border};"></div>
 
+                    <!-- Show Recent Items setting -->
+                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; font-size: 13px;">Show Recent Items</div>
+                            <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Display recent history chips above tables across all modals. (Uncheck to maximize vertical table space)</div>
+                        </div>
+                        <input type="checkbox" id="fasttag-setting-show-recent" ${getShowRecentChips() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                    </div>
+
+                    <div style="height: 1px; background: ${border};"></div>
+
+                    <!-- Show Pinned Items setting -->
+                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; font-size: 13px;">Show Pinned Items</div>
+                            <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Display pinned chips (📌) in quick action bars.</div>
+                        </div>
+                        <input type="checkbox" id="fasttag-setting-show-pinned" ${getShowPinnedChips() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                    </div>
+
+                    <div style="height: 1px; background: ${border};"></div>
+
                     <!-- Auto-Scrape in Sequential Mode setting -->
                     <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
                         <div style="flex: 1;">
@@ -2131,6 +2174,22 @@
             sugToggle.addEventListener('change', (e) => {
                 setEnableSuggestions(e.target.checked);
                 showToast(`Suggestions ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
+            });
+        }
+
+        const recentToggle = modal.querySelector('#fasttag-setting-show-recent');
+        if (recentToggle) {
+            recentToggle.addEventListener('change', (e) => {
+                setShowRecentChips(e.target.checked);
+                showToast(`Recent items ${e.target.checked ? 'enabled' : 'hidden'}`, 'info');
+            });
+        }
+
+        const pinnedToggle = modal.querySelector('#fasttag-setting-show-pinned');
+        if (pinnedToggle) {
+            pinnedToggle.addEventListener('change', (e) => {
+                setShowPinnedChips(e.target.checked);
+                showToast(`Pinned items ${e.target.checked ? 'enabled' : 'hidden'}`, 'info');
             });
         }
 
@@ -4049,15 +4108,18 @@
         const target = form.querySelector(`#${type}-quick-actions`);
         if (!target) return;
 
-        const pinned = readPinnedEntries(type)
+        const showPinned = getShowPinnedChips();
+        const showRecent = getShowRecentChips();
+
+        const pinned = showPinned ? readPinnedEntries(type)
             .filter(item => item && (item.name || item.title))
-            .map(item => ({ id: item.id, name: item.name || item.title, isPinned: true }));
+            .map(item => ({ id: item.id, name: item.name || item.title, isPinned: true })) : [];
 
         const pinnedIds = new Set(pinned.map(p => String(p.id)));
 
-        const recent = readRecentEntries(type)
+        const recent = showRecent ? readRecentEntries(type)
             .filter(item => item && (item.name || item.title) && !pinnedIds.has(String(item.id)))
-            .map(item => ({ id: item.id, name: item.name || item.title, isPinned: false }));
+            .map(item => ({ id: item.id, name: item.name || item.title, isPinned: false })) : [];
 
         const combinedList = [...pinned, ...recent];
 
@@ -8478,8 +8540,11 @@
 
     function renderColumnChips(container, type, searchInput, selectedIds, onSelect) {
         if (!container) return;
-        const pinned = readPinnedEntries(type).map(p => ({ ...p, isPinned: true }));
-        const recent = readRecentEntries(type).filter(r => !pinned.some(p => String(p.id) === String(r.id)));
+        const showPinned = getShowPinnedChips();
+        const showRecent = getShowRecentChips();
+
+        const pinned = showPinned ? readPinnedEntries(type).map(p => ({ ...p, isPinned: true })) : [];
+        const recent = showRecent ? readRecentEntries(type).filter(r => !pinned.some(p => String(p.id) === String(r.id))) : [];
         const combined = [...pinned, ...recent];
 
         if (!combined.length) {
@@ -9163,39 +9228,37 @@
             };
 
             const updateSaveButton = () => {
-                const dirty = isDirty();
                 if (sequentialEditState.enabled) {
                     const cards = sequentialEditState.allSceneCards || getAllVisibleSceneCards();
                     const idx = getSceneCardIndex(currentSceneId, cards);
                     const isLast = idx !== -1 && idx === cards.length - 1;
-                    if (dirty) {
-                        const saveText = isEasterEggActive() ? 'Save & Next Scene 🍫 ►' : 'Save & Next Scene ►';
-                        const closeText = isEasterEggActive() ? 'Save & Close 🍫' : 'Save & Close';
-                        popup.saveBtn.textContent = isLast ? closeText : saveText;
-                        popup.saveBtn.style.background = '#10b981';
-                        popup.saveBtn.classList.add('fasttag-btn-pulse-calm');
-                    } else {
-                        popup.saveBtn.textContent = isLast ? 'Close' : 'Next Scene ►';
-                        popup.saveBtn.style.background = '#6366f1';
-                        popup.saveBtn.classList.remove('fasttag-btn-pulse-calm');
+
+                    if (popup.cancelBtn) {
+                        popup.cancelBtn.style.flex = 'none';
+                        popup.cancelBtn.style.width = 'auto';
+                        popup.cancelBtn.style.fontWeight = '500';
+                        popup.cancelBtn.textContent = 'Close';
                     }
-                    popup.saveBtn.disabled = false;
-                    popup.saveBtn.style.opacity = '1';
-                    popup.saveBtn.style.cursor = 'pointer';
-                } else {
-                    popup.saveBtn.textContent = isEasterEggActive() ? 'Save Scene 🍫' : 'Save Scene';
-                    if (dirty) {
+
+                    if (popup.saveBtn) {
+                        popup.saveBtn.style.display = 'block';
+                        popup.saveBtn.style.flex = '1';
                         popup.saveBtn.disabled = false;
                         popup.saveBtn.style.opacity = '1';
                         popup.saveBtn.style.cursor = 'pointer';
-                        popup.saveBtn.style.background = '#10b981';
-                        popup.saveBtn.classList.add('fasttag-btn-pulse-calm');
-                    } else {
-                        popup.saveBtn.disabled = true;
-                        popup.saveBtn.style.opacity = '0.45';
-                        popup.saveBtn.style.cursor = 'not-allowed';
-                        popup.saveBtn.style.background = '#475569';
+                        popup.saveBtn.textContent = isLast ? (isEasterEggActive() ? 'Close 🍫' : 'Close') : (isEasterEggActive() ? 'Next Scene 🍫 ►' : 'Next Scene ►');
+                        popup.saveBtn.style.background = '#6366f1';
                         popup.saveBtn.classList.remove('fasttag-btn-pulse-calm');
+                    }
+                } else {
+                    if (popup.saveBtn) {
+                        popup.saveBtn.style.display = 'none';
+                    }
+                    if (popup.cancelBtn) {
+                        popup.cancelBtn.style.flex = '1';
+                        popup.cancelBtn.style.width = '100%';
+                        popup.cancelBtn.style.fontWeight = '600';
+                        popup.cancelBtn.textContent = isEasterEggActive() ? 'Done 🍫' : 'Done';
                     }
                 }
             };
@@ -9300,7 +9363,7 @@
                         ]);
                         refreshAllUI();
                         updateEverythingKeyboardHighlight();
-                        updateSaveButton();
+                        await doSave(selectedStudioId ? `Studio "${st.name}" assigned` : 'Studio removed');
                         popup.globalSearch.focus({ preventScroll: true });
                     };
 
@@ -9355,7 +9418,7 @@
                         ]);
                         refreshAllUI();
                         updateEverythingKeyboardHighlight();
-                        updateSaveButton();
+                        await doSave('Removed from group');
                         popup.globalSearch.focus({ preventScroll: true });
                     };
                     groupsBar.selectedContainer.appendChild(pill);
@@ -9424,7 +9487,7 @@
                         ]);
                         refreshAllUI();
                         updateEverythingKeyboardHighlight();
-                        updateSaveButton();
+                        await doSave(`Added to group "${grp.name}"`);
                         popup.globalSearch.focus({ preventScroll: true });
                     };
                     groupsBar.recentContainer.appendChild(chip);
@@ -9447,7 +9510,7 @@
                     ]);
                     refreshAllUI();
                     updateEverythingKeyboardHighlight();
-                    updateSaveButton();
+                    await doSave('Studio cleared');
                     popup.globalSearch.focus({ preventScroll: true });
                 };
             }
@@ -9528,7 +9591,7 @@
                     fetchColumnData('performers', performersTable, query, selectedPerformerIds)
                 ]);
                 refreshAllUI();
-                updateSaveButton();
+                await doSave('Tags updated');
             };
 
             const onPerformerChipSelect = async () => {
@@ -9538,7 +9601,7 @@
                     fetchColumnData('performers', performersTable, query, selectedPerformerIds)
                 ]);
                 refreshAllUI();
-                updateSaveButton();
+                await doSave('Performers updated');
             };
 
             if (tagsTable) {
@@ -9576,7 +9639,7 @@
                 activeNavIndex = rows.indexOf(row);
                 refreshAllUI();
                 updateEverythingKeyboardHighlight();
-                updateSaveButton();
+                await doSave(wasSelected ? 'Tag removed' : 'Tags updated');
 
                 const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
                 if (hasSearch) {
@@ -9632,7 +9695,7 @@
                 activeNavIndex = rows.indexOf(row);
                 refreshAllUI();
                 updateEverythingKeyboardHighlight();
-                updateSaveButton();
+                await doSave(wasSelected ? 'Performer removed' : 'Performers updated');
 
                 const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
                 if (hasSearch) {
@@ -10519,7 +10582,7 @@
                             }
 
                             refreshAllUI();
-                            updateSaveButton();
+                            await doSave(isSelected ? (currentNavSection === 'tags' ? 'Tag removed' : 'Performer removed') : (currentNavSection === 'tags' ? 'Tags updated' : 'Performers updated'));
 
                             if (hasSearch) {
                                 popup.globalSearch.value = '';
@@ -10720,7 +10783,7 @@
                     if (holderPerfs) holderPerfs.scrollTop = 0;
                     refreshAllUI();
                     updateEverythingKeyboardHighlight();
-                    updateSaveButton();
+                    await doSave('Scene updated');
                     if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
                 };
 
@@ -10838,18 +10901,13 @@
                     const cards = sequentialEditState.allSceneCards || getAllVisibleSceneCards();
                     const idx = getSceneCardIndex(currentSceneId, cards);
                     const isLast = idx !== -1 && idx === cards.length - 1;
-                    if (isDirty()) {
-                        await doSave();
-                    }
                     if (isLast) {
                         closePopup();
                     } else {
                         navigateSequentialEditEverything(popup, currentSceneId, 1, null);
                     }
                 } else {
-                    if (isDirty()) {
-                        await doSave();
-                    }
+                    closePopup();
                 }
             };
 
