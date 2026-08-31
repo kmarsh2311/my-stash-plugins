@@ -4167,16 +4167,22 @@
 
     function resetAllLayoutsToDefault() {
         try {
-            // 1. Remove custom popup sizes
+            // 1. Remove custom popup sizes and positions
             localStorage.removeItem('stash_fast_tag_popup_size_everything');
             localStorage.removeItem('stash_fast_tag_popup_size_single');
             localStorage.removeItem('stash_fast_tag_popup_size');
+            localStorage.removeItem('fasttag_everything_pos');
+            localStorage.removeItem('fasttag_video_hud_pos');
+            localStorage.removeItem('fasttag_video_hud_size');
+            localStorage.removeItem('fasttag_scraper_hud_pos');
+            localStorage.removeItem('fasttag_scraper_hud_size');
+            localStorage.removeItem('fasttag_embedded_scraper_h');
 
             // 2. Remove all custom column widths and splitters
             const keysToRemove = [];
             for (let i = 0; i < localStorage.length; i++) {
                 const k = localStorage.key(i);
-                if (k && (k.startsWith('fasttag_col_width_') || k.startsWith('fasttag_splitter_') || k === 'fasttag_everything_splitter_ratio')) {
+                if (k && (k.startsWith('fasttag_col_width_') || k.startsWith('fasttag_splitter_') || k === 'fasttag_everything_splitter_ratio' || k === 'fasttag_everything_col_split')) {
                     keysToRemove.push(k);
                 }
             }
@@ -4188,14 +4194,20 @@
             floatingScraperHudPosition = null;
             floatingScraperHudSize = null;
 
-            // 4. If a popup is currently open, smoothly snap it to optimal size and redraw tables
+            // 4. If a popup is currently open, smoothly snap it to optimal size and centered position
             if (activePopup?.element) {
-                const isEverything = activePopup.element.getAttribute('data-popup-type') === 'everything';
+                const isEverything = activePopup.element.getAttribute('data-popup-type') === 'everything' || activePopup.element.getAttribute('data-popup-type') === 'bulk-everything';
                 const type = isEverything ? 'everything' : 'single';
                 const optimal = getOptimalPopupSize(type);
-                activePopup.element.style.transition = 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1), height 0.25s cubic-bezier(0.4, 0, 0.2, 1)';
+                activePopup.element.style.transition = 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1), height 0.25s cubic-bezier(0.4, 0, 0.2, 1), left 0.25s cubic-bezier(0.4, 0, 0.2, 1), top 0.25s cubic-bezier(0.4, 0, 0.2, 1)';
                 activePopup.element.style.width = `${optimal.width}px`;
                 activePopup.element.style.height = `${optimal.height}px`;
+                if (isEverything) {
+                    const posX = Math.max(8, Math.round((window.innerWidth - optimal.width) / 2));
+                    const posY = Math.max(8, Math.round(Math.max(8, (window.innerHeight - optimal.height) / 2)));
+                    activePopup.element.style.left = `${posX}px`;
+                    activePopup.element.style.top = `${posY}px`;
+                }
                 setTimeout(() => {
                     if (activePopup?.element) activePopup.element.style.transition = '';
                     if (activeTableInstance) {
@@ -4210,7 +4222,7 @@
                 }, 260);
             }
 
-            toastSuccess('All popup sizes and column layouts reset to optimal display defaults');
+            toastSuccess('All popup sizes, window positions, and column layouts reset to optimal defaults');
         } catch (err) {
             console.error('[FastTag] Error resetting layouts:', err);
             toastError('Failed to reset layouts: ' + err.message);
