@@ -8913,12 +8913,20 @@
                 if (!allStudios) return;
 
                 if (selectedStudioId) {
-                    const curStudio = allStudios.find(s => String(s.id) === String(selectedStudioId)) || (popup.sceneData?.studio?.id === selectedStudioId ? popup.sceneData.studio : null);
+                    let curStudio = allStudios.find(s => String(s.id) === String(selectedStudioId));
+                    if (!curStudio && popup.sceneData?.studio && String(popup.sceneData.studio.id) === String(selectedStudioId)) {
+                        curStudio = popup.sceneData.studio;
+                    }
+                    if (!curStudio) {
+                        const recents = getRecentEntries('studios') || [];
+                        curStudio = recents.find(s => String(s.id) === String(selectedStudioId));
+                    }
                     if (curStudio) {
                         studioBar.chipName.textContent = curStudio.name;
                         studioBar.chip.style.display = 'inline-flex';
                     } else {
-                        studioBar.chip.style.display = 'none';
+                        studioBar.chipName.textContent = `Studio #${selectedStudioId}`;
+                        studioBar.chip.style.display = 'inline-flex';
                     }
                 } else {
                     studioBar.chip.style.display = 'none';
@@ -8974,6 +8982,7 @@
 
                     chip.onclick = async (e) => {
                         e.preventDefault();
+                        e.stopPropagation();
                         if (selectedStudioId === String(st.id)) {
                             selectedStudioId = null;
                         } else {
@@ -8983,9 +8992,8 @@
                         popup.globalSearch.value = '';
                         popup.globalClear.style.display = 'none';
                         if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-                        activeColType = 'tags';
-                        activeColIndex = -1;
-                        activeMetaIndex = -1;
+                        currentNavSection = 'tags';
+                        activeNavIndex = -1;
                         await Promise.all([
                             fetchColumnData('tags', tagsTable, '', selectedTagIds),
                             fetchColumnData('performers', performersTable, '', selectedPerformerIds)
@@ -9013,29 +9021,19 @@
                             allGroups = res?.data?.findGroups?.groups || res?.data?.findMovies?.movies || [];
                         }
                     } catch (e) {
-                        try {
-                            const fallbackRes = await fetchGQL(`query { findMovies(filter: { per_page: -1 }) { movies { id name } } }`);
-                            allGroups = fallbackRes?.data?.findMovies?.movies || [];
-                        } catch (e2) {
-                            console.error('[FastTag] Failed to fetch groups:', e, e2);
-                        }
+                        allGroups = [];
                     }
-                    if (allGroups && allGroups.length) setCache('groups', allGroups);
+                    setCache('groups', allGroups);
                 }
-                if (!allGroups) allGroups = [];
+                if (!allGroups) return;
 
-                const isDark = getEffectiveTheme() === 'dark';
                 groupsBar.selectedContainer.innerHTML = '';
-                groupsBar.recentContainer.innerHTML = '';
-
-                // Render Selected Group Pills with Remove Button (✕)
                 selectedGroupIds.forEach(id => {
-                    const grp = allGroups.find(g => String(g.id) === String(id)) || (popup.sceneData?.groups || []).map(g => g.group).find(g => g && String(g.id) === String(id));
+                    const grp = allGroups.find(g => String(g.id) === String(id));
                     const name = grp ? grp.name : `Group #${id}`;
-
                     const pill = document.createElement('div');
                     pill.className = 'fasttag-group-pill';
-                    pill.style.cssText = `display: inline-flex; align-items: center; gap: 3.5px; font-weight: 700; padding: 1.5px 6px; border-radius: 999px; font-size: 10px; white-space: nowrap; flex-shrink: 0; cursor: default;`;
+                    pill.style.cssText = `display: inline-flex; align-items: center; gap: 4px; font-weight: 700; padding: 1.5px 6px; border-radius: 999px; font-size: 10px; white-space: nowrap; flex-shrink: 0; cursor: default;`;
                     pill.innerHTML = `
                         <span style="font-weight: 800; font-size: 9.5px; opacity: 0.95;">📁</span>
                         <span>${escapeHtml(name)}</span>
@@ -9049,9 +9047,8 @@
                         popup.globalSearch.value = '';
                         popup.globalClear.style.display = 'none';
                         if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-                        activeColType = 'tags';
-                        activeColIndex = -1;
-                        activeMetaIndex = -1;
+                        currentNavSection = 'tags';
+                        activeNavIndex = -1;
                         await Promise.all([
                             fetchColumnData('tags', tagsTable, '', selectedTagIds),
                             fetchColumnData('performers', performersTable, '', selectedPerformerIds)
@@ -9065,6 +9062,8 @@
                 });
 
                 const term = searchQuery ? searchQuery.trim().toLowerCase() : '';
+                const isDark = getEffectiveTheme() === 'dark';
+                groupsBar.recentContainer.innerHTML = '';
                 if (!term) {
                     if (selectedGroupIds.size === 0) {
                         const emptySpan = document.createElement('span');
@@ -9075,7 +9074,6 @@
                     return;
                 }
 
-                // When searching: match groups
                 const matchingGroups = allGroups
                     .filter(g => (g.name || '').toLowerCase().includes(term) && !selectedGroupIds.has(String(g.id)))
                     .sort((a, b) => {
@@ -9112,14 +9110,14 @@
 
                     chip.onclick = async (e) => {
                         e.preventDefault();
+                        e.stopPropagation();
                         selectedGroupIds.add(String(grp.id));
                         addRecentEntry('groups', grp);
                         popup.globalSearch.value = '';
                         popup.globalClear.style.display = 'none';
                         if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-                        activeColType = 'tags';
-                        activeColIndex = -1;
-                        activeMetaIndex = -1;
+                        currentNavSection = 'tags';
+                        activeNavIndex = -1;
                         await Promise.all([
                             fetchColumnData('tags', tagsTable, '', selectedTagIds),
                             fetchColumnData('performers', performersTable, '', selectedPerformerIds)
@@ -9136,13 +9134,13 @@
             if (popup.studioBar?.clearBtn) {
                 popup.studioBar.clearBtn.onclick = async (e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     selectedStudioId = null;
                     popup.globalSearch.value = '';
                     popup.globalClear.style.display = 'none';
                     if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
-                    activeColType = 'tags';
-                    activeColIndex = -1;
-                    activeMetaIndex = -1;
+                    currentNavSection = 'tags';
+                    activeNavIndex = -1;
                     await Promise.all([
                         fetchColumnData('tags', tagsTable, '', selectedTagIds),
                         fetchColumnData('performers', performersTable, '', selectedPerformerIds)
