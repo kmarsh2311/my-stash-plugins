@@ -3957,6 +3957,42 @@
         } catch (e) {}
     }
 
+    function getDefaultEverythingPosition(formW, formH) {
+        const screenW = window.innerWidth || 1920;
+        const screenH = window.innerHeight || 1080;
+        const minTop = 8;
+        const minLeft = 8;
+
+        const defaultVideoSize = getDefaultPopoutSize();
+        const videoW = parseInt(defaultVideoSize.width, 10) || 600;
+        const scraperW = 390;
+        const margin = 14;
+
+        let posX = null;
+        let posY = null;
+
+        // If screen is wide enough to accommodate Video (Left) + Form (Center) + Scraper (Right)
+        // Balance the flanking spaces so both sidecars have comfortable, equal breathing room without any collision
+        if (screenW >= videoW + formW + scraperW + (margin * 3)) {
+            // Symmetrical balanced flanking: (screenW - formW + videoW - scraperW) / 2
+            posX = Math.round((screenW - formW + videoW - scraperW) / 2);
+        } else if (screenW >= videoW + formW + (margin * 2)) {
+            // Ensure Video HUD on the left has zero overlap
+            posX = Math.round(videoW + (margin * 2));
+        } else {
+            // Fallback for smaller screens: centered
+            posX = Math.round((screenW - formW) / 2);
+        }
+
+        // Keep strictly within screen bounds
+        const maxAllowedLeft = Math.max(minLeft, screenW - formW - 8);
+        const maxAllowedTop = Math.max(minTop, screenH - formH - 8);
+        posX = Math.max(minLeft, Math.min(maxAllowedLeft, posX));
+        posY = Math.max(minTop, Math.min(maxAllowedTop, Math.round((screenH - formH) / 2)));
+
+        return { x: posX, y: posY };
+    }
+
     function resetAllLayoutsToDefault() {
         try {
             // 1. Remove custom popup sizes and positions
@@ -3986,7 +4022,7 @@
             floatingScraperHudPosition = null;
             floatingScraperHudSize = null;
 
-            // 4. If a popup is currently open, smoothly snap it to optimal size and centered position
+            // 4. If a popup is currently open, smoothly snap it to optimal size and balanced position
             if (activePopup?.element) {
                 const isEverything = activePopup.element.getAttribute('data-popup-type') === 'everything' || activePopup.element.getAttribute('data-popup-type') === 'bulk-everything';
                 const type = isEverything ? 'everything' : 'single';
@@ -3995,10 +4031,9 @@
                 activePopup.element.style.width = `${optimal.width}px`;
                 activePopup.element.style.height = `${optimal.height}px`;
                 if (isEverything) {
-                    const posX = Math.max(8, Math.round((window.innerWidth - optimal.width) / 2));
-                    const posY = Math.max(8, Math.round(Math.max(8, (window.innerHeight - optimal.height) / 2)));
-                    activePopup.element.style.left = `${posX}px`;
-                    activePopup.element.style.top = `${posY}px`;
+                    const pos = getDefaultEverythingPosition(optimal.width, optimal.height);
+                    activePopup.element.style.left = `${pos.x}px`;
+                    activePopup.element.style.top = `${pos.y}px`;
                 }
                 setTimeout(() => {
                     if (activePopup?.element) activePopup.element.style.transition = '';
@@ -5962,9 +5997,9 @@
             }
 
             if (posX == null || posY == null) {
-                // Centered horizontally & comfortably near top/middle
-                posX = Math.max(minLeft, Math.round((window.innerWidth - formW) / 2));
-                posY = Math.max(minTop, Math.round(Math.max(minTop, (window.innerHeight - formH) / 2)));
+                const defPos = getDefaultEverythingPosition(formW, formH);
+                posX = defPos.x;
+                posY = defPos.y;
             }
 
             form.style.left = `${posX}px`;
