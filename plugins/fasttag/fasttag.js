@@ -5261,7 +5261,7 @@
                                             <span style="font-size: 11px;">✏️</span>
                                             <span>Title:</span>
                                         </label>
-                                        <span style="display: inline-block; background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#e0e7ff' : '#312e81'}; padding: 2px 7px; border-radius: 4px; font-weight: 700; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(match.title || '')}">${escapeHtml(match.title || 'Untitled Match')}</span>
+                                        <span style="display: inline-block; max-width: calc(100% - 75px); background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#e0e7ff' : '#312e81'}; padding: 2px 7px; border-radius: 4px; font-weight: 700; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="${escapeHtml(match.title || '')}">${escapeHtml(match.title || 'Untitled Match')}</span>
                                         ${match.date ? `<span style="font-size: 10.5px; color: ${isDark ? '#94a3b8' : '#64748b'}; font-weight: 500;">(${match.date})</span>` : ''}
                                     </div>
 
@@ -5273,12 +5273,12 @@
                                                 <span>Studio:</span>
                                             </label>
                                             ${isStudioNew ? `
-                                                <span style="display: inline-flex; align-items: baseline; gap: 4px; background: ${isDark ? 'rgba(245, 158, 11, 0.12)' : '#fef3c7'}; color: ${isDark ? '#fde68a' : '#92400e'}; border: 1px dashed ${isDark ? 'rgba(245, 158, 11, 0.55)' : '#f59e0b'}; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 11px;" title="Not in your local library — will create new studio upon saving">
-                                                    <span>${escapeHtml(studioName)}</span>
-                                                    <span style="font-size: 8.5px; font-weight: 700; background: ${isDark ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.25)'}; padding: 0.5px 3.5px; border-radius: 3px; color: ${isDark ? '#fef08a' : '#78350f'};">+ New</span>
+                                                <span style="display: inline-flex; align-items: baseline; gap: 4px; max-width: calc(100% - 75px); background: ${isDark ? 'rgba(245, 158, 11, 0.12)' : '#fef3c7'}; color: ${isDark ? '#fde68a' : '#92400e'}; border: 1px dashed ${isDark ? 'rgba(245, 158, 11, 0.55)' : '#f59e0b'}; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 11px;" title="Not in your local library — will create new studio upon saving">
+                                                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(studioName)}</span>
+                                                    <span style="font-size: 8.5px; font-weight: 700; background: ${isDark ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.25)'}; padding: 0.5px 3.5px; border-radius: 3px; color: ${isDark ? '#fef08a' : '#78350f'}; flex-shrink: 0;">+ New</span>
                                                 </span>
                                             ` : `
-                                                <span style="display: inline-block; background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#e0e7ff' : '#312e81'}; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 11px;" title="Exists in your local library">${escapeHtml(studioName)}</span>
+                                                <span style="display: inline-block; max-width: calc(100% - 75px); background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#e0e7ff' : '#312e81'}; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="Exists in your local library">${escapeHtml(studioName)}</span>
                                             `}
                                         </div>
                                     ` : ''}
@@ -5299,7 +5299,7 @@
                                                 <span style="font-size: 11px;">✏️</span>
                                                 <span>Title:</span>
                                             </label>
-                                            <span style="display: inline-block; background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#e0e7ff' : '#312e81'}; padding: 2px 7px; border-radius: 4px; font-weight: 700; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(match.title || '')}">${escapeHtml(match.title || 'Untitled Match')}</span>
+                                            <span style="display: inline-block; max-width: calc(100% - 75px); background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#e0e7ff' : '#312e81'}; padding: 2px 7px; border-radius: 4px; font-weight: 700; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="${escapeHtml(match.title || '')}">${escapeHtml(match.title || 'Untitled Match')}</span>
                                             ${match.date ? `<span style="font-size: 10.5px; color: ${isDark ? '#94a3b8' : '#64748b'}; font-weight: 500;">(${match.date})</span>` : ''}
                                         </div>
 
@@ -5311,12 +5311,12 @@
                                                     <span>Studio:</span>
                                                 </label>
                                                 ${isStudioNew ? `
-                                                    <span style="display: inline-flex; align-items: baseline; gap: 4px; background: ${isDark ? 'rgba(245, 158, 11, 0.12)' : '#fef3c7'}; color: ${isDark ? '#fde68a' : '#92400e'}; border: 1px dashed ${isDark ? 'rgba(245, 158, 11, 0.55)' : '#f59e0b'}; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 11px;" title="Not in your local library — will create new studio upon saving">
-                                                        <span>${escapeHtml(studioName)}</span>
-                                                        <span style="font-size: 8.5px; font-weight: 700; background: ${isDark ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.25)'}; padding: 0.5px 3.5px; border-radius: 3px; color: ${isDark ? '#fef08a' : '#78350f'};">+ New</span>
+                                                    <span style="display: inline-flex; align-items: baseline; gap: 4px; max-width: calc(100% - 75px); background: ${isDark ? 'rgba(245, 158, 11, 0.12)' : '#fef3c7'}; color: ${isDark ? '#fde68a' : '#92400e'}; border: 1px dashed ${isDark ? 'rgba(245, 158, 11, 0.55)' : '#f59e0b'}; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 11px;" title="Not in your local library — will create new studio upon saving">
+                                                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(studioName)}</span>
+                                                        <span style="font-size: 8.5px; font-weight: 700; background: ${isDark ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.25)'}; padding: 0.5px 3.5px; border-radius: 3px; color: ${isDark ? '#fef08a' : '#78350f'}; flex-shrink: 0;">+ New</span>
                                                     </span>
                                                 ` : `
-                                                    <span style="display: inline-block; background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#e0e7ff' : '#312e81'}; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 11px;" title="Exists in your local library">${escapeHtml(studioName)}</span>
+                                                    <span style="display: inline-block; max-width: calc(100% - 75px); background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#e0e7ff' : '#312e81'}; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="Exists in your local library">${escapeHtml(studioName)}</span>
                                                 `}
                                             </div>
                                         ` : ''}
