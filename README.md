@@ -37,11 +37,11 @@ Featuring a **Dual-Table Edit Everything Workspace**, **Random Untagged Backlog 
 * **⤢ Floating Video Popout HUD:** Click `⤢` to detach the video into a 2x floating, resizable workstation while FastTag collapses into a 33px placeholder bar for 100% vertical table space. Click `⤝` to snap back!
 * **⚙️ Category Tabbed Settings Suite:** Redesigned 4-tab settings modal (**🎨 Display**, **🎬 Video**, **⚡ Scraper**, **🛠️ System**) with 250-entry flight recorder diagnostics and instant reset buttons.
 * **🎭 Performer Hover ID Cards & 1-Click Profile Jump:** Hovering over any performer row displays a frosted glass ID card with their 110×146px portrait photo, rating (`★★★★☆`), country flag (`🇺🇸 US`), gender, age, aliases, and disambiguation. Click to open their profile in a new tab!
-* **⚡ Smart Auto-Save Workflow:** Quick-action suggestions, recent pills (`1`–`9`), studio chips, and search-and-select immediately auto-save to the scene.
+* **⚡ Smart Auto-Save Workflow:** Quick-action suggestions, recent chips, studio chips, and search-and-select immediately auto-save to the scene.
 * **💾 Save-in-Place Workflow:** Clicking `Save` saves changes directly to Stash while keeping the popup open so you can continue tagging without interruption.
 * **🎨 State-Aware Pulsing Save Button:** Save button stays dimmed when everything is saved, and lights up **Emerald Green** with a breathing pulse when pending edits exist.
 * **💡 Smart Scene Suggestions:** Automatically detects and suggests matching tags, performers, and studios from filenames, titles, directory paths, and quality badges (`4K`, `1080p`, `NEW`).
-* **📌 Pinned Tokens:** Pin favorite tags, performers, and studios (`Alt + Click` or `Right Click`) for fixed, permanent muscle-memory number hotkeys (`1`–`9`).
+* **📌 Pinned Tokens:** Pin favorite tags, performers, and studios (`Alt + Click` or `Right Click`) for 1-click quick action chips.
 * **🏢 Full Entity Editing:** Edit Tags, Performers, Studios (with parent hierarchy search), and Galleries directly from any scene card.
 * **📦 Multi-Scene Bulk Tagging:** Batch-apply or remove tags, performers, and studios across multiple selected scenes simultaneously.
 * **📐 8-Direction Resizing & Size Memory:** Stretch the modal from any edge or corner with automatic size persistence.
@@ -74,10 +74,8 @@ Featuring a **Dual-Table Edit Everything Workspace**, **Random Untagged Backlog 
 | <kbd>Alt</kbd> + <kbd>→</kbd> / <kbd>Alt</kbd> + <kbd>←</kbd> | Next / Previous scene in sequential mode |
 | <kbd>Mouse Wheel</kbd> | Scrub video forward/backward *(in Full Video mode)* |
 | <kbd>Shift</kbd> + <kbd>Mouse Wheel</kbd> | Freeze video & step frame-by-frame |
-| <kbd>1</kbd> – <kbd>9</kbd> | Toggle recent / pinned token chips |
-| <kbd>/</kbd> or <kbd>S</kbd> | Focus global search box |
 | <kbd>Esc</kbd> | Clear search box / close modal (2-stage) |
-| <kbd>Enter</kbd> | Save in place |
+| <kbd>Enter</kbd> | Save in place *(or Save & Next Scene in Sequential Mode)* |
 
 ---
 
