@@ -4,6 +4,15 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.0.1] - 2026-09-01
+
+### Added & Improved
+- **⚙️ Card Icon Click Toggle**:
+  - Added `Enable Card Icon Clicks` setting in **⚙️ FastTag Settings ➔ 🎨 Display** tab.
+  - Allows users to disable left-clicking scene card badge icons so FastTag popups only open via the right-click context menu.
+
+---
+
 ## [4.0.0] - 2026-09-01
 
 ### Major Release Highlights & UI Overhaul

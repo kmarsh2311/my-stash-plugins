@@ -1630,6 +1630,16 @@
     const SHOW_RECENT_STORAGE_KEY = 'fasttag_show_recent_chips';
     const SHOW_PINNED_STORAGE_KEY = 'fasttag_show_pinned_chips';
     const ALWAYS_PLAY_FULL_VIDEO_KEY = 'fasttag_always_play_full_video';
+    const ENABLE_CARD_ICON_CLICKS_KEY = 'fasttag_enable_card_icon_clicks';
+
+    function getEnableCardIconClicks() {
+        const val = localStorage.getItem(ENABLE_CARD_ICON_CLICKS_KEY);
+        return val === null ? true : val === 'true'; // Default true (ON)
+    }
+
+    function setEnableCardIconClicks(enabled) {
+        localStorage.setItem(ENABLE_CARD_ICON_CLICKS_KEY, enabled ? 'true' : 'false');
+    }
 
     function getAlwaysPlayFullVideo() {
         const val = localStorage.getItem(ALWAYS_PLAY_FULL_VIDEO_KEY);
@@ -2118,6 +2128,17 @@
                             </div>
                             <input type="checkbox" id="fasttag-setting-show-pinned" ${getShowPinnedChips() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
                         </div>
+
+                        <div style="height: 1px; background: ${border};"></div>
+
+                        <!-- Card Icon Clicks setting -->
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 13px;">Enable Card Icon Clicks</div>
+                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Left-clicking Tag, Performer, Studio, or Gallery icons on scene cards opens FastTag popups directly. (Uncheck to require right-click context menu)</div>
+                            </div>
+                            <input type="checkbox" id="fasttag-setting-card-icon-clicks" ${getEnableCardIconClicks() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                        </div>
                     </div>
 
                     <!-- TAB 2: VIDEO -->
@@ -2314,6 +2335,14 @@
             pinnedToggle.addEventListener('change', (e) => {
                 setShowPinnedChips(e.target.checked);
                 showToast(`Pinned items ${e.target.checked ? 'enabled' : 'hidden'}`, 'info');
+            });
+        }
+
+        const iconClicksToggle = modal.querySelector('#fasttag-setting-card-icon-clicks');
+        if (iconClicksToggle) {
+            iconClicksToggle.addEventListener('change', (e) => {
+                setEnableCardIconClicks(e.target.checked);
+                showToast(`Card icon clicks ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
             });
         }
 
@@ -13789,6 +13818,7 @@
 
     document.addEventListener('click', function(event) {
         if (activePopup) return;
+        if (!getEnableCardIconClicks()) return;
         const sceneCard = event.target.closest('.scene-card, [class*="scene-card"], [class*="SceneCard"]');
         if (!sceneCard) return;
 
