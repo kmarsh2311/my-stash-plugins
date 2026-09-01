@@ -4,6 +4,28 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.0.0] - 2026-09-01
+
+### Major Release Highlights & UI Overhaul
+- **🎨 Category Tabbed Settings Suite**:
+  - Completely redesigned FastTag Settings into 4 compact, dedicated category tabs:
+    - **Display & UI**: Theme, Show ID Column, Smart Suggestions, Recent Items, Pinned Items.
+    - **Video & Playback**: Always Play Full Video, Video Scrubbing Speeds (Slow, Normal, Fast, Shift Freeze, Reset Defaults).
+    - **Scraper & Workflow**: Auto-Scrape in Sequential Mode, Detach Scraper Sidecar.
+    - **System & Diagnostics**: Layouts Reset, Debug Mode toggle, 250-entry Flight Recorder buffer, Copy/Download Logs, Trash clear.
+  - Replaces long vertical scrolling with a sleek, compact 0-scroll tabbed interface.
+- **🎨 Vibrant Vector SVG Icons**:
+  - Replaced grey emojis in Studio and Group header bars with glowing, high-definition SVG icons:
+    - **Studio**: Indigo Cinema Camera (`#818cf8`) with soft glow shadow.
+    - **Group**: Amber Filmstrip (`#f59e0b`) with soft glow shadow.
+- **🎬 Always Play Full Video & Cross-Platform <kbd>Option+V</kbd> / <kbd>Alt+V</kbd> Shortcut**:
+  - Added "Always Play Full Video" toggle in Settings to automatically stream the full video when opening scenes instead of short preview clips.
+  - Added instant keyboard shortcut: **<kbd>Option+V</kbd> (Mac)** / **<kbd>Alt+V</kbd> (Windows/Linux)** to toggle between Full Video Stream and Preview on the fly.
+  - Native input interception prevents Mac keyboards from typing the special character `√` into search boxes.
+  - Automatic 800ms retry logic for network stalls and sleeping NAS hard drives, with calm, friendly toast feedback for unsupported video codecs.
+
+---
+
 ## [3.9.7] - 2026-09-01
 
 ### Added & Improved

@@ -1629,6 +1629,16 @@
 
     const SHOW_RECENT_STORAGE_KEY = 'fasttag_show_recent_chips';
     const SHOW_PINNED_STORAGE_KEY = 'fasttag_show_pinned_chips';
+    const ALWAYS_PLAY_FULL_VIDEO_KEY = 'fasttag_always_play_full_video';
+
+    function getAlwaysPlayFullVideo() {
+        const val = localStorage.getItem(ALWAYS_PLAY_FULL_VIDEO_KEY);
+        return val === 'true'; // Default false (OFF)
+    }
+
+    function setAlwaysPlayFullVideo(enabled) {
+        localStorage.setItem(ALWAYS_PLAY_FULL_VIDEO_KEY, enabled ? 'true' : 'false');
+    }
 
     function getShowRecentChips() {
         const val = localStorage.getItem(SHOW_RECENT_STORAGE_KEY);
@@ -2025,175 +2035,246 @@
         const cardBg = isDark ? '#0f172a' : '#f8fafc';
 
         modal.innerHTML = `
-            <div style="background: ${bg}; color: ${text}; border: 1px solid ${border}; border-radius: 12px; width: 460px; max-width: 92vw; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); overflow: hidden; font-family: inherit;">
-                <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid ${border}; background: ${cardBg};">
+            <div style="background: ${bg}; color: ${text}; border: 1px solid ${border}; border-radius: 12px; width: 480px; max-width: 92vw; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); overflow: hidden; font-family: inherit;">
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px 12px; border-bottom: 1px solid ${border}; background: ${cardBg};">
                     <div style="font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px;">
                         <span>⚙️</span> FastTag Settings
                     </div>
                     <button id="fasttag-settings-close" style="background: none; border: none; font-size: 18px; color: ${textMuted}; cursor: pointer; line-height: 1; padding: 4px;">✕</button>
                 </div>
-                <div style="padding: 18px; display: flex; flex-direction: column; gap: 16px; max-height: 75vh; overflow-y: auto;">
-                    <!-- Theme setting -->
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-                        <div>
-                            <div style="font-weight: 600; font-size: 13px;">Theme</div>
-                            <div style="font-size: 11px; color: ${textMuted};">Choose popup visual theme</div>
-                        </div>
-                        <select id="fasttag-setting-theme" style="padding: 6px 10px; border-radius: 6px; border: 1px solid ${border}; background: ${cardBg}; color: ${text}; font-size: 12px; cursor: pointer;">
-                            <option value="dark" ${currentPref === 'dark' ? 'selected' : ''}>Dark</option>
-                            <option value="light" ${currentPref === 'light' ? 'selected' : ''}>Light</option>
-                            <option value="auto" ${currentPref === 'auto' ? 'selected' : ''}>Auto (Match Stash)</option>
-                        </select>
-                    </div>
 
-                    <div style="height: 1px; background: ${border};"></div>
+                <!-- Category Tabs Header -->
+                <div id="fasttag-settings-tab-bar" style="display: flex; gap: 4px; padding: 6px 12px; background: ${cardBg}; border-bottom: 1px solid ${border}; user-select: none;">
+                    <button type="button" class="fasttag-settings-tab-btn active" data-tab="display" style="flex: 1; padding: 6px 4px; font-size: 11.5px; font-weight: 700; border: none; border-radius: 7px; background: #6366f1; color: #ffffff; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.15s ease;">
+                        <span>🎨</span> Display
+                    </button>
+                    <button type="button" class="fasttag-settings-tab-btn" data-tab="video" style="flex: 1; padding: 6px 4px; font-size: 11.5px; font-weight: 600; border: none; border-radius: 7px; background: transparent; color: ${textMuted}; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.15s ease;">
+                        <span>🎬</span> Video
+                    </button>
+                    <button type="button" class="fasttag-settings-tab-btn" data-tab="scraper" style="flex: 1; padding: 6px 4px; font-size: 11.5px; font-weight: 600; border: none; border-radius: 7px; background: transparent; color: ${textMuted}; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.15s ease;">
+                        <span>⚡</span> Scraper
+                    </button>
+                    <button type="button" class="fasttag-settings-tab-btn" data-tab="system" style="flex: 1; padding: 6px 4px; font-size: 11.5px; font-weight: 600; border: none; border-radius: 7px; background: transparent; color: ${textMuted}; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.15s ease;">
+                        <span>🛠️</span> System
+                    </button>
+                </div>
 
-                    <!-- Show ID Column setting -->
-                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
-                        <div style="flex: 1;">
-                            <div style="font-weight: 600; font-size: 13px;">Show ID Column</div>
-                            <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Display numeric database ID column in Tag, Performer, Studio, and Gallery popups. (When unchecked, Name and Title expand to 100% width)</div>
-                        </div>
-                        <input type="checkbox" id="fasttag-setting-show-ids" ${showIds ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
-                    </div>
-
-                    <div style="height: 1px; background: ${border};"></div>
-
-                    <!-- Smart Suggestions setting -->
-                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
-                        <div style="flex: 1;">
-                            <div style="font-weight: 600; font-size: 13px;">Smart Suggestions</div>
-                            <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Automatically detect and suggest matching Performers, Tags, and Studios from filenames and titles.</div>
-                        </div>
-                        <input type="checkbox" id="fasttag-setting-suggestions" ${enableSug ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
-                    </div>
-
-                    <div style="height: 1px; background: ${border};"></div>
-
-                    <!-- Show Recent Items setting -->
-                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
-                        <div style="flex: 1;">
-                            <div style="font-weight: 600; font-size: 13px;">Show Recent Items</div>
-                            <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Display recent history chips above tables across all modals. (Uncheck to maximize vertical table space)</div>
-                        </div>
-                        <input type="checkbox" id="fasttag-setting-show-recent" ${getShowRecentChips() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
-                    </div>
-
-                    <div style="height: 1px; background: ${border};"></div>
-
-                    <!-- Show Pinned Items setting -->
-                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
-                        <div style="flex: 1;">
-                            <div style="font-weight: 600; font-size: 13px;">Show Pinned Items</div>
-                            <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Display pinned chips (📌) in quick action bars.</div>
-                        </div>
-                        <input type="checkbox" id="fasttag-setting-show-pinned" ${getShowPinnedChips() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
-                    </div>
-
-                    <div style="height: 1px; background: ${border};"></div>
-
-                    <!-- Auto-Scrape in Sequential Mode setting -->
-                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
-                        <div style="flex: 1;">
-                            <div style="font-weight: 600; font-size: 13px;">Auto-Scrape in Sequential Mode</div>
-                            <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Automatically fetch scraper matches on scene transitions when using Edit Everything in Sequential Mode.</div>
-                        </div>
-                        <input type="checkbox" id="fasttag-setting-auto-scrape" ${autoScrape ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
-                    </div>
-
-                    <div style="height: 1px; background: ${border};"></div>
-
-                    <!-- Detach Scraper Window setting -->
-                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
-                        <div style="flex: 1;">
-                            <div style="font-weight: 600; font-size: 13px;">Detach Scraper Window</div>
-                            <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Open scraper matches in a floating sidecar window alongside the popup instead of embedding inside.</div>
-                        </div>
-                        <input type="checkbox" id="fasttag-setting-detach-scraper" ${getDetachScraper() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
-                    </div>
-
-                    <div style="height: 1px; background: ${border};"></div>
-
-                    <!-- Video Scrubbing Speeds setting -->
-                    <div style="display: flex; flex-direction: column; gap: 10px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="padding: 16px 18px; min-height: 290px; max-height: 60vh; overflow-y: auto;">
+                    <!-- TAB 1: DISPLAY -->
+                    <div id="fasttag-tab-pane-display" class="fasttag-tab-pane" style="display: flex; flex-direction: column; gap: 14px;">
+                        <!-- Theme setting -->
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
                             <div>
-                                <div style="font-weight: 600; font-size: 13px;">Video Scrubbing Speeds</div>
-                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Seconds skipped per wheel notch in Full Video mode (Set to 0 to disable a tier)</div>
+                                <div style="font-weight: 600; font-size: 13px;">Theme</div>
+                                <div style="font-size: 11px; color: ${textMuted};">Choose popup visual theme</div>
                             </div>
-                            <button type="button" id="fasttag-setting-reset-speeds" style="background: none; border: 1px solid ${border}; color: ${textMuted}; font-size: 11px; padding: 4px 8px; border-radius: 5px; cursor: pointer; transition: all 0.15s ease;">Reset Defaults</button>
+                            <select id="fasttag-setting-theme" style="padding: 6px 10px; border-radius: 6px; border: 1px solid ${border}; background: ${cardBg}; color: ${text}; font-size: 12px; cursor: pointer;">
+                                <option value="dark" ${currentPref === 'dark' ? 'selected' : ''}>Dark</option>
+                                <option value="light" ${currentPref === 'light' ? 'selected' : ''}>Light</option>
+                                <option value="auto" ${currentPref === 'auto' ? 'selected' : ''}>Auto (Match Stash)</option>
+                            </select>
                         </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: ${cardBg}; padding: 12px; border-radius: 8px; border: 1px solid ${border};">
-                            <div style="display: flex; flex-direction: column; gap: 4px;">
-                                <label style="font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 4px;">
-                                    <span>🐢</span> Slow Click (sec)
-                                </label>
-                                <input type="number" id="fasttag-speed-slow" min="0" max="30" step="1" value="${scrubSpeeds.slow}" style="width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px; border: 1px solid ${border}; background: ${bg}; color: ${text}; font-size: 12px; font-family: inherit;">
-                            </div>
-                            <div style="display: flex; flex-direction: column; gap: 4px;">
-                                <label style="font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 4px;">
-                                    <span>🚗</span> Normal Scroll (sec)
-                                </label>
-                                <input type="number" id="fasttag-speed-normal" min="0" max="60" step="1" value="${scrubSpeeds.normal}" style="width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px; border: 1px solid ${border}; background: ${bg}; color: ${text}; font-size: 12px; font-family: inherit;">
-                            </div>
-                            <div style="display: flex; flex-direction: column; gap: 4px;">
-                                <label style="font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 4px;">
-                                    <span>🚀</span> Fast Flick (sec)
-                                </label>
-                                <input type="number" id="fasttag-speed-fast" min="0" max="120" step="1" value="${scrubSpeeds.fast}" style="width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px; border: 1px solid ${border}; background: ${bg}; color: ${text}; font-size: 12px; font-family: inherit;">
-                            </div>
-                            <div style="display: flex; flex-direction: column; gap: 4px;">
-                                <label style="font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 4px;">
-                                    <span>⏸️</span> Shift Freeze (sec)
-                                </label>
-                                <input type="number" id="fasttag-speed-freeze" min="0.1" max="10" step="0.5" value="${scrubSpeeds.freeze}" style="width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px; border: 1px solid ${border}; background: ${bg}; color: ${text}; font-size: 12px; font-family: inherit;">
-                            </div>
-                        </div>
-                    <div style="height: 1px; background: ${border};"></div>
 
-                    <!-- Reset Layouts & Sizes setting -->
-                    <div style="display: flex; flex-direction: column; gap: 8px; background: ${cardBg}; padding: 12px; border-radius: 8px; border: 1px solid ${border};">
-                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
-                            <div style="flex: 1;">
-                                <div style="font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 5px;">
-                                    <span>📐</span> Layout & Dimensions
-                                </div>
-                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Reset all customized popup sizes, column widths, and window positions back to optimal display defaults.</div>
-                            </div>
-                            <button type="button" id="fasttag-setting-reset-layouts" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); color: #818cf8; font-size: 11.5px; font-weight: 600; padding: 5px 10px; border-radius: 6px; cursor: pointer; transition: all 0.15s ease; white-space: nowrap;">↺ Reset Layouts</button>
-                        </div>
-                    </div>
+                        <div style="height: 1px; background: ${border};"></div>
 
-                    <div style="height: 1px; background: ${border};"></div>
-
-                    <!-- Developer & Diagnostics / Debug Mode -->
-                    <div style="display: flex; flex-direction: column; gap: 10px; background: ${cardBg}; padding: 12px; border-radius: 8px; border: 1px solid ${border};">
+                        <!-- Show ID Column setting -->
                         <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
                             <div style="flex: 1;">
-                                <div style="font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 5px;">
-                                    <span>🛠️</span> Debug Mode
-                                </div>
-                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Extends toast display time to 15 seconds (with pause-on-hover & copy buttons) and records continuous diagnostics.</div>
+                                <div style="font-weight: 600; font-size: 13px;">Show ID Column</div>
+                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Display numeric database ID column in Tag, Performer, Studio, and Gallery popups.</div>
                             </div>
-                            <input type="checkbox" id="fasttag-setting-debug-mode" ${getDebugMode() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                            <input type="checkbox" id="fasttag-setting-show-ids" ${showIds ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
                         </div>
-                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px dashed ${border}; padding-top: 8px; margin-top: 2px;">
-                            <div style="font-size: 11px; color: ${textMuted}; display: flex; align-items: center; gap: 4px;">
-                                <span>📋</span> Logs: <strong id="fasttag-log-count" style="color: ${text};">${getLogBufferSize()} entries</strong>
+
+                        <div style="height: 1px; background: ${border};"></div>
+
+                        <!-- Smart Suggestions setting -->
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 13px;">Smart Suggestions</div>
+                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Automatically detect and suggest matching Performers, Tags, and Studios from filenames and titles.</div>
                             </div>
-                            <div style="display: flex; gap: 6px;">
-                                <button type="button" id="fasttag-btn-copy-log" style="background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.35); color: #818cf8; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 5px; cursor: pointer;">📋 Copy Log</button>
-                                <button type="button" id="fasttag-btn-export-log" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 5px; cursor: pointer;">📥 Download Log</button>
-                                <button type="button" id="fasttag-btn-clear-log" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); color: #f87171; font-size: 11px; font-weight: 600; padding: 4px 7px; border-radius: 5px; cursor: pointer;" title="Clear log buffer">🗑️</button>
+                            <input type="checkbox" id="fasttag-setting-suggestions" ${enableSug ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                        </div>
+
+                        <div style="height: 1px; background: ${border};"></div>
+
+                        <!-- Show Recent Items setting -->
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 13px;">Show Recent Items</div>
+                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Display recent history chips above tables across all modals.</div>
+                            </div>
+                            <input type="checkbox" id="fasttag-setting-show-recent" ${getShowRecentChips() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                        </div>
+
+                        <div style="height: 1px; background: ${border};"></div>
+
+                        <!-- Show Pinned Items setting -->
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 13px;">Show Pinned Items</div>
+                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Display pinned chips (📌) in quick action bars.</div>
+                            </div>
+                            <input type="checkbox" id="fasttag-setting-show-pinned" ${getShowPinnedChips() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: VIDEO -->
+                    <div id="fasttag-tab-pane-video" class="fasttag-tab-pane" style="display: none; flex-direction: column; gap: 14px;">
+                        <!-- Always Play Full Video setting -->
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 13px;">Always Play Full Video</div>
+                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Automatically stream the full video when opening scenes instead of short preview clips. (Shortcut: Option+V / Alt+V)</div>
+                            </div>
+                            <input type="checkbox" id="fasttag-setting-always-full-video" ${getAlwaysPlayFullVideo() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                        </div>
+
+                        <div style="height: 1px; background: ${border};"></div>
+
+                        <!-- Video Scrubbing Speeds setting -->
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div>
+                                    <div style="font-weight: 600; font-size: 13px;">Video Scrubbing Speeds</div>
+                                    <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Seconds skipped per wheel notch in Full Video mode (Set to 0 to disable)</div>
+                                </div>
+                                <button type="button" id="fasttag-setting-reset-speeds" style="background: none; border: 1px solid ${border}; color: ${textMuted}; font-size: 11px; padding: 4px 8px; border-radius: 5px; cursor: pointer; transition: all 0.15s ease;">Reset Defaults</button>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: ${cardBg}; padding: 12px; border-radius: 8px; border: 1px solid ${border};">
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <label style="font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                                        <span>🐢</span> Slow Click (sec)
+                                    </label>
+                                    <input type="number" id="fasttag-speed-slow" min="0" max="30" step="1" value="${scrubSpeeds.slow}" style="width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px; border: 1px solid ${border}; background: ${bg}; color: ${text}; font-size: 12px; font-family: inherit;">
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <label style="font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                                        <span>🚗</span> Normal Scroll (sec)
+                                    </label>
+                                    <input type="number" id="fasttag-speed-normal" min="0" max="60" step="1" value="${scrubSpeeds.normal}" style="width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px; border: 1px solid ${border}; background: ${bg}; color: ${text}; font-size: 12px; font-family: inherit;">
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <label style="font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                                        <span>🚀</span> Fast Flick (sec)
+                                    </label>
+                                    <input type="number" id="fasttag-speed-fast" min="0" max="120" step="1" value="${scrubSpeeds.fast}" style="width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px; border: 1px solid ${border}; background: ${bg}; color: ${text}; font-size: 12px; font-family: inherit;">
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <label style="font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                                        <span>⏸️</span> Shift Freeze (sec)
+                                    </label>
+                                    <input type="number" id="fasttag-speed-freeze" min="0.1" max="10" step="0.5" value="${scrubSpeeds.freeze}" style="width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px; border: 1px solid ${border}; background: ${bg}; color: ${text}; font-size: 12px; font-family: inherit;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 3: SCRAPER -->
+                    <div id="fasttag-tab-pane-scraper" class="fasttag-tab-pane" style="display: none; flex-direction: column; gap: 14px;">
+                        <!-- Auto-Scrape in Sequential Mode setting -->
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 13px;">Auto-Scrape in Sequential Mode</div>
+                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Automatically fetch scraper matches on scene transitions when using Edit Everything in Sequential Mode.</div>
+                            </div>
+                            <input type="checkbox" id="fasttag-setting-auto-scrape" ${autoScrape ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                        </div>
+
+                        <div style="height: 1px; background: ${border};"></div>
+
+                        <!-- Detach Scraper Window setting -->
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 13px;">Detach Scraper Window</div>
+                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Open scraper matches in a floating sidecar window alongside the popup instead of embedding inside.</div>
+                            </div>
+                            <input type="checkbox" id="fasttag-setting-detach-scraper" ${getDetachScraper() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                        </div>
+                    </div>
+
+                    <!-- TAB 4: SYSTEM -->
+                    <div id="fasttag-tab-pane-system" class="fasttag-tab-pane" style="display: none; flex-direction: column; gap: 14px;">
+                        <!-- Reset Layouts & Sizes setting -->
+                        <div style="display: flex; flex-direction: column; gap: 8px; background: ${cardBg}; padding: 12px; border-radius: 8px; border: 1px solid ${border};">
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 5px;">
+                                        <span>📐</span> Layout & Dimensions
+                                    </div>
+                                    <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Reset all customized popup sizes, column widths, and window positions back to optimal display defaults.</div>
+                                </div>
+                                <button type="button" id="fasttag-setting-reset-layouts" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); color: #818cf8; font-size: 11.5px; font-weight: 600; padding: 5px 10px; border-radius: 6px; cursor: pointer; transition: all 0.15s ease; white-space: nowrap;">↺ Reset Layouts</button>
+                            </div>
+                        </div>
+
+                        <!-- Developer & Diagnostics / Debug Mode -->
+                        <div style="display: flex; flex-direction: column; gap: 10px; background: ${cardBg}; padding: 12px; border-radius: 8px; border: 1px solid ${border};">
+                            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 5px;">
+                                        <span>🛠️</span> Debug Mode
+                                    </div>
+                                    <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Extends toast display time to 15 seconds and records continuous diagnostics.</div>
+                                </div>
+                                <input type="checkbox" id="fasttag-setting-debug-mode" ${getDebugMode() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px dashed ${border}; padding-top: 8px; margin-top: 2px;">
+                                <div style="font-size: 11px; color: ${textMuted}; display: flex; align-items: center; gap: 4px;">
+                                    <span>📋</span> Logs: <strong id="fasttag-log-count" style="color: ${text};">${getLogBufferSize()} entries</strong>
+                                </div>
+                                <div style="display: flex; gap: 6px;">
+                                    <button type="button" id="fasttag-btn-copy-log" style="background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.35); color: #818cf8; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 5px; cursor: pointer;">📋 Copy Log</button>
+                                    <button type="button" id="fasttag-btn-export-log" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 5px; cursor: pointer;">📥 Download Log</button>
+                                    <button type="button" id="fasttag-btn-clear-log" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); color: #f87171; font-size: 11px; font-weight: 600; padding: 4px 7px; border-radius: 5px; cursor: pointer;" title="Clear log buffer">🗑️</button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
+
                 <div style="padding: 12px 18px; background: ${cardBg}; border-top: 1px solid ${border}; display: flex; justify-content: flex-end;">
                     <button id="fasttag-settings-done" style="background: #6366f1; color: white; border: none; padding: 7px 18px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer;">Done</button>
                 </div>
             </div>
         `;
+
+        // Tab Switching Handlers
+        let activeSettingsTab = 'display';
+        const tabBtns = modal.querySelectorAll('.fasttag-settings-tab-btn');
+        const tabPanes = modal.querySelectorAll('.fasttag-tab-pane');
+
+        const switchSettingsTab = (targetTab) => {
+            activeSettingsTab = targetTab;
+            tabBtns.forEach(btn => {
+                const isActive = btn.getAttribute('data-tab') === targetTab;
+                btn.classList.toggle('active', isActive);
+                btn.style.background = isActive ? '#6366f1' : 'transparent';
+                btn.style.color = isActive ? '#ffffff' : textMuted;
+                btn.style.fontWeight = isActive ? '700' : '600';
+            });
+            tabPanes.forEach(pane => {
+                const isTarget = pane.id === `fasttag-tab-pane-${targetTab}`;
+                pane.style.display = isTarget ? 'flex' : 'none';
+            });
+        };
+
+        tabBtns.forEach(btn => {
+            btn.onclick = () => switchSettingsTab(btn.getAttribute('data-tab'));
+            btn.onmouseenter = () => {
+                if (btn.getAttribute('data-tab') !== activeSettingsTab) {
+                    btn.style.background = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
+                    btn.style.color = text;
+                }
+            };
+            btn.onmouseleave = () => {
+                if (btn.getAttribute('data-tab') !== activeSettingsTab) {
+                    btn.style.background = 'transparent';
+                    btn.style.color = textMuted;
+                }
+            };
+        });
 
         const themeSelect = modal.querySelector('#fasttag-setting-theme');
         if (themeSelect) {
@@ -2249,6 +2330,14 @@
             detachScraperToggle.addEventListener('change', (e) => {
                 setDetachScraper(e.target.checked);
                 showToast(`Scraper sidecar ${e.target.checked ? 'detached' : 'embedded'}`, 'info');
+            });
+        }
+
+        const alwaysFullVideoToggle = modal.querySelector('#fasttag-setting-always-full-video');
+        if (alwaysFullVideoToggle) {
+            alwaysFullVideoToggle.addEventListener('change', (e) => {
+                setAlwaysPlayFullVideo(e.target.checked);
+                showToast(`Always play full video ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
             });
         }
 
@@ -3219,8 +3308,24 @@
                 video.setAttribute('muted', '');
                 video.src = streamUrl;
 
+                let hasRetriedStream = false;
                 video.onerror = () => {
-                    showToast('Full stream playback failed (unsupported codec)', 'warning');
+                    // If transient network glitch or drive spin-up delay, retry once after 800ms
+                    if (!hasRetriedStream && video.error && (video.error.code === 2 || video.error.code === 1)) {
+                        hasRetriedStream = true;
+                        setTimeout(() => {
+                            if (currentMedia === video && !signal.aborted) {
+                                video.load();
+                                video.play().catch(() => {});
+                            }
+                        }, 800);
+                        return;
+                    }
+                    const errCode = video.error ? video.error.code : 0;
+                    const msg = errCode === 4
+                        ? 'Full video format not supported by browser — showing preview'
+                        : 'Full stream unavailable — showing preview';
+                    showToast(msg, 'info', 3000);
                     renderMedia('preview');
                 };
 
@@ -3393,8 +3498,24 @@
         document.addEventListener('keyup', onKeyUp, { signal });
         window.addEventListener('blur', onWindowBlur, { signal });
 
-        // Initial render
-        renderMedia('preview');
+        window._fastTagActiveToggleVideoMode = () => {
+            if (currentMode === 'stream') {
+                renderMedia('preview');
+                showToast('Switched to Video Preview', 'info', 1500);
+            } else {
+                renderMedia('stream');
+                showToast('Streaming Full Video', 'info', 1500);
+            }
+        };
+
+        signal.addEventListener('abort', () => {
+            if (window._fastTagActiveToggleVideoMode) {
+                window._fastTagActiveToggleVideoMode = null;
+            }
+        });
+
+        // Initial render (honors Always Play Full Video setting)
+        renderMedia(getAlwaysPlayFullVideo() ? 'stream' : 'preview');
 
         // Initial Popout State sync
         if (isVideoPoppedOut || isVideoHudPersistedOpen()) {
@@ -6943,6 +7064,16 @@
 
         // Strictly contain all popup keyboard events so they never bubble out to Stash
         form.addEventListener('keydown', (e) => {
+            // Alt+V / Option+V to toggle Full Video Stream vs Preview (prevent Mac from typing special character √ into inputs)
+            if (e.altKey && (e.code === 'KeyV' || e.key === 'v' || e.key === 'V' || e.key === '√')) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (typeof window._fastTagActiveToggleVideoMode === 'function') {
+                    window._fastTagActiveToggleVideoMode();
+                }
+                return;
+            }
+
             e.stopPropagation();
             const isTyping = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
             if (!isTyping && (e.key === ' ' || e.key === 'Spacebar' || e.key === 'j' || e.key === 'k' || e.key === 'l' || e.key === 'n' || e.key === 'p')) {
@@ -6986,6 +7117,16 @@
                     e.preventDefault();
                     e.stopPropagation();
                     scrapeBtn.click();
+                    return;
+                }
+            }
+
+            // Alt+V / Option+V to toggle Full Video Stream vs Preview
+            if (e.altKey && (e.code === 'KeyV' || e.key === 'v' || e.key === 'V' || e.key === '√')) {
+                if (typeof window._fastTagActiveToggleVideoMode === 'function') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window._fastTagActiveToggleVideoMode();
                     return;
                 }
             }
@@ -8439,7 +8580,12 @@
             <div id="everything-metadata-bar" style="display: flex; gap: 6px; margin-bottom: 5px; flex-shrink: 0; min-height: 25px; box-sizing: border-box;">
                 <!-- Left Half: Studio (Compact Icon Prefix + Smooth Horizontal Scroll) -->
                 <div id="everything-studio-half" style="display: flex; align-items: center; gap: 5px; flex: 1 1 0px; min-width: 0; padding: 2.5px 6px; background: ${studioBarBg}; border: ${studioBarBorder}; border-radius: 7px; box-sizing: border-box; overflow: hidden;" title="Studio">
-                    <span style="font-size: 11px; display: flex; align-items: center; flex-shrink: 0; user-select: none; opacity: 0.9;" title="Studio">🏢</span>
+                    <span style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; user-select: none; width: 14px; height: 14px;" title="Studio">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#818cf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 1px 2px rgba(99,102,241,0.5));">
+                            <path d="M15 10l5-3v10l-5-3"></path>
+                            <rect x="2" y="6" width="13" height="12" rx="2.5"></rect>
+                        </svg>
+                    </span>
                     <div id="everything-studio-scroll" style="display: flex; align-items: center; gap: 3.5px; flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none;">
                         <div id="everything-selected-studio-chip" class="fasttag-studio-pill" style="display: none; align-items: center; gap: 4px; font-weight: 700; padding: 1.5px 6px; border-radius: 999px; font-size: 10px; white-space: nowrap; flex-shrink: 0; cursor: default;">
                             <span style="font-weight: 800; font-size: 9.5px; opacity: 0.95;">✓</span>
@@ -8450,9 +8596,20 @@
                     </div>
                 </div>
 
-                <!-- Right Half: Groups (Compact Folder Icon Prefix + Smooth Horizontal Scroll) -->
+                <!-- Right Half: Groups (Compact Filmstrip Icon Prefix + Smooth Horizontal Scroll) -->
                 <div id="everything-groups-half" style="display: flex; align-items: center; gap: 5px; flex: 1 1 0px; min-width: 0; padding: 2.5px 6px; background: ${studioBarBg}; border: ${studioBarBorder}; border-radius: 7px; box-sizing: border-box; overflow: hidden;" title="Group">
-                    <span style="font-size: 11px; display: flex; align-items: center; flex-shrink: 0; user-select: none; opacity: 0.9;" title="Group">📁</span>
+                    <span style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; user-select: none; width: 14px; height: 14px;" title="Group">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 1px 2px rgba(245,158,11,0.5));">
+                            <rect x="3" y="3" width="18" height="18" rx="2.5"></rect>
+                            <line x1="8.5" y1="3" x2="8.5" y2="21"></line>
+                            <line x1="15.5" y1="3" x2="15.5" y2="21"></line>
+                            <line x1="3" y1="8" x2="8.5" y2="8"></line>
+                            <line x1="15.5" y1="8" x2="21" y2="8"></line>
+                            <line x1="3" y1="12" x2="21" y2="12"></line>
+                            <line x1="3" y1="16" x2="8.5" y2="16"></line>
+                            <line x1="15.5" y1="16" x2="21" y2="16"></line>
+                        </svg>
+                    </span>
                     <div id="everything-groups-scroll" style="display: flex; align-items: center; gap: 3.5px; flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none;">
                         <div id="everything-selected-groups-container" style="display: flex; gap: 3.5px; align-items: center; flex-shrink: 0;"></div>
                         <div id="everything-recent-groups" style="display: flex; gap: 3.5px; align-items: center; flex-shrink: 0;"></div>
@@ -9574,7 +9731,7 @@
                     pill.className = 'fasttag-group-pill';
                     pill.style.cssText = `display: inline-flex; align-items: center; gap: 4px; font-weight: 700; padding: 1.5px 6px; border-radius: 999px; font-size: 10px; white-space: nowrap; flex-shrink: 0; cursor: default;`;
                     pill.innerHTML = `
-                        <span style="font-weight: 800; font-size: 9.5px; opacity: 0.95;">📁</span>
+                        <span style="font-weight: 800; font-size: 9.5px; opacity: 0.95;">✓</span>
                         <span>${escapeHtml(name)}</span>
                         <button type="button" class="fasttag-pill-clear-btn" style="background: none; border: none; cursor: pointer; color: #ffffff; font-weight: 700; font-size: 12px; padding: 0 0 0 2.5px; line-height: 1; opacity: 0.85;" title="Remove Group">&times;</button>
                     `;
@@ -11471,7 +11628,7 @@
                     pill.className = 'fasttag-group-pill';
                     pill.style.cssText = `display: inline-flex; align-items: center; gap: 3.5px; font-weight: 700; padding: 1.5px 6px; border-radius: 999px; font-size: 10px; white-space: nowrap; flex-shrink: 0; cursor: default;`;
                     pill.innerHTML = `
-                        <span style="font-weight: 800; font-size: 9.5px; opacity: 0.95;">📁</span>
+                        <span style="font-weight: 800; font-size: 9.5px; opacity: 0.95;">✓</span>
                         <span>${escapeHtml(name)}</span>
                         <button type="button" class="fasttag-pill-clear-btn" style="background: none; border: none; cursor: pointer; color: #ffffff; font-weight: 700; font-size: 12px; padding: 0 0 0 2.5px; line-height: 1; opacity: 0.85;" title="Remove Group">&times;</button>
                     `;
