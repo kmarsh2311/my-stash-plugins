@@ -1,39 +1,52 @@
+<div align="center">
+
+# ⚡ FastTag for Stash
+### Lightning-Fast Scene Tagging Workflow & Backlog Manager for Stash
+
+![Version](https://img.shields.io/badge/version-4.0.0-6366f1?style=for-the-badge)
+![Stash](https://img.shields.io/badge/Stash-v0.26+-f59e0b?style=for-the-badge)
+![License](https://img.shields.io/badge/license-AGPL--3.0-10b981?style=for-the-badge)
+
+<br />
+
 <p align="center">
-  <img src="docs/images/context_menu.png" alt="FastTag Context Menu" height="380" />
-  <img src="docs/images/edit_tags.png" alt="FastTag Edit Tags" height="380" />
-  <img src="docs/images/edit_everything.png" alt="FastTag Edit Everything" height="380" />
+  <img src="docs/images/context_menu.png" alt="FastTag Context Menu" height="340" />
+  <img src="docs/images/edit_tags.png" alt="FastTag Edit Tags" height="340" />
+  <img src="docs/images/edit_everything.png" alt="FastTag Edit Everything" height="340" />
 </p>
 
-# My Stash Plugins
-
-A collection of custom scripts and plugins designed to speed up the [Stash](https://github.com/stashapp/stash) workflow for video scene tagging and metadata cleanup. This repository is focused on fast tagging of scenes, performers, galleries, and related metadata without leaving the library view.
+</div>
 
 ---
 
-## 🛠 Featured Scripts
+## 🚀 Overview
 
-### FastTag - Scene Manager Context Menu
-A fast tagging workflow for Stash scene cards, designed for video libraries where you want to assign tags and performers quickly without leaving the page. 
+**FastTag** is a powerful, keyboard-driven tagging workflow plugin for [Stash](https://github.com/stashapp/stash). It allows you to edit tags, performers, studios, and galleries directly from scene cards without navigating away from your library or opening multiple tabs.
 
-*   **⚡ Edit Everything (All-in-One Workspace):** Dual side-by-side tables for editing Tags, Performers, and Studios simultaneously with resizable columns, compact Studio & Group bars with glowing SVG icons, and 16:9 video preview.
-*   **🎲 Random Untagged Scene Mode:** One-click backlog cleanup with 3D rolling dice keyframe animations, sunset cyberpunk button, remaining backlog counter, and secret power-user hotkeys (<kbd>Cmd/Ctrl+Enter</kbd>).
-*   **🔁 In-Place Sequential Navigation:** Review and tag scene-by-scene sequentially (`[1/60]`) with instant in-place transitions.
-*   **📊 Smart Popularity Search:** Ranks search results by popularity (scene count) & match relevance across all modals, keeping selected items pinned at the top when search is empty.
-*   **🎬 Full Video Stream Scrubbing & Frame Freeze:** Toggle to `🎬 Full Video` to scrub through the full scene with velocity-based mouse wheel control, hold <kbd>Shift</kbd> to freeze & step frame-by-frame, and tap <kbd>Option+V</kbd> (Mac) / <kbd>Alt+V</kbd> (Windows/Linux) to toggle modes.
-*   **⤢ Floating Video Popout HUD:** Click `⤢` to detach the video into a 2x floating, resizable window while FastTag collapses into a 33px placeholder bar for 100% vertical table space. Click `⤝` to snap back!
-*   **⚙️ Category Tabbed Settings Suite:** Redesigned 4-tab settings modal (**🎨 Display**, **🎬 Video**, **⚡ Scraper**, **🛠️ System**) with 250-entry flight recorder diagnostics and instant reset buttons.
-*   **🎭 Performer Hover ID Cards & 1-Click Profile Jump:** Hovering over any performer row displays a frosted glass ID card with their 110×146px portrait photo, rating (`★★★★☆`), country flag (`🇺🇸 US`), gender, age, aliases, and disambiguation. Click to open their profile in a new tab!
-*   **⚡ Smart Auto-Save Workflow:** Quick-action suggestions, recent pills (`1`–`9`), studio chips, and search-and-select immediately auto-save to the scene.
-*   **💾 Save-in-Place Workflow:** Clicking `Save` saves changes directly to Stash while keeping the popup open so you can continue tagging without interruption.
-*   **🎨 State-Aware Pulsing Save Button:** Save button stays dimmed when everything is saved, and lights up **Emerald Green** with a breathing pulse when pending edits exist.
-*   **💡 Smart Scene Suggestions:** Automatically detects and suggests matching tags, performers, and studios from filenames, titles, directory paths, and quality badges (`4K`, `1080p`, `NEW`).
-*   **📌 Pinned Tokens:** Pin favorite tags, performers, and studios (`Alt + Click` or `Right Click`) for fixed, permanent muscle-memory number hotkeys (`1`–`9`).
-*   **🏢 Full Entity Editing:** Edit Tags, Performers, Studios (with parent hierarchy search), and Galleries directly from any scene card.
-*   **📦 Multi-Scene Bulk Tagging:** Batch-apply or remove tags, performers, and studios across multiple selected scenes simultaneously.
-*   **⌨️ Number Hotkeys (`1`–`9`) & Search Shortcut (`/`):** Fast single-key toggling for tokens, with `/` or `S` to jump into search.
-*   **📐 8-Direction Resizing & Size Memory:** Stretch the modal from any edge or corner with automatic size persistence.
+Featuring a **Dual-Table Edit Everything Workspace**, **Random Untagged Backlog Mode**, **Smart Popularity Search**, **Full Video Stream Scrubbing**, and **Performer ID Cards**, FastTag makes organizing media collections effortless and fast.
 
-*See the full release history in [CHANGELOG.md](plugins/fasttag/CHANGELOG.md) and the comprehensive user guide in [HOWTO.md](plugins/fasttag/HOWTO.md).*
+---
+
+## 🔥 Key Features
+
+* **⚡ Edit Everything (All-in-One Workspace):** Dual side-by-side tables for editing Tags, Performers, and Studios simultaneously with resizable columns, compact Studio & Group bars with glowing SVG icons, and 16:9 video preview.
+* **🎲 Random Untagged Scene Mode:** One-click backlog cleanup with 3D rolling dice keyframe animations, sunset cyberpunk button, remaining backlog counter, and secret power-user hotkeys (<kbd>Cmd/Ctrl+Enter</kbd>).
+* **🔁 In-Place Sequential Navigation:** Review and tag scene-by-scene sequentially (`[1/60]`) with instant in-place transitions.
+* **📊 Smart Popularity Search:** Ranks active search results by popularity (scene count) & match relevance across all modals, keeping selected items pinned at the top when search is empty.
+* **🎬 Full Video Stream Scrubbing & Frame Freeze:** Toggle to `🎬 Full Video` to scrub through full scene streams with velocity-based mouse wheel control, hold <kbd>Shift</kbd> to freeze & step frame-by-frame, and tap <kbd>Option+V</kbd> (Mac) / <kbd>Alt+V</kbd> (Windows/Linux) to toggle modes.
+* **⤢ Floating Video Popout HUD:** Click `⤢` to detach the video into a 2x floating, resizable workstation while FastTag collapses into a 33px placeholder bar for 100% vertical table space. Click `⤝` to snap back!
+* **⚙️ Category Tabbed Settings Suite:** Redesigned 4-tab settings modal (**🎨 Display**, **🎬 Video**, **⚡ Scraper**, **🛠️ System**) with 250-entry flight recorder diagnostics and instant reset buttons.
+* **🎭 Performer Hover ID Cards & 1-Click Profile Jump:** Hovering over any performer row displays a frosted glass ID card with their 110×146px portrait photo, rating (`★★★★☆`), country flag (`🇺🇸 US`), gender, age, aliases, and disambiguation. Click to open their profile in a new tab!
+* **⚡ Smart Auto-Save Workflow:** Quick-action suggestions, recent pills (`1`–`9`), studio chips, and search-and-select immediately auto-save to the scene.
+* **💾 Save-in-Place Workflow:** Clicking `Save` saves changes directly to Stash while keeping the popup open so you can continue tagging without interruption.
+* **🎨 State-Aware Pulsing Save Button:** Save button stays dimmed when everything is saved, and lights up **Emerald Green** with a breathing pulse when pending edits exist.
+* **💡 Smart Scene Suggestions:** Automatically detects and suggests matching tags, performers, and studios from filenames, titles, directory paths, and quality badges (`4K`, `1080p`, `NEW`).
+* **📌 Pinned Tokens:** Pin favorite tags, performers, and studios (`Alt + Click` or `Right Click`) for fixed, permanent muscle-memory number hotkeys (`1`–`9`).
+* **🏢 Full Entity Editing:** Edit Tags, Performers, Studios (with parent hierarchy search), and Galleries directly from any scene card.
+* **📦 Multi-Scene Bulk Tagging:** Batch-apply or remove tags, performers, and studios across multiple selected scenes simultaneously.
+* **📐 8-Direction Resizing & Size Memory:** Stretch the modal from any edge or corner with automatic size persistence.
+
+---
 
 ## 📥 Installation
 
@@ -52,34 +65,29 @@ A fast tagging workflow for Stash scene cards, designed for video libraries wher
 
 ---
 
-## 📖 How to Use
+## ⌨️ Keyboard Shortcuts Cheat Sheet
 
-> For the full illustrated guide and workflows, see **[HOWTO.md](plugins/fasttag/HOWTO.md)**.
-
-* **Open FastTag:** **Right-Click** anywhere on any scene card in Stash to open the context menu.
-* **⚡ Edit Everything:** Tag everything in one unified window with dual side-by-side tables for Tags & Performers, dedicated Studio bar, smart suggestions, and 16:9 video preview.
-* **Single Entity Modes:** Choose `Edit Tags...`, `Edit Performers...`, `Edit Studio...`, or `Edit Galleries...` for focused edits.
-* **🔁 Sequential Mode:** Check `[x] Sequential` to review and tag scene-by-scene (`[1/60]`) with instant in-place transitions.
-* **💡 Smart Suggestions:** 1-click accept tags, performers, and studios auto-detected from filenames, titles, and video quality badges.
-* **📌 Pin Favorites:** `Alt + Click` or `Right-Click` any recent chip to pin it for permanent number hotkeys (`1`–`9`).
-* **➕ Quick Entity Creation:** Type a new name into search and click `+ Create` to check spelling and aliases before adding it to Stash and your scene.
-* **⚙️ FastTag Settings:** Right-click ➔ `FastTag Settings` to toggle database ID columns, enable/disable suggestions, and switch themes.
-* **💾 Save in Place:** Clicking `Save` (or pressing `Enter`) saves changes immediately to Stash and keeps the popup open so you can continue tagging.
-* **⌨️ Hotkeys:**
-  - `Scroll Wheel`: Scrub full video forward/backward (in Full Video mode)
-  - `Hold Shift + Scroll`: Freeze video and step frame-by-frame
-  - `1`–`9`: Toggle recent chips (auto-saves immediately)
-  - `/` or `S`: Focus search
-  - `Esc`: Clear search / close popup
-  - `Alt + →` / `Alt + ←`: Next / Previous scene in sequential mode
-  - `Enter`: Save in place (or Save & Next Scene in sequential mode)
+| Shortcut | Action |
+| :--- | :--- |
+| <kbd>Option</kbd> + <kbd>V</kbd> *(Mac)* / <kbd>Alt</kbd> + <kbd>V</kbd> | Toggle Full Video Stream vs Preview mode |
+| <kbd>Cmd</kbd> + <kbd>Enter</kbd> *(Mac)* / <kbd>Ctrl</kbd> + <kbd>Enter</kbd> | Roll Next Random Untagged Scene *(in Random Mode)* |
+| <kbd>Alt</kbd> + <kbd>→</kbd> / <kbd>Alt</kbd> + <kbd>←</kbd> | Next / Previous scene in sequential mode |
+| <kbd>Mouse Wheel</kbd> | Scrub video forward/backward *(in Full Video mode)* |
+| <kbd>Shift</kbd> + <kbd>Mouse Wheel</kbd> | Freeze video & step frame-by-frame |
+| <kbd>1</kbd> – <kbd>9</kbd> | Toggle recent / pinned token chips |
+| <kbd>/</kbd> or <kbd>S</kbd> | Focus global search box |
+| <kbd>Esc</kbd> | Clear search box / close modal (2-stage) |
+| <kbd>Enter</kbd> | Save in place |
 
 ---
 
-## 🎯 Why This Exists
-This plugin is built for quickly tagging scenes in a video library, especially when you want to assign metadata like performers, tags, and galleries without opening multiple pages or navigating away from the current view.
+## 📖 Documentation & Links
+
+* 📘 **Full User Guide**: See **[HOWTO.md](plugins/fasttag/HOWTO.md)** for complete workflows and screenshots.
+* 📝 **Release History**: See **[CHANGELOG.md](plugins/fasttag/CHANGELOG.md)** for full version history.
 
 ---
 
 ## 🤝 Support & Contributing
-*   **Support:** If you find FastTag helpful, you can [buy me a KitKat here 🍫](https://buymeacoffee.com/kamarsh).
+
+If you find FastTag helpful, feel free to [buy me a KitKat here 🍫](https://buymeacoffee.com/kamarsh)!
