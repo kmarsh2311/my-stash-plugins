@@ -8026,6 +8026,7 @@
                 updateVisibility();
                 await fetchData("", true);
                 refreshUI();
+                await saveWithoutReload(sceneId, selectedIds);
                 filterInput.focus({ preventScroll: true });
             } else {
                 toastError(`Failed to create ${config.title.toLowerCase()}`, res.errors);
@@ -10674,10 +10675,20 @@
                     refreshAllUI();
                     await doSave(`${config.title} "${finalName}" created & added to scene`);
                     popup.globalSearch.focus({ preventScroll: true });
-                    } else {
-                        toastError(`Failed to create ${config.title.toLowerCase()}`, res.errors);
-                    }
-                };
+                } else {
+                    toastError(`Failed to create ${config.title.toLowerCase()}`, res.errors);
+                }
+            };
+
+            form.addEventListener('click', (e) => {
+                const createBtn = e.target.closest('.fasttag-create-empty-btn');
+                if (createBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const targetType = createBtn.getAttribute('data-type');
+                    if (targetType) handleCreateEntity(targetType);
+                }
+            });
 
                 const refreshAllUI = () => {
                     updateBadges();
