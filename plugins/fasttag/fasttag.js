@@ -368,6 +368,49 @@
         #scenes-custom-menu.theme-dark a { color: #e2e8f0; }
         #scenes-custom-menu.theme-dark a:hover { background: #334155; color: #ffffff; }
 
+        .fasttag-btn-random {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%) !important;
+            box-shadow: 0 4px 14px rgba(139, 92, 246, 0.4), 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+            border: 1px solid rgba(255, 255, 255, 0.18) !important;
+            color: #ffffff !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.01em;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .fasttag-btn-random:hover {
+            transform: translateY(-1.5px) !important;
+            box-shadow: 0 6px 20px rgba(217, 70, 239, 0.5), 0 2px 5px rgba(0, 0, 0, 0.25) !important;
+            filter: brightness(1.06);
+        }
+        .fasttag-btn-random:active {
+            transform: translateY(1px) scale(0.98) !important;
+            box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4) !important;
+        }
+        .fasttag-btn-random::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%; width: 60%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+            transform: skewX(-20deg);
+            transition: left 0.6s ease;
+            pointer-events: none;
+        }
+        .fasttag-dice-icon {
+            display: inline-block;
+            transform-origin: center center;
+        }
+        @keyframes fasttagDiceRoll {
+            0% { transform: rotate(0deg) scale(1); }
+            40% { transform: rotate(180deg) scale(1.45); }
+            75% { transform: rotate(380deg) scale(1.15); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+        .fasttag-dice-rolling {
+            animation: fasttagDiceRoll 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) both !important;
+        }
+
         #scenes-custom-menu.theme-light {
             background: #ffffff;
             border: 1px solid #e2e8f0;
@@ -3163,7 +3206,7 @@
                 showCueOnce();
 
                 const video = document.createElement('video');
-                video.style.cssText = 'display: block; width: 100%; height: 100%; object-fit: cover; background: #0f172a; pointer-events: none;';
+                video.style.cssText = 'display: block; width: 100%; height: 100%; object-fit: contain; background: #0f172a; pointer-events: none;';
                 video.muted = true;
                 video.defaultMuted = true;
                 video.volume = 0;
@@ -3201,7 +3244,7 @@
                     const isVideo = /\/preview(?:[?#]|$)|\.(mp4|webm|mov|m4v|ogg)(\?.*)?$/i.test(previewUrl);
                     if (isVideo) {
                         const video = document.createElement('video');
-                        video.style.cssText = 'display: block; width: 100%; height: 100%; object-fit: cover; background: #0f172a; pointer-events: none;';
+                        video.style.cssText = 'display: block; width: 100%; height: 100%; object-fit: contain; background: #0f172a; pointer-events: none;';
                         video.muted = true;
                         video.defaultMuted = true;
                         video.volume = 0;
@@ -3228,7 +3271,7 @@
                     } else {
                         // Image/webp preview
                         const img = document.createElement('img');
-                        img.style.cssText = 'display: block; width: 100%; height: 100%; object-fit: cover; background: #0f172a; pointer-events: none;';
+                        img.style.cssText = 'display: block; width: 100%; height: 100%; object-fit: contain; background: #0f172a; pointer-events: none;';
                         img.alt = 'Scene preview';
                         img.loading = 'eager';
                         img.src = previewUrl;
@@ -3260,7 +3303,7 @@
                 return;
             }
             const img = document.createElement('img');
-            img.style.cssText = 'display: block; width: 100%; height: 100%; object-fit: cover; background: #0f172a; pointer-events: none;';
+            img.style.cssText = 'display: block; width: 100%; height: 100%; object-fit: contain; background: #0f172a; pointer-events: none;';
             img.alt = 'Scene cover';
             img.loading = 'eager';
             img.onerror = () => {
@@ -3954,18 +3997,18 @@
     // --- Search, Sorting, and Quick Selection ---
     function getSmartSortComparator(term, selectedIds, labelKey, searchFields = [labelKey], sortKey = 'name_asc') {
         return (a, b) => {
-            const hasSet = selectedIds && typeof selectedIds.has === 'function';
-            const aSel = hasSet && selectedIds.has(String(a.id));
-            const bSel = hasSet && selectedIds.has(String(b.id));
-            if (aSel && !bSel) return -1;
-            if (!aSel && bSel) return 1;
-
             const aName = String(a[labelKey] || '').trim().toLowerCase();
             const bName = String(b[labelKey] || '').trim().toLowerCase();
             const aId = String(a.id || '').trim();
             const bId = String(b.id || '').trim();
 
             if (!term) {
+                const hasSet = selectedIds && typeof selectedIds.has === 'function';
+                const aSel = hasSet && selectedIds.has(String(a.id));
+                const bSel = hasSet && selectedIds.has(String(b.id));
+                if (aSel && !bSel) return -1;
+                if (!aSel && bSel) return 1;
+
                 switch (sortKey) {
                     case 'name_desc':
                         return bName.localeCompare(aName);
@@ -4434,6 +4477,7 @@
         createMenuItem('🖼️ Edit Galleries', () => openEntityPopup('galleries', sceneId, cardElement));
         createMenuItem('🎬 Edit Scene', () => openEditScenePage(sceneId));
         createMenuItem('⚡ Edit Everything', () => openEditEverythingPopup(sceneId, cardElement));
+        createMenuItem('🎲 Random Untagged Scene', () => rollNextRandomUntaggedScene());
 
         const bulkScenes = getBulkSelectedScenes();
         if (bulkScenes.length >= 2) {
@@ -8377,13 +8421,15 @@
                     <span id="everything-popup-title" class="popup-title" style="font-size: 13px; font-weight: 600; line-height: 1.2; user-select: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: grab; display: inline-flex; align-items: center;">⚡ Edit Scene (Tags + Performers + Studio)</span>
                 </div>
                 <div style="display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; cursor: default;">
-                    <label class="popup-seq-label" style="font-size: 12px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; user-select: none; margin: 0; line-height: 1;">
-                        <input type="checkbox" id="everything-sequential-mode" style="cursor: pointer; margin: 0; width: 13px; height: 13px; accent-color: #6366f1; vertical-align: middle;">
-                        Sequential
-                    </label>
-                    <div id="everything-nav-group" style="display: inline-flex; align-items: center; gap: 4px; overflow: hidden; max-width: 0; opacity: 0; transition: max-width 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease; vertical-align: middle;">
-                        <button type="button" id="everything-prev-btn" class="popup-nav-btn" title="Previous scene (Alt+Left)" style="padding: 2px 7px; height: 22px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; box-sizing: border-box;">◄</button>
-                        <button type="button" id="everything-next-btn" class="popup-nav-btn" title="Next scene (Alt+Right)" style="padding: 2px 7px; height: 22px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; box-sizing: border-box;">►</button>
+                    <div id="everything-seq-container" style="display: inline-flex; align-items: center; gap: 6px;">
+                        <label class="popup-seq-label" style="font-size: 12px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; user-select: none; margin: 0; line-height: 1;">
+                            <input type="checkbox" id="everything-sequential-mode" style="cursor: pointer; margin: 0; width: 13px; height: 13px; accent-color: #6366f1; vertical-align: middle;">
+                            Sequential
+                        </label>
+                        <div id="everything-nav-group" style="display: inline-flex; align-items: center; gap: 4px; overflow: hidden; max-width: 0; opacity: 0; transition: max-width 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease; vertical-align: middle;">
+                            <button type="button" id="everything-prev-btn" class="popup-nav-btn" title="Previous scene (Alt+Left)" style="padding: 2px 7px; height: 22px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; box-sizing: border-box;">◄</button>
+                            <button type="button" id="everything-next-btn" class="popup-nav-btn" title="Next scene (Alt+Right)" style="padding: 2px 7px; height: 22px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; box-sizing: border-box;">►</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -8504,6 +8550,7 @@
         return {
             element: form,
             titleSpan: form.querySelector('#everything-popup-title'),
+            seqContainer: form.querySelector('#everything-seq-container'),
             sequentialCheckbox: form.querySelector('#everything-sequential-mode'),
             navGroup: form.querySelector('#everything-nav-group'),
             prevBtn: form.querySelector('#everything-prev-btn'),
@@ -8853,6 +8900,60 @@
         renderSuggestionsUI();
     }
 
+    async function rollNextRandomUntaggedScene(popup = null) {
+        if (popup && popup.saveBtn) {
+            const dice = popup.saveBtn.querySelector('.fasttag-dice-icon');
+            if (dice) {
+                dice.classList.remove('fasttag-dice-rolling');
+                void dice.offsetWidth;
+                dice.classList.add('fasttag-dice-rolling');
+            }
+        }
+
+        const query = `
+            query FindRandomUntaggedScene {
+                findScenes(
+                    scene_filter: { tags: { modifier: IS_NULL } }
+                    filter: { per_page: 1, sort: "random" }
+                ) {
+                    count
+                    scenes {
+                        id
+                        title
+                        files { path }
+                    }
+                }
+            }
+        `;
+        try {
+            showToast('🎲 Rolling random untagged scene...', 'info', 1500);
+            const res = await fetchGQL(query);
+            const data = res?.data?.findScenes;
+            const count = data?.count || 0;
+            const scenes = data?.scenes || [];
+
+            if (scenes.length === 0 || !scenes[0]?.id) {
+                toastSuccess('🎉 No untagged scenes found! Your library is fully tagged.');
+                return;
+            }
+
+            const targetScene = scenes[0];
+            if (popup && popup.element && popup.element.isConnected) {
+                popup._isRandomMode = true;
+                popup._randomUntaggedCount = count;
+                sequentialEditState.enabled = false;
+                await loadEditEverythingDataIntoPopup(targetScene.id, null, popup);
+                popup._context?.refreshAllUI?.();
+                toastSuccess(`🎲 Rolled random untagged scene (${count} remaining)`);
+            } else {
+                await openEditEverythingPopup(targetScene.id, null, true, count);
+                toastSuccess(`🎲 Found random untagged scene (${count} remaining)`);
+            }
+        } catch (e) {
+            toastError('Failed to find random untagged scene', e);
+        }
+    }
+
     async function navigateSequentialEditEverything(popup, sceneId, direction, doSaveFn) {
         if (!sequentialEditState.enabled) return;
 
@@ -8941,11 +9042,23 @@
         const titleSpan = popup.titleSpan;
 
         const updateUI = () => {
-            const isEnabled = sequentialEditState.enabled;
-            seqCheckbox.checked = isEnabled;
+            const isRandom = Boolean(popup._isRandomMode);
+            const isSeq = Boolean(sequentialEditState.enabled) && !isRandom;
+            seqCheckbox.checked = isSeq;
             const sceneTitle = getSceneTitle(popup.sceneData, sceneId, cardElement);
 
-            if (isEnabled) {
+            if (isRandom) {
+                const untaggedCount = popup._randomUntaggedCount !== undefined ? popup._randomUntaggedCount : '?';
+                titleSpan.innerHTML = `<span style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; font-size: 13px; line-height: 1; flex-shrink: 0; margin-right: 4px; user-select: none; transform: translateY(1.5px);">⚡</span><span style="opacity: 0.95; font-size: 11px; background: rgba(99,102,241,0.25); border: 1px solid rgba(99,102,241,0.45); padding: 1px 6px; border-radius: 4px; margin-right: 7px; font-weight: 700; color: #a5b4fc; white-space: nowrap; flex-shrink: 0; line-height: 1.3;">🎲 [${untaggedCount} untagged]</span><span class="fasttag-marquee-box" style="flex: 1; min-width: 0; overflow: hidden; display: inline-flex; align-items: center;"><span class="fasttag-marquee-track"><span class="fasttag-marquee-item" data-raw-title="${escapeHtml(sceneTitle)}" title="${escapeHtml(sceneTitle)}">${escapeHtml(sceneTitle)}</span></span></span>`;
+                titleSpan.title = `🎲 ${sceneTitle} [${untaggedCount} untagged]`;
+                applyMarqueeAnimation(titleSpan);
+
+                if (popup.seqContainer) popup.seqContainer.style.display = 'none';
+                if (popup.navGroup) popup.navGroup.style.display = 'none';
+            } else if (isSeq) {
+                if (popup.seqContainer) popup.seqContainer.style.display = 'inline-flex';
+                if (popup.navGroup) popup.navGroup.style.display = 'inline-flex';
+
                 if (!sequentialEditState.allSceneCards || sequentialEditState.allSceneCards.length === 0) {
                     sequentialEditState.allSceneCards = getAllVisibleSceneCards();
                 }
@@ -8958,31 +9071,38 @@
                     applyMarqueeAnimation(titleSpan);
                 }
             } else {
+                if (popup.seqContainer) popup.seqContainer.style.display = 'inline-flex';
+                if (popup.navGroup) popup.navGroup.style.display = 'inline-flex';
+
                 titleSpan.innerHTML = `<span style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; font-size: 13px; line-height: 1; flex-shrink: 0; margin-right: 7px; user-select: none; transform: translateY(1.5px);">⚡</span><span class="fasttag-marquee-box" style="flex: 1; min-width: 0; overflow: hidden; display: inline-flex; align-items: center;"><span class="fasttag-marquee-track"><span class="fasttag-marquee-item" data-raw-title="${escapeHtml(sceneTitle)}" title="${escapeHtml(sceneTitle)}">${escapeHtml(sceneTitle)}</span></span></span>`;
                 titleSpan.title = sceneTitle;
                 applyMarqueeAnimation(titleSpan);
             }
 
-            prevBtn.disabled = !isEnabled;
-            nextBtn.disabled = !isEnabled;
-            prevBtn.style.opacity = isEnabled ? '1' : '0.4';
-            nextBtn.style.opacity = isEnabled ? '1' : '0.4';
-            prevBtn.style.cursor = isEnabled ? 'pointer' : 'not-allowed';
-            nextBtn.style.cursor = isEnabled ? 'pointer' : 'not-allowed';
+            prevBtn.disabled = !isSeq;
+            nextBtn.disabled = !isSeq;
+            prevBtn.style.opacity = isSeq ? '1' : '0.4';
+            nextBtn.style.opacity = isSeq ? '1' : '0.4';
+            prevBtn.style.cursor = isSeq ? 'pointer' : 'not-allowed';
+            nextBtn.style.cursor = isSeq ? 'pointer' : 'not-allowed';
 
             if (popup.navGroup) {
-                popup.navGroup.style.maxWidth = isEnabled ? '60px' : '0';
-                popup.navGroup.style.opacity = isEnabled ? '1' : '0';
+                popup.navGroup.style.maxWidth = isSeq ? '60px' : '0';
+                popup.navGroup.style.opacity = isSeq ? '1' : '0';
             }
         };
 
         try {
-            const savedPref = localStorage.getItem('fasttag_sequential_edit_mode');
-            if (savedPref === 'true') {
-                sequentialEditState.enabled = true;
-                sequentialEditState.allSceneCards = getAllVisibleSceneCards();
-                sequentialEditState.currentIndex = getSceneCardIndex(sceneId, sequentialEditState.allSceneCards);
-                sequentialEditState.currentSceneId = sceneId;
+            if (!popup._isRandomMode) {
+                const savedPref = localStorage.getItem('fasttag_sequential_edit_mode');
+                if (savedPref === 'true') {
+                    sequentialEditState.enabled = true;
+                    sequentialEditState.allSceneCards = getAllVisibleSceneCards();
+                    sequentialEditState.currentIndex = getSceneCardIndex(sceneId, sequentialEditState.allSceneCards);
+                    sequentialEditState.currentSceneId = sceneId;
+                }
+            } else {
+                sequentialEditState.enabled = false;
             }
         } catch (e) {}
 
@@ -9025,6 +9145,16 @@
             hideScrapeCoverTooltip();
             navigateSequentialEditEverything(popup, sceneId, 1, doSaveFn);
         };
+
+        if (popup.randomBtn) {
+            popup.randomBtn.onclick = async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                popup.randomBtn.style.transform = 'scale(0.92)';
+                setTimeout(() => { if (popup.randomBtn) popup.randomBtn.style.transform = 'none'; }, 150);
+                await rollNextRandomUntaggedScene(popup);
+            };
+        }
     }
 
     async function loadEditEverythingDataIntoPopup(sceneId, cardElement, popup) {
@@ -9145,7 +9275,7 @@
         }
     }
 
-    async function openEditEverythingPopup(sceneId, cardElement) {
+    async function openEditEverythingPopup(sceneId, cardElement, isRandomMode = false, randomCount = 0) {
         try {
             if (!isTabulatorLoaded()) {
                 await ensureDependenciesLoaded();
@@ -9157,6 +9287,11 @@
 
             // If the Everything popup is already open, reuse it in-place! Zero redraw flash!
             if (activePopup && activePopup.type === 'everything' && activePopup.element && activePopup.element.isConnected) {
+                activePopup._isRandomMode = isRandomMode;
+                activePopup._randomUntaggedCount = randomCount;
+                if (isRandomMode) {
+                    sequentialEditState.enabled = false;
+                }
                 await loadEditEverythingDataIntoPopup(sceneId, cardElement, activePopup);
                 return;
             }
@@ -9169,6 +9304,11 @@
 
             const popup = createEditEverythingPopupShell();
             popup.type = 'everything';
+            popup._isRandomMode = isRandomMode;
+            popup._randomUntaggedCount = randomCount;
+            if (isRandomMode) {
+                sequentialEditState.enabled = false;
+            }
             activePopup = popup;
             const form = popup.element;
             positionPopupNearCard(form, cardElement);
@@ -9242,7 +9382,26 @@
             };
 
             const updateSaveButton = () => {
-                if (sequentialEditState.enabled) {
+                if (popup._isRandomMode) {
+                    if (popup.cancelBtn) {
+                        popup.cancelBtn.style.flex = 'none';
+                        popup.cancelBtn.style.width = 'auto';
+                        popup.cancelBtn.style.fontWeight = '500';
+                        popup.cancelBtn.textContent = 'Close';
+                    }
+                    if (popup.saveBtn) {
+                        popup.saveBtn.style.display = 'block';
+                        popup.saveBtn.style.flex = '1';
+                        popup.saveBtn.disabled = false;
+                        popup.saveBtn.style.opacity = '1';
+                        popup.saveBtn.style.cursor = 'pointer';
+                        if (!popup.saveBtn.classList.contains('fasttag-btn-random')) {
+                            popup.saveBtn.className = 'fasttag-btn-random';
+                            popup.saveBtn.innerHTML = `<span class="fasttag-dice-icon" style="display: inline-block; margin-right: 6px; font-size: 15px; line-height: 1; vertical-align: middle;">🎲</span>Next Random Scene`;
+                        }
+                        popup.saveBtn.classList.remove('fasttag-btn-pulse-calm');
+                    }
+                } else if (sequentialEditState.enabled) {
                     const cards = sequentialEditState.allSceneCards || getAllVisibleSceneCards();
                     const idx = getSceneCardIndex(currentSceneId, cards);
                     const isLast = idx !== -1 && idx === cards.length - 1;
@@ -9255,6 +9414,8 @@
                     }
 
                     if (popup.saveBtn) {
+                        popup.saveBtn.className = '';
+                        popup.saveBtn.style.boxShadow = 'none';
                         popup.saveBtn.style.display = 'block';
                         popup.saveBtn.style.flex = '1';
                         popup.saveBtn.disabled = false;
@@ -9266,6 +9427,7 @@
                     }
                 } else {
                     if (popup.saveBtn) {
+                        popup.saveBtn.className = '';
                         popup.saveBtn.style.display = 'none';
                     }
                     if (popup.cancelBtn) {
@@ -10572,7 +10734,7 @@
                     const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
                     if (!hasSearch) {
                         e.preventDefault();
-                        if (popup.saveBtn) popup.saveBtn.click();
+                        if (!popup._isRandomMode && popup.saveBtn) popup.saveBtn.click();
                         return;
                     }
 
@@ -10921,7 +11083,9 @@
             }
 
             popup.saveBtn.onclick = async () => {
-                if (sequentialEditState.enabled) {
+                if (popup._isRandomMode) {
+                    await rollNextRandomUntaggedScene(popup);
+                } else if (sequentialEditState.enabled) {
                     const cards = sequentialEditState.allSceneCards || getAllVisibleSceneCards();
                     const idx = getSceneCardIndex(currentSceneId, cards);
                     const isLast = idx !== -1 && idx === cards.length - 1;

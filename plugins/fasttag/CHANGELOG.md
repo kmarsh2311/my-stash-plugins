@@ -4,6 +4,23 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [3.9.7] - 2026-09-01
+
+### Added & Improved
+- **🎲 Random Untagged Scene Mode**:
+  - Added dedicated Random Mode accessible from the scene card context menu (`🎲 Random Untagged Scene`).
+  - Automatically queries Stash GraphQL for random untagged scenes in your library and opens them directly in FastTag.
+  - Dedicated Random Mode header displays remaining backlog counter (`⚡ 🎲 [X untagged] Scene Title`) and hides sequential controls.
+  - Prominent **`[ 🎲 Next Random Scene ]`** bottom footer button styled with a vibrant sunset gradient, soft ambient glow, hover shimmer, and animated 3D keyframe dice spin on roll.
+  - Secret power-user hotkey: <kbd>Ctrl+Enter</kbd> (PC/Linux) and <kbd>Cmd+Enter</kbd> (Mac) rolls the next random untagged scene, while plain <kbd>Enter</kbd> is safely locked to prevent accidental scene skips.
+- **Smart Popularity-Driven Search**:
+  - When actively searching, results are now sorted purely by **Match Relevance & Scene Count (popularity)** across all modals, ensuring popular tags (e.g. `Blond Hair`) always appear at the top.
+  - Selected tags/performers remain pinned at the very top of tables when search is empty for instant review and 1-click removal.
+- **Video Preview Aspect Ratio Scaling**:
+  - Changed video and image preview rendering to `object-fit: contain`. Popped-out floating video HUD and embedded preview windows now scale the full video frame smoothly without cropping or cutting off logos/subtitles.
+
+---
+
 ## [3.9.6] - 2026-09-01
 
 ### Fixed & Improved
