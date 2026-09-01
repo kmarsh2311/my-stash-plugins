@@ -3971,14 +3971,18 @@
                         return bName.localeCompare(aName);
                     case 'sort_name':
                     case 'sort_name_asc': {
-                        const aSort = String(a.sort_name || a[labelKey] || '').trim().toLowerCase();
-                        const bSort = String(b.sort_name || b[labelKey] || '').trim().toLowerCase();
-                        return aSort.localeCompare(bSort) || aName.localeCompare(bName);
+                        const aSort = String(a.sort_name && a.sort_name.trim() ? a.sort_name : (a[labelKey] || '')).trim().toLowerCase();
+                        const bSort = String(b.sort_name && b.sort_name.trim() ? b.sort_name : (b[labelKey] || '')).trim().toLowerCase();
+                        if (aSort < bSort) return -1;
+                        if (aSort > bSort) return 1;
+                        return aName < bName ? -1 : (aName > bName ? 1 : 0);
                     }
                     case 'sort_name_desc': {
-                        const aSort = String(a.sort_name || a[labelKey] || '').trim().toLowerCase();
-                        const bSort = String(b.sort_name || b[labelKey] || '').trim().toLowerCase();
-                        return bSort.localeCompare(aSort) || bName.localeCompare(aName);
+                        const aSort = String(a.sort_name && a.sort_name.trim() ? a.sort_name : (a[labelKey] || '')).trim().toLowerCase();
+                        const bSort = String(b.sort_name && b.sort_name.trim() ? b.sort_name : (b[labelKey] || '')).trim().toLowerCase();
+                        if (aSort > bSort) return -1;
+                        if (aSort < bSort) return 1;
+                        return aName > bName ? -1 : (aName < bName ? 1 : 0);
                     }
                     case 'scene_count_desc':
                         return (Number(b.scene_count) || 0) - (Number(a.scene_count) || 0) || aName.localeCompare(bName);

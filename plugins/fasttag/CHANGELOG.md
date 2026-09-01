@@ -4,6 +4,15 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [3.9.6] - 2026-09-01
+
+### Fixed & Improved
+- **SQLite-Accurate `Stash Sort Name` Collation**:
+  - `Stash Sort Name` on Tags now compares strings using raw ASCII character collation (`!` $\rightarrow$ `0-9` $\rightarrow$ `_` $\rightarrow$ `A-Z`), matching Stash's backend `COLLATE NOCASE` query 1:1.
+  - Tag sorting now perfectly honors custom prefix markers (e.g. `!Favorite` at top, `zzz_Junk` at bottom).
+
+---
+
 ## [3.9.5] - 2026-08-31
 
 ### Added & Improved
