@@ -6479,12 +6479,21 @@
             item.aliases.split(',').forEach(a => { if (a.trim()) namesToCheck.push({ name: a.trim(), isPrimary: false }); });
         }
 
+        const primaryWords = normalizeTextForSuggestions(item.name || item.title || '').split(/\s+/).filter(Boolean);
+        const isPrimaryMultiWord = primaryWords.length > 1;
+
         for (const { name: raw, isPrimary } of namesToCheck) {
             const clean = normalizeTextForSuggestions(raw);
             if (!clean || clean.length < 2) continue;
 
-            if (!isPrimary && (clean.length <= 3 || SUGGESTION_STOP_WORDS.has(clean))) {
-                continue;
+            if (!isPrimary) {
+                const aliasWords = clean.split(/\s+/).filter(Boolean);
+                if (isPrimaryMultiWord && aliasWords.length === 1) {
+                    continue;
+                }
+                if (clean.length <= 3 || SUGGESTION_STOP_WORDS.has(clean)) {
+                    continue;
+                }
             }
 
             if (normalizedSpaced.includes(' ' + clean + ' ')) return true;
