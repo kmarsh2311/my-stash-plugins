@@ -1715,7 +1715,126 @@
     let isVideoPoppedOut = false;
     let floatingHudElement = null;
     let floatingHudPosition = null;
-    let floatingHudSize = null;
+    // --- Google Gemini AI Smart Metadata & Filename Parser ---
+    const GEMINI_API_KEY_KEY = 'fasttag_gemini_api_key';
+    const GEMINI_MODEL_KEY = 'fasttag_gemini_model';
+    const GEMINI_AUTO_PARSE_KEY = 'fasttag_gemini_auto_parse';
+    const GEMINI_SUGGESTIONS_KEY = 'fasttag_gemini_suggestions';
+
+    function getGeminiApiKey() {
+        return localStorage.getItem(GEMINI_API_KEY_KEY) || '';
+    }
+    function setGeminiApiKey(val) {
+        localStorage.setItem(GEMINI_API_KEY_KEY, (val || '').trim());
+    }
+    function getGeminiModel() {
+        return localStorage.getItem(GEMINI_MODEL_KEY) || 'gemini-1.5-flash';
+    }
+    function setGeminiModel(val) {
+        localStorage.setItem(GEMINI_MODEL_KEY, val || 'gemini-1.5-flash');
+    }
+    function getGeminiAutoParse() {
+        const val = localStorage.getItem(GEMINI_AUTO_PARSE_KEY);
+        return val === null ? true : val === 'true';
+    }
+    function setGeminiAutoParse(enabled) {
+        localStorage.setItem(GEMINI_AUTO_PARSE_KEY, enabled ? 'true' : 'false');
+    }
+    function getGeminiSuggestions() {
+        const val = localStorage.getItem(GEMINI_SUGGESTIONS_KEY);
+        return val === null ? true : val === 'true';
+    }
+    function setGeminiSuggestions(enabled) {
+        localStorage.setItem(GEMINI_SUGGESTIONS_KEY, enabled ? 'true' : 'false');
+    }
+
+    async function callGeminiAPI(prompt, customApiKey = null, customModel = null) {
+        const apiKey = customApiKey || getGeminiApiKey();
+        if (!apiKey) throw new Error('No Gemini API key configured. Enter your key in Settings ➔ 🤖 AI');
+        const model = customModel || getGeminiModel();
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+        const payload = {
+            contents: [{
+                parts: [{ text: prompt }]
+            }],
+            generationConfig: {
+                responseMimeType: "application/json",
+                temperature: 0.1
+            }
+        };
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            let errorText = await res.text();
+            try {
+                const parsed = JSON.parse(errorText);
+                errorText = parsed?.error?.message || errorText;
+            } catch (e) {}
+            throw new Error(`Gemini API error (${res.status}): ${errorText}`);
+        }
+
+        const data = await res.json();
+        const rawJson = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!rawJson) throw new Error('No response content returned from Gemini');
+        return JSON.parse(rawJson);
+    }
+
+    const geminiSceneParseCache = new Map();
+
+    async function parseSceneWithGemini(sceneId, rawFilename, rawTitle) {
+        if (geminiSceneParseCache.has(sceneId)) {
+            return geminiSceneParseCache.get(sceneId);
+        }
+
+        const apiKey = getGeminiApiKey();
+        if (!apiKey) throw new Error('No Gemini API key configured. Enter your key in Settings ➔ 🤖 AI');
+
+        ftLog('ACTION', 'GeminiAI', `Running AI smart parser on scene #${sceneId}: "${rawFilename || rawTitle}"...`);
+
+        // Small library samples to guide fuzzy performer/studio matching
+        let performersContext = [];
+        let studiosContext = [];
+        try {
+            const cachedPerformers = getCachedOrNull('performers') || [];
+            if (cachedPerformers.length > 0) {
+                performersContext = cachedPerformers.map(p => p.name).slice(0, 150);
+            }
+            const cachedStudios = getCachedOrNull('studios') || [];
+            if (cachedStudios.length > 0) {
+                studiosContext = cachedStudios.map(s => s.name).slice(0, 60);
+            }
+        } catch (e) {}
+
+        const prompt = `You are an expert video metadata extractor and parser.
+Analyze this video filename and title:
+Filename: "${rawFilename || ''}"
+Title: "${rawTitle || ''}"
+
+${performersContext.length > 0 ? `Sample library performers for reference: ${JSON.stringify(performersContext)}` : ''}
+${studiosContext.length > 0 ? `Sample library studios for reference: ${JSON.stringify(studiosContext)}` : ''}
+
+Extract and return a valid JSON object matching this schema:
+{
+  "clean_title": "Clean, human-readable scene title without technical metadata, video codecs, resolutions, site prefixes, or raw date prefixes",
+  "date": "Release date formatted as YYYY-MM-DD (or null if not found)",
+  "studio": "Studio, Network, or Website name (or null)",
+  "performers": ["Array of performer/actor names extracted from filename or title"],
+  "tags": ["Array of descriptive tags/genres/themes (e.g. Twink, Solo, Interview, BDSM, Outdoor)"],
+  "confidence": 95
+}`;
+
+        const result = await callGeminiAPI(prompt, apiKey, getGeminiModel());
+        ftLog('ACTION', 'GeminiAI', `Gemini AI parsed scene #${sceneId}: title="${result?.clean_title}", studio="${result?.studio}", performers=${JSON.stringify(result?.performers || [])}`);
+
+        geminiSceneParseCache.set(sceneId, result);
+        return result;
+    }
 
     function getDefaultPopoutSize(hostContainer) {
         const screenW = window.innerWidth;
@@ -2064,6 +2183,9 @@
                     <button type="button" class="fasttag-settings-tab-btn" data-tab="scraper" style="flex: 1; padding: 6px 4px; font-size: 11.5px; font-weight: 600; border: none; border-radius: 7px; background: transparent; color: ${textMuted}; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.15s ease;">
                         <span>⚡</span> Scraper
                     </button>
+                    <button type="button" class="fasttag-settings-tab-btn" data-tab="ai" style="flex: 1; padding: 6px 4px; font-size: 11.5px; font-weight: 600; border: none; border-radius: 7px; background: transparent; color: ${textMuted}; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.15s ease;">
+                        <span>🤖</span> AI
+                    </button>
                     <button type="button" class="fasttag-settings-tab-btn" data-tab="system" style="flex: 1; padding: 6px 4px; font-size: 11.5px; font-weight: 600; border: none; border-radius: 7px; background: transparent; color: ${textMuted}; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.15s ease;">
                         <span>🛠️</span> System
                     </button>
@@ -2215,7 +2337,64 @@
                         </div>
                     </div>
 
-                    <!-- TAB 4: SYSTEM -->
+                    <!-- TAB 4: AI (GEMINI) -->
+                    <div id="fasttag-tab-pane-ai" class="fasttag-tab-pane" style="display: none; flex-direction: column; gap: 14px;">
+                        <!-- Gemini API Key configuration -->
+                        <div style="display: flex; flex-direction: column; gap: 8px; background: ${cardBg}; padding: 12px; border-radius: 8px; border: 1px solid ${border};">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div style="font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                                    <span>✨</span> Google Gemini API Key
+                                </div>
+                                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="font-size: 11px; color: #818cf8; text-decoration: none; font-weight: 600;">Get Free Key ↗</a>
+                            </div>
+                            <div style="font-size: 11px; color: ${textMuted};">Powers intelligent filename parsing, performer extraction, studio identification, and clean title generation.</div>
+                            
+                            <div style="display: flex; gap: 6px; margin-top: 4px;">
+                                <div style="position: relative; flex: 1;">
+                                    <input type="password" id="fasttag-setting-gemini-key" value="${getGeminiApiKey()}" placeholder="Paste your Gemini API key here..." style="width: 100%; box-sizing: border-box; padding: 7px 34px 7px 10px; border-radius: 6px; border: 1px solid ${border}; background: ${bg}; color: ${text}; font-size: 12px; font-family: monospace;">
+                                    <button type="button" id="fasttag-btn-toggle-key" style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 13px; color: ${textMuted}; padding: 2px 4px;" title="Show/Hide Key">👁️</button>
+                                </div>
+                                <button type="button" id="fasttag-btn-test-gemini" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); color: #818cf8; font-size: 11.5px; font-weight: 600; padding: 6px 12px; border-radius: 6px; cursor: pointer; transition: all 0.15s ease; white-space: nowrap;">⚡ Test Key</button>
+                            </div>
+                            <div id="fasttag-gemini-test-status" style="font-size: 11px; display: none; margin-top: 2px;"></div>
+                        </div>
+
+                        <!-- Gemini Model Selection -->
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                            <div>
+                                <div style="font-weight: 600; font-size: 13px;">AI Model</div>
+                                <div style="font-size: 11px; color: ${textMuted};">Select Google Gemini model</div>
+                            </div>
+                            <select id="fasttag-setting-gemini-model" style="padding: 6px 10px; border-radius: 6px; border: 1px solid ${border}; background: ${cardBg}; color: ${text}; font-size: 12px; cursor: pointer;">
+                                <option value="gemini-1.5-flash" ${getGeminiModel() === 'gemini-1.5-flash' ? 'selected' : ''}>Gemini 1.5 Flash (Fastest, Recommended)</option>
+                                <option value="gemini-1.5-pro" ${getGeminiModel() === 'gemini-1.5-pro' ? 'selected' : ''}>Gemini 1.5 Pro (Deep Analysis)</option>
+                            </select>
+                        </div>
+
+                        <div style="height: 1px; background: ${border};"></div>
+
+                        <!-- Auto-Parse on Scene Open -->
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 13px;">Auto-Parse Filename on Scene Open</div>
+                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Automatically run AI filename extraction when opening a scene to suggest missing metadata.</div>
+                            </div>
+                            <input type="checkbox" id="fasttag-setting-gemini-auto-parse" ${getGeminiAutoParse() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                        </div>
+
+                        <div style="height: 1px; background: ${border};"></div>
+
+                        <!-- Include AI in Smart Suggestions -->
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 13px;">Include AI Results in Smart Suggestions</div>
+                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Show sparkling AI suggestions (✨) directly in the quick-suggestion chip list.</div>
+                            </div>
+                            <input type="checkbox" id="fasttag-setting-gemini-suggestions" ${getGeminiSuggestions() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                        </div>
+                    </div>
+
+                    <!-- TAB 5: SYSTEM -->
                     <div id="fasttag-tab-pane-system" class="fasttag-tab-pane" style="display: none; flex-direction: column; gap: 14px;">
                         <!-- Reset Layouts & Sizes setting -->
                         <div style="display: flex; flex-direction: column; gap: 8px; background: ${cardBg}; padding: 12px; border-radius: 8px; border: 1px solid ${border};">
@@ -2408,6 +2587,89 @@
                 if (speedFastInput) speedFastInput.value = DEFAULT_SCRUB_SPEEDS.fast;
                 if (speedFreezeInput) speedFreezeInput.value = DEFAULT_SCRUB_SPEEDS.freeze;
                 showToast('Scrubbing speeds & onboarding tips reset', 'info');
+            });
+        }
+
+        // TAB 4: AI Listeners
+        const geminiKeyInput = modal.querySelector('#fasttag-setting-gemini-key');
+        const toggleKeyBtn = modal.querySelector('#fasttag-btn-toggle-key');
+        const testGeminiBtn = modal.querySelector('#fasttag-btn-test-gemini');
+        const geminiTestStatus = modal.querySelector('#fasttag-gemini-test-status');
+        const geminiModelSelect = modal.querySelector('#fasttag-setting-gemini-model');
+        const geminiAutoParseToggle = modal.querySelector('#fasttag-setting-gemini-auto-parse');
+        const geminiSuggestionsToggle = modal.querySelector('#fasttag-setting-gemini-suggestions');
+
+        if (geminiKeyInput) {
+            geminiKeyInput.addEventListener('input', (e) => {
+                setGeminiApiKey(e.target.value);
+            });
+        }
+
+        if (toggleKeyBtn && geminiKeyInput) {
+            toggleKeyBtn.addEventListener('click', () => {
+                const isPass = geminiKeyInput.type === 'password';
+                geminiKeyInput.type = isPass ? 'text' : 'password';
+                toggleKeyBtn.textContent = isPass ? '🔒' : '👁️';
+            });
+        }
+
+        if (testGeminiBtn && geminiTestStatus) {
+            testGeminiBtn.addEventListener('click', async () => {
+                const key = geminiKeyInput?.value?.trim() || getGeminiApiKey();
+                if (!key) {
+                    geminiTestStatus.style.display = 'block';
+                    geminiTestStatus.style.color = '#f87171';
+                    geminiTestStatus.textContent = '✕ Please paste a Gemini API key first.';
+                    return;
+                }
+
+                testGeminiBtn.disabled = true;
+                testGeminiBtn.textContent = '⏳ Testing...';
+                geminiTestStatus.style.display = 'block';
+                geminiTestStatus.style.color = '#818cf8';
+                geminiTestStatus.textContent = 'Connecting to Google Gemini API...';
+
+                try {
+                    const testPrompt = `Respond with JSON: {"status": "ok", "message": "Gemini 1.5 Flash Connected"}`;
+                    const res = await callGeminiAPI(testPrompt, key, geminiModelSelect?.value || 'gemini-1.5-flash');
+                    if (res?.status === 'ok') {
+                        geminiTestStatus.style.color = '#34d399';
+                        geminiTestStatus.innerHTML = `✓ <strong>Connected!</strong> Google Gemini AI is online and ready.`;
+                        setGeminiApiKey(key);
+                        showToast('✓ Gemini API key verified & saved successfully!', 'success');
+                    } else {
+                        geminiTestStatus.style.color = '#f87171';
+                        geminiTestStatus.textContent = `✕ Unexpected response from Gemini.`;
+                    }
+                } catch (err) {
+                    geminiTestStatus.style.color = '#f87171';
+                    geminiTestStatus.textContent = `✕ ${err.message}`;
+                    showToast(`Gemini Test Failed: ${err.message}`, 'error');
+                } finally {
+                    testGeminiBtn.disabled = false;
+                    testGeminiBtn.textContent = '⚡ Test Key';
+                }
+            });
+        }
+
+        if (geminiModelSelect) {
+            geminiModelSelect.addEventListener('change', (e) => {
+                setGeminiModel(e.target.value);
+                showToast(`Gemini Model set to ${e.target.value}`, 'info');
+            });
+        }
+
+        if (geminiAutoParseToggle) {
+            geminiAutoParseToggle.addEventListener('change', (e) => {
+                setGeminiAutoParse(e.target.checked);
+                showToast(`Auto-Parse on Scene Open ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
+            });
+        }
+
+        if (geminiSuggestionsToggle) {
+            geminiSuggestionsToggle.addEventListener('change', (e) => {
+                setGeminiSuggestions(e.target.checked);
+                showToast(`AI Smart Suggestions ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
             });
         }
 
@@ -8658,7 +8920,11 @@
                 </div>
                 <button type="button" id="everything-refresh-btn" class="popup-refresh-btn" title="Refresh all caches" style="padding: 8px 10px; cursor: pointer; font-size: 13px; font-weight: 500; border-radius: 8px; white-space: nowrap; line-height: 1; flex-shrink: 0;">↻</button>
                 <button type="button" id="everything-scrape-btn" class="popup-scrape-btn" title="Scrape scene metadata (StashDB / Scrapers) [Alt+S]" style="padding: 7px 10px; cursor: pointer; font-size: 11.5px; font-weight: 700; border-radius: 8px; white-space: nowrap; line-height: 1; flex-shrink: 0; background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#c7d2fe' : '#4338ca'}; border: 1px solid ${isDark ? 'rgba(99, 102, 241, 0.45)' : '#a5b4fc'}; display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s ease;">⚡ Scrape</button>
+                <button type="button" id="everything-ai-btn" class="popup-ai-btn" title="Extract Clean Title, Performers & Studio with Google Gemini AI [Alt+A]" style="padding: 7px 10px; cursor: pointer; font-size: 11.5px; font-weight: 700; border-radius: 8px; white-space: nowrap; line-height: 1; flex-shrink: 0; background: ${isDark ? 'rgba(168, 85, 247, 0.2)' : '#f3e8ff'}; color: ${isDark ? '#e9d5ff' : '#7e22ce'}; border: 1px solid ${isDark ? 'rgba(168, 85, 247, 0.45)' : '#d8b4fe'}; display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s ease;">✨ AI Parse</button>
             </div>
+
+            <!-- Interactive AI Match Card Container -->
+            <div id="everything-ai-card-container" style="display: none; flex-direction: column; margin-bottom: 6px; flex-shrink: 0; width: 100%; box-sizing: border-box;"></div>
 
             <!-- Interactive Scraper Match Card Container -->
             <div id="everything-scraper-card-container" style="display: none; flex-direction: column; margin-bottom: 6px; flex-shrink: 0; width: 100%; box-sizing: border-box;"></div>
@@ -8763,6 +9029,8 @@
             globalClear: form.querySelector('#everything-global-clear'),
             scrapeBtn: form.querySelector('#everything-scrape-btn'),
             scraperCardContainer: form.querySelector('#everything-scraper-card-container'),
+            aiBtn: form.querySelector('#everything-ai-btn'),
+            aiCardContainer: form.querySelector('#everything-ai-card-container'),
             refreshBtn: form.querySelector('#everything-refresh-btn'),
             columnsContainer: form.querySelector('#everything-columns-container'),
             colTags: form.querySelector('#everything-col-tags'),
@@ -9430,6 +9698,14 @@
                 }, 80);
             }
 
+            if (getGeminiAutoParse() && getGeminiApiKey()) {
+                setTimeout(() => {
+                    if (typeof popup.triggerAIParse === 'function') {
+                        popup.triggerAIParse(true, sceneId, cardElement);
+                    }
+                }, 100);
+            }
+
             await loadUnifiedSuggestions(sceneId, cardElement, popup.suggestionsContainer, {
                 selectedTagIds: selTags,
                 selectedPerformerIds: selPerfs,
@@ -9458,6 +9734,298 @@
         } catch (err) {
             console.error('[FastTag] Error in loadEditEverythingDataIntoPopup:', err);
             toastError(`Error loading data: ${err?.message || err}`);
+        }
+    }
+
+    function renderEverythingAIMatchCard(container, aiResult, sceneId, popup, ctx) {
+        if (!container) return;
+        if (!aiResult) {
+            container.style.display = 'none';
+            container.innerHTML = '';
+            return;
+        }
+
+        const isDark = getEffectiveTheme() === 'dark';
+        const cardBg = isDark ? 'linear-gradient(135deg, rgba(88, 28, 135, 0.22) 0%, rgba(15, 23, 42, 0.85) 100%)' : 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)';
+        const cardBorder = isDark ? '1px solid rgba(168, 85, 247, 0.45)' : '1px solid #c084fc';
+        const textMain = isDark ? '#ffffff' : '#1e1b4b';
+        const textSub = isDark ? '#c084fc' : '#7e22ce';
+
+        const allTags = getCachedOrNull('tags') || [];
+        const allPerformers = getCachedOrNull('performers') || [];
+        const allStudios = getCachedOrNull('studios') || [];
+
+        // Match performers by name/alias
+        const matchedPerformers = (aiResult.performers || []).map(pName => {
+            const clean = normalizeTextForSuggestions(pName);
+            const found = allPerformers.find(p => {
+                if (normalizeTextForSuggestions(p.name) === clean) return true;
+                if (p.alias_list && p.alias_list.some(a => normalizeTextForSuggestions(a) === clean)) return true;
+                return false;
+            });
+            return { rawName: pName, item: found, matched: !!found };
+        });
+
+        // Match studio by name/alias
+        let matchedStudio = null;
+        if (aiResult.studio) {
+            const cleanStudio = normalizeTextForSuggestions(aiResult.studio);
+            matchedStudio = allStudios.find(s => {
+                if (normalizeTextForSuggestions(s.name) === cleanStudio) return true;
+                if (s.aliases && s.aliases.some(a => normalizeTextForSuggestions(a) === cleanStudio)) return true;
+                return false;
+            });
+        }
+
+        // Match tags by name/alias
+        const matchedTags = (aiResult.tags || []).map(tName => {
+            const clean = normalizeTextForSuggestions(tName);
+            const found = allTags.find(t => {
+                if (normalizeTextForSuggestions(t.name) === clean) return true;
+                if (t.aliases && t.aliases.some(a => normalizeTextForSuggestions(a) === clean)) return true;
+                return false;
+            });
+            return { rawName: tName, item: found, matched: !!found };
+        });
+
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.background = cardBg;
+        container.style.border = cardBorder;
+        container.style.borderRadius = '8px';
+        container.style.padding = '8px 10px';
+        container.style.boxShadow = '0 4px 12px rgba(168, 85, 247, 0.15)';
+
+        container.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 13px;">✨</span>
+                    <strong style="font-size: 12px; color: ${textMain};">Google Gemini AI Suggestions</strong>
+                    ${aiResult.confidence ? `<span style="font-size: 10px; background: rgba(168, 85, 247, 0.25); color: ${textSub}; font-weight: 700; padding: 1.5px 6px; border-radius: 999px;">${aiResult.confidence}% match</span>` : ''}
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <button type="button" id="fasttag-ai-apply-all-btn" style="background: linear-gradient(135deg, #9333ea 0%, #6366f1 100%); color: #ffffff; border: none; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(147, 51, 234, 0.4); transition: transform 0.1s ease;">
+                        <span>🚀 Apply All</span>
+                    </button>
+                    <button type="button" id="fasttag-ai-close-card-btn" style="background: none; border: none; color: ${isDark ? '#94a3b8' : '#64748b'}; font-size: 14px; cursor: pointer; padding: 2px 4px; line-height: 1;">✕</button>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 5px; font-size: 11.5px;">
+                <!-- Clean Title -->
+                ${aiResult.clean_title ? `
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; background: rgba(0,0,0,0.15); padding: 3px 6px; border-radius: 5px;">
+                        <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">
+                            <span style="color: ${textSub}; font-weight: 600;">Title:</span>
+                            <span style="color: ${textMain}; font-weight: 500; margin-left: 4px;">"${escapeHtml(aiResult.clean_title)}"</span>
+                        </div>
+                        <button type="button" id="fasttag-ai-apply-title-btn" style="background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.5); color: ${textSub}; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; cursor: pointer; flex-shrink: 0;">Set Title</button>
+                    </div>
+                ` : ''}
+
+                <!-- Date & Studio -->
+                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                    ${aiResult.date ? `
+                        <div style="display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.15); padding: 2px 6px; border-radius: 5px;">
+                            <span style="color: ${textSub}; font-weight: 600;">Date:</span>
+                            <span style="color: ${textMain};">${escapeHtml(aiResult.date)}</span>
+                            <button type="button" id="fasttag-ai-apply-date-btn" style="background: none; border: 1px solid rgba(168,85,247,0.4); color: ${textSub}; font-size: 9.5px; font-weight: 700; padding: 1px 4px; border-radius: 4px; cursor: pointer; margin-left: 2px;">Set</button>
+                        </div>
+                    ` : ''}
+
+                    ${aiResult.studio ? `
+                        <div style="display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.15); padding: 2px 6px; border-radius: 5px;">
+                            <span style="color: ${textSub}; font-weight: 600;">Studio:</span>
+                            <span style="color: ${textMain}; font-weight: 600;">${escapeHtml(matchedStudio ? matchedStudio.name : aiResult.studio)}</span>
+                            ${matchedStudio ? `
+                                <button type="button" id="fasttag-ai-apply-studio-btn" style="background: #4f46e5; color: #fff; border: none; font-size: 9.5px; font-weight: 700; padding: 1px 5px; border-radius: 4px; cursor: pointer;">+ Set</button>
+                            ` : `<span style="font-size: 9.5px; opacity: 0.6; font-style: italic;">(not in library)</span>`}
+                        </div>
+                    ` : ''}
+                </div>
+
+                <!-- Performers -->
+                ${matchedPerformers.length > 0 ? `
+                    <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                        <span style="color: ${textSub}; font-weight: 600; font-size: 11px;">Performers:</span>
+                        <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                            ${matchedPerformers.map((p) => {
+                                if (p.matched) {
+                                    return `<button type="button" class="fasttag-ai-chip-perf" data-id="${p.item.id}" style="background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.5); color: ${isDark ? '#bae6fd' : '#0369a1'}; font-size: 10px; font-weight: 600; padding: 1.5px 6px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 2px;">+ ${escapeHtml(p.item.name)}</button>`;
+                                } else {
+                                    return `<span style="font-size: 10px; opacity: 0.6; color: ${textMain}; padding: 1.5px 4px;">${escapeHtml(p.rawName)} <em>(new)</em></span>`;
+                                }
+                            }).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+
+                <!-- Tags -->
+                ${matchedTags.filter(t => t.matched).length > 0 ? `
+                    <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                        <span style="color: ${textSub}; font-weight: 600; font-size: 11px;">Tags:</span>
+                        <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                            ${matchedTags.filter(t => t.matched).map((t) => {
+                                return `<button type="button" class="fasttag-ai-chip-tag" data-id="${t.item.id}" style="background: rgba(99, 102, 241, 0.18); border: 1px solid rgba(99, 102, 241, 0.5); color: ${isDark ? '#c7d2fe' : '#4338ca'}; font-size: 10px; font-weight: 600; padding: 1.5px 6px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 2px;">+ ${escapeHtml(t.item.name)}</button>`;
+                            }).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+
+        // Wire event handlers on the AI Match Card
+        const closeBtn = container.querySelector('#fasttag-ai-close-card-btn');
+        if (closeBtn) {
+            closeBtn.onclick = (e) => {
+                e.preventDefault();
+                container.style.display = 'none';
+            };
+        }
+
+        const applyTitleBtn = container.querySelector('#fasttag-ai-apply-title-btn');
+        if (applyTitleBtn && aiResult.clean_title) {
+            applyTitleBtn.onclick = async (e) => {
+                e.preventDefault();
+                try {
+                    await fetchGQL(`mutation DirectSceneUpdate($input: SceneUpdateInput!) { sceneUpdate(input: $input) { id title } }`, {
+                        input: { id: sceneId, title: aiResult.clean_title }
+                    });
+                    applyTitleBtn.textContent = '✓ Set';
+                    applyTitleBtn.disabled = true;
+                    applyTitleBtn.style.background = '#059669';
+                    applyTitleBtn.style.color = '#fff';
+                    toastSuccess(`Updated Scene Title to "${aiResult.clean_title}"`);
+                    await refreshSceneCards();
+                } catch (err) {
+                    toastError(`Failed to update title: ${err.message}`);
+                }
+            };
+        }
+
+        const applyDateBtn = container.querySelector('#fasttag-ai-apply-date-btn');
+        if (applyDateBtn && aiResult.date) {
+            applyDateBtn.onclick = async (e) => {
+                e.preventDefault();
+                try {
+                    await fetchGQL(`mutation DirectSceneUpdate($input: SceneUpdateInput!) { sceneUpdate(input: $input) { id date } }`, {
+                        input: { id: sceneId, date: aiResult.date }
+                    });
+                    applyDateBtn.textContent = '✓ Set';
+                    applyDateBtn.disabled = true;
+                    applyDateBtn.style.background = '#059669';
+                    applyDateBtn.style.color = '#fff';
+                    toastSuccess(`Updated Scene Date to ${aiResult.date}`);
+                    await refreshSceneCards();
+                } catch (err) {
+                    toastError(`Failed to update date: ${err.message}`);
+                }
+            };
+        }
+
+        const applyStudioBtn = container.querySelector('#fasttag-ai-apply-studio-btn');
+        if (applyStudioBtn && matchedStudio) {
+            applyStudioBtn.onclick = async (e) => {
+                e.preventDefault();
+                if (typeof ctx.setSelectedStudio === 'function') {
+                    ctx.setSelectedStudio(String(matchedStudio.id));
+                }
+                addRecentEntry('studios', matchedStudio);
+                if (typeof ctx.doSave === 'function') {
+                    await ctx.doSave(`Studio set to "${matchedStudio.name}"`);
+                }
+                applyStudioBtn.textContent = '✓';
+                applyStudioBtn.disabled = true;
+            };
+        }
+
+        container.querySelectorAll('.fasttag-ai-chip-perf').forEach(btn => {
+            btn.onclick = async (e) => {
+                e.preventDefault();
+                const pId = btn.getAttribute('data-id');
+                if (pId && ctx.selectedPerformerIds) {
+                    ctx.selectedPerformerIds.add(String(pId));
+                    const item = allPerformers.find(p => String(p.id) === String(pId));
+                    if (item) addRecentEntry('performers', item);
+                    if (typeof ctx.doSave === 'function') {
+                        await ctx.doSave(`Added performer`);
+                    }
+                    btn.style.background = '#059669';
+                    btn.style.color = '#fff';
+                    btn.textContent = `✓ ${btn.textContent.replace(/^\+\s*/, '')}`;
+                }
+            };
+        });
+
+        container.querySelectorAll('.fasttag-ai-chip-tag').forEach(btn => {
+            btn.onclick = async (e) => {
+                e.preventDefault();
+                const tId = btn.getAttribute('data-id');
+                if (tId && ctx.selectedTagIds) {
+                    ctx.selectedTagIds.add(String(tId));
+                    const item = allTags.find(t => String(t.id) === String(tId));
+                    if (item) addRecentEntry('tags', item);
+                    if (typeof ctx.doSave === 'function') {
+                        await ctx.doSave(`Added tag`);
+                    }
+                    btn.style.background = '#059669';
+                    btn.style.color = '#fff';
+                    btn.textContent = `✓ ${btn.textContent.replace(/^\+\s*/, '')}`;
+                }
+            };
+        });
+
+        const applyAllBtn = container.querySelector('#fasttag-ai-apply-all-btn');
+        if (applyAllBtn) {
+            applyAllBtn.onclick = async (e) => {
+                e.preventDefault();
+                applyAllBtn.disabled = true;
+                applyAllBtn.textContent = '⏳ Applying...';
+
+                try {
+                    const updateVars = { id: sceneId };
+                    if (aiResult.clean_title) updateVars.title = aiResult.clean_title;
+                    if (aiResult.date) updateVars.date = aiResult.date;
+
+                    if (matchedStudio && typeof ctx.setSelectedStudio === 'function') {
+                        ctx.setSelectedStudio(String(matchedStudio.id));
+                        addRecentEntry('studios', matchedStudio);
+                    }
+
+                    matchedPerformers.filter(p => p.matched).forEach(p => {
+                        if (ctx.selectedPerformerIds) {
+                            ctx.selectedPerformerIds.add(String(p.item.id));
+                            addRecentEntry('performers', p.item);
+                        }
+                    });
+
+                    matchedTags.filter(t => t.matched).forEach(t => {
+                        if (ctx.selectedTagIds) {
+                            ctx.selectedTagIds.add(String(t.item.id));
+                            addRecentEntry('tags', t.item);
+                        }
+                    });
+
+                    if (updateVars.title || updateVars.date) {
+                        await fetchGQL(`mutation DirectSceneUpdate($input: SceneUpdateInput!) { sceneUpdate(input: $input) { id } }`, {
+                            input: updateVars
+                        });
+                    }
+
+                    if (typeof ctx.doSave === 'function') {
+                        await ctx.doSave('Applied all Gemini AI suggestions');
+                    }
+
+                    applyAllBtn.style.background = '#059669';
+                    applyAllBtn.innerHTML = '<span>✓ Applied All!</span>';
+                    showToast('✓ Successfully applied Gemini AI metadata!', 'success');
+                    await refreshSceneCards();
+                } catch (err) {
+                    applyAllBtn.disabled = false;
+                    applyAllBtn.innerHTML = '<span>🚀 Apply All</span>';
+                    toastError(`Failed to apply AI metadata: ${err.message}`);
+                }
+            };
         }
     }
 
@@ -11265,6 +11833,80 @@
                 popup.scrapeBtn.onclick = async (e) => {
                     if (e) { e.preventDefault(); e.stopPropagation(); }
                     await triggerScrapeAction(false, popup.currentSceneId, popup.currentCardElement);
+                };
+            }
+
+            const triggerAIParseAction = async (forceOpen = false, targetSceneId = null, targetCardElement = null) => {
+                const activeSceneId = targetSceneId || popup.currentSceneId || currentSceneId;
+                const activeCardElement = targetCardElement || popup.currentCardElement || cardElement;
+
+                const isAIOpen = popup.aiCardContainer && popup.aiCardContainer.style.display !== 'none' && popup.aiCardContainer.innerHTML.trim() !== '';
+                if (isAIOpen && !forceOpen) {
+                    popup.aiCardContainer.style.display = 'none';
+                    popup.aiCardContainer.innerHTML = '';
+                    if (popup.aiBtn) popup.aiBtn.innerHTML = '<span>✨ AI Parse</span>';
+                    return;
+                }
+
+                const apiKey = getGeminiApiKey();
+                if (!apiKey) {
+                    showToast('Please enter your Google Gemini API Key in Settings ➔ 🤖 AI', 'info');
+                    openSettingsModal();
+                    setTimeout(() => {
+                        const aiTabBtn = document.querySelector('.fasttag-settings-tab-btn[data-tab="ai"]');
+                        if (aiTabBtn) aiTabBtn.click();
+                    }, 50);
+                    return;
+                }
+
+                if (popup.aiBtn) {
+                    popup.aiBtn.disabled = true;
+                    popup.aiBtn.innerHTML = '<span>⏳ AI Parsing...</span>';
+                }
+
+                try {
+                    let title = '';
+                    let fileName = '';
+                    let details = '';
+
+                    try {
+                        const query = `query ($id: ID!) { findScene(id: $id) { title details files { path } } }`;
+                        const res = await fetchGQL(query, { id: activeSceneId });
+                        const scene = res?.data?.findScene;
+                        if (scene) {
+                            if (scene.title) title = scene.title;
+                            if (scene.details) details = scene.details;
+                            if (scene.files && scene.files.length > 0 && scene.files[0]?.path) {
+                                const filePath = scene.files[0].path;
+                                const parts = filePath.split(/[/\\]/);
+                                fileName = parts.length > 0 ? parts[parts.length - 1] : filePath;
+                            }
+                        }
+                    } catch (e) {}
+
+                    const aiResult = await parseSceneWithGemini(activeSceneId, fileName, title);
+                    if (popup.aiCardContainer) {
+                        renderEverythingAIMatchCard(popup.aiCardContainer, aiResult, activeSceneId, popup, popup._context);
+                    }
+                    if (popup.aiBtn) {
+                        popup.aiBtn.disabled = false;
+                        popup.aiBtn.innerHTML = '<span>✨ AI Parse</span>';
+                    }
+                } catch (err) {
+                    if (popup.aiBtn) {
+                        popup.aiBtn.disabled = false;
+                        popup.aiBtn.innerHTML = '<span>✨ AI Parse</span>';
+                    }
+                    toastError(`AI Parse Error: ${err.message}`);
+                }
+            };
+
+            popup.triggerAIParse = triggerAIParseAction;
+
+            if (popup.aiBtn) {
+                popup.aiBtn.onclick = async (e) => {
+                    if (e) { e.preventDefault(); e.stopPropagation(); }
+                    await triggerAIParseAction(false, popup.currentSceneId, popup.currentCardElement);
                 };
             }
 
