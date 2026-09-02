@@ -24,20 +24,38 @@ WS_MAGIC_STRING = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 def process_gemini_request(data):
     req_type = data.get("type", "parse")
     api_key = data.get("api_key", "").strip()
-    model = data.get("model", "gemini-1.5-flash").strip()
+    model = data.get("model", "gemini-1.5-flash-latest").strip()
 
     if not api_key:
         return {"error": "No API key provided"}
 
     if req_type == "test":
-        prompt = "Respond with JSON: {\"status\": \"ok\", \"message\": \"Connected to Gemini\"}"
-    else:
-        filename = data.get("filename", "").strip()
-        title = data.get("title", "").strip()
-        performers_context = data.get("performers_context", [])
-        studios_context = data.get("studios_context", [])
+        # Test key validity by listing available models
+        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+        try:
+            req = urllib.request.Request(url)
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                resp_data = json.loads(resp.read().decode("utf-8"))
+                models = [m.get("name", "").replace("models/", "") for m in resp_data.get("models", []) if "generateContent" in m.get("supportedGenerationMethods", [])]
+                return {"status": "ok", "message": f"Connected! Available models: {', '.join(models[:4])}", "models": models}
+        except urllib.error.HTTPError as e:
+            err_msg = e.read().decode("utf-8", errors="ignore")
+            try:
+                err_json = json.loads(err_msg)
+                err_msg = err_json.get("error", {}).get("message", err_msg)
+            except Exception:
+                pass
+            return {"error": f"Google Gemini API error ({e.code}): {err_msg}"}
+        except Exception as e:
+            return {"error": str(e)}
 
-        prompt = f"""You are an expert video metadata extractor and parser.
+    # Parse request
+    filename = data.get("filename", "").strip()
+    title = data.get("title", "").strip()
+    performers_context = data.get("performers_context", [])
+    studios_context = data.get("studios_context", [])
+
+    prompt = f"""You are an expert video metadata extractor and parser.
 Analyze this video filename and title:
 Filename: "{filename}"
 Title: "{title}"
@@ -55,29 +73,43 @@ Extract and return a valid JSON object matching this schema:
   "confidence": 95
 }}"""
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-    payload = json.dumps({
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"responseMimeType": "application/json", "temperature": 0.1}
-    }).encode("utf-8")
+    # Model fallback cascade
+    candidate_models = [model]
+    for fallback in ["gemini-1.5-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro-latest"]:
+        if fallback not in candidate_models:
+            candidate_models.append(fallback)
 
-    try:
-        req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            resp_data = json.loads(resp.read().decode("utf-8"))
-            raw_text = resp_data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "{}")
-            parsed = json.loads(raw_text)
-            return {"status": "ok", "result": parsed}
-    except urllib.error.HTTPError as e:
-        err_msg = e.read().decode("utf-8", errors="ignore")
+    last_error = None
+    for candidate in candidate_models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{candidate}:generateContent?key={api_key}"
+        payload = json.dumps({
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseMimeType": "application/json", "temperature": 0.1}
+        }).encode("utf-8")
+
         try:
-            err_json = json.loads(err_msg)
-            err_msg = err_json.get("error", {}).get("message", err_msg)
-        except Exception:
-            pass
-        return {"error": f"Google Gemini API error ({e.code}): {err_msg}"}
-    except Exception as e:
-        return {"error": str(e)}
+            req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                resp_data = json.loads(resp.read().decode("utf-8"))
+                raw_text = resp_data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "{}")
+                parsed = json.loads(raw_text)
+                return {"status": "ok", "result": parsed, "model_used": candidate}
+        except urllib.error.HTTPError as e:
+            err_msg = e.read().decode("utf-8", errors="ignore")
+            try:
+                err_json = json.loads(err_msg)
+                err_msg = err_json.get("error", {}).get("message", err_msg)
+            except Exception:
+                pass
+            last_error = f"Google Gemini API error ({e.code}): {err_msg}"
+            if e.code == 404:
+                continue # Try next candidate model
+            return {"error": last_error}
+        except Exception as e:
+            last_error = str(e)
+            continue
+
+    return {"error": last_error or "All candidate Gemini models failed"}
 
 class DualServerHandler(socketserver.StreamRequestHandler):
     def handle(self):
