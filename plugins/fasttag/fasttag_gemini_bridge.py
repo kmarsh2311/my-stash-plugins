@@ -35,27 +35,34 @@ def get_available_models(api_key):
                 m.get("name", "").replace("models/", "")
                 for m in resp_data.get("models", [])
                 if "generateContent" in m.get("supportedGenerationMethods", [])
+                and not any(bad in m.get("name", "").lower() for bad in ["tts", "audio", "image", "embedding", "aqa", "realtime", "robotics"])
             ]
             AVAILABLE_MODELS_CACHE[api_key] = models
+            log_path = os.path.expanduser("~/.stash/fasttag_gemini_bridge.log")
+            with open(log_path, "a") as f:
+                f.write(f"AVAILABLE MODELS FOR KEY: {models}\n")
             return models
     except Exception as e:
+        log_path = os.path.expanduser("~/.stash/fasttag_gemini_bridge.log")
+        with open(log_path, "a") as f:
+            f.write(f"ERROR FETCHING MODELS: {e}\n")
         return []
 
 def get_ordered_candidate_models(api_key, requested_model=None):
     models = get_available_models(api_key)
     ordered = []
 
-    if requested_model and requested_model in models:
-        ordered.append(requested_model)
-
     priority = [
-        "gemini-3.6-flash", "gemini-3.0-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-exp",
-        "gemini-1.5-flash-002", "gemini-1.5-flash-001", "gemini-1.5-flash", "gemini-1.5-flash-latest",
-        "gemini-1.5-flash-8b", "gemini-1.5-pro-002", "gemini-1.5-pro-001", "gemini-1.5-pro", "gemini-1.5-pro-latest", "gemini-pro"
+        "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-3.8-flash",
+        "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite",
+        "gemini-pro-latest", "gemini-2.5-flash-lite"
     ]
 
+    if requested_model and not any(bad in requested_model.lower() for bad in ["tts", "audio", "image", "embedding"]):
+        ordered.append(requested_model)
+
     for p in priority:
-        if p in models and p not in ordered:
+        if p not in ordered and (not models or p in models):
             ordered.append(p)
 
     for m in models:
@@ -63,14 +70,14 @@ def get_ordered_candidate_models(api_key, requested_model=None):
             ordered.append(m)
 
     if not ordered:
-        ordered = ["gemini-3.6-flash", "gemini-2.0-flash", "gemini-1.5-flash-002", "gemini-1.5-flash"]
+        ordered = ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-3.8-flash", "gemini-3.6-flash"]
 
     return ordered
 
 def process_gemini_request(data):
     req_type = data.get("type", "parse")
     api_key = data.get("api_key", "").strip()
-    req_model = data.get("model", "gemini-3.6-flash").strip()
+    req_model = data.get("model", "gemini-flash-latest").strip()
 
     if not api_key:
         return {"error": "No API key provided"}
@@ -112,17 +119,33 @@ Extract and return a valid JSON object matching this schema:
         "generationConfig": {"responseMimeType": "application/json", "temperature": 0.1}
     }).encode("utf-8")
 
+    log_path = os.path.expanduser("~/.stash/fasttag_gemini_bridge.log")
+    def log(msg):
+        try:
+            with open(log_path, "a") as f:
+                f.write(f"[{threading.current_thread().name}] {msg}\n")
+        except Exception:
+            pass
+
+    log(f"Received {req_type} request. Model requested: '{req_model}', filename: '{filename}'")
+
     last_error = None
-    for chosen_model in candidates:
+    import time
+    for chosen_model in candidates[:5]: # Try up to 5 models on rate limits
+        start_t = time.time()
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{chosen_model}:generateContent?key={api_key}"
+        log(f"Attempting model: {chosen_model}...")
         try:
             req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            with urllib.request.urlopen(req, timeout=5) as resp: # 5s fast timeout
                 resp_data = json.loads(resp.read().decode("utf-8"))
                 raw_text = resp_data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "{}")
                 parsed = json.loads(raw_text)
+                elapsed = time.time() - start_t
+                log(f"Model {chosen_model} SUCCEEDED in {elapsed:.2f}s!")
                 return {"status": "ok", "result": parsed, "model_used": chosen_model}
         except urllib.error.HTTPError as e:
+            elapsed = time.time() - start_t
             err_msg = e.read().decode("utf-8", errors="ignore")
             try:
                 err_json = json.loads(err_msg)
@@ -130,15 +153,16 @@ Extract and return a valid JSON object matching this schema:
             except Exception:
                 pass
             last_error = f"Google Gemini API error ({e.code}) on model {chosen_model}: {err_msg}"
-            # If 404 or model is deprecated/not available, cascade immediately to next candidate model!
-            if e.code == 404 or "no longer available" in err_msg or "not found" in err_msg:
-                continue
-            return {"error": last_error}
+            log(f"Model {chosen_model} FAILED ({e.code}) in {elapsed:.2f}s: {err_msg}")
+            continue
         except Exception as e:
+            elapsed = time.time() - start_t
             last_error = str(e)
+            log(f"Model {chosen_model} EXCEPTION in {elapsed:.2f}s: {e}")
             continue
 
-    return {"error": last_error or "All candidate Gemini models failed"}
+    log(f"All candidates failed. Last error: {last_error}")
+    return {"error": last_error or "Google Gemini API did not respond in time"}
 
 class DualServerHandler(socketserver.StreamRequestHandler):
     def handle(self):

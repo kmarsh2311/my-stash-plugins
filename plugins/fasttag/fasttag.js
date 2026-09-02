@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash FastTag
 // @namespace    http://tampermonkey.net/
-// @version      4.0.1
+// @version      4.1.0
 // @description  Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
@@ -15,7 +15,7 @@
 
 (async function() {
     'use strict';
-    console.log('[FastTag v4.0.1] Initialized with Settings, Suggestions, Pinned Chips, Bulk Mode, and Hotkeys');
+    console.log('[FastTag v4.1.0] Initialized with Settings, Suggestions, Pinned Chips, Bulk Mode, and Hotkeys');
 
     // --- Entity Configuration & Schema Registry ---
     const ENTITY_CONFIG = {
@@ -1424,7 +1424,7 @@
 
             toast.innerHTML = `
                 <span style="font-size: 13px; line-height: 1; flex-shrink: 0;">${icon}</span>
-                <span style="word-break: break-word; max-width: 600px;">${escapeHtml(message)}</span>
+                <span class="fasttag-toast-msg" style="word-break: break-word; max-width: 600px;">${escapeHtml(message)}</span>
                 ${copyBtnHtml}
                 ${closeBtnHtml}
             `;
@@ -1434,7 +1434,8 @@
             if (copyBtn) {
                 copyBtn.onclick = (e) => {
                     e.stopPropagation();
-                    let copyText = `[FastTag Toast ${type.toUpperCase()}]\n${message}`;
+                    const msgEl = toast.querySelector('.fasttag-toast-msg');
+                    let copyText = (msgEl ? msgEl.innerText : message.replace(/<[^>]*>/g, '')).trim();
                     if (debugPayload) {
                         try {
                             copyText += '\n\nDetails:\n' + (typeof debugPayload === 'object' ? JSON.stringify(debugPayload, null, 2) : String(debugPayload));
@@ -1442,11 +1443,38 @@
                             copyText += '\n\nDetails:\n' + String(debugPayload);
                         }
                     }
+
+                    const fallbackCopy = (txt) => {
+                        const ta = document.createElement('textarea');
+                        ta.value = txt;
+                        ta.setAttribute('readonly', '');
+                        ta.style.position = 'fixed';
+                        ta.style.left = '-9999px';
+                        ta.style.top = '0';
+                        document.body.appendChild(ta);
+                        ta.focus();
+                        ta.select();
+                        ta.setSelectionRange(0, ta.value.length);
+                        try {
+                            document.execCommand('copy');
+                            copyBtn.textContent = '✓ Copied!';
+                        } catch (err) {
+                            copyBtn.textContent = '❌ Failed';
+                        }
+                        ta.remove();
+                    };
+
                     if (navigator.clipboard && navigator.clipboard.writeText) {
-                        navigator.clipboard.writeText(copyText);
+                        navigator.clipboard.writeText(copyText).then(() => {
+                            copyBtn.textContent = '✓ Copied!';
+                        }).catch(() => {
+                            fallbackCopy(copyText);
+                        });
+                    } else {
+                        fallbackCopy(copyText);
                     }
-                    copyBtn.textContent = '✓ Copied!';
-                    setTimeout(() => { if (copyBtn) copyBtn.textContent = '📋 Copy'; }, 2000);
+
+                    setTimeout(() => { if (copyBtn) copyBtn.textContent = '📋 Copy'; }, 2500);
                 };
             }
 
@@ -1495,7 +1523,7 @@
     };
 
     const toastError = (message, debug) => {
-        showToast(message, 'error', 3000, debug);
+        showToast(message, 'error', 8000, debug);
         if (debug) {
             console.error(debug);
         } else {
@@ -1516,7 +1544,7 @@
         localStorage.setItem(USAGE_STORAGE_KEY, String(count));
         if (count === 100) {
             setTimeout(() => {
-                showToast('🍫 Achievement Unlocked: 100 Scenes Tagged! Have a break, have a KitKat! 🎉', 'success', 7000);
+                showToast('🍫 Achievement Unlocked: 100 Scenes Tagged! Have a break, buy me a KitKat! 🎉', 'success', 7000);
             }, 500);
         }
         return count;
@@ -1728,10 +1756,10 @@
         localStorage.setItem(GEMINI_API_KEY_KEY, (val || '').trim());
     }
     function getGeminiModel() {
-        return localStorage.getItem(GEMINI_MODEL_KEY) || 'gemini-1.5-flash';
+        return localStorage.getItem(GEMINI_MODEL_KEY) || 'gemini-flash-latest';
     }
     function setGeminiModel(val) {
-        localStorage.setItem(GEMINI_MODEL_KEY, val || 'gemini-1.5-flash');
+        localStorage.setItem(GEMINI_MODEL_KEY, val || 'gemini-flash-latest');
     }
     function getGeminiAutoParse() {
         const val = localStorage.getItem(GEMINI_AUTO_PARSE_KEY);
@@ -1853,9 +1881,9 @@
             setTimeout(() => {
                 if (geminiPendingRequests.has(id)) {
                     geminiPendingRequests.delete(id);
-                    rejFn(new Error('Gemini request timed out (15s)'));
+                    rejFn(new Error('AI request took too long (>12s). Google API may be busy or rate-limited.'));
                 }
-            }, 15000);
+            }, 12000);
         });
     }
 
@@ -2261,8 +2289,8 @@
                     <button type="button" class="fasttag-settings-tab-btn" data-tab="scraper" style="flex: 1; padding: 6px 4px; font-size: 11.5px; font-weight: 600; border: none; border-radius: 7px; background: transparent; color: ${textMuted}; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.15s ease;">
                         <span>⚡</span> Scraper
                     </button>
-                    <button type="button" class="fasttag-settings-tab-btn" data-tab="ai" style="flex: 1; padding: 6px 4px; font-size: 11.5px; font-weight: 600; border: none; border-radius: 7px; background: transparent; color: ${textMuted}; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.15s ease;">
-                        <span>🤖</span> AI
+                    <button type="button" class="fasttag-settings-tab-btn" data-tab="ai" style="flex: 1; padding: 6px 4px; font-size: 11.5px; font-weight: 600; border: none; border-radius: 7px; background: transparent; color: ${textMuted}; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: all 0.15s ease;">
+                        <span>🤖</span> AI <span style="font-size: 8px; padding: 1px 4px; border-radius: 3px; background: rgba(245, 158, 11, 0.2); color: #f59e0b; font-weight: 800; line-height: 1.1;">BETA</span>
                     </button>
                     <button type="button" class="fasttag-settings-tab-btn" data-tab="system" style="flex: 1; padding: 6px 4px; font-size: 11.5px; font-weight: 600; border: none; border-radius: 7px; background: transparent; color: ${textMuted}; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.15s ease;">
                         <span>🛠️</span> System
@@ -2417,6 +2445,20 @@
 
                     <!-- TAB 4: AI (GEMINI) -->
                     <div id="fasttag-tab-pane-ai" class="fasttag-tab-pane" style="display: none; flex-direction: column; gap: 14px;">
+                        <!-- Prominent Experimental Feature Banner -->
+                        <div style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; padding: 10px 12px; display: flex; align-items: flex-start; gap: 10px;">
+                            <span style="font-size: 18px; line-height: 1.1; flex-shrink: 0;">⚠️</span>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 700; font-size: 12px; color: #f59e0b; display: flex; align-items: center; gap: 6px;">
+                                    EXPERIMENTAL FEATURE
+                                    <span style="font-size: 8.5px; background: rgba(245, 158, 11, 0.25); color: #f59e0b; padding: 1px 5px; border-radius: 4px; font-weight: 800;">ACTIVE DEVELOPMENT</span>
+                                </div>
+                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 3px; line-height: 1.45;">
+                                    The Gemini AI Smart Parser is an experimental feature currently under active development. Results, quotas, and response times may vary depending on filename formatting and Google API availability.
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Gemini API Key configuration -->
                         <div style="display: flex; flex-direction: column; gap: 8px; background: ${cardBg}; padding: 12px; border-radius: 8px; border: 1px solid ${border};">
                             <div style="display: flex; align-items: center; justify-content: space-between;">
@@ -2444,8 +2486,11 @@
                                 <div style="font-size: 11px; color: ${textMuted};">Select Google Gemini model</div>
                             </div>
                             <select id="fasttag-setting-gemini-model" style="padding: 6px 10px; border-radius: 6px; border: 1px solid ${border}; background: ${cardBg}; color: ${text}; font-size: 12px; cursor: pointer;">
-                                <option value="gemini-1.5-flash" ${getGeminiModel() === 'gemini-1.5-flash' ? 'selected' : ''}>Gemini 1.5 Flash (Fastest, Recommended)</option>
-                                <option value="gemini-1.5-pro" ${getGeminiModel() === 'gemini-1.5-pro' ? 'selected' : ''}>Gemini 1.5 Pro (Deep Analysis)</option>
+                                <option value="gemini-flash-latest" ${getGeminiModel() === 'gemini-flash-latest' ? 'selected' : ''}>Gemini Flash Latest (Auto-Managed, Recommended)</option>
+                                <option value="gemini-3.8-flash" ${getGeminiModel() === 'gemini-3.8-flash' ? 'selected' : ''}>Gemini 3.8 Flash (High Performance)</option>
+                                <option value="gemini-3.6-flash" ${getGeminiModel() === 'gemini-3.6-flash' ? 'selected' : ''}>Gemini 3.6 Flash</option>
+                                <option value="gemini-flash-lite-latest" ${getGeminiModel() === 'gemini-flash-lite-latest' ? 'selected' : ''}>Gemini Flash Lite (Fastest)</option>
+                                <option value="gemini-pro-latest" ${getGeminiModel() === 'gemini-pro-latest' ? 'selected' : ''}>Gemini Pro Latest (Deep Analysis)</option>
                             </select>
                         </div>
 
@@ -4067,7 +4112,33 @@
         }
     }
 
-    async function refreshSceneCards() {
+    async function refreshSceneCards(sceneId = null) {
+        const resetRefractCards = () => {
+            try {
+                if (sceneId) {
+                    const sIdStr = String(sceneId);
+                    document.querySelectorAll(
+                        `.scene-card a[href^="/scenes/${sIdStr}?"], ` +
+                        `.scene-card a[href="/scenes/${sIdStr}"], ` +
+                        `.scene-card a[href^="/scenes/${sIdStr}/"]`
+                    ).forEach(a => {
+                        const card = a.closest('.scene-card');
+                        if (card) {
+                            card.removeAttribute('data-stash-sc');
+                            card.querySelectorAll('.stash-performer-circles').forEach(el => el.remove());
+                        }
+                    });
+                } else {
+                    document.querySelectorAll('.scene-card').forEach(card => {
+                        card.removeAttribute('data-stash-sc');
+                        card.querySelectorAll('.stash-performer-circles').forEach(el => el.remove());
+                    });
+                }
+            } catch (e) {}
+        };
+
+        resetRefractCards();
+
         const apollo = window.__APOLLO_CLIENT__;
         if (!apollo || typeof apollo.getObservableQueries !== 'function') return false;
 
@@ -4078,7 +4149,19 @@
 
         if (!sceneQueries.length) return false;
         await Promise.all(sceneQueries.map(query => query.refetch()));
+
+        // Also clean after Apollo refetch resolves and React updates the DOM
+        setTimeout(resetRefractCards, 60);
+        setTimeout(resetRefractCards, 300);
         return true;
+    }
+
+    let refreshSceneCardsTimer = null;
+    function refreshSceneCardsDebounced(sceneId = null, delayMs = 150) {
+        clearTimeout(refreshSceneCardsTimer);
+        refreshSceneCardsTimer = setTimeout(() => {
+            refreshSceneCards(sceneId);
+        }, delayMs);
     }
 
     async function updateEntityForScene(type, sceneId, selectedIds) {
@@ -4088,6 +4171,22 @@
             toastError(`Failed to update ${config.title.toLowerCase()}`, res.errors);
             return false;
         }
+        // Refract Theme compatibility: strip its "already processed" marker and circles
+        // so it re-queries fresh data for this card on its next MutationObserver pass.
+        try {
+            const sceneIdStr = String(sceneId);
+            document.querySelectorAll(
+                `.scene-card a[href^="/scenes/${sceneIdStr}?"], ` +
+                `.scene-card a[href="/scenes/${sceneIdStr}"], ` +
+                `.scene-card a[href^="/scenes/${sceneIdStr}/"]`
+            ).forEach(a => {
+                const card = a.closest('.scene-card');
+                if (card) {
+                    card.removeAttribute('data-stash-sc');
+                    card.querySelectorAll('.stash-performer-circles').forEach(el => el.remove());
+                }
+            });
+        } catch (e) {}
         return true;
     }
 
@@ -7007,8 +7106,11 @@
         return splitStr.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
     }
 
-    function isSuggestionMatch(item, normalizedSpaced, tokenSet) {
+    function isSuggestionMatch(item, normalizedSpaced, tokenSet, tokens = null) {
         if (!item) return false;
+        if (!tokens) {
+            tokens = normalizedSpaced.trim().split(/\s+/).filter(Boolean);
+        }
         const namesToCheck = [];
         if (item.name) namesToCheck.push({ name: item.name, isPrimary: true });
         if (item.title && item.title !== item.name) namesToCheck.push({ name: item.title, isPrimary: true });
@@ -7046,11 +7148,33 @@
             if (normalizedSpaced.includes(' ' + clean + ' ')) return true;
 
             const words = clean.split(/\s+/).filter(Boolean);
+            const compact = clean.replace(/\s+/g, '');
             if (words.length > 1) {
-                const compact = clean.replace(/\s+/g, '');
                 if (compact.length >= 4 && tokenSet.has(compact)) return true;
+                if (words.every(w => tokenSet.has(w))) return true;
             } else if (words.length === 1 && clean.length >= 3 && !SUGGESTION_STOP_WORDS.has(clean)) {
                 if (tokenSet.has(clean)) return true;
+            }
+
+            // Check if adjacent tokens in scene text combine to match compact (e.g. "only" + "fans" matches "onlyfans")
+            if (compact.length >= 4 && tokens && tokens.length > 1) {
+                for (let i = 0; i < tokens.length - 1; i++) {
+                    if (tokens[i] + tokens[i + 1] === compact) return true;
+                    if (i < tokens.length - 2 && tokens[i] + tokens[i + 1] + tokens[i + 2] === compact) return true;
+                }
+            }
+
+            // Plural / singular stemming check (e.g. "Tattoo" matches "tattoos", "Piercings" matches "piercing")
+            if (clean.length >= 4 && !SUGGESTION_STOP_WORDS.has(clean)) {
+                if (clean.endsWith('s')) {
+                    const singular = clean.slice(0, -1);
+                    if (singular.length >= 3 && (tokenSet.has(singular) || normalizedSpaced.includes(' ' + singular + ' '))) return true;
+                } else {
+                    const plural = clean + 's';
+                    if (tokenSet.has(plural) || normalizedSpaced.includes(' ' + plural + ' ')) return true;
+                    const pluralEs = clean + 'es';
+                    if (tokenSet.has(pluralEs) || normalizedSpaced.includes(' ' + pluralEs + ' ')) return true;
+                }
             }
         }
         return false;
@@ -7094,7 +7218,7 @@
                 if (!item || !item.id) continue;
                 if (existingSet.has(String(item.id))) continue;
 
-                if (isSuggestionMatch(item, normalizedSpaced, tokenSet)) {
+                if (isSuggestionMatch(item, normalizedSpaced, tokenSet, tokens)) {
                     suggestions.push(item);
                     if (suggestions.length >= 20) break;
                 }
@@ -7360,6 +7484,12 @@
     }
 
     function setupPopupListeners(form, signal, onSaveCallback) {
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }, { signal });
+
         setTimeout(() => {
             document.addEventListener('mousedown', (e) => {
                 if (e.target && (
@@ -9292,13 +9422,28 @@
             }
             if (!cached || !Array.isArray(cached)) continue;
 
-            const existingSet = (ctx && typeof ctx.getSelectedIds === 'function') ? ctx.getSelectedIds(type) : null;
+            let existingSet = null;
+            if (ctx) {
+                if (typeof ctx.getSelectedIds === 'function') {
+                    existingSet = ctx.getSelectedIds(type);
+                } else if (type === 'tags') {
+                    existingSet = ctx.selectedTagIds;
+                } else if (type === 'performers') {
+                    existingSet = ctx.selectedPerformerIds;
+                } else if (type === 'studios') {
+                    const sid = typeof ctx.selectedStudioId === 'function' ? ctx.selectedStudioId() : ctx.selectedStudioId;
+                    existingSet = sid ? new Set([String(sid)]) : new Set();
+                } else if (type === 'groups') {
+                    const gids = typeof ctx.selectedGroupIds === 'function' ? ctx.selectedGroupIds() : ctx.selectedGroupIds;
+                    existingSet = gids || new Set();
+                }
+            }
 
             for (const item of cached) {
                 if (!item || !item.id) continue;
                 if (existingSet && (existingSet.has(String(item.id)) || existingSet.has(Number(item.id)))) continue;
 
-                if (isSuggestionMatch(item, normalizedSpaced, tokenSet)) {
+                if (isSuggestionMatch(item, normalizedSpaced, tokenSet, tokens)) {
                     allSuggestions.push({ type, icon, item });
                     if (allSuggestions.length >= 30) break;
                 }
@@ -9714,9 +9859,20 @@
                 popup.scraperCardContainer.innerHTML = '';
                 popup.scraperCardContainer.style.display = 'none';
             }
-            hideScrapeCoverTooltip();
-
             ctx.setCurrentSceneId(sceneId);
+            popup.currentSceneId = sceneId;
+            popup.currentCardElement = cardElement;
+
+            // Close & clear previous scene's AI parse card immediately on navigation
+            if (popup.aiCardContainer) {
+                popup.aiCardContainer.style.display = 'none';
+                popup.aiCardContainer.innerHTML = '';
+            }
+            if (popup.aiBtn) {
+                popup.aiBtn.disabled = false;
+                popup.aiBtn.innerHTML = '<span>✨ AI Parse</span>';
+            }
+
             attachScenePreview(popup.previewContainer, sceneId, cardElement);
 
             popup.globalSearch.value = '';
@@ -9846,12 +10002,21 @@
         const allPerformers = getCachedOrNull('performers') || [];
         const allStudios = getCachedOrNull('studios') || [];
 
+        const matchesEntityName = (candidateName, searchName) => {
+            if (!candidateName || !searchName) return false;
+            const cClean = normalizeTextForSuggestions(candidateName);
+            const sClean = normalizeTextForSuggestions(searchName);
+            if (cClean === sClean) return true;
+            const cNoSpace = cClean.replace(/\s+/g, '');
+            const sNoSpace = sClean.replace(/\s+/g, '');
+            return cNoSpace.length > 0 && cNoSpace === sNoSpace;
+        };
+
         // Match performers by name/alias
         const matchedPerformers = (aiResult.performers || []).map(pName => {
-            const clean = normalizeTextForSuggestions(pName);
             const found = allPerformers.find(p => {
-                if (normalizeTextForSuggestions(p.name) === clean) return true;
-                if (p.alias_list && p.alias_list.some(a => normalizeTextForSuggestions(a) === clean)) return true;
+                if (matchesEntityName(p.name, pName)) return true;
+                if (p.alias_list && p.alias_list.some(a => matchesEntityName(a, pName))) return true;
                 return false;
             });
             return { rawName: pName, item: found, matched: !!found };
@@ -9860,24 +10025,26 @@
         // Match studio by name/alias
         let matchedStudio = null;
         if (aiResult.studio) {
-            const cleanStudio = normalizeTextForSuggestions(aiResult.studio);
             matchedStudio = allStudios.find(s => {
-                if (normalizeTextForSuggestions(s.name) === cleanStudio) return true;
-                if (s.aliases && s.aliases.some(a => normalizeTextForSuggestions(a) === cleanStudio)) return true;
+                if (matchesEntityName(s.name, aiResult.studio)) return true;
+                if (s.aliases && s.aliases.some(a => matchesEntityName(a, aiResult.studio))) return true;
                 return false;
             });
         }
 
         // Match tags by name/alias
         const matchedTags = (aiResult.tags || []).map(tName => {
-            const clean = normalizeTextForSuggestions(tName);
             const found = allTags.find(t => {
-                if (normalizeTextForSuggestions(t.name) === clean) return true;
-                if (t.aliases && t.aliases.some(a => normalizeTextForSuggestions(a) === clean)) return true;
+                if (matchesEntityName(t.name, tName)) return true;
+                if (t.aliases && t.aliases.some(a => matchesEntityName(a, tName))) return true;
                 return false;
             });
             return { rawName: tName, item: found, matched: !!found };
         });
+
+        const selTagIds = ctx?.getSelectedTags ? ctx.getSelectedTags() : (ctx?.selectedTagIds || new Set());
+        const selPerfIds = ctx?.getSelectedPerformers ? ctx.getSelectedPerformers() : (ctx?.selectedPerformerIds || new Set());
+        const selStudioId = ctx?.getSelectedStudio ? ctx.getSelectedStudio() : null;
 
         container.style.display = 'flex';
         container.style.flexDirection = 'column';
@@ -9886,6 +10053,8 @@
         container.style.borderRadius = '8px';
         container.style.padding = '8px 10px';
         container.style.boxShadow = '0 4px 12px rgba(168, 85, 247, 0.15)';
+
+        const isStudioAlreadySelected = matchedStudio && selStudioId && String(selStudioId) === String(matchedStudio.id);
 
         container.innerHTML = `
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
@@ -9929,8 +10098,10 @@
                             <span style="color: ${textSub}; font-weight: 600;">Studio:</span>
                             <span style="color: ${textMain}; font-weight: 600;">${escapeHtml(matchedStudio ? matchedStudio.name : aiResult.studio)}</span>
                             ${matchedStudio ? `
-                                <button type="button" id="fasttag-ai-apply-studio-btn" style="background: #4f46e5; color: #fff; border: none; font-size: 9.5px; font-weight: 700; padding: 1px 5px; border-radius: 4px; cursor: pointer;">+ Set</button>
-                            ` : `<span style="font-size: 9.5px; opacity: 0.6; font-style: italic;">(not in library)</span>`}
+                                <button type="button" id="fasttag-ai-apply-studio-btn" style="background: ${isStudioAlreadySelected ? '#059669' : '#4f46e5'}; color: #fff; border: none; font-size: 9.5px; font-weight: 700; padding: 1px 5px; border-radius: 4px; cursor: pointer;">${isStudioAlreadySelected ? '✓ Set' : '+ Set'}</button>
+                            ` : `
+                                <button type="button" id="fasttag-ai-create-studio-btn" data-name="${escapeHtml(aiResult.studio)}" style="background: rgba(168, 85, 247, 0.2); border: 1px dashed rgba(168, 85, 247, 0.6); color: ${isDark ? '#e9d5ff' : '#7e22ce'}; font-size: 9.5px; font-weight: 700; padding: 1px 6px; border-radius: 4px; cursor: pointer;" title="Create '${escapeHtml(aiResult.studio)}' studio in Stash & set as scene studio">+ Create</button>
+                            `}
                         </div>
                     ` : ''}
                 </div>
@@ -9942,9 +10113,14 @@
                         <div style="display: flex; gap: 4px; flex-wrap: wrap;">
                             ${matchedPerformers.map((p) => {
                                 if (p.matched) {
-                                    return `<button type="button" class="fasttag-ai-chip-perf" data-id="${p.item.id}" style="background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.5); color: ${isDark ? '#bae6fd' : '#0369a1'}; font-size: 10px; font-weight: 600; padding: 1.5px 6px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 2px;">+ ${escapeHtml(p.item.name)}</button>`;
+                                    const isAdded = selPerfIds && selPerfIds.has(String(p.item.id));
+                                    const pillBg = isAdded ? '#059669' : 'rgba(56, 189, 248, 0.18)';
+                                    const pillBorder = isAdded ? '1px solid #059669' : '1px solid rgba(56, 189, 248, 0.5)';
+                                    const pillColor = isAdded ? '#ffffff' : (isDark ? '#bae6fd' : '#0369a1');
+                                    const pillText = isAdded ? `✓ ${escapeHtml(p.item.name)}` : `+ ${escapeHtml(p.item.name)}`;
+                                    return `<button type="button" class="fasttag-ai-chip-perf" data-id="${p.item.id}" style="background: ${pillBg}; border: ${pillBorder}; color: ${pillColor}; font-size: 10px; font-weight: 600; padding: 1.5px 6px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 2px;" title="${isAdded ? 'Already added to scene' : 'Add to scene'}">${pillText}</button>`;
                                 } else {
-                                    return `<span style="font-size: 10px; opacity: 0.6; color: ${textMain}; padding: 1.5px 4px;">${escapeHtml(p.rawName)} <em>(new)</em></span>`;
+                                    return `<button type="button" class="fasttag-ai-chip-create-perf" data-name="${escapeHtml(p.rawName)}" style="background: rgba(168, 85, 247, 0.15); border: 1px dashed rgba(168, 85, 247, 0.6); color: ${isDark ? '#e9d5ff' : '#7e22ce'}; font-size: 10px; font-weight: 600; padding: 1.5px 7px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 3px;" title="Create '${escapeHtml(p.rawName)}' in Stash & add to scene">+ Create "${escapeHtml(p.rawName)}"</button>`;
                                 }
                             }).join('')}
                         </div>
@@ -9952,12 +10128,21 @@
                 ` : ''}
 
                 <!-- Tags -->
-                ${matchedTags.filter(t => t.matched).length > 0 ? `
+                ${matchedTags.length > 0 ? `
                     <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
                         <span style="color: ${textSub}; font-weight: 600; font-size: 11px;">Tags:</span>
                         <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-                            ${matchedTags.filter(t => t.matched).map((t) => {
-                                return `<button type="button" class="fasttag-ai-chip-tag" data-id="${t.item.id}" style="background: rgba(99, 102, 241, 0.18); border: 1px solid rgba(99, 102, 241, 0.5); color: ${isDark ? '#c7d2fe' : '#4338ca'}; font-size: 10px; font-weight: 600; padding: 1.5px 6px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 2px;">+ ${escapeHtml(t.item.name)}</button>`;
+                            ${matchedTags.map((t) => {
+                                if (t.matched) {
+                                    const isAdded = selTagIds && selTagIds.has(String(t.item.id));
+                                    const pillBg = isAdded ? '#059669' : 'rgba(99, 102, 241, 0.18)';
+                                    const pillBorder = isAdded ? '1px solid #059669' : '1px solid rgba(99, 102, 241, 0.5)';
+                                    const pillColor = isAdded ? '#ffffff' : (isDark ? '#c7d2fe' : '#4338ca');
+                                    const pillText = isAdded ? `✓ ${escapeHtml(t.item.name)}` : `+ ${escapeHtml(t.item.name)}`;
+                                    return `<button type="button" class="fasttag-ai-chip-tag" data-id="${t.item.id}" style="background: ${pillBg}; border: ${pillBorder}; color: ${pillColor}; font-size: 10px; font-weight: 600; padding: 1.5px 6px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 2px;" title="${isAdded ? 'Already added to scene' : 'Add to scene'}">${pillText}</button>`;
+                                } else {
+                                    return `<button type="button" class="fasttag-ai-chip-create-tag" data-name="${escapeHtml(t.rawName)}" style="background: rgba(168, 85, 247, 0.15); border: 1px dashed rgba(168, 85, 247, 0.6); color: ${isDark ? '#e9d5ff' : '#7e22ce'}; font-size: 10px; font-weight: 600; padding: 1.5px 7px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 3px;" title="Create tag '${escapeHtml(t.rawName)}' in Stash & add to scene">+ Create "${escapeHtml(t.rawName)}"</button>`;
+                                }
                             }).join('')}
                         </div>
                     </div>
@@ -9971,6 +10156,7 @@
             closeBtn.onclick = (e) => {
                 e.preventDefault();
                 container.style.display = 'none';
+                container.innerHTML = '';
             };
         }
 
@@ -10036,6 +10222,48 @@
             };
         }
 
+        const createStudioBtn = container.querySelector('#fasttag-ai-create-studio-btn');
+        if (createStudioBtn) {
+            createStudioBtn.onclick = async (e) => {
+                e.preventDefault();
+                const rawName = createStudioBtn.getAttribute('data-name');
+                if (!rawName) return;
+                createStudioBtn.disabled = true;
+                createStudioBtn.textContent = '⏳ Creating...';
+                try {
+                    const res = await fetchGQL(ENTITY_CONFIG.studios.createQuery, ENTITY_CONFIG.studios.createVariables(rawName));
+                    const newId = ENTITY_CONFIG.studios.createExtract(res.data);
+                    if (newId) {
+                        invalidateCache('studios');
+                        if (typeof ctx.setSelectedStudio === 'function') {
+                            ctx.setSelectedStudio(String(newId));
+                        }
+                        addRecentEntry('studios', { id: newId, name: rawName });
+                        if (typeof ctx.renderStudioBar === 'function') {
+                            await ctx.renderStudioBar('');
+                        }
+                        if (typeof ctx.refreshAllUI === 'function') ctx.refreshAllUI();
+                        if (typeof ctx.doSave === 'function') {
+                            await ctx.doSave(`Created & set studio "${rawName}"`);
+                        }
+                        createStudioBtn.style.background = '#059669';
+                        createStudioBtn.style.border = 'none';
+                        createStudioBtn.style.color = '#fff';
+                        createStudioBtn.textContent = '✓ Set';
+                        toastSuccess(`Created & set studio "${rawName}"`);
+                    } else {
+                        createStudioBtn.disabled = false;
+                        createStudioBtn.textContent = '+ Create';
+                        toastError(`Failed to create studio "${rawName}"`);
+                    }
+                } catch (err) {
+                    createStudioBtn.disabled = false;
+                    createStudioBtn.textContent = '+ Create';
+                    toastError(`Error creating studio: ${err.message}`);
+                }
+            };
+        }
+
         container.querySelectorAll('.fasttag-ai-chip-perf').forEach(btn => {
             btn.onclick = async (e) => {
                 e.preventDefault();
@@ -10055,6 +10283,46 @@
                     btn.style.background = '#059669';
                     btn.style.color = '#fff';
                     btn.textContent = `✓ ${btn.textContent.replace(/^\+\s*/, '')}`;
+                }
+            };
+        });
+
+        container.querySelectorAll('.fasttag-ai-chip-create-perf').forEach(btn => {
+            btn.onclick = async (e) => {
+                e.preventDefault();
+                const rawName = btn.getAttribute('data-name');
+                if (!rawName) return;
+                btn.disabled = true;
+                btn.textContent = '⏳ Creating...';
+                try {
+                    const res = await fetchGQL(ENTITY_CONFIG.performers.createQuery, ENTITY_CONFIG.performers.createVariables(rawName));
+                    const newId = ENTITY_CONFIG.performers.createExtract(res.data);
+                    if (newId) {
+                        invalidateCache('performers');
+                        const perfSet = ctx.getSelectedPerformers ? ctx.getSelectedPerformers() : ctx.selectedPerformerIds;
+                        if (perfSet) perfSet.add(String(newId));
+                        addRecentEntry('performers', { id: newId, name: rawName });
+                        if (typeof ctx.fetchColumnData === 'function') {
+                            await ctx.fetchColumnData('performers', popup.performersTable, '', perfSet);
+                        }
+                        if (typeof ctx.refreshAllUI === 'function') ctx.refreshAllUI();
+                        if (typeof ctx.doSave === 'function') {
+                            await ctx.doSave(`Created & added performer "${rawName}"`);
+                        }
+                        btn.style.background = '#059669';
+                        btn.style.border = 'none';
+                        btn.style.color = '#fff';
+                        btn.textContent = `✓ ${rawName}`;
+                        toastSuccess(`Created & added performer "${rawName}"`);
+                    } else {
+                        btn.disabled = false;
+                        btn.textContent = `+ Create "${rawName}"`;
+                        toastError(`Failed to create performer "${rawName}"`);
+                    }
+                } catch (err) {
+                    btn.disabled = false;
+                    btn.textContent = `+ Create "${rawName}"`;
+                    toastError(`Error creating performer: ${err.message}`);
                 }
             };
         });
@@ -10082,6 +10350,46 @@
             };
         });
 
+        container.querySelectorAll('.fasttag-ai-chip-create-tag').forEach(btn => {
+            btn.onclick = async (e) => {
+                e.preventDefault();
+                const rawName = btn.getAttribute('data-name');
+                if (!rawName) return;
+                btn.disabled = true;
+                btn.textContent = '⏳ Creating...';
+                try {
+                    const res = await fetchGQL(ENTITY_CONFIG.tags.createQuery, ENTITY_CONFIG.tags.createVariables(rawName));
+                    const newId = ENTITY_CONFIG.tags.createExtract(res.data);
+                    if (newId) {
+                        invalidateCache('tags');
+                        const tagSet = ctx.getSelectedTags ? ctx.getSelectedTags() : ctx.selectedTagIds;
+                        if (tagSet) tagSet.add(String(newId));
+                        addRecentEntry('tags', { id: newId, name: rawName });
+                        if (typeof ctx.fetchColumnData === 'function') {
+                            await ctx.fetchColumnData('tags', popup.tagsTable, '', tagSet);
+                        }
+                        if (typeof ctx.refreshAllUI === 'function') ctx.refreshAllUI();
+                        if (typeof ctx.doSave === 'function') {
+                            await ctx.doSave(`Created & added tag "${rawName}"`);
+                        }
+                        btn.style.background = '#059669';
+                        btn.style.border = 'none';
+                        btn.style.color = '#fff';
+                        btn.textContent = `✓ ${rawName}`;
+                        toastSuccess(`Created & added tag "${rawName}"`);
+                    } else {
+                        btn.disabled = false;
+                        btn.textContent = `+ Create "${rawName}"`;
+                        toastError(`Failed to create tag "${rawName}"`);
+                    }
+                } catch (err) {
+                    btn.disabled = false;
+                    btn.textContent = `+ Create "${rawName}"`;
+                    toastError(`Error creating tag: ${err.message}`);
+                }
+            };
+        });
+
         const applyAllBtn = container.querySelector('#fasttag-ai-apply-all-btn');
         if (applyAllBtn) {
             applyAllBtn.onclick = async (e) => {
@@ -10097,23 +10405,53 @@
                     if (matchedStudio && typeof ctx.setSelectedStudio === 'function') {
                         ctx.setSelectedStudio(String(matchedStudio.id));
                         addRecentEntry('studios', matchedStudio);
+                    } else if (!matchedStudio && aiResult.studio && typeof ctx.setSelectedStudio === 'function') {
+                        try {
+                            const res = await fetchGQL(ENTITY_CONFIG.studios.createQuery, ENTITY_CONFIG.studios.createVariables(aiResult.studio));
+                            const newId = ENTITY_CONFIG.studios.createExtract(res.data);
+                            if (newId) {
+                                invalidateCache('studios');
+                                ctx.setSelectedStudio(String(newId));
+                                addRecentEntry('studios', { id: newId, name: aiResult.studio });
+                            }
+                        } catch (e) {}
                     }
 
                     const perfSet = ctx.getSelectedPerformers ? ctx.getSelectedPerformers() : ctx.selectedPerformerIds;
-                    matchedPerformers.filter(p => p.matched).forEach(p => {
-                        if (perfSet) {
+                    for (const p of matchedPerformers) {
+                        if (p.matched && perfSet) {
                             perfSet.add(String(p.item.id));
                             addRecentEntry('performers', p.item);
+                        } else if (!p.matched && p.rawName && perfSet) {
+                            try {
+                                const res = await fetchGQL(ENTITY_CONFIG.performers.createQuery, ENTITY_CONFIG.performers.createVariables(p.rawName));
+                                const newId = ENTITY_CONFIG.performers.createExtract(res.data);
+                                if (newId) {
+                                    invalidateCache('performers');
+                                    perfSet.add(String(newId));
+                                    addRecentEntry('performers', { id: newId, name: p.rawName });
+                                }
+                            } catch (e) {}
                         }
-                    });
+                    }
 
                     const tagSet = ctx.getSelectedTags ? ctx.getSelectedTags() : ctx.selectedTagIds;
-                    matchedTags.filter(t => t.matched).forEach(t => {
-                        if (tagSet) {
+                    for (const t of matchedTags) {
+                        if (t.matched && tagSet) {
                             tagSet.add(String(t.item.id));
                             addRecentEntry('tags', t.item);
+                        } else if (!t.matched && t.rawName && tagSet) {
+                            try {
+                                const res = await fetchGQL(ENTITY_CONFIG.tags.createQuery, ENTITY_CONFIG.tags.createVariables(t.rawName));
+                                const newId = ENTITY_CONFIG.tags.createExtract(res.data);
+                                if (newId) {
+                                    invalidateCache('tags');
+                                    tagSet.add(String(newId));
+                                    addRecentEntry('tags', { id: newId, name: t.rawName });
+                                }
+                            } catch (e) {}
                         }
-                    });
+                    }
 
                     if (updateVars.title || updateVars.date) {
                         await fetchGQL(`mutation DirectSceneUpdate($input: SceneUpdateInput!) { sceneUpdate(input: $input) { id } }`, {
@@ -10202,13 +10540,13 @@
             let isRestoring = false;
             let currentSceneId = sceneId;
 
-            // Initialize Tabulator tables once
+            // Initialize Tabulator tables with cached data immediately so there's zero placeholder flash
             const tagsTable = new Tabulator(popup.tags.tableContainer, {
-                data: [],
+                data: getCachedOrNull('tags') || [],
                 layout: "fitColumns",
                 columnResizeMode: "fit",
                 height: "100%",
-                placeholder: "No Tags Found",
+                placeholder: () => getCachedOrNull('tags') ? "No Tags Found" : "Loading Tags...",
                 selectable: true,
                 index: "id",
                 columnDefaults: { headerSort: false },
@@ -10219,11 +10557,11 @@
             attachColumnWidthSaver(tagsTable, 'tags', 'everything');
 
             const performersTable = new Tabulator(popup.performers.tableContainer, {
-                data: [],
+                data: getCachedOrNull('performers') || [],
                 layout: "fitColumns",
                 columnResizeMode: "fit",
                 height: "100%",
-                placeholder: "No Performers Found",
+                placeholder: () => getCachedOrNull('performers') ? "No Performers Found" : "Loading Performers...",
                 selectable: true,
                 index: "id",
                 columnDefaults: { headerSort: false },
@@ -10597,18 +10935,11 @@
 
                 isRestoring = true;
                 try {
-                    if (typeof tableInstance.deselectRow === 'function') {
-                        tableInstance.deselectRow();
-                    }
                     await tableInstance.setData(data);
-                    if (typeof tableInstance.deselectRow === 'function') {
-                        tableInstance.deselectRow();
-                    }
                     selIds.forEach(id => {
                         const r = tableInstance.getRow(id);
                         if (r) tableInstance.selectRow(r);
                     });
-                    tableInstance.redraw(true);
 
                     const rawTerm = (popup.globalSearch?.value || '').trim();
                     const bottomCreateEl = popup[type]?.bottomCreateContainer;
@@ -10693,7 +11024,7 @@
                 activeNavIndex = rows.indexOf(row);
                 refreshAllUI();
                 updateEverythingKeyboardHighlight();
-                await doSave(wasSelected ? 'Tag removed' : 'Tags updated');
+                doSave(wasSelected ? 'Tag removed' : 'Tags updated');
 
                 const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
                 if (hasSearch) {
@@ -10749,7 +11080,7 @@
                 activeNavIndex = rows.indexOf(row);
                 refreshAllUI();
                 updateEverythingKeyboardHighlight();
-                await doSave(wasSelected ? 'Performer removed' : 'Performers updated');
+                doSave(wasSelected ? 'Performer removed' : 'Performers updated');
 
                 const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
                 if (hasSearch) {
@@ -11610,7 +11941,7 @@
                     }
 
                     const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
-                    if (!hasSearch) {
+                    if (!hasSearch && activeNavIndex < 0) {
                         e.preventDefault();
                         if (!popup._isRandomMode && popup.saveBtn) popup.saveBtn.click();
                         return;
@@ -11636,7 +11967,8 @@
                             }
 
                             refreshAllUI();
-                            await doSave(isSelected ? (currentNavSection === 'tags' ? 'Tag removed' : 'Performer removed') : (currentNavSection === 'tags' ? 'Tags updated' : 'Performers updated'));
+                            clearTimeout(searchDebounce);
+                            doSave(isSelected ? (currentNavSection === 'tags' ? 'Tag removed' : 'Performer removed') : (currentNavSection === 'tags' ? 'Tags updated' : 'Performers updated'));
 
                             if (hasSearch) {
                                 popup.globalSearch.value = '';
@@ -11759,7 +12091,9 @@
                     } catch (e) {}
                 };
 
-                const doSave = async (customSuccessMessage = null, shouldCloseScraper = false) => {
+                let pendingEverythingSaveSeq = 0;
+            const doSave = async (customSuccessMessage = null, shouldCloseScraper = false) => {
+                const saveSeq = ++pendingEverythingSaveSeq;
                     if (shouldCloseScraper && !window._fastTagEverythingScraperOpen) {
                         if (popup.scraperCardContainer) {
                             popup.scraperCardContainer.innerHTML = '';
@@ -11791,6 +12125,7 @@
                         });
 
                         if (res?.data?.sceneUpdate?.id) {
+                            if (saveSeq !== pendingEverythingSaveSeq) return true;
                             initialTagIds = new Set(selectedTagIds);
                             initialPerformerIds = new Set(selectedPerformerIds);
                             initialStudioId = selectedStudioId;
@@ -11815,7 +12150,23 @@
                                 if (grp) addRecentEntry('groups', grp);
                             });
 
-                            await refreshSceneCards();
+                            // Refract Theme compatibility: strip its "already processed" marker and circles
+                            try {
+                                const sIdStr = String(currentSceneId);
+                                document.querySelectorAll(
+                                    `.scene-card a[href^="/scenes/${sIdStr}?"], ` +
+                                    `.scene-card a[href="/scenes/${sIdStr}"], ` +
+                                    `.scene-card a[href^="/scenes/${sIdStr}/"]`
+                                ).forEach(a => {
+                                    const card = a.closest('.scene-card');
+                                    if (card) {
+                                        card.removeAttribute('data-stash-sc');
+                                        card.querySelectorAll('.stash-performer-circles').forEach(el => el.remove());
+                                    }
+                                });
+                            } catch (e) {}
+
+                            refreshSceneCardsDebounced(currentSceneId);
                             recordSaveUsage();
                             toastSuccess(customSuccessMessage || 'Scene saved successfully');
                             updateSaveButton();
@@ -12156,13 +12507,13 @@
             let isRestoring = false;
             let searchDebounce = null;
 
-            // Initialize Tabulator tables
+            // Initialize Tabulator tables with cached data immediately so there's zero placeholder flash
             const tagsTable = new Tabulator(popup.tags.tableContainer, {
-                data: [],
+                data: getCachedOrNull('tags') || [],
                 layout: "fitColumns",
                 columnResizeMode: "fit",
                 height: "100%",
-                placeholder: "No Tags Found",
+                placeholder: () => getCachedOrNull('tags') ? "No Tags Found" : "Loading Tags...",
                 selectable: true,
                 index: "id",
                 columnDefaults: { headerSort: false },
@@ -12173,11 +12524,11 @@
             attachColumnWidthSaver(tagsTable, 'tags', 'bulk-everything');
 
             const performersTable = new Tabulator(popup.performers.tableContainer, {
-                data: [],
+                data: getCachedOrNull('performers') || [],
                 layout: "fitColumns",
                 columnResizeMode: "fit",
                 height: "100%",
-                placeholder: "No Performers Found",
+                placeholder: () => getCachedOrNull('performers') ? "No Performers Found" : "Loading Performers...",
                 selectable: true,
                 index: "id",
                 columnDefaults: { headerSort: false },
@@ -13575,7 +13926,7 @@
                     }
 
                     const hasSearch = popup.globalSearch && popup.globalSearch.value.trim().length > 0;
-                    if (!hasSearch) {
+                    if (!hasSearch && activeNavIndex < 0) {
                         e.preventDefault();
                         if (popup.saveBtn) popup.saveBtn.click();
                         return;
@@ -13804,10 +14155,11 @@
         const form = activePopup.element;
 
         const table = new Tabulator(activePopup.tableContainer, {
+            data: getCachedOrNull(type) || [],
             layout: "fitColumns",
             columnResizeMode: "fit",
             height: "100%",
-            placeholder: `No ${config.pluralTitle} Found`,
+            placeholder: () => getCachedOrNull(type) ? `No ${config.pluralTitle} Found` : `Loading ${config.pluralTitle}...`,
             selectable: true,
             index: "id",
             columnDefaults: {
@@ -13928,12 +14280,15 @@
         };
         form._fastTagOnResize = refreshUI;
 
+        let pendingSaveSeq = 0;
         const saveWithoutReload = async (sId, ids, showToast = true) => {
+            const currentSeq = ++pendingSaveSeq;
             sessionStorage.setItem(scrollKey, window.scrollY);
             const success = await updateEntityForScene(type, sId, Array.from(ids));
+            if (currentSeq !== pendingSaveSeq) return success;
             if (success) {
                 sequentialEditState.initialSelectedIds = new Set(ids);
-                await refreshSceneCards();
+                refreshSceneCardsDebounced(sId);
                 recordSaveUsage();
                 if (showToast) {
                     toastSuccess(`${config.pluralTitle} updated`);
@@ -13966,7 +14321,8 @@
                 addRecentEntry(type, rowData);
             }
 
-            await saveWithoutReload(sceneId, selectedIds);
+            refreshUI();
+            saveWithoutReload(sceneId, selectedIds);
 
             const hasSearch = filterInput && filterInput.value.trim().length > 0;
             if (hasSearch) {
@@ -14028,13 +14384,7 @@
 
             isRestoringSelections = true;
             try {
-                if (typeof activeTableInstance.deselectRow === 'function') {
-                    activeTableInstance.deselectRow();
-                }
                 await activeTableInstance.setData(data);
-                if (typeof activeTableInstance.deselectRow === 'function') {
-                    activeTableInstance.deselectRow();
-                }
                 selectedIds.forEach(id => {
                     const r = activeTableInstance.getRow(id);
                     if (r) activeTableInstance.selectRow(r);
@@ -14043,9 +14393,6 @@
                 renderSmartSuggestions(form, type, filterInput, selectedIds, smartSuggestions, onRecentChipSelect);
                 updateSequentialEditUI(form, type, selectedIds);
                 updateVisibility();
-                if (typeof activeTableInstance.redraw === 'function') {
-                    activeTableInstance.redraw(true);
-                }
                 if (resetScroll && data.length > 0) {
                     const holder = activeTableInstance.element?.querySelector('.tabulator-tableholder') || activeTableInstance.element;
                     if (holder) {
@@ -14345,6 +14692,7 @@
                 }
                 updateSingleKeyboardHighlight();
             } else if (e.key === 'Enter') {
+                clearTimeout(debounceTimer);
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();
@@ -14411,22 +14759,27 @@
                         if (hadSearch) {
                             filterInput.value = '';
                             updateVisibility();
-                            await saveWithoutReload(sceneId, selectedIds);
-                            await fetchData("", true);
-                            if (!wasSelected) {
-                                const r = activeTableInstance.getRow(rowData.id);
-                                if (r) activeTableInstance.scrollToRow(r, "top", false);
-                            }
-                            currentSingleSection = 'table';
-                            singleNavIndex = -1;
-                        } else {
                             refreshUI();
-                            await saveWithoutReload(sceneId, selectedIds);
-                            if (wasSelected) {
-                                await fetchData("", true);
+                            saveWithoutReload(sceneId, selectedIds);
+                            fetchData("", true).then(() => {
+                                if (!wasSelected) {
+                                    const r = activeTableInstance.getRow(rowData.id);
+                                    if (r) activeTableInstance.scrollToRow(r, "top", false);
+                                }
+                                currentSingleSection = 'table';
+                                singleNavIndex = -1;
+                                updateSingleKeyboardHighlight();
+                                if (filterInput) filterInput.focus({ preventScroll: true });
+                            });
+                        } else {
+                            if (refreshBtn) {
+                                refreshBtn.classList.add('fasttag-refresh-pulse');
+                                refreshBtn.title = 'Re-sort list & pin selected tags to top';
                             }
+                            saveWithoutReload(sceneId, selectedIds);
+                            refreshUI();
+                            if (filterInput) filterInput.focus({ preventScroll: true });
                         }
-                        filterInput.focus({ preventScroll: true });
                         updateSingleKeyboardHighlight();
                     }
                 }
@@ -14625,4 +14978,26 @@
 
         openEntityPopup(clickedEntityType, sceneId, sceneCard);
     }, true);
+
+    // --- Background Cache Preloader (Instant 0ms popup opening) ---
+    async function preloadCaches() {
+        const types = ['tags', 'performers', 'studios', 'galleries'];
+        for (const type of types) {
+            if (!getCachedOrNull(type)) {
+                try {
+                    const config = ENTITY_CONFIG[type];
+                    if (config?.fetchQuery) {
+                        const res = await fetchGQL(config.fetchQuery);
+                        if (res?.data) {
+                            const data = config.extractList(res.data);
+                            if (Array.isArray(data) && data.length > 0) {
+                                setCache(type, data);
+                            }
+                        }
+                    }
+                } catch (e) {}
+            }
+        }
+    }
+    setTimeout(preloadCaches, 300);
 })();

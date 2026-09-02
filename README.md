@@ -3,7 +3,7 @@
 # ⚡ FastTag for Stash
 ### Lightning-Fast Scene Tagging Workflow & Backlog Manager for Stash
 
-![Version](https://img.shields.io/badge/version-4.0.0-6366f1?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-4.1.0-6366f1?style=for-the-badge)
 ![Stash](https://img.shields.io/badge/Stash-v0.26+-f59e0b?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-10b981?style=for-the-badge)
 
@@ -23,19 +23,20 @@
 
 **FastTag** is a powerful, keyboard-driven tagging workflow plugin for [Stash](https://github.com/stashapp/stash). It allows you to edit tags, performers, studios, and galleries directly from scene cards without navigating away from your library or opening multiple tabs.
 
-Featuring a **Dual-Table Edit Everything Workspace**, **Random Untagged Backlog Mode**, **Smart Popularity Search**, **Full Video Stream Scrubbing**, and **Performer ID Cards**, FastTag makes organizing media collections effortless and fast.
+Featuring a **Dual-Table Edit Everything Workspace**, **AI Smart Parser**, **Random Untagged Backlog Mode**, **Smart Popularity Search**, **Full Video Stream Scrubbing**, and **Performer ID Cards**, FastTag makes organizing media collections effortless and fast.
 
 ---
 
 ## 🔥 Key Features
 
+* **🤖 AI Smart Parser (Google Gemini Beta):** 1-Click extraction of clean titles, release dates, studios, performers, and tags from messy filenames using Google Gemini. Ships with a local Python WebSocket bridge daemon (`port 9998`), multi-model auto-failover, 1-click entity creation, and seamless sequential navigation.
 * **⚡ Edit Everything (All-in-One Workspace):** Dual side-by-side tables for editing Tags, Performers, and Studios simultaneously with resizable columns, compact Studio & Group bars with glowing SVG icons, and 16:9 video preview.
 * **🎲 Random Untagged Scene Mode:** One-click backlog cleanup with 3D rolling dice keyframe animations, sunset cyberpunk button, remaining backlog counter, and secret power-user hotkeys (<kbd>Cmd/Ctrl+Enter</kbd>).
 * **🔁 In-Place Sequential Navigation:** Review and tag scene-by-scene sequentially (`[1/60]`) with instant in-place transitions.
 * **📊 Smart Popularity Search:** Ranks active search results by popularity (scene count) & match relevance across all modals, keeping selected items pinned at the top when search is empty.
 * **🎬 Full Video Stream Scrubbing & Frame Freeze:** Toggle to `🎬 Full Video` to scrub through full scene streams with velocity-based mouse wheel control, hold <kbd>Shift</kbd> to freeze & step frame-by-frame, and tap <kbd>Option+V</kbd> (Mac) / <kbd>Alt+V</kbd> (Windows/Linux) to toggle modes.
 * **⤢ Floating Video Popout HUD:** Click `⤢` to detach the video into a 2x floating, resizable workstation while FastTag collapses into a 33px placeholder bar for 100% vertical table space. Click `⤝` to snap back!
-* **⚙️ Category Tabbed Settings Suite:** Redesigned 4-tab settings modal (**🎨 Display**, **🎬 Video**, **⚡ Scraper**, **🛠️ System**) with 250-entry flight recorder diagnostics and instant reset buttons.
+* **⚙️ Category Tabbed Settings Suite:** Sleek 5-tab settings modal (**🎨 Display**, **🎬 Video**, **⚡ Scraper**, **🤖 AI**, **🛠️ System**) with 250-entry flight recorder diagnostics and instant reset buttons.
 * **🎭 Performer Hover ID Cards & 1-Click Profile Jump:** Hovering over any performer row displays a frosted glass ID card with their 110×146px portrait photo, rating (`★★★★☆`), country flag (`🇺🇸 US`), gender, age, aliases, and disambiguation. Click to open their profile in a new tab!
 * **⚡ Smart Auto-Save Workflow:** Quick-action suggestions, recent chips, studio chips, and search-and-select immediately auto-save to the scene.
 * **💾 Save-in-Place Workflow:** Clicking `Save` saves changes directly to Stash while keeping the popup open so you can continue tagging without interruption.

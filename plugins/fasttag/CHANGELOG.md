@@ -4,6 +4,29 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.1.0] - 2026-09-02
+
+### Added & Improved
+- **🤖 AI Smart Parser (Google Gemini Beta)**:
+  - **1-Click Scene Parsing**: Click **`✨ AI Parse`** in Edit Everything to automatically extract clean scene titles, release dates, studios, performers, and tags from messy filenames using Google Gemini.
+  - **Local WebSocket Bridge**: Ships with lightweight Python bridge daemon (`fasttag_gemini_bridge.py`) and Stash tasks (`fasttag_task.py`) listening locally on port `9998`, bypassing browser CORS / Content-Security-Policy network restrictions.
+  - **Intelligent Multi-Model Failover**: Automatically cascades across up to 5 models (`gemini-flash-latest`, `gemini-flash-lite-latest`, `gemini-3.8-flash`, `gemini-3.7-flash`, `gemini-3.5-flash`) on Google 429 rate limit quotas.
+  - **1-Click Entity Creation**: Shows purple dashed buttons (`+ Create "Name"`) for missing performers, studios, and tags directly inside the suggestions card.
+  - **Sequential Navigation Lifecycle**: Automatically clears and hides AI cards when advancing scenes, re-parsing only when auto-parse is enabled.
+  - **Settings Integration**: Dedicated **🤖 AI** tab in FastTag Settings with API key storage, model selector, auto-parse toggle, and live connection testing.
+- **💡 Enhanced Suggestion Engine**:
+  - **Adjacent-Token Compound Word Joining**: Multi-word tokens in filenames (e.g., `Only Fans`, `Deep Throat`, `Step Brother`) now properly match single-word tags (`Onlyfans`, `Deepthroat`, `Stepbrother`).
+  - **Plural & Singular Stemming**: Flexible stemming matches plurals and singulars (e.g. `Tattoos` ➔ `Tattoo`, `Piercing` ➔ `Piercings`).
+  - **Space-Agnostic Fuzzy Matching**: Handles camelCase vs lowercase database differences seamlessly.
+  - **Status Indicators**: Displays emerald green checkmark (`✓`) for tags and performers already added to the scene.
+- **🛠️ Bug Fixes & Refinements**:
+  - **Universal Toast Copying**: Added off-screen textarea fallback to ensure toast **📋 Copy** button works universally across plain HTTP, HTTPS, and local network IP connections.
+  - **Toast Duration**: Extended error toast visibility to 8 seconds with hover pause.
+  - **Zero-Latency Table Loading**: Pre-populates Tabulator tables from memory cache (`getCachedOrNull`) to eliminate the brief *"No tags found"* placeholder flash.
+  - **Keyboard Navigation**: Enter key properly toggles highlighted items in single-entity popups without jumping scenes.
+
+---
+
 ## [4.0.1] - 2026-09-01
 
 ### Added & Improved
