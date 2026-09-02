@@ -3075,27 +3075,14 @@
         return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     }
 
-    let previewTokenCounter = 0;
-
     async function attachScenePreview(hostContainer, sceneId, cardElement) {
+        if (previewAbortController) {
+            previewAbortController.abort();
+        }
+        previewAbortController = new AbortController();
+        const { signal } = previewAbortController;
+
         if (!hostContainer) return;
-        if (hostContainer._previewAbortController) {
-            hostContainer._previewAbortController.abort();
-        }
-        const previewAbort = new AbortController();
-        hostContainer._previewAbortController = previewAbort;
-        const { signal } = previewAbort;
-
-        const myToken = ++previewTokenCounter;
-
-        const { previewUrl, coverUrl, streamUrl } = await fetchSceneMediaUrls(sceneId, cardElement);
-        if (myToken !== previewTokenCounter || signal.aborted) return;
-
-        if (!previewUrl && !coverUrl && !streamUrl) {
-            hostContainer.style.display = 'none';
-            return;
-        }
-
         hostContainer.innerHTML = '';
         hostContainer.style.display = 'block';
         hostContainer.style.position = 'relative';
@@ -3130,6 +3117,14 @@
                 window.open(sceneUrl, '_blank');
             }
         };
+
+        const { previewUrl, coverUrl, streamUrl } = await fetchSceneMediaUrls(sceneId, cardElement);
+        if (signal.aborted) return;
+
+        if (!previewUrl && !coverUrl && !streamUrl) {
+            hostContainer.style.display = 'none';
+            return;
+        }
 
         let currentMode = 'preview'; // 'preview' or 'stream'
         let currentMedia = null;
@@ -3887,15 +3882,15 @@
             }
         });
 
-        // Initial Popout State sync - attach mediaContainer to DOM first so video can initialize and play
+        // Initial render (honors Always Play Full Video setting)
+        renderMedia(getAlwaysPlayFullVideo() ? 'stream' : 'preview');
+
+        // Initial Popout State sync
         if (isVideoPoppedOut || isVideoHudPersistedOpen()) {
             togglePopout(true);
         } else {
             hostContainer.appendChild(mediaContainer);
         }
-
-        // Initial render (honors Always Play Full Video setting)
-        renderMedia(getAlwaysPlayFullVideo() ? 'stream' : 'preview');
     }
 
     // --- State & Sequential Utilities ---
