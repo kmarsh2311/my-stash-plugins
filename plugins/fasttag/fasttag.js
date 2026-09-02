@@ -1883,7 +1883,7 @@
                 btn.style.border = isDark ? '1px dashed rgba(148, 163, 184, 0.45)' : '1px dashed #94a3b8';
                 btn.style.color = isDark ? '#94a3b8' : '#64748b';
                 btn.title = `Scene is ${unorgWord} in Stash. Click to mark as ${orgWord}.`;
-                btn.innerHTML = `<span style="font-size: 11px; opacity: 0.85; line-height: 1;">◯</span> ${unorgWord}`;
+                btn.innerHTML = `<span style="font-size: 11px; line-height: 1;">⚡</span> ${unorgWord}`;
             }
         };
 
@@ -11184,8 +11184,8 @@
                     const orgWord = getOrganizedWord('organized');
                     const markWord = getOrganizedWord('mark_as');
                     data.unshift({
-                        id: isOrg ? '✓' : '◯',
-                        name: isOrg ? `✓ ${orgWord}` : `◯ ${markWord}`,
+                        id: isOrg ? '✓' : '⚡',
+                        name: isOrg ? `✓ ${orgWord}` : `⚡ ${markWord}`,
                         _isVirtualOrganized: true,
                         _isOrganizedState: isOrg
                     });
@@ -14749,8 +14749,8 @@
                 const orgWord = getOrganizedWord('organized');
                 const markWord = getOrganizedWord('mark_as');
                 data.unshift({
-                    id: isOrg ? '✓' : '◯',
-                    name: isOrg ? `✓ ${orgWord}` : `◯ ${markWord}`,
+                    id: isOrg ? '✓' : '⚡',
+                    name: isOrg ? `✓ ${orgWord}` : `⚡ ${markWord}`,
                     _isVirtualOrganized: true,
                     _isOrganizedState: isOrg
                 });
