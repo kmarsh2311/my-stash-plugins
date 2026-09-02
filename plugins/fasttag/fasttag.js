@@ -11185,7 +11185,7 @@
                     const markWord = getOrganizedWord('mark_as');
                     data.unshift({
                         id: isOrg ? '✓' : '⚡',
-                        name: isOrg ? `✓ ${orgWord}` : `⚡ ${markWord}`,
+                        name: isOrg ? orgWord : markWord,
                         _isVirtualOrganized: true,
                         _isOrganizedState: isOrg
                     });
@@ -14750,7 +14750,7 @@
                 const markWord = getOrganizedWord('mark_as');
                 data.unshift({
                     id: isOrg ? '✓' : '⚡',
-                    name: isOrg ? `✓ ${orgWord}` : `⚡ ${markWord}`,
+                    name: isOrg ? orgWord : markWord,
                     _isVirtualOrganized: true,
                     _isOrganizedState: isOrg
                 });
