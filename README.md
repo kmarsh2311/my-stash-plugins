@@ -4,6 +4,7 @@
 ### Lightning-Fast Scene Tagging Workflow & Backlog Manager for Stash
 
 ![Version](https://img.shields.io/badge/version-4.1.0-6366f1?style=for-the-badge)
+[![Changelog](https://img.shields.io/badge/changelog-v4.1.0-8b5cf6?style=for-the-badge)](CHANGELOG.md)
 ![Stash](https://img.shields.io/badge/Stash-v0.26+-f59e0b?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-10b981?style=for-the-badge)
 
@@ -24,6 +25,9 @@
 **FastTag** is a powerful, keyboard-driven tagging workflow plugin for [Stash](https://github.com/stashapp/stash). It allows you to edit tags, performers, studios, and galleries directly from scene cards without navigating away from your library or opening multiple tabs.
 
 Featuring a **Dual-Table Edit Everything Workspace**, **AI Smart Parser**, **Random Untagged Backlog Mode**, **Smart Popularity Search**, **Full Video Stream Scrubbing**, and **Performer ID Cards**, FastTag makes organizing media collections effortless and fast.
+
+> [!TIP]
+> **✨ What's New in v4.1.0**: Added **AI Smart Parser** powered by Google Gemini (bypasses browser CORS via local Python WebSocket daemon), enhanced suggestion engine with compound-word joining (`Only Fans` ➔ `Onlyfans`) & plural stemming, 1-click entity creation, and zero-latency table caching. Read the full **[CHANGELOG.md](CHANGELOG.md)**.
 
 ---
 
@@ -83,7 +87,7 @@ Featuring a **Dual-Table Edit Everything Workspace**, **AI Smart Parser**, **Ran
 ## 📖 Documentation & Links
 
 * 📘 **Full User Guide**: See **[HOWTO.md](plugins/fasttag/HOWTO.md)** for complete workflows and screenshots.
-* 📝 **Release History**: See **[CHANGELOG.md](plugins/fasttag/CHANGELOG.md)** for full version history.
+* 📝 **Release History**: See **[CHANGELOG.md](CHANGELOG.md)** for full version history.
 
 ---
 
