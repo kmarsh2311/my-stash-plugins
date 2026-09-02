@@ -10008,6 +10008,12 @@
                     ctx.setSelectedStudio(String(matchedStudio.id));
                 }
                 addRecentEntry('studios', matchedStudio);
+                if (typeof ctx.renderStudioBar === 'function') {
+                    ctx.renderStudioBar('');
+                }
+                if (typeof ctx.refreshAllUI === 'function') {
+                    ctx.refreshAllUI();
+                }
                 if (typeof ctx.doSave === 'function') {
                     await ctx.doSave(`Studio set to "${matchedStudio.name}"`);
                 }
@@ -10020,12 +10026,17 @@
             btn.onclick = async (e) => {
                 e.preventDefault();
                 const pId = btn.getAttribute('data-id');
-                if (pId && ctx.selectedPerformerIds) {
-                    ctx.selectedPerformerIds.add(String(pId));
+                const perfSet = ctx.getSelectedPerformers ? ctx.getSelectedPerformers() : ctx.selectedPerformerIds;
+                if (pId && perfSet) {
+                    perfSet.add(String(pId));
                     const item = allPerformers.find(p => String(p.id) === String(pId));
                     if (item) addRecentEntry('performers', item);
+                    if (typeof ctx.fetchColumnData === 'function') {
+                        await ctx.fetchColumnData('performers', popup.performersTable, '', perfSet);
+                    }
+                    if (typeof ctx.refreshAllUI === 'function') ctx.refreshAllUI();
                     if (typeof ctx.doSave === 'function') {
-                        await ctx.doSave(`Added performer`);
+                        await ctx.doSave(`Added performer "${item?.name || pId}"`);
                     }
                     btn.style.background = '#059669';
                     btn.style.color = '#fff';
@@ -10038,12 +10049,17 @@
             btn.onclick = async (e) => {
                 e.preventDefault();
                 const tId = btn.getAttribute('data-id');
-                if (tId && ctx.selectedTagIds) {
-                    ctx.selectedTagIds.add(String(tId));
+                const tagSet = ctx.getSelectedTags ? ctx.getSelectedTags() : ctx.selectedTagIds;
+                if (tId && tagSet) {
+                    tagSet.add(String(tId));
                     const item = allTags.find(t => String(t.id) === String(tId));
                     if (item) addRecentEntry('tags', item);
+                    if (typeof ctx.fetchColumnData === 'function') {
+                        await ctx.fetchColumnData('tags', popup.tagsTable, '', tagSet);
+                    }
+                    if (typeof ctx.refreshAllUI === 'function') ctx.refreshAllUI();
                     if (typeof ctx.doSave === 'function') {
-                        await ctx.doSave(`Added tag`);
+                        await ctx.doSave(`Added tag "${item?.name || tId}"`);
                     }
                     btn.style.background = '#059669';
                     btn.style.color = '#fff';
@@ -10069,16 +10085,18 @@
                         addRecentEntry('studios', matchedStudio);
                     }
 
+                    const perfSet = ctx.getSelectedPerformers ? ctx.getSelectedPerformers() : ctx.selectedPerformerIds;
                     matchedPerformers.filter(p => p.matched).forEach(p => {
-                        if (ctx.selectedPerformerIds) {
-                            ctx.selectedPerformerIds.add(String(p.item.id));
+                        if (perfSet) {
+                            perfSet.add(String(p.item.id));
                             addRecentEntry('performers', p.item);
                         }
                     });
 
+                    const tagSet = ctx.getSelectedTags ? ctx.getSelectedTags() : ctx.selectedTagIds;
                     matchedTags.filter(t => t.matched).forEach(t => {
-                        if (ctx.selectedTagIds) {
-                            ctx.selectedTagIds.add(String(t.item.id));
+                        if (tagSet) {
+                            tagSet.add(String(t.item.id));
                             addRecentEntry('tags', t.item);
                         }
                     });
@@ -10087,6 +10105,21 @@
                         await fetchGQL(`mutation DirectSceneUpdate($input: SceneUpdateInput!) { sceneUpdate(input: $input) { id } }`, {
                             input: updateVars
                         });
+                    }
+
+                    if (typeof ctx.renderStudioBar === 'function') {
+                        ctx.renderStudioBar('');
+                    }
+
+                    if (typeof ctx.fetchColumnData === 'function') {
+                        await Promise.all([
+                            ctx.fetchColumnData('tags', popup.tagsTable, '', tagSet || new Set()),
+                            ctx.fetchColumnData('performers', popup.performersTable, '', perfSet || new Set())
+                        ]);
+                    }
+
+                    if (typeof ctx.refreshAllUI === 'function') {
+                        ctx.refreshAllUI();
                     }
 
                     if (typeof ctx.doSave === 'function') {
