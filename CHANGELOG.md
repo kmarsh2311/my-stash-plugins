@@ -4,6 +4,15 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.2.1] - 2026-09-02
+
+### Changed & Improved
+- **🎨 Scene Organisation UI Polish**:
+  - **Color Distinction**: The virtual action row now displays in warm amber (`#f59e0b` / `#fbbf24`) with `[ ⚡ ] Mark as Organised` when a scene is unorganised, ensuring it is never mistaken for already completed work while maintaining clean separation from the red keyboard focus selector.
+  - **Reserved Emerald Green**: Green (`#10b981`) is now strictly reserved for the confirmed completed state `[ ✓ ] Organised`.
+  - **Streamlined Layout**: Cleaned up the virtual row to show the icon badge in the ID column without duplicating glyphs in the name column.
+  - **Aligned Footer Button**: Leveled the footer pill button to 32px height with 6px border radius to sit flush alongside the Save and Close buttons.
+
 ## [4.2.0] - 2026-09-02
 
 ### Added

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash FastTag
 // @namespace    http://tampermonkey.net/
-// @version      4.2.0
+// @version      4.2.1
 // @description  Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
@@ -15,7 +15,7 @@
 
 (async function() {
     'use strict';
-    console.log('[FastTag v4.2.0] Initialized with Settings, Suggestions, Pinned Chips, Bulk Mode, Hotkeys, and Scene Organisation');
+    console.log('[FastTag v4.2.1] Initialized with Settings, Suggestions, Pinned Chips, Bulk Mode, Hotkeys, and Scene Organisation');
 
     // --- Entity Configuration & Schema Registry ---
     const ENTITY_CONFIG = {
