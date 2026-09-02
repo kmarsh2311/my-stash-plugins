@@ -550,24 +550,55 @@
             color: #ffffff !important;
             border-bottom: 1px solid #4338ca !important;
         }
+        /* Virtual Action Row - Base */
         #scenes-popup .tabulator .tabulator-row.fasttag-virtual-action-row,
         #scenes-popup.theme-dark .tabulator .tabulator-row.fasttag-virtual-action-row,
         #scenes-popup.theme-dark .tabulator .tabulator-row.tabulator-row-even.fasttag-virtual-action-row,
         #scenes-popup.theme-dark .tabulator .tabulator-row.tabulator-row-odd.fasttag-virtual-action-row {
-            background-color: rgba(16, 185, 129, 0.14) !important;
+            transition: background-color 0.12s ease;
+        }
+
+        /* Virtual Action Row - Pending (Warm Amber) */
+        #scenes-popup .tabulator .tabulator-row.fasttag-virtual-action-row.fasttag-action-pending,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.fasttag-virtual-action-row.fasttag-action-pending,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.tabulator-row-even.fasttag-virtual-action-row.fasttag-action-pending,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.tabulator-row-odd.fasttag-virtual-action-row.fasttag-action-pending {
+            background-color: rgba(245, 158, 11, 0.12) !important;
+            border-left: 3px solid #f59e0b !important;
+        }
+        #scenes-popup .tabulator .tabulator-row.fasttag-virtual-action-row.fasttag-action-pending:hover,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.fasttag-virtual-action-row.fasttag-action-pending:hover,
+        #scenes-popup .tabulator .tabulator-row.fasttag-virtual-action-row.fasttag-action-pending.fasttag-keyboard-active,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.fasttag-virtual-action-row.fasttag-action-pending.fasttag-keyboard-active {
+            background-color: rgba(245, 158, 11, 0.24) !important;
+        }
+        .tabulator-row.fasttag-virtual-action-row.fasttag-action-pending .tabulator-cell {
+            font-weight: 600 !important;
+            color: #b45309 !important;
+        }
+        #scenes-popup.theme-dark .tabulator-row.fasttag-virtual-action-row.fasttag-action-pending .tabulator-cell {
+            color: #fbbf24 !important;
+        }
+
+        /* Virtual Action Row - Completed (Emerald Green) */
+        #scenes-popup .tabulator .tabulator-row.fasttag-virtual-action-row.fasttag-action-completed,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.fasttag-virtual-action-row.fasttag-action-completed,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.tabulator-row-even.fasttag-virtual-action-row.fasttag-action-completed,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.tabulator-row-odd.fasttag-virtual-action-row.fasttag-action-completed {
+            background-color: rgba(16, 185, 129, 0.12) !important;
             border-left: 3px solid #10b981 !important;
         }
-        #scenes-popup .tabulator .tabulator-row.fasttag-virtual-action-row:hover,
-        #scenes-popup.theme-dark .tabulator .tabulator-row.fasttag-virtual-action-row:hover,
-        #scenes-popup .tabulator .tabulator-row.fasttag-virtual-action-row.fasttag-keyboard-active,
-        #scenes-popup.theme-dark .tabulator .tabulator-row.fasttag-virtual-action-row.fasttag-keyboard-active {
-            background-color: rgba(16, 185, 129, 0.28) !important;
+        #scenes-popup .tabulator .tabulator-row.fasttag-virtual-action-row.fasttag-action-completed:hover,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.fasttag-virtual-action-row.fasttag-action-completed:hover,
+        #scenes-popup .tabulator .tabulator-row.fasttag-virtual-action-row.fasttag-action-completed.fasttag-keyboard-active,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.fasttag-virtual-action-row.fasttag-action-completed.fasttag-keyboard-active {
+            background-color: rgba(16, 185, 129, 0.24) !important;
         }
-        .tabulator-row.fasttag-virtual-action-row .tabulator-cell {
+        .tabulator-row.fasttag-virtual-action-row.fasttag-action-completed .tabulator-cell {
             font-weight: 600 !important;
             color: #059669 !important;
         }
-        #scenes-popup.theme-dark .tabulator-row.fasttag-virtual-action-row .tabulator-cell {
+        #scenes-popup.theme-dark .tabulator-row.fasttag-virtual-action-row.fasttag-action-completed .tabulator-cell {
             color: #34d399 !important;
         }
 
@@ -1846,32 +1877,46 @@
                 btn.style.border = '1px solid #059669';
                 btn.style.color = '#ffffff';
                 btn.title = `Scene is marked as ${orgWord} in Stash. Click to toggle.`;
-                btn.innerHTML = `<span style="font-weight: 800; font-size: 10px; line-height: 1;">✓</span> ${orgWord}`;
+                btn.innerHTML = `<span style="font-weight: 800; font-size: 11px; line-height: 1;">✓</span> ${orgWord}`;
             } else {
                 btn.style.background = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)';
                 btn.style.border = isDark ? '1px dashed rgba(148, 163, 184, 0.45)' : '1px dashed #94a3b8';
                 btn.style.color = isDark ? '#94a3b8' : '#64748b';
                 btn.title = `Scene is ${unorgWord} in Stash. Click to mark as ${orgWord}.`;
-                btn.innerHTML = `<span style="font-size: 9px; opacity: 0.75; line-height: 1;">◯</span> ${unorgWord}`;
+                btn.innerHTML = `<span style="font-size: 11px; opacity: 0.85; line-height: 1;">◯</span> ${unorgWord}`;
             }
         };
 
         btn.style.cssText = `
-            padding: 2px 8px;
-            border-radius: 999px;
-            font-size: 11px;
+            padding: 0 12px;
+            border-radius: 6px;
+            font-size: 12px;
             font-weight: 600;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
-            gap: 4px;
-            line-height: 1.25;
+            justify-content: center;
+            gap: 5px;
+            line-height: 1;
             transition: all 0.15s ease;
             user-select: none;
             vertical-align: middle;
             box-sizing: border-box;
-            height: 22px;
+            height: 32px;
         `;
+
+        btn.onmouseenter = () => {
+            if (!currentOrganized) {
+                const isDark = getEffectiveTheme() === 'dark';
+                btn.style.background = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)';
+                btn.style.borderColor = isDark ? 'rgba(148, 163, 184, 0.7)' : '#64748b';
+            } else {
+                btn.style.background = '#047857';
+            }
+        };
+        btn.onmouseleave = () => {
+            renderBtn(currentOrganized);
+        };
 
         renderBtn(currentOrganized);
 
@@ -10738,8 +10783,16 @@
                 index: "id",
                 rowFormatter: (row) => {
                     const d = row.getData();
-                    if (d && (d._isVirtualOrganized || d.id === '⚡')) {
-                        row.getElement().classList.add('fasttag-virtual-action-row');
+                    if (d && (d._isVirtualOrganized || d.id === '⚡' || d.id === '◯' || d.id === '✓')) {
+                        const el = row.getElement();
+                        el.classList.add('fasttag-virtual-action-row');
+                        if (d._isOrganizedState) {
+                            el.classList.add('fasttag-action-completed');
+                            el.classList.remove('fasttag-action-pending');
+                        } else {
+                            el.classList.add('fasttag-action-pending');
+                            el.classList.remove('fasttag-action-completed');
+                        }
                     }
                 },
                 columnDefaults: { headerSort: false },
@@ -11131,9 +11184,10 @@
                     const orgWord = getOrganizedWord('organized');
                     const markWord = getOrganizedWord('mark_as');
                     data.unshift({
-                        id: '⚡',
-                        name: isOrg ? `✓ ${orgWord}` : markWord,
-                        _isVirtualOrganized: true
+                        id: isOrg ? '✓' : '◯',
+                        name: isOrg ? `✓ ${orgWord}` : `◯ ${markWord}`,
+                        _isVirtualOrganized: true,
+                        _isOrganizedState: isOrg
                     });
                 }
 
@@ -11213,7 +11267,7 @@
                 if (!rowData || !rowData.id) return;
                 const strId = String(rowData.id);
 
-                if (rowData._isVirtualOrganized || strId === '__fasttag_virtual_organized__' || strId === '⚡') {
+                if (rowData._isVirtualOrganized || strId === '__fasttag_virtual_organized__' || strId === '⚡' || strId === '◯' || strId === '✓') {
                     if (popup.organizedBtn) {
                         popup.organizedBtn.click();
                     }
@@ -12192,7 +12246,7 @@
                             const rowData = selectedRow.getData();
                             const idStr = String(rowData.id);
 
-                            if (rowData._isVirtualOrganized || idStr === '__fasttag_virtual_organized__' || idStr === '⚡') {
+                            if (rowData._isVirtualOrganized || idStr === '__fasttag_virtual_organized__' || idStr === '⚡' || idStr === '◯' || idStr === '✓') {
                                 if (popup.organizedBtn) {
                                     popup.organizedBtn.click();
                                 }
@@ -14432,8 +14486,16 @@
             index: "id",
             rowFormatter: (row) => {
                 const d = row.getData();
-                if (d && (d._isVirtualOrganized || d.id === '⚡')) {
-                    row.getElement().classList.add('fasttag-virtual-action-row');
+                if (d && (d._isVirtualOrganized || d.id === '⚡' || d.id === '◯' || d.id === '✓')) {
+                    const el = row.getElement();
+                    el.classList.add('fasttag-virtual-action-row');
+                    if (d._isOrganizedState) {
+                        el.classList.add('fasttag-action-completed');
+                        el.classList.remove('fasttag-action-pending');
+                    } else {
+                        el.classList.add('fasttag-action-pending');
+                        el.classList.remove('fasttag-action-completed');
+                    }
                 }
             },
             columnDefaults: {
@@ -14598,7 +14660,7 @@
             if (!rowData || !rowData.id) return;
             const strId = String(rowData.id);
 
-            if (rowData._isVirtualOrganized || strId === '__fasttag_virtual_organized__' || strId === '⚡') {
+            if (rowData._isVirtualOrganized || strId === '__fasttag_virtual_organized__' || strId === '⚡' || strId === '◯' || strId === '✓') {
                 if (popup.organizedBtn) {
                     popup.organizedBtn.click();
                 }
@@ -14687,9 +14749,10 @@
                 const orgWord = getOrganizedWord('organized');
                 const markWord = getOrganizedWord('mark_as');
                 data.unshift({
-                    id: '⚡',
-                    name: isOrg ? `✓ ${orgWord}` : markWord,
-                    _isVirtualOrganized: true
+                    id: isOrg ? '✓' : '◯',
+                    name: isOrg ? `✓ ${orgWord}` : `◯ ${markWord}`,
+                    _isVirtualOrganized: true,
+                    _isOrganizedState: isOrg
                 });
             }
 
@@ -15072,7 +15135,7 @@
                     const rowData = targetRow.getData();
                     if (rowData && rowData.id) {
                         const strId = String(rowData.id);
-                        if (rowData._isVirtualOrganized || strId === '__fasttag_virtual_organized__' || strId === '⚡') {
+                        if (rowData._isVirtualOrganized || strId === '__fasttag_virtual_organized__' || strId === '⚡' || strId === '◯' || strId === '✓') {
                             if (popup.organizedBtn) {
                                 popup.organizedBtn.click();
                             }
