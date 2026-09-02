@@ -19,6 +19,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - **Plural & Singular Stemming**: Flexible stemming matches plurals and singulars (e.g. `Tattoos` ➔ `Tattoo`, `Piercing` ➔ `Piercings`).
   - **Space-Agnostic Fuzzy Matching**: Handles camelCase vs lowercase database differences seamlessly.
   - **Status Indicators**: Displays emerald green checkmark (`✓`) for tags and performers already added to the scene.
+- **🎨 Real-Time Refract Theme Compatibility**:
+  - Automatically clears Refract theme's processed card markers and performer circles whenever tags, performers, or studios are saved.
+  - Triggers Refract's MutationObserver to immediately re-render updated performer avatar circles and studio badges on scene cards in real time without requiring a manual page reload.
 - **🛠️ Bug Fixes & Refinements**:
   - **Universal Toast Copying**: Added off-screen textarea fallback to ensure toast **📋 Copy** button works universally across plain HTTP, HTTPS, and local network IP connections.
   - **Toast Duration**: Extended error toast visibility to 8 seconds with hover pause.
