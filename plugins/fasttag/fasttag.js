@@ -3731,10 +3731,18 @@
                         video.src = previewUrl;
 
                         video.onerror = () => {
-                            renderCoverOnly();
+                            if (streamUrl) {
+                                renderMedia('stream');
+                            } else {
+                                renderCoverOnly();
+                            }
                         };
                         video.addEventListener('error', () => {
-                            renderCoverOnly();
+                            if (streamUrl) {
+                                renderMedia('stream');
+                            } else {
+                                renderCoverOnly();
+                            }
                         });
 
                         currentMedia = video;
@@ -3749,11 +3757,17 @@
                         img.loading = 'eager';
                         img.src = previewUrl;
                         img.onerror = () => {
-                            renderCoverOnly();
+                            if (streamUrl) {
+                                renderMedia('stream');
+                            } else {
+                                renderCoverOnly();
+                            }
                         };
                         currentMedia = img;
                         mediaContainer.insertBefore(img, mediaContainer.firstChild);
                     }
+                } else if (streamUrl) {
+                    renderMedia('stream');
                 } else {
                     renderCoverOnly();
                 }
