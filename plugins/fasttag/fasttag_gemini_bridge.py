@@ -21,33 +21,71 @@ import socketserver
 PORT = 9998
 WS_MAGIC_STRING = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
+AVAILABLE_MODELS_CACHE = {} # api_key -> list of valid model names
+
+def get_available_models(api_key):
+    if api_key in AVAILABLE_MODELS_CACHE:
+        return AVAILABLE_MODELS_CACHE[api_key]
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+    try:
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            resp_data = json.loads(resp.read().decode("utf-8"))
+            models = [
+                m.get("name", "").replace("models/", "")
+                for m in resp_data.get("models", [])
+                if "generateContent" in m.get("supportedGenerationMethods", [])
+            ]
+            AVAILABLE_MODELS_CACHE[api_key] = models
+            return models
+    except Exception as e:
+        return []
+
+def get_best_model(api_key, requested_model="gemini-1.5-flash"):
+    models = get_available_models(api_key)
+    if requested_model and requested_model in models:
+        return requested_model
+
+    # Check for prefix / partial match
+    if requested_model:
+        for m in models:
+            if requested_model in m or m.startswith(requested_model):
+                return m
+
+    # Preference ranking
+    for pref in [
+        "gemini-1.5-flash-002", "gemini-1.5-flash-001", "gemini-1.5-flash", "gemini-1.5-flash-latest",
+        "gemini-2.0-flash", "gemini-2.0-flash-exp", "gemini-1.5-flash-8b",
+        "gemini-1.5-pro-002", "gemini-1.5-pro-001", "gemini-1.5-pro", "gemini-1.5-pro-latest", "gemini-pro"
+    ]:
+        if pref in models:
+            return pref
+
+    # Fallback to any flash or pro model
+    for m in models:
+        if "flash" in m:
+            return m
+    for m in models:
+        if "pro" in m:
+            return m
+
+    return models[0] if models else (requested_model or "gemini-1.5-flash")
+
 def process_gemini_request(data):
     req_type = data.get("type", "parse")
     api_key = data.get("api_key", "").strip()
-    model = data.get("model", "gemini-1.5-flash-latest").strip()
+    req_model = data.get("model", "gemini-1.5-flash").strip()
 
     if not api_key:
         return {"error": "No API key provided"}
 
     if req_type == "test":
-        # Test key validity by listing available models
-        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
-        try:
-            req = urllib.request.Request(url)
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                resp_data = json.loads(resp.read().decode("utf-8"))
-                models = [m.get("name", "").replace("models/", "") for m in resp_data.get("models", []) if "generateContent" in m.get("supportedGenerationMethods", [])]
-                return {"status": "ok", "message": f"Connected! Available models: {', '.join(models[:4])}", "models": models}
-        except urllib.error.HTTPError as e:
-            err_msg = e.read().decode("utf-8", errors="ignore")
-            try:
-                err_json = json.loads(err_msg)
-                err_msg = err_json.get("error", {}).get("message", err_msg)
-            except Exception:
-                pass
-            return {"error": f"Google Gemini API error ({e.code}): {err_msg}"}
-        except Exception as e:
-            return {"error": str(e)}
+        models = get_available_models(api_key)
+        if models:
+            chosen = get_best_model(api_key, req_model)
+            return {"status": "ok", "message": f"Connected! Active model: {chosen}", "models": models}
+        else:
+            return {"error": "Could not verify models. Please check your API key."}
 
     # Parse request
     filename = data.get("filename", "").strip()
@@ -73,43 +111,30 @@ Extract and return a valid JSON object matching this schema:
   "confidence": 95
 }}"""
 
-    # Model fallback cascade
-    candidate_models = [model]
-    for fallback in ["gemini-1.5-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro-latest"]:
-        if fallback not in candidate_models:
-            candidate_models.append(fallback)
+    chosen_model = get_best_model(api_key, req_model)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{chosen_model}:generateContent?key={api_key}"
+    payload = json.dumps({
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"responseMimeType": "application/json", "temperature": 0.1}
+    }).encode("utf-8")
 
-    last_error = None
-    for candidate in candidate_models:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{candidate}:generateContent?key={api_key}"
-        payload = json.dumps({
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"responseMimeType": "application/json", "temperature": 0.1}
-        }).encode("utf-8")
-
+    try:
+        req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            resp_data = json.loads(resp.read().decode("utf-8"))
+            raw_text = resp_data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "{}")
+            parsed = json.loads(raw_text)
+            return {"status": "ok", "result": parsed, "model_used": chosen_model}
+    except urllib.error.HTTPError as e:
+        err_msg = e.read().decode("utf-8", errors="ignore")
         try:
-            req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                resp_data = json.loads(resp.read().decode("utf-8"))
-                raw_text = resp_data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "{}")
-                parsed = json.loads(raw_text)
-                return {"status": "ok", "result": parsed, "model_used": candidate}
-        except urllib.error.HTTPError as e:
-            err_msg = e.read().decode("utf-8", errors="ignore")
-            try:
-                err_json = json.loads(err_msg)
-                err_msg = err_json.get("error", {}).get("message", err_msg)
-            except Exception:
-                pass
-            last_error = f"Google Gemini API error ({e.code}): {err_msg}"
-            if e.code == 404:
-                continue # Try next candidate model
-            return {"error": last_error}
-        except Exception as e:
-            last_error = str(e)
-            continue
-
-    return {"error": last_error or "All candidate Gemini models failed"}
+            err_json = json.loads(err_msg)
+            err_msg = err_json.get("error", {}).get("message", err_msg)
+        except Exception:
+            pass
+        return {"error": f"Google Gemini API error ({e.code}) on model {chosen_model}: {err_msg}"}
+    except Exception as e:
+        return {"error": str(e)}
 
 class DualServerHandler(socketserver.StreamRequestHandler):
     def handle(self):
