@@ -1748,41 +1748,41 @@
         localStorage.setItem(GEMINI_SUGGESTIONS_KEY, enabled ? 'true' : 'false');
     }
 
-    async function callGeminiAPI(prompt, customApiKey = null, customModel = null) {
+    async function ensureGeminiBridgeRunning() {
+        try {
+            const probe = await fetch('http://127.0.0.1:9998/health', { method: 'GET' });
+            if (probe.ok) return true;
+        } catch (e) {}
+
+        // Auto-start via Stash plugin task if not running
+        try {
+            await fetchGQL(`mutation { runPluginTask(plugin_id: "mypluginrc", task_name: "Start Gemini Bridge") }`);
+            await new Promise(r => setTimeout(r, 600));
+            const probe2 = await fetch('http://127.0.0.1:9998/health', { method: 'GET' });
+            if (probe2.ok) return true;
+        } catch (e) {}
+
+        return false;
+    }
+
+    async function callGeminiAPI(customApiKey = null, customModel = null) {
         const apiKey = customApiKey || getGeminiApiKey();
         if (!apiKey) throw new Error('No Gemini API key configured. Enter your key in Settings ➔ 🤖 AI');
         const model = customModel || getGeminiModel();
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-        const payload = {
-            contents: [{
-                parts: [{ text: prompt }]
-            }],
-            generationConfig: {
-                responseMimeType: "application/json",
-                temperature: 0.1
-            }
-        };
+        await ensureGeminiBridgeRunning();
 
-        const res = await fetch(url, {
+        const res = await fetch('http://127.0.0.1:9998/gemini_test', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({ api_key: apiKey, model: model })
         });
 
-        if (!res.ok) {
-            let errorText = await res.text();
-            try {
-                const parsed = JSON.parse(errorText);
-                errorText = parsed?.error?.message || errorText;
-            } catch (e) {}
-            throw new Error(`Gemini API error (${res.status}): ${errorText}`);
-        }
-
         const data = await res.json();
-        const rawJson = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!rawJson) throw new Error('No response content returned from Gemini');
-        return JSON.parse(rawJson);
+        if (!res.ok || data.error) {
+            throw new Error(data.error || `HTTP ${res.status}`);
+        }
+        return data.result || data;
     }
 
     const geminiSceneParseCache = new Map();
@@ -1811,25 +1811,27 @@
             }
         } catch (e) {}
 
-        const prompt = `You are an expert video metadata extractor and parser.
-Analyze this video filename and title:
-Filename: "${rawFilename || ''}"
-Title: "${rawTitle || ''}"
+        await ensureGeminiBridgeRunning();
 
-${performersContext.length > 0 ? `Sample library performers for reference: ${JSON.stringify(performersContext)}` : ''}
-${studiosContext.length > 0 ? `Sample library studios for reference: ${JSON.stringify(studiosContext)}` : ''}
+        const res = await fetch('http://127.0.0.1:9998/gemini_parse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                api_key: apiKey,
+                model: getGeminiModel(),
+                filename: rawFilename || '',
+                title: rawTitle || '',
+                performers_context: performersContext,
+                studios_context: studiosContext
+            })
+        });
 
-Extract and return a valid JSON object matching this schema:
-{
-  "clean_title": "Clean, human-readable scene title without technical metadata, video codecs, resolutions, site prefixes, or raw date prefixes",
-  "date": "Release date formatted as YYYY-MM-DD (or null if not found)",
-  "studio": "Studio, Network, or Website name (or null)",
-  "performers": ["Array of performer/actor names extracted from filename or title"],
-  "tags": ["Array of descriptive tags/genres/themes (e.g. Twink, Solo, Interview, BDSM, Outdoor)"],
-  "confidence": 95
-}`;
+        const data = await res.json();
+        if (!res.ok || data.error) {
+            throw new Error(data.error || `HTTP ${res.status}`);
+        }
 
-        const result = await callGeminiAPI(prompt, apiKey, getGeminiModel());
+        const result = data.result;
         ftLog('ACTION', 'GeminiAI', `Gemini AI parsed scene #${sceneId}: title="${result?.clean_title}", studio="${result?.studio}", performers=${JSON.stringify(result?.performers || [])}`);
 
         geminiSceneParseCache.set(sceneId, result);
@@ -2630,8 +2632,7 @@ Extract and return a valid JSON object matching this schema:
                 geminiTestStatus.textContent = 'Connecting to Google Gemini API...';
 
                 try {
-                    const testPrompt = `Respond with JSON: {"status": "ok", "message": "Gemini 1.5 Flash Connected"}`;
-                    const res = await callGeminiAPI(testPrompt, key, geminiModelSelect?.value || 'gemini-1.5-flash');
+                    const res = await callGeminiAPI(key, geminiModelSelect?.value || 'gemini-1.5-flash');
                     if (res?.status === 'ok') {
                         geminiTestStatus.style.color = '#34d399';
                         geminiTestStatus.innerHTML = `✓ <strong>Connected!</strong> Google Gemini AI is online and ready.`;

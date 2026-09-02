@@ -7,3 +7,16 @@ ui:
     - fasttag.js
   css:
     - tabulator.min.css
+exec:
+  - python3
+  - "{pluginDir}/fasttag_task.py"
+interface: raw
+tasks:
+  - name: Start Gemini Bridge
+    description: Spawns the lightweight Gemini AI bridge.
+    execArgs:
+      - start
+  - name: Stop Gemini Bridge
+    description: Stops the Gemini AI bridge.
+    execArgs:
+      - stop
