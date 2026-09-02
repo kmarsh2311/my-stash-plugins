@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash FastTag
 // @namespace    http://tampermonkey.net/
-// @version      4.1.0
+// @version      4.2.0
 // @description  Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
@@ -15,7 +15,7 @@
 
 (async function() {
     'use strict';
-    console.log('[FastTag v4.1.0] Initialized with Settings, Suggestions, Pinned Chips, Bulk Mode, and Hotkeys');
+    console.log('[FastTag v4.2.0] Initialized with Settings, Suggestions, Pinned Chips, Bulk Mode, Hotkeys, and Scene Organisation');
 
     // --- Entity Configuration & Schema Registry ---
     const ENTITY_CONFIG = {
@@ -31,7 +31,7 @@
             ],
             fetchQuery: `query { findTags(filter: { per_page: -1 }) { tags { id name sort_name scene_count created_at updated_at } } }`,
             extractList: data => data?.findTags?.tags || [],
-            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title files { path } tags { id } } }`,
+            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title organized files { path } tags { id } } }`,
             extractExisting: data => data?.findScene?.tags?.map(t => t.id) || [],
             createQuery: `mutation ($name: String!) { tagCreate(input: { name: $name }) { id name } }`,
             createExtract: data => data?.tagCreate?.id,
@@ -52,7 +52,7 @@
             ],
             fetchQuery: `query { findPerformers(filter: { per_page: -1 }) { performers { id name disambiguation scene_count birthdate rating100 created_at updated_at image_path country gender alias_list } } }`,
             extractList: data => data?.findPerformers?.performers || [],
-            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title files { path } performers { id } } }`,
+            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title organized files { path } performers { id } } }`,
             extractExisting: data => data?.findScene?.performers?.map(p => p.id) || [],
             createQuery: `mutation ($name: String!) { performerCreate(input: { name: $name }) { id name } }`,
             createExtract: data => data?.performerCreate?.id,
@@ -90,7 +90,7 @@
                     updated_at: g.updated_at || ''
                 };
             }),
-            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title files { path } galleries { id } } }`,
+            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title organized files { path } galleries { id } } }`,
             extractExisting: data => data?.findScene?.galleries?.map(g => g.id) || [],
             createQuery: `mutation ($title: String!) { galleryCreate(input: { title: $title }) { id title } }`,
             createExtract: data => data?.galleryCreate?.id,
@@ -119,7 +119,7 @@
                 created_at: s.created_at || '',
                 updated_at: s.updated_at || ''
             })),
-            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title files { path } studio { id name } } }`,
+            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title organized files { path } studio { id name } } }`,
             extractExisting: data => data?.findScene?.studio?.id ? [data.findScene.studio.id] : [],
             createQuery: `mutation ($name: String!) { studioCreate(input: { name: $name }) { id name } }`,
             createExtract: data => data?.studioCreate?.id,
@@ -139,7 +139,7 @@
             ],
             fetchQuery: `query { findGroups(filter: { per_page: -1 }) { groups { id name scene_count created_at updated_at } } }`,
             extractList: data => data?.findGroups?.groups || [],
-            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title files { path } groups { group { id name } scene_index } } }`,
+            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title organized files { path } groups { group { id name } scene_index } } }`,
             extractExisting: data => (data?.findScene?.groups || []).map(g => g.group?.id).filter(Boolean),
             createQuery: `mutation ($name: String!) { groupCreate(input: { name: $name }) { id name } }`,
             createExtract: data => data?.groupCreate?.id,
@@ -549,6 +549,26 @@
             background-color: #312e81 !important;
             color: #ffffff !important;
             border-bottom: 1px solid #4338ca !important;
+        }
+        #scenes-popup .tabulator .tabulator-row.fasttag-virtual-action-row,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.fasttag-virtual-action-row,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.tabulator-row-even.fasttag-virtual-action-row,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.tabulator-row-odd.fasttag-virtual-action-row {
+            background-color: rgba(16, 185, 129, 0.14) !important;
+            border-left: 3px solid #10b981 !important;
+        }
+        #scenes-popup .tabulator .tabulator-row.fasttag-virtual-action-row:hover,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.fasttag-virtual-action-row:hover,
+        #scenes-popup .tabulator .tabulator-row.fasttag-virtual-action-row.fasttag-keyboard-active,
+        #scenes-popup.theme-dark .tabulator .tabulator-row.fasttag-virtual-action-row.fasttag-keyboard-active {
+            background-color: rgba(16, 185, 129, 0.28) !important;
+        }
+        .tabulator-row.fasttag-virtual-action-row .tabulator-cell {
+            font-weight: 600 !important;
+            color: #059669 !important;
+        }
+        #scenes-popup.theme-dark .tabulator-row.fasttag-virtual-action-row .tabulator-cell {
+            color: #34d399 !important;
         }
 
         #scenes-popup .tabulator .tabulator-row.fasttag-keyboard-active,
@@ -1743,6 +1763,7 @@
     let isVideoPoppedOut = false;
     let floatingHudElement = null;
     let floatingHudPosition = null;
+    let floatingHudSize = null;
     // --- Google Gemini AI Smart Metadata & Filename Parser ---
     const GEMINI_API_KEY_KEY = 'fasttag_gemini_api_key';
     const GEMINI_MODEL_KEY = 'fasttag_gemini_model';
@@ -1774,6 +1795,121 @@
     }
     function setGeminiSuggestions(enabled) {
         localStorage.setItem(GEMINI_SUGGESTIONS_KEY, enabled ? 'true' : 'false');
+    }
+
+    // --- Organized Status Workflow Helpers ---
+    const AUTO_MARK_ORGANIZED_KEY = 'stash_fast_tag_auto_mark_organized';
+    function getAutoMarkOrganized() {
+        return localStorage.getItem(AUTO_MARK_ORGANIZED_KEY) === 'true';
+    }
+    function setAutoMarkOrganized(enabled) {
+        localStorage.setItem(AUTO_MARK_ORGANIZED_KEY, enabled ? 'true' : 'false');
+    }
+
+    async function updateSceneOrganized(sceneId, isOrganized) {
+        if (!sceneId) return false;
+        try {
+            const query = `mutation UpdateSceneOrganized($id: ID!, $organized: Boolean!) {
+                sceneUpdate(input: { id: $id, organized: $organized }) {
+                    id
+                    organized
+                }
+            }`;
+            const res = await fetchGQL(query, { id: String(sceneId), organized: Boolean(isOrganized) });
+            return res?.data?.sceneUpdate?.organized !== undefined;
+        } catch (e) {
+            console.error('[FastTag] Error updating organized status:', e);
+            return false;
+        }
+    }
+
+    function getOrganizedWord(form = 'organized') {
+        const lang = (navigator.language || (navigator.languages && navigator.languages[0]) || 'en-US').toLowerCase();
+        const isBritish = lang.includes('gb') || lang.includes('uk') || lang.includes('au') || lang.includes('nz') || lang.includes('za') || lang.includes('ie');
+        if (form === 'organized') return isBritish ? 'Organised' : 'Organized';
+        if (form === 'unorganized') return isBritish ? 'Unorganised' : 'Unorganized';
+        if (form === 'mark_as') return isBritish ? 'Mark as Organised' : 'Mark as Organized';
+        return isBritish ? 'Organised' : 'Organized';
+    }
+
+    function setupOrganizedButton(btn, getSceneId, initialOrganized = false) {
+        if (!btn) return { update: () => {}, get: () => false };
+        let currentOrganized = Boolean(initialOrganized);
+
+        const renderBtn = (isOrg) => {
+            const isDark = getEffectiveTheme() === 'dark';
+            btn.style.display = 'inline-flex';
+            const orgWord = getOrganizedWord('organized');
+            const unorgWord = getOrganizedWord('unorganized');
+            if (isOrg) {
+                btn.style.background = '#059669';
+                btn.style.border = '1px solid #059669';
+                btn.style.color = '#ffffff';
+                btn.title = `Scene is marked as ${orgWord} in Stash. Click to toggle.`;
+                btn.innerHTML = `<span style="font-weight: 800; font-size: 10px; line-height: 1;">✓</span> ${orgWord}`;
+            } else {
+                btn.style.background = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)';
+                btn.style.border = isDark ? '1px dashed rgba(148, 163, 184, 0.45)' : '1px dashed #94a3b8';
+                btn.style.color = isDark ? '#94a3b8' : '#64748b';
+                btn.title = `Scene is ${unorgWord} in Stash. Click to mark as ${orgWord}.`;
+                btn.innerHTML = `<span style="font-size: 9px; opacity: 0.75; line-height: 1;">◯</span> ${unorgWord}`;
+            }
+        };
+
+        btn.style.cssText = `
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            line-height: 1.25;
+            transition: all 0.15s ease;
+            user-select: none;
+            vertical-align: middle;
+            box-sizing: border-box;
+            height: 22px;
+        `;
+
+        renderBtn(currentOrganized);
+
+        btn.onclick = async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const sId = typeof getSceneId === 'function' ? getSceneId() : getSceneId;
+            if (!sId) return;
+
+            const nextOrg = !currentOrganized;
+            renderBtn(nextOrg); // Optimistic UI
+            btn.style.pointerEvents = 'none';
+
+            try {
+                const ok = await updateSceneOrganized(sId, nextOrg);
+                if (ok) {
+                    currentOrganized = nextOrg;
+                    showToast(nextOrg ? `✓ Scene marked as ${getOrganizedWord('organized')}` : `Scene marked as ${getOrganizedWord('unorganized')}`, 'info', 2000);
+                    refreshSceneCardsDebounced(sId);
+                } else {
+                    renderBtn(currentOrganized); // rollback
+                    toastError('Failed to update organized status');
+                }
+            } catch (err) {
+                renderBtn(currentOrganized); // rollback
+                toastError('Error updating organized status');
+            } finally {
+                btn.style.pointerEvents = 'auto';
+            }
+        };
+
+        return {
+            update: (newVal) => {
+                currentOrganized = Boolean(newVal);
+                renderBtn(currentOrganized);
+            },
+            get: () => currentOrganized
+        };
     }
 
     let geminiSocket = null;
@@ -2287,7 +2423,7 @@
                         <span>🎬</span> Video
                     </button>
                     <button type="button" class="fasttag-settings-tab-btn" data-tab="scraper" style="flex: 1; padding: 6px 4px; font-size: 11.5px; font-weight: 600; border: none; border-radius: 7px; background: transparent; color: ${textMuted}; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.15s ease;">
-                        <span>⚡</span> Scraper
+                        <span>⚡</span> Workflow
                     </button>
                     <button type="button" class="fasttag-settings-tab-btn" data-tab="ai" style="flex: 1; padding: 6px 4px; font-size: 11.5px; font-weight: 600; border: none; border-radius: 7px; background: transparent; color: ${textMuted}; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: all 0.15s ease;">
                         <span>🤖</span> AI <span style="font-size: 8px; padding: 1px 4px; border-radius: 3px; background: rgba(245, 158, 11, 0.2); color: #f59e0b; font-weight: 800; line-height: 1.1;">BETA</span>
@@ -2420,8 +2556,19 @@
                         </div>
                     </div>
 
-                    <!-- TAB 3: SCRAPER -->
+                    <!-- TAB 3: WORKFLOW -->
                     <div id="fasttag-tab-pane-scraper" class="fasttag-tab-pane" style="display: none; flex-direction: column; gap: 14px;">
+                        <!-- Auto-Mark Scene as Organized / Organised -->
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 13px;">Auto-Mark Scene as ${getOrganizedWord('organized')}</div>
+                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Automatically set scene status to '${getOrganizedWord('organized')}' when saving tags in FastTag.</div>
+                            </div>
+                            <input type="checkbox" id="fasttag-setting-auto-mark-organized" ${getAutoMarkOrganized() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #059669; margin-top: 2px;">
+                        </div>
+
+                        <div style="height: 1px; background: ${border};"></div>
+
                         <!-- Auto-Scrape in Sequential Mode setting -->
                         <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
                             <div style="flex: 1;">
@@ -2645,6 +2792,14 @@
             iconClicksToggle.addEventListener('change', (e) => {
                 setEnableCardIconClicks(e.target.checked);
                 showToast(`Card icon clicks ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
+            });
+        }
+
+        const autoMarkOrganizedToggle = modal.querySelector('#fasttag-setting-auto-mark-organized');
+        if (autoMarkOrganizedToggle) {
+            autoMarkOrganizedToggle.addEventListener('change', (e) => {
+                setAutoMarkOrganized(e.target.checked);
+                showToast(`Auto-Mark Scene as Organized ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
             });
         }
 
@@ -3104,7 +3259,21 @@
             previewUrl = `${baseOrigin}/scene/${encodeURIComponent(sceneId)}/preview`;
         }
 
-        return { previewUrl, coverUrl, streamUrl };
+        const toRelative = (url) => {
+            if (!url) return url;
+            try {
+                const u = new URL(url, window.location.href);
+                return u.pathname + u.search;
+            } catch (e) {
+                return url;
+            }
+        };
+
+        return {
+            previewUrl: toRelative(previewUrl),
+            coverUrl: toRelative(coverUrl),
+            streamUrl: toRelative(streamUrl)
+        };
     }
 
     function formatTime(seconds) {
@@ -3121,13 +3290,15 @@
     }
 
     async function attachScenePreview(hostContainer, sceneId, cardElement) {
-        if (previewAbortController) {
-            previewAbortController.abort();
-        }
-        previewAbortController = new AbortController();
-        const { signal } = previewAbortController;
-
         if (!hostContainer) return;
+        if (hostContainer._previewAbortController) {
+            hostContainer._previewAbortController.abort();
+        }
+        const previewAbort = new AbortController();
+        hostContainer._previewAbortController = previewAbort;
+        previewAbortController = previewAbort;
+        const { signal } = previewAbort;
+
         hostContainer.innerHTML = '';
         hostContainer.style.display = 'block';
         hostContainer.style.position = 'relative';
@@ -4227,6 +4398,9 @@
 
                 const success = await updateEntityForScene(type, currentSceneId, currentSelectedIds);
                 if (success) {
+                    if (getAutoMarkOrganized()) {
+                        updateSceneOrganized(currentSceneId, true);
+                    }
                     recordSaveUsage();
                     toastSuccess(`${ENTITY_CONFIG[type].title} saved`);
                     await refreshSceneCards();
@@ -7304,7 +7478,8 @@
             <div id="${type}-bottom-create-container" style="display: none; align-items: center; justify-content: center; margin-bottom: 8px; flex-shrink: 0;">
                 <button type="button" id="${type}-create-btn" class="fasttag-create-empty-btn" style="display: inline-flex; align-items: center; gap: 6px; width: 100%; justify-content: center; padding: 7px 14px; background: #059669; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 5px rgba(5,150,105,0.3); transition: all 0.15s ease;"></button>
             </div>
-            <div style="display: flex; gap: 8px; flex-shrink: 0;">
+            <div style="display: flex; gap: 8px; align-items: center; flex-shrink: 0;">
+                <button type="button" id="${type}-organized-btn" class="fasttag-organized-pill" style="display: none; flex-shrink: 0;"></button>
                 <button type="button" id="${type}-save-btn" style="flex: 1; padding: 8px; cursor: pointer; font-size: 12px; font-weight: 600; background: #6366f1; color: white; border: none; border-radius: 6px; transition: background 0.15s ease;">Save ${config.pluralTitle}</button>
                 <button type="button" id="${type}-cancel-btn" class="popup-cancel-btn" style="padding: 8px 14px; cursor: pointer; font-size: 12px; font-weight: 500; border-radius: 6px;">Close</button>
             </div>
@@ -7332,6 +7507,7 @@
             createBtn: form.querySelector(`#${type}-create-btn`),
             scrapeBtn: form.querySelector(`#${type}-scrape-btn`),
             scraperCardContainer: form.querySelector(`#${type}-scraper-card-container`),
+            organizedBtn: form.querySelector(`#${type}-organized-btn`),
             refreshBtn: form.querySelector(`#${type}-refresh-btn`),
             saveBtn: form.querySelector(`#${type}-save-btn`),
             cancelBtn: form.querySelector(`#${type}-cancel-btn`)
@@ -9203,7 +9379,8 @@
             </div>
 
             <!-- Global Action Bar -->
-            <div style="display: flex; gap: 8px; flex-shrink: 0;">
+            <div style="display: flex; gap: 8px; align-items: center; flex-shrink: 0;">
+                <button type="button" id="everything-organized-btn" class="fasttag-organized-pill" style="display: none; flex-shrink: 0;"></button>
                 <button type="button" id="everything-save-btn" style="flex: 1; padding: 8px; cursor: pointer; font-size: 12px; font-weight: 600; background: #6366f1; color: white; border: none; border-radius: 6px; transition: background 0.15s ease;">Save Scene</button>
                 <button type="button" id="everything-cancel-btn" class="popup-cancel-btn" style="padding: 8px 14px; cursor: pointer; font-size: 12px; font-weight: 500; border-radius: 6px;">Close</button>
             </div>
@@ -9223,6 +9400,7 @@
         return {
             element: form,
             titleSpan: form.querySelector('#everything-popup-title'),
+            organizedBtn: form.querySelector('#everything-organized-btn'),
             seqContainer: form.querySelector('#everything-seq-container'),
             sequentialCheckbox: form.querySelector('#everything-sequential-mode'),
             navGroup: form.querySelector('#everything-nav-group'),
@@ -9885,6 +10063,7 @@
                         id
                         title
                         details
+                        organized
                         files { path }
                         tags { id name }
                         performers { id name disambiguation }
@@ -9902,6 +10081,14 @@
                 console.error('[FastTag] Error loading scene details:', e);
             }
             popup.sceneData = sceneData;
+
+            if (popup.organizedBtn) {
+                if (!popup._organizedController) {
+                    popup._organizedController = setupOrganizedButton(popup.organizedBtn, () => popup.currentSceneId, sceneData?.organized);
+                } else {
+                    popup._organizedController.update(sceneData?.organized);
+                }
+            }
 
             const selTags = new Set((sceneData?.tags || []).map(t => String(t.id)));
             const selPerfs = new Set((sceneData?.performers || []).map(p => String(p.id)));
@@ -10549,6 +10736,12 @@
                 placeholder: () => getCachedOrNull('tags') ? "No Tags Found" : "Loading Tags...",
                 selectable: true,
                 index: "id",
+                rowFormatter: (row) => {
+                    const d = row.getData();
+                    if (d && (d._isVirtualOrganized || d.id === '⚡')) {
+                        row.getElement().classList.add('fasttag-virtual-action-row');
+                    }
+                },
                 columnDefaults: { headerSort: false },
                 columns: getColumnsWithSavedWidths('tags', 'everything', () => {
                     if (popup.tagsFetchData) popup.tagsFetchData();
@@ -10933,6 +11126,17 @@
 
                 data.sort(getSmartSortComparator(term, selIds, config.labelKey, searchFields, getSavedSortKey(type)));
 
+                if (type === 'tags' && term && ('organized'.startsWith(term) || 'unorganized'.startsWith(term) || 'organised'.startsWith(term) || 'unorganised'.startsWith(term) || term === 'org')) {
+                    const isOrg = popup._organizedController ? popup._organizedController.get() : false;
+                    const orgWord = getOrganizedWord('organized');
+                    const markWord = getOrganizedWord('mark_as');
+                    data.unshift({
+                        id: '⚡',
+                        name: isOrg ? `✓ ${orgWord}` : markWord,
+                        _isVirtualOrganized: true
+                    });
+                }
+
                 isRestoring = true;
                 try {
                     await tableInstance.setData(data);
@@ -11008,6 +11212,28 @@
                 const rowData = row.getData();
                 if (!rowData || !rowData.id) return;
                 const strId = String(rowData.id);
+
+                if (rowData._isVirtualOrganized || strId === '__fasttag_virtual_organized__' || strId === '⚡') {
+                    if (popup.organizedBtn) {
+                        popup.organizedBtn.click();
+                    }
+                    popup.globalSearch.value = '';
+                    popup.globalClear.style.display = 'none';
+                    if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                    currentNavSection = 'tags';
+                    activeNavIndex = -1;
+                    await Promise.all([
+                        fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                        fetchColumnData('performers', performersTable, '', selectedPerformerIds),
+                        renderStudioBar(''),
+                        renderGroupBar('')
+                    ]);
+                    refreshAllUI();
+                    updateEverythingKeyboardHighlight();
+                    if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
+                    return;
+                }
+
                 const wasSelected = selectedTagIds.has(strId);
 
                 if (wasSelected) {
@@ -11435,6 +11661,17 @@
             };
 
             popup.globalSearch.onkeydown = async (e) => {
+                if ((e.altKey && e.code === 'KeyO') || (e.altKey && e.key.toLowerCase() === 'o')) {
+                    e.preventDefault();
+                    if (popup.organizedBtn) {
+                        popup.organizedBtn.click();
+                        setTimeout(() => {
+                            fetchColumnData('tags', tagsTable, popup.globalSearch?.value || '', selectedTagIds);
+                        }, 50);
+                    }
+                    return;
+                }
+
                 if (e.key === 'Tab' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
                     e.preventDefault();
                     if (currentNavSection === 'studios') {
@@ -11953,8 +12190,30 @@
                         const selectedRow = rows[targetIdx];
                         if (selectedRow) {
                             const rowData = selectedRow.getData();
-                            const isSelected = selectedRow.isSelected();
                             const idStr = String(rowData.id);
+
+                            if (rowData._isVirtualOrganized || idStr === '__fasttag_virtual_organized__' || idStr === '⚡') {
+                                if (popup.organizedBtn) {
+                                    popup.organizedBtn.click();
+                                }
+                                popup.globalSearch.value = '';
+                                popup.globalClear.style.display = 'none';
+                                if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
+                                currentNavSection = 'tags';
+                                activeNavIndex = -1;
+                                await Promise.all([
+                                    fetchColumnData('tags', tagsTable, '', selectedTagIds),
+                                    fetchColumnData('performers', performersTable, '', selectedPerformerIds),
+                                    renderStudioBar(''),
+                                    renderGroupBar('')
+                                ]);
+                                refreshAllUI();
+                                updateEverythingKeyboardHighlight();
+                                if (popup.globalSearch) popup.globalSearch.focus({ preventScroll: true });
+                                return;
+                            }
+
+                            const isSelected = selectedRow.isSelected();
                             if (isSelected) {
                                 selectedRow.deselect();
                                 if (currentNavSection === 'tags') selectedTagIds.delete(idStr);
@@ -12102,29 +12361,38 @@
                         hideScrapeCoverTooltip();
                     }
 
+                    const autoMarkOrg = getAutoMarkOrganized();
                     const mutation = `
-                        mutation SceneUpdateEverything($id: ID!, $tag_ids: [ID!], $performer_ids: [ID!], $studio_id: ID, $groups: [SceneGroupInput!]) {
+                        mutation SceneUpdateEverything($id: ID!, $tag_ids: [ID!], $performer_ids: [ID!], $studio_id: ID, $groups: [SceneGroupInput!]${autoMarkOrg ? ', $organized: Boolean' : ''}) {
                             sceneUpdate(input: {
                                 id: $id,
                                 tag_ids: $tag_ids,
                                 performer_ids: $performer_ids,
                                 studio_id: $studio_id,
-                                groups: $groups
+                                groups: $groups${autoMarkOrg ? ', organized: $organized' : ''}
                             }) {
                                 id
+                                organized
                             }
                         }
                     `;
                     try {
-                        const res = await fetchGQL(mutation, {
+                        const variables = {
                             id: currentSceneId,
                             tag_ids: Array.from(selectedTagIds),
                             performer_ids: Array.from(selectedPerformerIds),
                             studio_id: selectedStudioId || null,
                             groups: Array.from(selectedGroupIds).map(gid => ({ group_id: gid }))
-                        });
+                        };
+                        if (autoMarkOrg) {
+                            variables.organized = true;
+                        }
+                        const res = await fetchGQL(mutation, variables);
 
                         if (res?.data?.sceneUpdate?.id) {
+                            if (autoMarkOrg && popup._organizedController) {
+                                popup._organizedController.update(true);
+                            }
                             if (saveSeq !== pendingEverythingSaveSeq) return true;
                             initialTagIds = new Set(selectedTagIds);
                             initialPerformerIds = new Set(selectedPerformerIds);
@@ -14162,6 +14430,12 @@
             placeholder: () => getCachedOrNull(type) ? `No ${config.pluralTitle} Found` : `Loading ${config.pluralTitle}...`,
             selectable: true,
             index: "id",
+            rowFormatter: (row) => {
+                const d = row.getData();
+                if (d && (d._isVirtualOrganized || d.id === '⚡')) {
+                    row.getElement().classList.add('fasttag-virtual-action-row');
+                }
+            },
             columnDefaults: {
                 headerSort: false
             },
@@ -14210,6 +14484,13 @@
 
         const existingRes = await fetchGQL(config.fetchExistingQuery, { id: sceneId });
         form._fastTagSceneData = existingRes?.data?.findScene;
+        if (popup.organizedBtn) {
+            if (!popup._organizedController) {
+                popup._organizedController = setupOrganizedButton(popup.organizedBtn, () => form._fastTagSceneId, form._fastTagSceneData?.organized);
+            } else {
+                popup._organizedController.update(form._fastTagSceneData?.organized);
+            }
+        }
         const existingIds = config.extractExisting(existingRes.data);
         const selectedIds = new Set(existingIds.map(id => String(id)));
         sequentialEditState.initialSelectedIds = new Set(selectedIds);
@@ -14287,6 +14568,12 @@
             const success = await updateEntityForScene(type, sId, Array.from(ids));
             if (currentSeq !== pendingSaveSeq) return success;
             if (success) {
+                if (getAutoMarkOrganized()) {
+                    updateSceneOrganized(sId, true);
+                    if (popup._organizedController) {
+                        popup._organizedController.update(true);
+                    }
+                }
                 sequentialEditState.initialSelectedIds = new Set(ids);
                 refreshSceneCardsDebounced(sId);
                 recordSaveUsage();
@@ -14310,6 +14597,19 @@
             const rowData = row.getData();
             if (!rowData || !rowData.id) return;
             const strId = String(rowData.id);
+
+            if (rowData._isVirtualOrganized || strId === '__fasttag_virtual_organized__' || strId === '⚡') {
+                if (popup.organizedBtn) {
+                    popup.organizedBtn.click();
+                }
+                filterInput.value = '';
+                updateVisibility();
+                refreshUI();
+                await fetchData("", true);
+                if (filterInput) filterInput.focus({ preventScroll: true });
+                return;
+            }
+
             const wasSelected = selectedIds.has(strId);
 
             if (wasSelected) {
@@ -14381,6 +14681,17 @@
             }
 
             data.sort(getSmartSortComparator(term, selectedIds, config.labelKey, searchFields, getSavedSortKey(type)));
+
+            if (type === 'tags' && term && ('organized'.startsWith(term) || 'unorganized'.startsWith(term) || 'organised'.startsWith(term) || 'unorganised'.startsWith(term) || term === 'org')) {
+                const isOrg = popup._organizedController ? popup._organizedController.get() : false;
+                const orgWord = getOrganizedWord('organized');
+                const markWord = getOrganizedWord('mark_as');
+                data.unshift({
+                    id: '⚡',
+                    name: isOrg ? `✓ ${orgWord}` : markWord,
+                    _isVirtualOrganized: true
+                });
+            }
 
             isRestoringSelections = true;
             try {
@@ -14543,6 +14854,20 @@
         };
 
         filterInput.onkeydown = async (e) => {
+            if (e.altKey && (e.key === 'o' || e.key === 'O' || e.code === 'KeyO')) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (popup.organizedBtn) {
+                    popup.organizedBtn.click();
+                    setTimeout(() => {
+                        if (type === 'tags' && filterInput.value.trim()) {
+                            fetchData(filterInput.value, false);
+                        }
+                    }, 50);
+                }
+                return;
+            }
+
             const rows = activeTableInstance && typeof activeTableInstance.getRows === 'function' ? activeTableInstance.getRows() : [];
             const isBottomCreateVisible = popup.bottomCreateContainer && popup.bottomCreateContainer.style.display !== 'none';
             const suggBtns = getSingleSuggestions();
@@ -14747,6 +15072,20 @@
                     const rowData = targetRow.getData();
                     if (rowData && rowData.id) {
                         const strId = String(rowData.id);
+                        if (rowData._isVirtualOrganized || strId === '__fasttag_virtual_organized__' || strId === '⚡') {
+                            if (popup.organizedBtn) {
+                                popup.organizedBtn.click();
+                            }
+                            filterInput.value = '';
+                            updateVisibility();
+                            refreshUI();
+                            await fetchData("", true);
+                            currentSingleSection = 'table';
+                            singleNavIndex = -1;
+                            updateSingleKeyboardHighlight();
+                            if (filterInput) filterInput.focus({ preventScroll: true });
+                            return;
+                        }
                         const wasSelected = selectedIds.has(strId);
                         if (wasSelected) {
                             selectedIds.delete(strId);

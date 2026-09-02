@@ -4,6 +4,20 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.2.0] - 2026-09-02
+
+### Added
+- **📁 Full Scene Organisation Workflow**:
+  - **Quick Organised Pill**: Added an interactive `✓ Organised` / `◯ Unorganised` badge directly in the popup header with optimistic 0ms UI feedback and instant background Apollo Client cache sync.
+  - **Virtual Action Row in Tags Search**: Typing "org", "organised", "unorganised", or "organized" in the search box reveals an emerald-green virtual action row to quickly toggle scene organisation via keyboard or click.
+  - **Auto-Mark Organised on Save**: New toggle in FastTag Settings (**Workflow** tab) to automatically mark scenes as organised whenever tag or metadata edits are saved.
+  - **Hotkeys**: Press <kbd>Alt</kbd> + <kbd>O</kbd> / <kbd>Option</kbd> + <kbd>O</kbd> inside any FastTag popup to immediately toggle the scene's organised status.
+  - **Locale Awareness**: Automatically displays British English (`Organised`) or American English (`Organized`) based on system language.
+
+### Fixed
+- **Video Preview & Floating HUD**: Resolved a missing variable declaration that caused a `ReferenceError` on launch when the floating Picture-in-Picture Video HUD was enabled in user preferences.
+- **Media URL Routing**: Ensured all preview, cover, and stream requests use clean relative URLs to prevent cross-origin media blocking across differing local hostnames or IPs.
+
 ## [4.1.0] - 2026-09-02
 
 ### Added & Improved
