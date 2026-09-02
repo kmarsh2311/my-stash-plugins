@@ -3882,15 +3882,15 @@
             }
         });
 
-        // Initial render (honors Always Play Full Video setting)
-        renderMedia(getAlwaysPlayFullVideo() ? 'stream' : 'preview');
-
-        // Initial Popout State sync
+        // Initial Popout State sync - attach mediaContainer to DOM first so video can initialize and play
         if (isVideoPoppedOut || isVideoHudPersistedOpen()) {
             togglePopout(true);
         } else {
             hostContainer.appendChild(mediaContainer);
         }
+
+        // Initial render (honors Always Play Full Video setting)
+        renderMedia(getAlwaysPlayFullVideo() ? 'stream' : 'preview');
     }
 
     // --- State & Sequential Utilities ---
