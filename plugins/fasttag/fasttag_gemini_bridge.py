@@ -1,100 +1,43 @@
 #!/usr/bin/env python3
 """
-FastTag Gemini AI Bridge
-A lightweight, zero-dependency bridge using Python standard library to bypass browser CSP restrictions.
+FastTag Gemini AI Bridge via WebSocket & HTTP
+Supports WebSocket (ws://) which is 100% allowed by Stash's Content-Security-Policy (connect-src ws: wss:)
+Zero third-party dependencies - standard library only!
 """
 import sys
+import os
 import json
+import socket
+import select
+import struct
+import base64
+import hashlib
 import urllib.request
 import urllib.error
+import threading
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+import socketserver
 
 PORT = 9998
+WS_MAGIC_STRING = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
-class GeminiBridgeHandler(BaseHTTPRequestHandler):
-    def log_message(self, format, *args):
-        # Clean logging
-        sys.stderr.write(f"[FastTag Gemini Bridge] {self.address_string()} - {format % args}\n")
+def process_gemini_request(data):
+    req_type = data.get("type", "parse")
+    api_key = data.get("api_key", "").strip()
+    model = data.get("model", "gemini-1.5-flash").strip()
 
-    def _send_cors(self, status=200, content_type="application/json"):
-        self.send_response(status)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
-        self.send_header("Access-Control-Allow-Headers", "*")
-        self.send_header("Access-Control-Allow-Private-Network", "true")
-        self.send_header("Access-Control-Max-Age", "86400")
-        if content_type:
-            self.send_header("Content-Type", content_type)
-        self.end_headers()
+    if not api_key:
+        return {"error": "No API key provided"}
 
-    def do_OPTIONS(self):
-        self._send_cors(204, None)
+    if req_type == "test":
+        prompt = "Respond with JSON: {\"status\": \"ok\", \"message\": \"Connected to Gemini\"}"
+    else:
+        filename = data.get("filename", "").strip()
+        title = data.get("title", "").strip()
+        performers_context = data.get("performers_context", [])
+        studios_context = data.get("studios_context", [])
 
-    def do_GET(self):
-        if self.path in ["/health", "/"]:
-            self._send_cors(200)
-            self.wfile.write(json.dumps({"status": "ok", "service": "FastTag Gemini AI Bridge"}).encode("utf-8"))
-        else:
-            self._send_cors(404)
-            self.wfile.write(b'{"error": "Not found"}')
-
-    def do_POST(self):
-        if self.path == "/gemini_test":
-            try:
-                length = int(self.headers.get("Content-Length", 0))
-                body = json.loads(self.rfile.read(length).decode("utf-8"))
-                api_key = body.get("api_key", "").strip()
-                model = body.get("model", "gemini-1.5-flash").strip()
-
-                if not api_key:
-                    self._send_cors(400)
-                    self.wfile.write(json.dumps({"error": "No API key provided"}).encode("utf-8"))
-                    return
-
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-                payload = json.dumps({
-                    "contents": [{"parts": [{"text": "Respond with JSON: {\"status\": \"ok\", \"message\": \"Connected to Gemini\"}"}]}],
-                    "generationConfig": {"responseMimeType": "application/json", "temperature": 0.1}
-                }).encode("utf-8")
-
-                req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    resp_data = json.loads(resp.read().decode("utf-8"))
-                    raw_text = resp_data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "{}")
-                    parsed = json.loads(raw_text)
-
-                self._send_cors(200)
-                self.wfile.write(json.dumps({"status": "ok", "result": parsed}).encode("utf-8"))
-            except urllib.error.HTTPError as e:
-                err_msg = e.read().decode("utf-8", errors="ignore")
-                try:
-                    err_json = json.loads(err_msg)
-                    err_msg = err_json.get("error", {}).get("message", err_msg)
-                except Exception:
-                    pass
-                self._send_cors(e.code)
-                self.wfile.write(json.dumps({"error": f"Google Gemini API error ({e.code}): {err_msg}"}).encode("utf-8"))
-            except Exception as e:
-                self._send_cors(500)
-                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
-
-        elif self.path == "/gemini_parse":
-            try:
-                length = int(self.headers.get("Content-Length", 0))
-                body = json.loads(self.rfile.read(length).decode("utf-8"))
-                api_key = body.get("api_key", "").strip()
-                model = body.get("model", "gemini-1.5-flash").strip()
-                filename = body.get("filename", "").strip()
-                title = body.get("title", "").strip()
-                performers_context = body.get("performers_context", [])
-                studios_context = body.get("studios_context", [])
-
-                if not api_key:
-                    self._send_cors(400)
-                    self.wfile.write(json.dumps({"error": "No API key provided"}).encode("utf-8"))
-                    return
-
-                prompt = f"""You are an expert video metadata extractor and parser.
+        prompt = f"""You are an expert video metadata extractor and parser.
 Analyze this video filename and title:
 Filename: "{filename}"
 Title: "{title}"
@@ -112,40 +55,151 @@ Extract and return a valid JSON object matching this schema:
   "confidence": 95
 }}"""
 
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-                payload = json.dumps({
-                    "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {"responseMimeType": "application/json", "temperature": 0.1}
-                }).encode("utf-8")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    payload = json.dumps({
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"responseMimeType": "application/json", "temperature": 0.1}
+    }).encode("utf-8")
 
-                req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    resp_data = json.loads(resp.read().decode("utf-8"))
-                    raw_text = resp_data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "{}")
-                    parsed = json.loads(raw_text)
+    try:
+        req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            resp_data = json.loads(resp.read().decode("utf-8"))
+            raw_text = resp_data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "{}")
+            parsed = json.loads(raw_text)
+            return {"status": "ok", "result": parsed}
+    except urllib.error.HTTPError as e:
+        err_msg = e.read().decode("utf-8", errors="ignore")
+        try:
+            err_json = json.loads(err_msg)
+            err_msg = err_json.get("error", {}).get("message", err_msg)
+        except Exception:
+            pass
+        return {"error": f"Google Gemini API error ({e.code}): {err_msg}"}
+    except Exception as e:
+        return {"error": str(e)}
 
-                self._send_cors(200)
-                self.wfile.write(json.dumps({"status": "ok", "result": parsed}).encode("utf-8"))
-            except urllib.error.HTTPError as e:
-                err_msg = e.read().decode("utf-8", errors="ignore")
-                try:
-                    err_json = json.loads(err_msg)
-                    err_msg = err_json.get("error", {}).get("message", err_msg)
-                except Exception:
-                    pass
-                self._send_cors(e.code)
-                self.wfile.write(json.dumps({"error": f"Google Gemini API error ({e.code}): {err_msg}"}).encode("utf-8"))
-            except Exception as e:
-                self._send_cors(500)
-                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+class DualServerHandler(socketserver.StreamRequestHandler):
+    def handle(self):
+        # Read HTTP request header
+        initial = b""
+        while b"\r\n\r\n" not in initial and len(initial) < 4096:
+            chunk = self.connection.recv(1024)
+            if not chunk:
+                return
+            initial += chunk
+
+        lines = initial.decode("utf-8", errors="ignore").split("\r\n")
+        req_line = lines[0] if lines else ""
+        headers = {}
+        for line in lines[1:]:
+            if ":" in line:
+                k, v = line.split(":", 1)
+                headers[k.strip().lower()] = v.strip()
+
+        # Check if WebSocket upgrade
+        if headers.get("upgrade", "").lower() == "websocket":
+            sec_key = headers.get("sec-websocket-key", "")
+            if not sec_key:
+                return
+            accept_val = base64.b64encode(hashlib.sha1(sec_key.encode("utf-8") + WS_MAGIC_STRING).digest()).decode("utf-8")
+            response = (
+                "HTTP/1.1 101 Switching Protocols\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                f"Sec-WebSocket-Accept: {accept_val}\r\n"
+                "\r\n"
+            )
+            self.connection.sendall(response.encode("utf-8"))
+            self.handle_websocket()
         else:
-            self._send_cors(404)
-            self.wfile.write(b'{"error": "Not found"}')
+            # Handle normal HTTP request (health check / CORS)
+            if "OPTIONS" in req_line:
+                resp = (
+                    "HTTP/1.1 204 No Content\r\n"
+                    "Access-Control-Allow-Origin: *\r\n"
+                    "Access-Control-Allow-Methods: GET, POST, OPTIONS, HEAD\r\n"
+                    "Access-Control-Allow-Headers: *\r\n"
+                    "Access-Control-Allow-Private-Network: true\r\n"
+                    "\r\n"
+                )
+                self.connection.sendall(resp.encode("utf-8"))
+            else:
+                body = json.dumps({"status": "ok", "service": "FastTag Gemini WebSocket Bridge"}).encode("utf-8")
+                resp = (
+                    "HTTP/1.1 200 OK\r\n"
+                    "Content-Type: application/json\r\n"
+                    "Access-Control-Allow-Origin: *\r\n"
+                    "Access-Control-Allow-Private-Network: true\r\n"
+                    f"Content-Length: {len(body)}\r\n"
+                    "\r\n"
+                ).encode("utf-8") + body
+                self.connection.sendall(resp)
+
+    def handle_websocket(self):
+        while True:
+            try:
+                head = self.connection.recv(2)
+                if not head or len(head) < 2:
+                    break
+                b1, b2 = head[0], head[1]
+                fin = b1 & 0x80
+                opcode = b1 & 0x0f
+                if opcode == 8: # Connection close
+                    break
+
+                masked = b2 & 0x80
+                payload_len = b2 & 0x7f
+
+                if payload_len == 126:
+                    ext = self.connection.recv(2)
+                    payload_len = struct.unpack("!H", ext)[0]
+                elif payload_len == 127:
+                    ext = self.connection.recv(8)
+                    payload_len = struct.unpack("!Q", ext)[0]
+
+                mask_key = self.connection.recv(4) if masked else None
+                payload = b""
+                while len(payload) < payload_len:
+                    chunk = self.connection.recv(min(4096, payload_len - len(payload)))
+                    if not chunk:
+                        break
+                    payload += chunk
+
+                if masked and mask_key:
+                    unmasked = bytearray(payload)
+                    for i in range(len(unmasked)):
+                        unmasked[i] ^= mask_key[i % 4]
+                    payload = bytes(unmasked)
+
+                if opcode == 1: # Text frame
+                    req_data = json.loads(payload.decode("utf-8"))
+                    req_id = req_data.get("id")
+                    res = process_gemini_request(req_data)
+                    if req_id is not None:
+                        res["id"] = req_id
+
+                    # Send response frame
+                    resp_bytes = json.dumps(res).encode("utf-8")
+                    out_len = len(resp_bytes)
+                    if out_len <= 125:
+                        out_head = bytes([0x81, out_len])
+                    elif out_len <= 65535:
+                        out_head = struct.pack("!BBH", 0x81, 126, out_len)
+                    else:
+                        out_head = struct.pack("!BBQ", 0x81, 127, out_len)
+
+                    self.connection.sendall(out_head + resp_bytes)
+            except Exception as e:
+                break
+
+class ThreadingTCPServerReuse(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
 
 def run_server():
-    server = ThreadingHTTPServer(("0.0.0.0", PORT), GeminiBridgeHandler)
-    server.daemon_threads = True
-    print(f"[FastTag Gemini Bridge] Listening on http://0.0.0.0:{PORT}", flush=True)
+    server = ThreadingTCPServerReuse(("0.0.0.0", PORT), DualServerHandler)
+    print(f"[FastTag Gemini Bridge] WebSocket & HTTP server listening on ws://0.0.0.0:{PORT}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -1748,21 +1748,115 @@
         localStorage.setItem(GEMINI_SUGGESTIONS_KEY, enabled ? 'true' : 'false');
     }
 
-    async function ensureGeminiBridgeRunning() {
-        try {
-            const probe = await fetch('http://127.0.0.1:9998/health', { method: 'GET' });
-            if (probe.ok) return true;
-        } catch (e) {}
+    let geminiSocket = null;
+    let geminiRequestId = 1;
+    const geminiPendingRequests = new Map();
 
-        // Auto-start via Stash plugin task if not running
-        try {
-            await fetchGQL(`mutation { runPluginTask(plugin_id: "mypluginrc", task_name: "Start Gemini Bridge") }`);
-            await new Promise(r => setTimeout(r, 600));
-            const probe2 = await fetch('http://127.0.0.1:9998/health', { method: 'GET' });
-            if (probe2.ok) return true;
-        } catch (e) {}
+    function getGeminiSocketUrl() {
+        const host = window.location.hostname || '127.0.0.1';
+        return `ws://${host}:9998`;
+    }
 
-        return false;
+    async function ensureGeminiSocket() {
+        if (geminiSocket && geminiSocket.readyState === WebSocket.OPEN) {
+            return geminiSocket;
+        }
+
+        return new Promise(async (resolve, reject) => {
+            let socketUrl = getGeminiSocketUrl();
+            let settled = false;
+
+            const setupSocketHandlers = (ws) => {
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        const id = data.id;
+                        if (id && geminiPendingRequests.has(id)) {
+                            const { resFn, rejFn } = geminiPendingRequests.get(id);
+                            geminiPendingRequests.delete(id);
+                            if (data.error) {
+                                rejFn(new Error(data.error));
+                            } else {
+                                resFn(data.result || data);
+                            }
+                        }
+                    } catch (e) {}
+                };
+                ws.onclose = () => {
+                    geminiSocket = null;
+                };
+            };
+
+            let ws;
+            try {
+                ws = new WebSocket(socketUrl);
+            } catch (e) {
+                // Ignore initial constructor error
+            }
+
+            const timeout = setTimeout(async () => {
+                if (!settled && (!ws || ws.readyState !== WebSocket.OPEN)) {
+                    if (ws) try { ws.close(); } catch (e) {}
+                    // Auto-start via Stash plugin task
+                    try {
+                        await fetchGQL(`mutation { runPluginTask(plugin_id: "mypluginrc", task_name: "Start Gemini Bridge") }`);
+                        await new Promise(r => setTimeout(r, 600));
+                        const wsRetry = new WebSocket(socketUrl);
+                        wsRetry.onopen = () => {
+                            if (!settled) {
+                                settled = true;
+                                geminiSocket = wsRetry;
+                                setupSocketHandlers(wsRetry);
+                                resolve(wsRetry);
+                            }
+                        };
+                        wsRetry.onerror = () => {
+                            if (!settled) {
+                                settled = true;
+                                reject(new Error('Cannot connect to FastTag Gemini Bridge. Click "Start Gemini Bridge" in Tasks.'));
+                            }
+                        };
+                    } catch (err) {
+                        if (!settled) {
+                            settled = true;
+                            reject(new Error('FastTag Gemini Bridge offline'));
+                        }
+                    }
+                }
+            }, 800);
+
+            if (ws) {
+                ws.onopen = () => {
+                    if (!settled) {
+                        settled = true;
+                        clearTimeout(timeout);
+                        geminiSocket = ws;
+                        setupSocketHandlers(ws);
+                        resolve(ws);
+                    }
+                };
+                ws.onerror = () => {
+                    // Fallback to timeout auto-starter
+                };
+            }
+        });
+    }
+
+    async function sendGeminiSocketRequest(payload) {
+        const socket = await ensureGeminiSocket();
+        const id = geminiRequestId++;
+        payload.id = id;
+
+        return new Promise((resFn, rejFn) => {
+            geminiPendingRequests.set(id, { resFn, rejFn });
+            socket.send(JSON.stringify(payload));
+            setTimeout(() => {
+                if (geminiPendingRequests.has(id)) {
+                    geminiPendingRequests.delete(id);
+                    rejFn(new Error('Gemini request timed out (15s)'));
+                }
+            }, 15000);
+        });
     }
 
     async function callGeminiAPI(customApiKey = null, customModel = null) {
@@ -1770,19 +1864,12 @@
         if (!apiKey) throw new Error('No Gemini API key configured. Enter your key in Settings ➔ 🤖 AI');
         const model = customModel || getGeminiModel();
 
-        await ensureGeminiBridgeRunning();
-
-        const res = await fetch('http://127.0.0.1:9998/gemini_test', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ api_key: apiKey, model: model })
+        const res = await sendGeminiSocketRequest({
+            type: "test",
+            api_key: apiKey,
+            model: model
         });
-
-        const data = await res.json();
-        if (!res.ok || data.error) {
-            throw new Error(data.error || `HTTP ${res.status}`);
-        }
-        return data.result || data;
+        return res;
     }
 
     const geminiSceneParseCache = new Map();
@@ -1811,31 +1898,20 @@
             }
         } catch (e) {}
 
-        await ensureGeminiBridgeRunning();
-
-        const res = await fetch('http://127.0.0.1:9998/gemini_parse', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                api_key: apiKey,
-                model: getGeminiModel(),
-                filename: rawFilename || '',
-                title: rawTitle || '',
-                performers_context: performersContext,
-                studios_context: studiosContext
-            })
+        const res = await sendGeminiSocketRequest({
+            type: "parse",
+            api_key: apiKey,
+            model: getGeminiModel(),
+            filename: rawFilename || '',
+            title: rawTitle || '',
+            performers_context: performersContext,
+            studios_context: studiosContext
         });
 
-        const data = await res.json();
-        if (!res.ok || data.error) {
-            throw new Error(data.error || `HTTP ${res.status}`);
-        }
+        ftLog('ACTION', 'GeminiAI', `Gemini AI parsed scene #${sceneId}: title="${res?.clean_title}", studio="${res?.studio}", performers=${JSON.stringify(res?.performers || [])}`);
 
-        const result = data.result;
-        ftLog('ACTION', 'GeminiAI', `Gemini AI parsed scene #${sceneId}: title="${result?.clean_title}", studio="${result?.studio}", performers=${JSON.stringify(result?.performers || [])}`);
-
-        geminiSceneParseCache.set(sceneId, result);
-        return result;
+        geminiSceneParseCache.set(sceneId, res);
+        return res;
     }
 
     function getDefaultPopoutSize(hostContainer) {
