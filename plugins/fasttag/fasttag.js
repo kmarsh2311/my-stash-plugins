@@ -7454,65 +7454,111 @@
             const isEverythingModal = popup?.element?.getAttribute('data-popup-type') === 'everything' || popup?.element?.getAttribute('data-popup-type') === 'bulk-everything' || activePopup?.type === 'everything' || Boolean(effectiveCtx);
 
             if (isEverythingModal && effectiveCtx) {
-                // In Edit Everything Popup: Update metadata first, then merge into context and trigger doSave()
-                const metaInput = { id: sceneId };
-                if (match.date) metaInput.date = match.date;
-                if (isDetailsChecked && match.details) metaInput.details = match.details;
-                if (match.image) metaInput.cover_image = match.image;
-                if (isTitleChecked && match.title) metaInput.title = match.title;
+                // Save scraper fields DIRECTLY. Do not route Accept through the general doSave()
+                // mutation because that also includes unrelated fields (for example groups) and can
+                // cause the whole GraphQL mutation to fail on Stash versions with a different schema.
+                // Cover image is deliberately saved in a SECOND mutation so an image-specific error
+                // cannot prevent title/studio/performers/date/details/tags from being saved.
 
-                if (metaInput.date || metaInput.details || metaInput.cover_image || metaInput.title) {
-                    const metaUpdate = `
-                        mutation UpdateSceneMeta($input: SceneUpdateInput!) {
-                            sceneUpdate(input: $input) { id }
+                const sceneRes = await fetchGQL(`
+                    query FastTagAcceptCurrentScene($id: ID!) {
+                        findScene(id: $id) {
+                            id
+                            performers { id }
+                            tags { id }
+                            studio { id }
                         }
-                    `;
-                    await fetchGQL(metaUpdate, { input: metaInput });
+                    }
+                `, { id: sceneId });
+
+                if (sceneRes?.errors?.length) {
+                    throw new Error(sceneRes.errors.map(e => e.message).join('; '));
                 }
 
+                const existingPerformerIds = (sceneRes?.data?.findScene?.performers || []).map(p => String(p.id));
+                const existingTagIds = (sceneRes?.data?.findScene?.tags || []).map(t => String(t.id));
+                const mergedPerformerIds = Array.from(new Set([...existingPerformerIds, ...performerIdsToAdd]));
+                const mergedTagIds = Array.from(new Set([...existingTagIds, ...tagIdsToAdd]));
+
+                const updateInput = { id: sceneId };
+                if (studioIdToSet) updateInput.studio_id = studioIdToSet;
+                if (performerIdsToAdd.length > 0) updateInput.performer_ids = mergedPerformerIds;
+                if (tagIdsToAdd.length > 0) updateInput.tag_ids = mergedTagIds;
+                if (match.date) updateInput.date = match.date;
+                if (isDetailsChecked && match.details) updateInput.details = match.details;
+                if (isTitleChecked && match.title) updateInput.title = match.title;
+
+                const saveRes = await fetchGQL(`
+                    mutation FastTagAcceptSave($input: SceneUpdateInput!) {
+                        sceneUpdate(input: $input) { id }
+                    }
+                `, { input: updateInput });
+
+                if (saveRes?.errors?.length || !saveRes?.data?.sceneUpdate?.id) {
+                    const msg = saveRes?.errors?.map(e => e.message).join('; ') || 'Stash did not return a saved scene.';
+                    throw new Error(msg);
+                }
+
+                // Save cover separately. If Stash rejects the image value, all other metadata is
+                // already safely committed and the user gets a warning rather than losing everything.
+                let coverSaved = true;
+                if (match.image) {
+                    const coverRes = await fetchGQL(`
+                        mutation FastTagAcceptCover($input: SceneUpdateInput!) {
+                            sceneUpdate(input: $input) { id }
+                        }
+                    `, { input: { id: sceneId, cover_image: match.image } });
+                    if (coverRes?.errors?.length || !coverRes?.data?.sceneUpdate?.id) {
+                        coverSaved = false;
+                        console.warn('[FastTag] Cover image save failed:', coverRes?.errors || coverRes);
+                    }
+                }
+
+                // Keep the Edit Everything popup state in sync with what was actually saved.
                 if (typeof effectiveCtx.setSelectedStudio === 'function' && studioIdToSet) {
                     effectiveCtx.setSelectedStudio(studioIdToSet);
                 }
-
-                let currentPerfs = typeof effectiveCtx.getSelectedPerformers === 'function' ? effectiveCtx.getSelectedPerformers() : new Set();
-                if (!(currentPerfs instanceof Set)) currentPerfs = new Set(currentPerfs || []);
-                performerIdsToAdd.forEach(id => currentPerfs.add(id));
                 if (typeof effectiveCtx.setSelectedPerformers === 'function') {
-                    effectiveCtx.setSelectedPerformers(currentPerfs);
+                    effectiveCtx.setSelectedPerformers(new Set(mergedPerformerIds));
                 }
-
-                let currentTags = typeof effectiveCtx.getSelectedTags === 'function' ? effectiveCtx.getSelectedTags() : new Set();
-                if (!(currentTags instanceof Set)) currentTags = new Set(currentTags || []);
-                tagIdsToAdd.forEach(id => currentTags.add(id));
                 if (typeof effectiveCtx.setSelectedTags === 'function') {
-                    effectiveCtx.setSelectedTags(currentTags);
+                    effectiveCtx.setSelectedTags(new Set(mergedTagIds));
+                }
+                if (typeof effectiveCtx.setInitialStudio === 'function' && studioIdToSet) {
+                    effectiveCtx.setInitialStudio(studioIdToSet);
+                }
+                if (typeof effectiveCtx.setInitialPerformers === 'function') {
+                    effectiveCtx.setInitialPerformers(new Set(mergedPerformerIds));
+                }
+                if (typeof effectiveCtx.setInitialTags === 'function') {
+                    effectiveCtx.setInitialTags(new Set(mergedTagIds));
                 }
 
                 if (typeof effectiveCtx.fetchColumnData === 'function' && popup) {
-                    if (popup.tagsTable) await effectiveCtx.fetchColumnData('tags', popup.tagsTable, '', currentTags);
-                    if (popup.performersTable) await effectiveCtx.fetchColumnData('performers', popup.performersTable, '', currentPerfs);
+                    if (popup.tagsTable) await effectiveCtx.fetchColumnData('tags', popup.tagsTable, '', new Set(mergedTagIds));
+                    if (popup.performersTable) await effectiveCtx.fetchColumnData('performers', popup.performersTable, '', new Set(mergedPerformerIds));
                 }
-                if (typeof effectiveCtx.renderStudioBar === 'function') {
-                    await effectiveCtx.renderStudioBar('');
-                }
-                if (typeof effectiveCtx.refreshAllUI === 'function') {
-                    effectiveCtx.refreshAllUI();
-                }
-                if (typeof effectiveCtx.doSave === 'function') {
-                    await effectiveCtx.doSave('Matched & Saved from StashDB!');
-                }
+                if (typeof effectiveCtx.renderStudioBar === 'function') await effectiveCtx.renderStudioBar('');
+                if (typeof effectiveCtx.refreshAllUI === 'function') effectiveCtx.refreshAllUI();
 
+                await refreshSceneCards(sceneId);
+                recordSaveUsage();
                 sessionScrapeCache.delete(sceneId);
 
-                // Keep the Scraper HUD open and transition Accept button into Saved state
                 window._fastTagEverythingScraperOpen = true;
                 const acceptBtn = container ? container.querySelector('#fasttag-scrape-accept-btn') : null;
                 if (acceptBtn) {
-                    acceptBtn.innerHTML = '<span>✓ Saved</span>';
+                    acceptBtn.innerHTML = coverSaved ? '<span>✓ Saved</span>' : '<span>✓ Saved (cover failed)</span>';
                     acceptBtn.disabled = true;
                     acceptBtn.style.opacity = '0.7';
                     acceptBtn.style.cursor = 'default';
                     acceptBtn.style.background = '#059669';
+                }
+
+                if (coverSaved) {
+                    toastSuccess('Matched & Saved from StashDB!');
+                } else {
+                    toastError('Metadata saved, but Stash rejected the cover image.');
                 }
                 return;
             } else {
