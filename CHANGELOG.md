@@ -4,6 +4,15 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.2.2] - 2026-09-03
+
+### Added & Improved
+- **⚡ Persistent Client Cache (IndexedDB) for Zero-Latency Remote Access**:
+  - **Local Browser Persistence**: Tags, performers, studios, groups, and galleries are now stored locally in the browser's persistent `IndexedDB` storage (`stash_fasttag_cache_db`), eliminating the multi-megabyte GraphQL download bottleneck across Wi-Fi or local network connections.
+  - **0ms Instant Startup Pre-Warming**: Pre-warms in-memory cache directly from IndexedDB at script startup, so opening **Edit Everything** on remote devices happens in 0ms without waiting for 20+ MB of JSON queries.
+  - **Stale-While-Revalidate (12h TTL)**: Popups open immediately from local storage while quietly updating any newly added tags or performers in the background every 2 hours.
+  - **Cache Management in Settings**: Added a **Persistent Client Cache** status card under **FastTag Settings ➔ System** displaying cached entity counts alongside a one-click **"🗑️ Purge Cache"** button.
+
 ## [4.2.1] - 2026-09-02
 
 ### Changed & Improved

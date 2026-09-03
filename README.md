@@ -3,8 +3,8 @@
 # ⚡ FastTag for Stash
 ### Lightning-Fast Scene Tagging Workflow & Backlog Manager for Stash
 
-![Version](https://img.shields.io/badge/version-4.2.1-6366f1?style=for-the-badge)
-[![Changelog](https://img.shields.io/badge/changelog-v4.2.1-8b5cf6?style=for-the-badge)](CHANGELOG.md)
+![Version](https://img.shields.io/badge/version-4.2.2-6366f1?style=for-the-badge)
+[![Changelog](https://img.shields.io/badge/changelog-v4.2.2-8b5cf6?style=for-the-badge)](CHANGELOG.md)
 ![Stash](https://img.shields.io/badge/Stash-v0.26+-f59e0b?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-10b981?style=for-the-badge)
 
@@ -27,7 +27,7 @@
 Featuring a **Dual-Table Edit Everything Workspace**, **AI Smart Parser**, **Scene Organisation Controls**, **Random Untagged Backlog Mode**, **Smart Popularity Search**, **Full Video Stream Scrubbing**, and **Performer ID Cards**, FastTag makes organizing media collections effortless and fast.
 
 > [!TIP]
-> **✨ What's New in v4.2.1**: Polished **Scene Organisation Workflow** with warm amber styling for pending actions (`[ ⚡ ] Mark as Organised`) to prevent visual confusion with finished work, emerald green strictly for completed states (`[ ✓ ] Organised`), leveled 32px footer button alignment, and zero-latency background Apollo Client cache sync. Read the full **[CHANGELOG.md](CHANGELOG.md)**.
+> **✨ What's New in v4.2.2**: Added **Persistent Client Cache (IndexedDB)** for zero-latency remote network access. Tags, performers, studios, groups, and galleries are persisted in local browser storage so **Edit Everything** mounts in 0ms without re-downloading multi-megabyte catalogs across Wi-Fi or LAN. Read the full **[CHANGELOG.md](CHANGELOG.md)**.
 
 ---
 

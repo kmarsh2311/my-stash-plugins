@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash FastTag
 // @namespace    http://tampermonkey.net/
-// @version      4.2.1
+// @version      4.2.2
 // @description  Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
@@ -15,7 +15,7 @@
 
 (async function() {
     'use strict';
-    console.log('[FastTag v4.2.1] Initialized with Settings, Suggestions, Pinned Chips, Bulk Mode, Hotkeys, and Scene Organisation');
+    console.log('[FastTag v4.2.2] Initialized with IndexedDB Cache, Settings, Suggestions, Bulk Mode, and Scene Organisation');
 
     // --- Entity Configuration & Schema Registry ---
     const ENTITY_CONFIG = {
@@ -162,9 +162,106 @@
         tags: { data: null, timestamp: 0 },
         performers: { data: null, timestamp: 0 },
         galleries: { data: null, timestamp: 0 },
-        studios: { data: null, timestamp: 0 }
+        studios: { data: null, timestamp: 0 },
+        groups: { data: null, timestamp: 0 }
     };
-    const CACHE_TTL = 5 * 60 * 1000;
+    const CACHE_TTL = 12 * 60 * 60 * 1000; // 12 hours
+    const REVALIDATE_INTERVAL = 2 * 60 * 60 * 1000; // 2 hours background revalidation threshold
+
+    // --- IndexedDB Persistent Caching Layer (0ms Remote Access) ---
+    const IDB_NAME = 'stash_fasttag_cache_db';
+    const IDB_VERSION = 1;
+    const IDB_STORE = 'entity_cache';
+    let idbPromise = null;
+
+    function getIDB() {
+        if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+        if (idbPromise) return idbPromise;
+
+        idbPromise = new Promise((resolve) => {
+            try {
+                const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+                req.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(IDB_STORE)) {
+                        db.createObjectStore(IDB_STORE, { keyPath: 'type' });
+                    }
+                };
+                req.onsuccess = (e) => resolve(e.target.result);
+                req.onerror = (err) => {
+                    console.warn('[FastTag] IndexedDB open error, falling back to memory cache:', err);
+                    resolve(null);
+                };
+            } catch (e) {
+                console.warn('[FastTag] IndexedDB initialization failed:', e);
+                resolve(null);
+            }
+        });
+        return idbPromise;
+    }
+
+    async function idbGet(type) {
+        try {
+            const db = await getIDB();
+            if (!db) return null;
+            return new Promise((resolve) => {
+                const tx = db.transaction(IDB_STORE, 'readonly');
+                const store = tx.objectStore(IDB_STORE);
+                const req = store.get(type);
+                req.onsuccess = () => resolve(req.result || null);
+                req.onerror = () => resolve(null);
+            });
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async function idbSet(type, data, timestamp = Date.now()) {
+        try {
+            const db = await getIDB();
+            if (!db) return;
+            const tx = db.transaction(IDB_STORE, 'readwrite');
+            const store = tx.objectStore(IDB_STORE);
+            store.put({ type, data, timestamp });
+        } catch (e) {
+            console.warn('[FastTag] Error writing to IndexedDB:', e);
+        }
+    }
+
+    async function idbDelete(type) {
+        try {
+            const db = await getIDB();
+            if (!db) return;
+            const tx = db.transaction(IDB_STORE, 'readwrite');
+            const store = tx.objectStore(IDB_STORE);
+            if (type) {
+                store.delete(type);
+            } else {
+                store.clear();
+            }
+        } catch (e) {}
+    }
+
+    async function prewarmCacheFromIDB() {
+        try {
+            const types = ['tags', 'performers', 'studios', 'groups', 'galleries'];
+            const promises = types.map(async (type) => {
+                const item = await idbGet(type);
+                if (item && item.data && Array.isArray(item.data) && (Date.now() - item.timestamp < CACHE_TTL)) {
+                    cacheStore[type] = { data: item.data, timestamp: item.timestamp };
+                }
+            });
+            await Promise.all(promises);
+            console.log('[FastTag] Pre-warmed cache from IndexedDB:', {
+                tags: cacheStore.tags?.data?.length || 0,
+                performers: cacheStore.performers?.data?.length || 0,
+                studios: cacheStore.studios?.data?.length || 0,
+                groups: cacheStore.groups?.data?.length || 0
+            });
+        } catch (e) {
+            console.warn('[FastTag] Error pre-warming cache from IndexedDB:', e);
+        }
+    }
 
     let sequentialEditState = {
         enabled: false,
@@ -2724,6 +2821,25 @@
                             </div>
                         </div>
 
+                        <!-- Persistent Cache (IndexedDB) -->
+                        <div style="display: flex; flex-direction: column; gap: 10px; background: ${cardBg}; padding: 12px; border-radius: 8px; border: 1px solid ${border};">
+                            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                                        <span>⚡</span> Persistent Client Cache (IndexedDB)
+                                    </div>
+                                    <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Caches tags, performers, studios, and groups locally in browser storage so Edit Everything opens in 0ms across network connections.</div>
+                                </div>
+                                <button type="button" id="fasttag-btn-purge-cache" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; font-size: 11.5px; font-weight: 600; padding: 5px 10px; border-radius: 6px; cursor: pointer; transition: all 0.15s ease; white-space: nowrap;">🗑️ Purge Cache</button>
+                            </div>
+                            <div id="fasttag-cache-stats" style="font-size: 11px; color: ${textMuted}; border-top: 1px dashed ${border}; padding-top: 6px; display: flex; gap: 10px; flex-wrap: wrap;">
+                                <span>Tags: <strong style="color: ${text};">${cacheStore.tags?.data?.length || 0}</strong></span>
+                                <span>Performers: <strong style="color: ${text};">${cacheStore.performers?.data?.length || 0}</strong></span>
+                                <span>Studios: <strong style="color: ${text};">${cacheStore.studios?.data?.length || 0}</strong></span>
+                                <span>Groups: <strong style="color: ${text};">${cacheStore.groups?.data?.length || 0}</strong></span>
+                            </div>
+                        </div>
+
                         <!-- Developer & Diagnostics / Debug Mode -->
                         <div style="display: flex; flex-direction: column; gap: 10px; background: ${cardBg}; padding: 12px; border-radius: 8px; border: 1px solid ${border};">
                             <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
@@ -3003,6 +3119,19 @@
             });
         }
 
+        const purgeCacheBtn = modal.querySelector('#fasttag-btn-purge-cache');
+        if (purgeCacheBtn) {
+            purgeCacheBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                invalidateCache();
+                const statsEl = modal.querySelector('#fasttag-cache-stats');
+                if (statsEl) {
+                    statsEl.innerHTML = '<span style="color: #10b981; font-weight: 600;">✓ Cache purged! Live network reload on next search.</span>';
+                }
+                showToast('Persistent client cache cleared', 'success');
+            });
+        }
+
         const debugToggle = modal.querySelector('#fasttag-setting-debug-mode');
         if (debugToggle) {
             debugToggle.addEventListener('click', async (e) => {
@@ -3089,26 +3218,54 @@
 
     function getCachedOrNull(type) {
         const item = cacheStore[type];
-        if (item && item.data && (Date.now() - item.timestamp < CACHE_TTL)) {
-            return item.data;
+        if (item && item.data && Array.isArray(item.data)) {
+            const age = Date.now() - item.timestamp;
+            if (age < CACHE_TTL) {
+                if (age > REVALIDATE_INTERVAL && !item._isRevalidating) {
+                    revalidateCacheInBackground(type);
+                }
+                return item.data;
+            }
         }
         return null;
     }
 
     function setCache(type, data) {
-        cacheStore[type] = { data, timestamp: Date.now() };
+        const now = Date.now();
+        cacheStore[type] = { data, timestamp: now };
+        idbSet(type, data, now);
     }
 
     function invalidateCache(type) {
         if (type && cacheStore[type]) {
             cacheStore[type] = { data: null, timestamp: 0 };
+            idbDelete(type);
         } else {
             cacheStore = {
                 tags: { data: null, timestamp: 0 },
                 performers: { data: null, timestamp: 0 },
                 galleries: { data: null, timestamp: 0 },
-        studios: { data: null, timestamp: 0 }
+                studios: { data: null, timestamp: 0 },
+                groups: { data: null, timestamp: 0 }
             };
+            idbDelete(null);
+        }
+    }
+
+    async function revalidateCacheInBackground(type) {
+        const config = ENTITY_CONFIG[type];
+        if (!config || !config.fetchQuery) return;
+        if (cacheStore[type]) cacheStore[type]._isRevalidating = true;
+        try {
+            const res = await fetchGQL(config.fetchQuery);
+            const freshList = config.extractList(res?.data);
+            if (freshList && freshList.length) {
+                setCache(type, freshList);
+            }
+        } catch (e) {
+            // Silently ignore background revalidation errors
+        } finally {
+            if (cacheStore[type]) cacheStore[type]._isRevalidating = false;
         }
     }
 
@@ -15383,7 +15540,8 @@
 
     // --- Background Cache Preloader (Instant 0ms popup opening) ---
     async function preloadCaches() {
-        const types = ['tags', 'performers', 'studios', 'galleries'];
+        await prewarmCacheFromIDB();
+        const types = ['tags', 'performers', 'studios', 'groups', 'galleries'];
         for (const type of types) {
             if (!getCachedOrNull(type)) {
                 try {
@@ -15401,5 +15559,7 @@
             }
         }
     }
+    // Prewarm from IndexedDB immediately on script execution, then run background checks after 300ms
+    prewarmCacheFromIDB();
     setTimeout(preloadCaches, 300);
 })();
