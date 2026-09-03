@@ -4618,20 +4618,13 @@
 
         resetRefractCards();
 
-        // If this specific scene was already updated directly in Apollo cache, skip the heavy 40-scene network refetch!
-        if (sceneId && apolloSceneSyncSuccess.has(String(sceneId))) {
-            apolloSceneSyncSuccess.delete(String(sceneId));
-            setTimeout(resetRefractCards, 60);
-            setTimeout(resetRefractCards, 300);
-            return true;
-        }
-
         const apollo = window.__APOLLO_CLIENT__;
         if (!apollo || typeof apollo.getObservableQueries !== 'function') return false;
 
         const sceneQueries = [...apollo.getObservableQueries().values()].filter(query => {
+            const queryName = query.queryName || query.options?.query?.definitions?.[0]?.name?.value || '';
             const queryText = query.options?.query?.loc?.source?.body || '';
-            return queryText.includes('FindScenes') && typeof query.refetch === 'function';
+            return (queryName === 'FindScenes' || queryText.includes('FindScenes') || queryName.includes('Scene')) && typeof query.refetch === 'function';
         });
 
         if (!sceneQueries.length) return false;
@@ -5539,6 +5532,7 @@
                 sessionScrapeCache.clear();
                 window._fastTagEverythingScraperOpen = false;
             }
+            refreshSceneCardsDebounced(null, 50);
         } finally {
             setTimeout(() => {
                 isModalClosing = false;
