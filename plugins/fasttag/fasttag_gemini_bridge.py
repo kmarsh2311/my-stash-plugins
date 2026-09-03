@@ -85,10 +85,14 @@ def process_gemini_request(data):
     candidates = get_ordered_candidate_models(api_key, req_model)
 
     if req_type == "test":
-        if candidates:
-            return {"status": "ok", "message": f"Connected! Active model: {candidates[0]}", "models": candidates}
-        else:
-            return {"error": "Could not verify models. Please check your API key."}
+        # Candidate names can include local fallbacks, so they are not proof that
+        # Google accepted the API key. Only report success when listModels returned
+        # at least one model from the authenticated Gemini API.
+        verified_models = get_available_models(api_key)
+        if not verified_models:
+            return {"error": "Could not verify Gemini access. Please check your API key and network connection."}
+        active_model = req_model if req_model in verified_models else candidates[0]
+        return {"status": "ok", "message": f"Connected! Active model: {active_model}", "models": verified_models}
 
     # Parse request
     filename = data.get("filename", "").strip()

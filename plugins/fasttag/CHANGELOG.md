@@ -4,6 +4,15 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.2.6] - 2026-09-04
+
+### Fixed
+- **Gemini Connection Verification**: The connection test now succeeds only after Google returns an authenticated model list, preventing invalid keys or network failures from appearing connected.
+- **Gemini Fallback Timing**: Increased the browser request timeout to allow the bridge's model fallback sequence to complete.
+- **Accurate Bulk Edit Results**: Bulk editing now distinguishes complete, partial, and total failure; failed operations keep the editor open for retry.
+- **Dark-Mode Performer Pills**: Corrected an invalid scraper performer-pill background colour.
+- **Userscript Version Metadata**: Synchronized the embedded userscript version with the FastTag release.
+
 ## [4.2.5] - 2026-09-03
 
 ### Fixed

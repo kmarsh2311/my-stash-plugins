@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash FastTag
 // @namespace    http://tampermonkey.net/
-// @version      4.2.2
+// @version      4.2.6
 // @description  Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
@@ -15,7 +15,7 @@
 
 (async function() {
     'use strict';
-    console.log('[FastTag v4.2.5] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
+    console.log('[FastTag v4.2.6] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
 
     // Selection set of fields to update Apollo's in-memory SceneCard directly (0ms latency, eliminates 40-scene FindScenes refetch)
     const SCENE_CARD_UPDATE_FIELDS = `
@@ -2171,9 +2171,9 @@
             setTimeout(() => {
                 if (geminiPendingRequests.has(id)) {
                     geminiPendingRequests.delete(id);
-                    rejFn(new Error('AI request took too long (>12s). Google API may be busy or rate-limited.'));
+                    rejFn(new Error('AI request took too long (>40s). Google API may be busy or rate-limited.'));
                 }
-            }, 12000);
+            }, 40000);
         });
     }
 
@@ -6972,7 +6972,7 @@
                                                     `;
                                                 }
                                                 return `
-                                                    <label style="display: inline-flex; align-items: baseline; gap: 4px; background: ${isDark ? 'rgba(14px 165, 233, 0.15)' : '#e0f2fe'}; color: ${isDark ? '#bae6fd' : '#0369a1'}; border: 1px solid ${isDark ? 'rgba(56, 189, 248, 0.35)' : '#7dd3fc'}; padding: 2px 6px; border-radius: 4px; font-size: 10px; cursor: pointer; user-select: none;" title="Exists in your local library">
+                                                    <label style="display: inline-flex; align-items: baseline; gap: 4px; background: ${isDark ? 'rgba(14, 165, 233, 0.15)' : '#e0f2fe'}; color: ${isDark ? '#bae6fd' : '#0369a1'}; border: 1px solid ${isDark ? 'rgba(56, 189, 248, 0.35)' : '#7dd3fc'}; padding: 2px 6px; border-radius: 4px; font-size: 10px; cursor: pointer; user-select: none;" title="Exists in your local library">
                                                         <input type="checkbox" class="fasttag-scrape-perf-item" data-idx="${pIdx}" checked style="cursor: pointer; width: 11px; height: 11px; accent-color: #0ea5e9; margin: 0; position: relative; top: 1.5px;">
                                                         <span>${escapeHtml(p.name)}</span>
                                                     </label>
@@ -14817,10 +14817,23 @@
                     }
                 }
 
-                toastSuccess(`Successfully updated ${updatedCount} scenes!`);
-                recordSaveUsage();
-                closePopup();
-                await refreshSceneCards();
+                const failedCount = bulkScenes.length - updatedCount;
+                if (updatedCount === bulkScenes.length) {
+                    toastSuccess(`Successfully updated all ${updatedCount} scenes!`);
+                    recordSaveUsage();
+                    closePopup();
+                    await refreshSceneCards();
+                } else {
+                    popup.saveBtn.disabled = false;
+                    popup.saveBtn.textContent = 'Retry Changes';
+                    if (updatedCount > 0) {
+                        recordSaveUsage();
+                        toastError(`Updated ${updatedCount} scenes, but ${failedCount} failed. The editor has stayed open so you can retry.`);
+                        await refreshSceneCards();
+                    } else {
+                        toastError(`No scenes were updated. All ${failedCount} updates failed; review the error log and retry.`);
+                    }
+                }
             };
             }
 
