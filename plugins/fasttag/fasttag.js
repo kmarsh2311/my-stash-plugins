@@ -15,7 +15,7 @@
 
 (async function() {
     'use strict';
-    console.log('[FastTag v4.2.4] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
+    console.log('[FastTag v4.2.5] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
 
     // Selection set of fields to update Apollo's in-memory SceneCard directly (0ms latency, eliminates 40-scene FindScenes refetch)
     const SCENE_CARD_UPDATE_FIELDS = `

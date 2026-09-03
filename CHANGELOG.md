@@ -4,6 +4,15 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.2.5] - 2026-09-03
+
+### Fixed
+- **Reliable StashDB Metadata Saving in Edit Everything**:
+  - Saves scraped title, studio, performers, date, details, and tags directly without including unrelated Edit Everything fields that may be incompatible with the active Stash schema.
+  - Merges scraped performers and tags with the scene's existing metadata instead of replacing existing selections.
+  - Saves the cover image separately so an image-specific failure cannot prevent the remaining metadata from being saved.
+  - Refreshes the popup and scene card after a successful save and clearly reports a cover-only failure.
+
 ## [4.2.4] - 2026-09-03
 
 ### Fixed
