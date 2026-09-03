@@ -4,6 +4,15 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.2.3] - 2026-09-03
+
+### Added & Improved
+- **🎯 Targeted Apollo Scene Card Sync (0ms Single-Card Updates)**:
+  - **Single-Card Apollo In-Memory Cache Sync**: Scene mutations now return updated card fields (`tags`, `performers`, `studio`, and `organized`), directly modifying `Scene:${id}` in Apollo Client's in-memory normalized store (`cache.modify`).
+  - **Eliminated 40-Scene Refetch Bottleneck**: Stopped re-downloading 20–40 full scenes over the network on every tag/performer save (`FindScenes` refetch bypassed when editing individual cards).
+  - **Instant Live Background Updates**: The scene card behind the popup updates its tag pills, performer names, studio, and organised status in real time (0ms) without having to close the popup.
+  - **Refract Theme Performer Circles**: Synchronously clears card markers so Refract immediately re-renders performer avatar circles on the target card.
+
 ## [4.2.2] - 2026-09-03
 
 ### Added & Improved

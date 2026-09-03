@@ -15,7 +15,16 @@
 
 (async function() {
     'use strict';
-    console.log('[FastTag v4.2.2] Initialized with IndexedDB Cache, Settings, Suggestions, Bulk Mode, and Scene Organisation');
+    console.log('[FastTag v4.2.3] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
+
+    // Selection set of fields to update Apollo's in-memory SceneCard directly (0ms latency, eliminates 40-scene FindScenes refetch)
+    const SCENE_CARD_UPDATE_FIELDS = `
+        id
+        organized
+        tags { id name }
+        performers { id name disambiguation gender image_path }
+        studio { id name image_path }
+    `;
 
     // --- Entity Configuration & Schema Registry ---
     const ENTITY_CONFIG = {
@@ -36,7 +45,7 @@
             createQuery: `mutation ($name: String!) { tagCreate(input: { name: $name }) { id name } }`,
             createExtract: data => data?.tagCreate?.id,
             createVariables: val => ({ name: val }),
-            updateQuery: `mutation ($scene_id: ID!, $tag_ids: [ID!]!) { sceneUpdate(input: { id: $scene_id, tag_ids: $tag_ids }) { id } }`,
+            updateQuery: `mutation ($scene_id: ID!, $tag_ids: [ID!]!) { sceneUpdate(input: { id: $scene_id, tag_ids: $tag_ids }) { ${SCENE_CARD_UPDATE_FIELDS} } }`,
             updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), tag_ids: ids.map(String) })
         },
         performers: {
@@ -57,7 +66,7 @@
             createQuery: `mutation ($name: String!) { performerCreate(input: { name: $name }) { id name } }`,
             createExtract: data => data?.performerCreate?.id,
             createVariables: val => ({ name: val }),
-            updateQuery: `mutation ($scene_id: ID!, $performer_ids: [ID!]!) { sceneUpdate(input: { id: $scene_id, performer_ids: $performer_ids }) { id } }`,
+            updateQuery: `mutation ($scene_id: ID!, $performer_ids: [ID!]!) { sceneUpdate(input: { id: $scene_id, performer_ids: $performer_ids }) { ${SCENE_CARD_UPDATE_FIELDS} } }`,
             updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), performer_ids: ids.map(String) })
         },
         galleries: {
@@ -95,7 +104,7 @@
             createQuery: `mutation ($title: String!) { galleryCreate(input: { title: $title }) { id title } }`,
             createExtract: data => data?.galleryCreate?.id,
             createVariables: val => ({ title: val }),
-            updateQuery: `mutation ($scene_id: ID!, $gallery_ids: [ID!]!) { sceneUpdate(input: { id: $scene_id, gallery_ids: $gallery_ids }) { id } }`,
+            updateQuery: `mutation ($scene_id: ID!, $gallery_ids: [ID!]!) { sceneUpdate(input: { id: $scene_id, gallery_ids: $gallery_ids }) { ${SCENE_CARD_UPDATE_FIELDS} } }`,
             updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), gallery_ids: ids.map(String) })
         },
         studios: {
@@ -124,7 +133,7 @@
             createQuery: `mutation ($name: String!) { studioCreate(input: { name: $name }) { id name } }`,
             createExtract: data => data?.studioCreate?.id,
             createVariables: val => ({ name: val }),
-            updateQuery: `mutation ($scene_id: ID!, $studio_id: ID) { sceneUpdate(input: { id: $scene_id, studio_id: $studio_id }) { id } }`,
+            updateQuery: `mutation ($scene_id: ID!, $studio_id: ID) { sceneUpdate(input: { id: $scene_id, studio_id: $studio_id }) { ${SCENE_CARD_UPDATE_FIELDS} } }`,
             updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), studio_id: ids.length > 0 ? String(ids[0]) : null })
         },
         groups: {
@@ -144,7 +153,7 @@
             createQuery: `mutation ($name: String!) { groupCreate(input: { name: $name }) { id name } }`,
             createExtract: data => data?.groupCreate?.id,
             createVariables: val => ({ name: val }),
-            updateQuery: `mutation ($scene_id: ID!, $groups: [SceneGroupInput!]) { sceneUpdate(input: { id: $scene_id, groups: $groups }) { id } }`,
+            updateQuery: `mutation ($scene_id: ID!, $groups: [SceneGroupInput!]) { sceneUpdate(input: { id: $scene_id, groups: $groups }) { ${SCENE_CARD_UPDATE_FIELDS} } }`,
             updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), groups: ids.map(id => ({ group_id: String(id) })) })
         }
     };
@@ -1939,11 +1948,13 @@
         try {
             const query = `mutation UpdateSceneOrganized($id: ID!, $organized: Boolean!) {
                 sceneUpdate(input: { id: $id, organized: $organized }) {
-                    id
-                    organized
+                    ${SCENE_CARD_UPDATE_FIELDS}
                 }
             }`;
             const res = await fetchGQL(query, { id: String(sceneId), organized: Boolean(isOrganized) });
+            if (res?.data?.sceneUpdate) {
+                syncSceneToApolloCache(res.data.sceneUpdate);
+            }
             return res?.data?.sceneUpdate?.organized !== undefined;
         } catch (e) {
             console.error('[FastTag] Error updating organized status:', e);
@@ -4485,6 +4496,101 @@
         }
     }
 
+    const apolloSceneSyncSuccess = new Set();
+
+    function syncSceneToApolloCache(sceneData) {
+        if (!sceneData || !sceneData.id) return false;
+        const sceneIdStr = String(sceneData.id);
+
+        // Refract Theme compatibility: strip its "already processed" marker on this specific card
+        try {
+            document.querySelectorAll(
+                `.scene-card a[href^="/scenes/${sceneIdStr}?"], ` +
+                `.scene-card a[href="/scenes/${sceneIdStr}"], ` +
+                `.scene-card a[href^="/scenes/${sceneIdStr}/"]`
+            ).forEach(a => {
+                const card = a.closest('.scene-card');
+                if (card) {
+                    card.removeAttribute('data-stash-sc');
+                    card.querySelectorAll('.stash-performer-circles').forEach(el => el.remove());
+                }
+            });
+        } catch (e) {}
+
+        const apollo = window.__APOLLO_CLIENT__;
+        if (!apollo || !apollo.cache) return false;
+
+        try {
+            const cacheId = (typeof apollo.cache.identify === 'function' && apollo.cache.identify({ __typename: 'Scene', id: sceneIdStr })) || `Scene:${sceneIdStr}`;
+
+            const fieldsToUpdate = {};
+
+            if (sceneData.tags !== undefined) {
+                fieldsToUpdate.tags = (existing, { toReference }) => {
+                    return (sceneData.tags || []).map(t => {
+                        const ref = typeof toReference === 'function' ? toReference({ __typename: 'Tag', id: String(t.id), name: t.name }) : null;
+                        return ref || { __typename: 'Tag', id: String(t.id), name: t.name };
+                    });
+                };
+            }
+
+            if (sceneData.performers !== undefined) {
+                fieldsToUpdate.performers = (existing, { toReference }) => {
+                    return (sceneData.performers || []).map(p => {
+                        const perfObj = {
+                            __typename: 'Performer',
+                            id: String(p.id),
+                            name: p.name,
+                            disambiguation: p.disambiguation || null,
+                            gender: p.gender || null,
+                            image_path: p.image_path || null
+                        };
+                        const ref = typeof toReference === 'function' ? toReference(perfObj) : null;
+                        return ref || perfObj;
+                    });
+                };
+            }
+
+            if (sceneData.studio !== undefined) {
+                fieldsToUpdate.studio = (existing, { toReference }) => {
+                    if (!sceneData.studio) return null;
+                    const stObj = {
+                        __typename: 'Studio',
+                        id: String(sceneData.studio.id),
+                        name: sceneData.studio.name,
+                        image_path: sceneData.studio.image_path || null
+                    };
+                    const ref = typeof toReference === 'function' ? toReference(stObj) : null;
+                    return ref || stObj;
+                };
+            }
+
+            if (sceneData.organized !== undefined) {
+                fieldsToUpdate.organized = () => Boolean(sceneData.organized);
+            }
+
+            if (sceneData.title !== undefined) {
+                fieldsToUpdate.title = () => sceneData.title;
+            }
+
+            if (sceneData.date !== undefined) {
+                fieldsToUpdate.date = () => sceneData.date;
+            }
+
+            if (Object.keys(fieldsToUpdate).length > 0) {
+                apollo.cache.modify({
+                    id: cacheId,
+                    fields: fieldsToUpdate
+                });
+                apolloSceneSyncSuccess.add(sceneIdStr);
+                return true;
+            }
+        } catch (err) {
+            console.warn('[FastTag] Error updating Apollo scene cache directly:', err);
+        }
+        return false;
+    }
+
     async function refreshSceneCards(sceneId = null) {
         const resetRefractCards = () => {
             try {
@@ -4511,6 +4617,14 @@
         };
 
         resetRefractCards();
+
+        // If this specific scene was already updated directly in Apollo cache, skip the heavy 40-scene network refetch!
+        if (sceneId && apolloSceneSyncSuccess.has(String(sceneId))) {
+            apolloSceneSyncSuccess.delete(String(sceneId));
+            setTimeout(resetRefractCards, 60);
+            setTimeout(resetRefractCards, 300);
+            return true;
+        }
 
         const apollo = window.__APOLLO_CLIENT__;
         if (!apollo || typeof apollo.getObservableQueries !== 'function') return false;
@@ -4543,6 +4657,9 @@
         if (res.errors) {
             toastError(`Failed to update ${config.title.toLowerCase()}`, res.errors);
             return false;
+        }
+        if (res?.data?.sceneUpdate) {
+            syncSceneToApolloCache(res.data.sceneUpdate);
         }
         // Refract Theme compatibility: strip its "already processed" marker and circles
         // so it re-queries fresh data for this card on its next MutationObserver pass.
@@ -7401,12 +7518,15 @@
                 if (match.image) updateVars.cover_image = match.image;
                 if (isTitleChecked && match.title) updateVars.title = match.title;
 
-                await fetchGQL(`
+                const updateRes = await fetchGQL(`
                     mutation DirectSceneUpdate($input: SceneUpdateInput!) {
-                        sceneUpdate(input: $input) { id }
+                        sceneUpdate(input: $input) { ${SCENE_CARD_UPDATE_FIELDS} }
                     }
                 `, { input: updateVars });
-                await refreshSceneCards();
+                if (updateRes?.data?.sceneUpdate) {
+                    syncSceneToApolloCache(updateRes.data.sceneUpdate);
+                }
+                await refreshSceneCards(sceneId);
                 toastSuccess('Matched & Saved from StashDB!');
 
                 sessionScrapeCache.delete(sceneId);
@@ -10554,15 +10674,18 @@
             applyTitleBtn.onclick = async (e) => {
                 e.preventDefault();
                 try {
-                    await fetchGQL(`mutation DirectSceneUpdate($input: SceneUpdateInput!) { sceneUpdate(input: $input) { id title } }`, {
+                    const titleRes = await fetchGQL(`mutation DirectSceneUpdate($input: SceneUpdateInput!) { sceneUpdate(input: $input) { ${SCENE_CARD_UPDATE_FIELDS} title } }`, {
                         input: { id: sceneId, title: aiResult.clean_title }
                     });
+                    if (titleRes?.data?.sceneUpdate) {
+                        syncSceneToApolloCache(titleRes.data.sceneUpdate);
+                    }
                     applyTitleBtn.textContent = '✓ Set';
                     applyTitleBtn.disabled = true;
                     applyTitleBtn.style.background = '#059669';
                     applyTitleBtn.style.color = '#fff';
                     toastSuccess(`Updated Scene Title to "${aiResult.clean_title}"`);
-                    await refreshSceneCards();
+                    await refreshSceneCards(sceneId);
                 } catch (err) {
                     toastError(`Failed to update title: ${err.message}`);
                 }
@@ -10574,15 +10697,18 @@
             applyDateBtn.onclick = async (e) => {
                 e.preventDefault();
                 try {
-                    await fetchGQL(`mutation DirectSceneUpdate($input: SceneUpdateInput!) { sceneUpdate(input: $input) { id date } }`, {
+                    const dateRes = await fetchGQL(`mutation DirectSceneUpdate($input: SceneUpdateInput!) { sceneUpdate(input: $input) { ${SCENE_CARD_UPDATE_FIELDS} date } }`, {
                         input: { id: sceneId, date: aiResult.date }
                     });
+                    if (dateRes?.data?.sceneUpdate) {
+                        syncSceneToApolloCache(dateRes.data.sceneUpdate);
+                    }
                     applyDateBtn.textContent = '✓ Set';
                     applyDateBtn.disabled = true;
                     applyDateBtn.style.background = '#059669';
                     applyDateBtn.style.color = '#fff';
                     toastSuccess(`Updated Scene Date to ${aiResult.date}`);
-                    await refreshSceneCards();
+                    await refreshSceneCards(sceneId);
                 } catch (err) {
                     toastError(`Failed to update date: ${err.message}`);
                 }
@@ -10870,7 +10996,7 @@
                     applyAllBtn.style.background = '#059669';
                     applyAllBtn.innerHTML = '<span>✓ Applied All!</span>';
                     showToast('✓ Successfully applied Gemini AI metadata!', 'success');
-                    await refreshSceneCards();
+                    await refreshSceneCards(sceneId);
                 } catch (err) {
                     applyAllBtn.disabled = false;
                     applyAllBtn.innerHTML = '<span>🚀 Apply All</span>';
@@ -12582,8 +12708,7 @@
                                 studio_id: $studio_id,
                                 groups: $groups${autoMarkOrg ? ', organized: $organized' : ''}
                             }) {
-                                id
-                                organized
+                                ${SCENE_CARD_UPDATE_FIELDS}
                             }
                         }
                     `;
@@ -12601,6 +12726,7 @@
                         const res = await fetchGQL(mutation, variables);
 
                         if (res?.data?.sceneUpdate?.id) {
+                            syncSceneToApolloCache(res.data.sceneUpdate);
                             if (autoMarkOrg && popup._organizedController) {
                                 popup._organizedController.update(true);
                             }
