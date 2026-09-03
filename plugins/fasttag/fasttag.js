@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash FastTag
 // @namespace    http://tampermonkey.net/
-// @version      4.2.6
+// @version      4.2.7
 // @description  Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
@@ -15,7 +15,7 @@
 
 (async function() {
     'use strict';
-    console.log('[FastTag v4.2.6] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
+    console.log('[FastTag v4.2.7] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
 
     // Selection set of fields to update Apollo's in-memory SceneCard directly (0ms latency, eliminates 40-scene FindScenes refetch)
     const SCENE_CARD_UPDATE_FIELDS = `
@@ -1213,30 +1213,30 @@
             height: 0 !important;
         }
 
-        /* Studio & Group SELECTED Pills - Solid Vibrant Filled Gradient */
+        /* Studio & Group selected pills - muted fills matching the selected table rows */
         .fasttag-studio-pill {
-            background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%) !important;
+            background: #312e81 !important;
             color: #ffffff !important;
-            border: 1px solid #6366f1 !important;
+            border: 1px solid #4338ca !important;
             box-shadow: 0 1px 3px rgba(0,0,0,0.35) !important;
             transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
         }
         .fasttag-studio-pill:hover {
             transform: translateY(-1px) !important;
-            filter: brightness(1.15) !important;
-            box-shadow: 0 3px 8px rgba(79, 70, 229, 0.5) !important;
+            filter: brightness(1.08) !important;
+            box-shadow: 0 3px 8px rgba(49, 46, 129, 0.4) !important;
         }
         .fasttag-group-pill {
-            background: linear-gradient(135deg, #9333ea 0%, #6b21a8 100%) !important;
+            background: #581c87 !important;
             color: #ffffff !important;
-            border: 1px solid #a855f7 !important;
+            border: 1px solid #7e22ce !important;
             box-shadow: 0 1px 3px rgba(0,0,0,0.35) !important;
             transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
         }
         .fasttag-group-pill:hover {
             transform: translateY(-1px) !important;
-            filter: brightness(1.15) !important;
-            box-shadow: 0 3px 8px rgba(147, 51, 234, 0.5) !important;
+            filter: brightness(1.08) !important;
+            box-shadow: 0 3px 8px rgba(88, 28, 135, 0.4) !important;
         }
         .fasttag-pill-clear-btn {
             transition: transform 0.15s ease, color 0.15s ease, opacity 0.15s ease !important;
@@ -1254,6 +1254,22 @@
             color: #94a3b8 !important;
             font-weight: 500 !important;
             transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+        #scenes-popup.theme-dark .fasttag-quick-chip[aria-pressed="true"] {
+            background: #312e81 !important;
+            border: 1px solid #4338ca !important;
+            color: #ffffff !important;
+            font-weight: 600 !important;
+        }
+        #scenes-popup.theme-dark .fasttag-quick-chip[aria-pressed="true"]:hover {
+            background: #3730a3 !important;
+            border-color: #6366f1 !important;
+        }
+        #scenes-popup.theme-light .fasttag-quick-chip[aria-pressed="true"] {
+            background: #e0e7ff !important;
+            border: 1px solid #a5b4fc !important;
+            color: #1e293b !important;
+            font-weight: 600 !important;
         }
         .fasttag-quick-chip.chip-studio:hover {
             background: rgba(99, 102, 241, 0.22) !important;
@@ -6873,6 +6889,10 @@
                                 ${match.image ? `
                                     <div class="fasttag-scrape-cover-thumb" style="width: 100%; max-height: clamp(160px, 35vh, 320px); aspect-ratio: 16/9; border-radius: 6px; overflow: hidden; background: #000; border: 1px solid ${isDark ? 'rgba(255,255,255,0.18)' : '#cbd5e1'}; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; transition: all 0.15s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.3); flex-shrink: 0;" title="Hover to view full-size cover">
                                         <img src="${match.image}" alt="Cover" style="width: 100%; height: 100%; object-fit: cover; display: block;" loading="lazy" />
+                                        <label style="position: absolute; left: 7px; bottom: 7px; z-index: 2; display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px; border-radius: 4px; background: rgba(15, 23, 42, 0.88); color: #e0e7ff; font-size: 10px; font-weight: 700; cursor: pointer; user-select: none;" title="Include this cover image when accepting the match">
+                                            <input type="checkbox" id="fasttag-scrape-chk-cover" checked style="cursor: pointer; width: 11px; height: 11px; accent-color: #6366f1; margin: 0;">
+                                            <span>🖼️ Cover</span>
+                                        </label>
                                     </div>
                                 ` : ''}
 
@@ -6886,7 +6906,12 @@
                                             <span>Title:</span>
                                         </label>
                                         <span style="display: inline-block; max-width: calc(100% - 75px); background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#e0e7ff' : '#312e81'}; padding: 2px 7px; border-radius: 4px; font-weight: 700; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="${escapeHtml(match.title || '')}">${escapeHtml(match.title || 'Untitled Match')}</span>
-                                        ${match.date ? `<span style="font-size: 10.5px; color: ${isDark ? '#94a3b8' : '#64748b'}; font-weight: 500;">(${match.date})</span>` : ''}
+                                        ${match.date ? `
+                                            <label style="display: inline-flex; align-items: baseline; gap: 4px; font-size: 10.5px; color: ${isDark ? '#94a3b8' : '#64748b'}; font-weight: 500; cursor: pointer; user-select: none;" title="Include this date when accepting the match">
+                                                <input type="checkbox" id="fasttag-scrape-chk-date" checked style="cursor: pointer; width: 11px; height: 11px; accent-color: #0ea5e9; margin: 0; position: relative; top: 1px;">
+                                                <span>📅 ${escapeHtml(match.date)}</span>
+                                            </label>
+                                        ` : ''}
                                     </div>
 
                                     ${studioName ? `
@@ -6913,6 +6938,10 @@
                                     ${match.image ? `
                                         <div class="fasttag-scrape-cover-thumb" style="flex-shrink: 0; width: 116px; height: 74px; border-radius: 6px; overflow: hidden; background: #000; border: 1px solid ${isDark ? 'rgba(255,255,255,0.18)' : '#cbd5e1'}; display: flex; align-items: center; justify-content: center; align-self: flex-start; cursor: pointer; position: relative; transition: all 0.15s ease;" title="Hover to view full-size cover">
                                             <img src="${match.image}" alt="Cover" style="width: 100%; height: 100%; object-fit: cover; display: block;" loading="lazy" />
+                                            <label style="position: absolute; left: 4px; bottom: 4px; z-index: 2; display: inline-flex; align-items: center; gap: 3px; padding: 2px 5px; border-radius: 3px; background: rgba(15, 23, 42, 0.88); color: #e0e7ff; font-size: 9px; font-weight: 700; cursor: pointer; user-select: none;" title="Include this cover image when accepting the match">
+                                                <input type="checkbox" id="fasttag-scrape-chk-cover" checked style="cursor: pointer; width: 10px; height: 10px; accent-color: #6366f1; margin: 0;">
+                                                <span>Cover</span>
+                                            </label>
                                         </div>
                                     ` : ''}
                                     <div style="display: flex; flex-direction: column; gap: 6px; justify-content: center; flex: 1; min-width: 0;">
@@ -6924,7 +6953,12 @@
                                                 <span>Title:</span>
                                             </label>
                                             <span style="display: inline-block; max-width: calc(100% - 75px); background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#e0e7ff' : '#312e81'}; padding: 2px 7px; border-radius: 4px; font-weight: 700; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="${escapeHtml(match.title || '')}">${escapeHtml(match.title || 'Untitled Match')}</span>
-                                            ${match.date ? `<span style="font-size: 10.5px; color: ${isDark ? '#94a3b8' : '#64748b'}; font-weight: 500;">(${match.date})</span>` : ''}
+                                            ${match.date ? `
+                                                <label style="display: inline-flex; align-items: baseline; gap: 4px; font-size: 10.5px; color: ${isDark ? '#94a3b8' : '#64748b'}; font-weight: 500; cursor: pointer; user-select: none;" title="Include this date when accepting the match">
+                                                    <input type="checkbox" id="fasttag-scrape-chk-date" checked style="cursor: pointer; width: 11px; height: 11px; accent-color: #0ea5e9; margin: 0; position: relative; top: 1px;">
+                                                    <span>📅 ${escapeHtml(match.date)}</span>
+                                                </label>
+                                            ` : ''}
                                         </div>
 
                                         ${studioName ? `
@@ -7355,6 +7389,8 @@
 
             const isStudioChecked = container.querySelector('#fasttag-scrape-chk-studio')?.checked ?? false;
             const isTitleChecked = container.querySelector('#fasttag-scrape-chk-title')?.checked ?? false;
+            const isDateChecked = container.querySelector('#fasttag-scrape-chk-date')?.checked ?? false;
+            const isCoverChecked = container.querySelector('#fasttag-scrape-chk-cover')?.checked ?? false;
             const isDetailsChecked = container.querySelector('#fasttag-scrape-chk-details')?.checked ?? false;
 
             // 1. Studio Resolution
@@ -7484,7 +7520,7 @@
                 if (studioIdToSet) updateInput.studio_id = studioIdToSet;
                 if (performerIdsToAdd.length > 0) updateInput.performer_ids = mergedPerformerIds;
                 if (tagIdsToAdd.length > 0) updateInput.tag_ids = mergedTagIds;
-                if (match.date) updateInput.date = match.date;
+                if (isDateChecked && match.date) updateInput.date = match.date;
                 if (isDetailsChecked && match.details) updateInput.details = match.details;
                 if (isTitleChecked && match.title) updateInput.title = match.title;
 
@@ -7502,7 +7538,7 @@
                 // Save cover separately. If Stash rejects the image value, all other metadata is
                 // already safely committed and the user gets a warning rather than losing everything.
                 let coverSaved = true;
-                if (match.image) {
+                if (isCoverChecked && match.image) {
                     const coverRes = await fetchGQL(`
                         mutation FastTagAcceptCover($input: SceneUpdateInput!) {
                             sceneUpdate(input: $input) { id }
@@ -7575,9 +7611,9 @@
                 if (studioIdToSet) updateVars.studio_id = studioIdToSet;
                 if (mergedPerformerIds.length > 0) updateVars.performer_ids = mergedPerformerIds;
                 if (mergedTagIds.length > 0) updateVars.tag_ids = mergedTagIds;
-                if (match.date) updateVars.date = match.date;
+                if (isDateChecked && match.date) updateVars.date = match.date;
                 if (isDetailsChecked && match.details) updateVars.details = match.details;
-                if (match.image) updateVars.cover_image = match.image;
+                if (isCoverChecked && match.image) updateVars.cover_image = match.image;
                 if (isTitleChecked && match.title) updateVars.title = match.title;
 
                 const updateRes = await fetchGQL(`
@@ -7853,7 +7889,6 @@
                     <span id="${type}-search-clear" class="popup-search-clear" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 16px; line-height: 1; display: none; user-select: none;">&times;</span>
                 </div>
                 <button type="button" id="${type}-refresh-btn" class="popup-refresh-btn" title="Refresh cache" style="padding: 8px 10px; cursor: pointer; font-size: 13px; font-weight: 500; border-radius: 8px; white-space: nowrap; line-height: 1;">↻</button>
-                <button type="button" id="${type}-scrape-btn" class="popup-scrape-btn" title="Scrape scene metadata (StashDB / Scrapers) [Alt+S]" style="padding: 7px 10px; cursor: pointer; font-size: 11.5px; font-weight: 700; border-radius: 8px; white-space: nowrap; line-height: 1; background: ${isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#c7d2fe' : '#4338ca'}; border: 1px solid ${isDark ? 'rgba(99, 102, 241, 0.45)' : '#a5b4fc'}; display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s ease;">⚡ Scrape</button>
             </div>
             <div id="${type}-scraper-card-container" style="display: none; flex-direction: column; margin-bottom: 8px; flex-shrink: 0; width: 100%; box-sizing: border-box;"></div>
             <div id="${type}-suggestions-container" style="display: none; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; flex-shrink: 0; background: rgba(245, 158, 11, 0.08); padding: 6px 8px; border-radius: 6px; border: 1px dashed rgba(245, 158, 11, 0.35);"></div>
@@ -9890,18 +9925,23 @@
             const chip = document.createElement('button');
             chip.type = 'button';
             chip.className = 'fasttag-quick-chip';
-            chip.title = `Click to toggle. Right-Click or Alt-Click to ${item.isPinned ? 'unpin' : 'pin'}.`;
+            chip.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+            chip.title = `${isSelected ? 'Selected — click to remove' : 'Click to add'}. Right-Click or Alt-Click to ${item.isPinned ? 'unpin' : 'pin'}.`;
 
             if (item.isPinned) {
                 const pinSpan = document.createElement('span');
                 pinSpan.textContent = '📌 ';
                 chip.appendChild(pinSpan);
             }
+            const stateSpan = document.createElement('span');
+            stateSpan.textContent = isSelected ? '✓ ' : '+ ';
+            stateSpan.style.fontWeight = '700';
+            chip.appendChild(stateSpan);
             const textNode = document.createTextNode(item.name || item.title || '');
             chip.appendChild(textNode);
 
-            const bg = isDark ? (isSelected ? '#312e81' : (item.isPinned ? '#1e1b4b' : '#1e293b')) : (isSelected ? '#e0e7ff' : '#f1f5f9');
-            const border = isDark ? (isSelected ? '#4338ca' : (item.isPinned ? '#6366f1' : '#475569')) : (isSelected ? '#a5b4fc' : '#cbd5e1');
+            const bg = isDark ? (isSelected ? '#4f46e5' : (item.isPinned ? '#1e1b4b' : '#1e293b')) : (isSelected ? '#c7d2fe' : '#f1f5f9');
+            const border = isDark ? (isSelected ? '#a5b4fc' : (item.isPinned ? '#6366f1' : '#475569')) : (isSelected ? '#6366f1' : '#cbd5e1');
             const color = isDark ? (isSelected ? '#ffffff' : (item.isPinned ? '#e0e7ff' : '#f1f5f9')) : (isSelected ? '#312e81' : '#1e293b');
 
             chip.style.cssText = `padding: 2px 7px; border: 1px solid ${border}; border-radius: 999px; background: ${bg}; color: ${color}; font-size: 11px; font-weight: ${item.isPinned || isSelected ? '600' : '500'}; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0; line-height: 1.25;`;
@@ -10554,10 +10594,10 @@
             }
 
             await loadUnifiedSuggestions(sceneId, cardElement, popup.suggestionsContainer, {
-                selectedTagIds: selTags,
-                selectedPerformerIds: selPerfs,
+                selectedTagIds: ctx.getSelectedTags(),
+                selectedPerformerIds: ctx.getSelectedPerformers(),
                 selectedStudioId: () => ctx.getSelectedStudio(),
-                selectedGroupIds: () => ctx.getSelectedGroups(),
+                selectedGroupIds: ctx.getSelectedGroups(),
                 setStudioId: (id) => { ctx.setSelectedStudio(id); },
                 addGroupId: (id) => { const grps = ctx.getSelectedGroups(); if (grps) grps.add(String(id)); },
                 tagsTable: popup.tagsTable,
