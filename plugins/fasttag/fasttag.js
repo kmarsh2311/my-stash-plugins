@@ -15,7 +15,7 @@
 
 (async function() {
     'use strict';
-    console.log('[FastTag v4.2.3] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
+    console.log('[FastTag v4.2.4] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
 
     // Selection set of fields to update Apollo's in-memory SceneCard directly (0ms latency, eliminates 40-scene FindScenes refetch)
     const SCENE_CARD_UPDATE_FIELDS = `
@@ -307,7 +307,8 @@
         tags: 'stash_fast_tag_recent_tags',
         performers: 'stash_fast_tag_recent_performers',
         galleries: 'stash_fast_tag_recent_galleries',
-        studios: 'stash_fast_tag_recent_studios'
+        studios: 'stash_fast_tag_recent_studios',
+        groups: 'stash_fast_tag_recent_groups'
     };
 
     // --- Scroll Restoration ---
@@ -5217,16 +5218,24 @@
     }
 
     function trySelectRecentChip(type, item, selectedIds, input, onSelected) {
-        if (item) {
-            addRecentEntry(type, item);
-        }
-        if (item && item.id != null) {
-            const idStr = String(item.id);
-            if (selectedIds.has(idStr)) {
-                selectedIds.delete(idStr);
-            } else {
-                selectedIds.add(idStr);
+        if (!item) return false;
+        let idStr = (item.id != null && item.id !== '') ? String(item.id) : null;
+        if (!idStr) {
+            const cached = getCachedOrNull(type) || [];
+            const name = item.name || item.title;
+            if (name) {
+                const found = cached.find(c => (c.name || c.title || '').trim().toLowerCase() === name.trim().toLowerCase());
+                if (found) idStr = String(found.id);
             }
+        }
+        if (!idStr) return false;
+
+        addRecentEntry(type, { ...item, id: idStr });
+
+        if (selectedIds.has(idStr)) {
+            selectedIds.delete(idStr);
+        } else {
+            selectedIds.add(idStr);
         }
         if (input && input.value) {
             input.value = '';
@@ -5245,16 +5254,29 @@
 
         const showPinned = getShowPinnedChips();
         const showRecent = getShowRecentChips();
+        const cached = getCachedOrNull(type) || [];
+
+        const resolveItem = (item, isPinned) => {
+            let id = (item.id != null && item.id !== '') ? String(item.id) : null;
+            const name = item.name || item.title;
+            if (!id && name) {
+                const found = cached.find(c => (c.name || c.title || '').trim().toLowerCase() === name.trim().toLowerCase());
+                if (found) id = String(found.id);
+            }
+            return { id, name, isPinned };
+        };
 
         const pinned = showPinned ? readPinnedEntries(type)
             .filter(item => item && (item.name || item.title))
-            .map(item => ({ id: item.id, name: item.name || item.title, isPinned: true })) : [];
+            .map(item => resolveItem(item, true))
+            .filter(item => item.id != null) : [];
 
         const pinnedIds = new Set(pinned.map(p => String(p.id)));
 
         const recent = showRecent ? readRecentEntries(type)
-            .filter(item => item && (item.name || item.title) && !pinnedIds.has(String(item.id)))
-            .map(item => ({ id: item.id, name: item.name || item.title, isPinned: false })) : [];
+            .filter(item => item && (item.name || item.title))
+            .map(item => resolveItem(item, false))
+            .filter(item => item.id != null && !pinnedIds.has(String(item.id))) : [];
 
         const combinedList = [...pinned, ...recent];
 
@@ -5349,9 +5371,9 @@
             }
 
             chip.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 if (e.altKey) {
-                    e.preventDefault();
-                    e.stopPropagation();
                     togglePinnedEntry(type, item);
                     renderQuickActions(form, type, input, selectedIds, onRecentChipSelect);
                     return;
@@ -9772,9 +9794,30 @@
         if (!container) return;
         const showPinned = getShowPinnedChips();
         const showRecent = getShowRecentChips();
+        const cached = getCachedOrNull(type) || [];
 
-        const pinned = showPinned ? readPinnedEntries(type).map(p => ({ ...p, isPinned: true })) : [];
-        const recent = showRecent ? readRecentEntries(type).filter(r => !pinned.some(p => String(p.id) === String(r.id))) : [];
+        const resolveItem = (item, isPinned) => {
+            let id = (item.id != null && item.id !== '') ? String(item.id) : null;
+            const name = item.name || item.title;
+            if (!id && name) {
+                const found = cached.find(c => (c.name || c.title || '').trim().toLowerCase() === name.trim().toLowerCase());
+                if (found) id = String(found.id);
+            }
+            return { id, name, isPinned };
+        };
+
+        const pinned = showPinned ? readPinnedEntries(type)
+            .filter(item => item && (item.name || item.title))
+            .map(p => resolveItem(p, true))
+            .filter(p => p.id != null) : [];
+
+        const pinnedIds = new Set(pinned.map(p => String(p.id)));
+
+        const recent = showRecent ? readRecentEntries(type)
+            .filter(item => item && (item.name || item.title))
+            .map(r => resolveItem(r, false))
+            .filter(r => r.id != null && !pinnedIds.has(String(r.id))) : [];
+
         const combined = [...pinned, ...recent];
 
         if (!combined.length) {
@@ -9819,6 +9862,7 @@
 
             chip.addEventListener('click', (e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 if (e.altKey) {
                     togglePinnedEntry(type, item);
                     renderColumnChips(container, type, searchInput, selectedIds, onSelect);
@@ -9974,16 +10018,23 @@
 
         const activateSuggestion = async (sug) => {
             const idStr = String(sug.item.id);
-            if (sug.type === 'tags') {
-                ctx.selectedTagIds.add(idStr);
-            } else if (sug.type === 'performers') {
-                ctx.selectedPerformerIds.add(idStr);
+            const tagSet = typeof ctx.getSelectedTags === 'function' ? ctx.getSelectedTags() : ctx.selectedTagIds;
+            const perfSet = typeof ctx.getSelectedPerformers === 'function' ? ctx.getSelectedPerformers() : ctx.selectedPerformerIds;
+            if (sug.type === 'tags' && tagSet) {
+                tagSet.add(idStr);
+            } else if (sug.type === 'performers' && perfSet) {
+                perfSet.add(idStr);
             } else if (sug.type === 'studios') {
-                if (typeof ctx.setStudioId === 'function') {
+                if (typeof ctx.setSelectedStudio === 'function') {
+                    ctx.setSelectedStudio(idStr);
+                } else if (typeof ctx.setStudioId === 'function') {
                     ctx.setStudioId(idStr);
                 }
             } else if (sug.type === 'groups') {
-                if (typeof ctx.addGroupId === 'function') {
+                const grpSet = typeof ctx.getSelectedGroups === 'function' ? ctx.getSelectedGroups() : ctx.selectedGroupIds;
+                if (grpSet) {
+                    grpSet.add(idStr);
+                } else if (typeof ctx.addGroupId === 'function') {
                     ctx.addGroupId(idStr);
                 }
             }
@@ -11506,22 +11557,20 @@
 
             const onTagChipSelect = async () => {
                 const query = popup.globalSearch?.value || '';
-                await Promise.all([
-                    fetchColumnData('tags', tagsTable, query, selectedTagIds),
-                    fetchColumnData('performers', performersTable, query, selectedPerformerIds)
-                ]);
                 refreshAllUI();
-                await doSave('Tags updated');
+                const savePromise = doSave('Tags updated');
+                await fetchColumnData('tags', tagsTable, query, selectedTagIds);
+                refreshAllUI();
+                await savePromise;
             };
 
             const onPerformerChipSelect = async () => {
                 const query = popup.globalSearch?.value || '';
-                await Promise.all([
-                    fetchColumnData('tags', tagsTable, query, selectedTagIds),
-                    fetchColumnData('performers', performersTable, query, selectedPerformerIds)
-                ]);
                 refreshAllUI();
-                await doSave('Performers updated');
+                const savePromise = doSave('Performers updated');
+                await fetchColumnData('performers', performersTable, query, selectedPerformerIds);
+                refreshAllUI();
+                await savePromise;
             };
 
             if (tagsTable) {
@@ -12804,18 +12853,39 @@
             // Store context methods on popup instance for in-place sequential updates & scraper matches
             popup._context = {
                 setCurrentSceneId: (id) => { currentSceneId = id; },
-                setSelectedTags: (s) => { selectedTagIds = s; },
-                setSelectedPerformers: (s) => { selectedPerformerIds = s; },
-                setSelectedStudio: (s) => { selectedStudioId = s; },
-                setSelectedGroups: (s) => { selectedGroupIds = s; },
+                setSelectedTags: (s) => {
+                    selectedTagIds.clear();
+                    if (s) s.forEach(id => selectedTagIds.add(String(id)));
+                },
+                setSelectedPerformers: (s) => {
+                    selectedPerformerIds.clear();
+                    if (s) s.forEach(id => selectedPerformerIds.add(String(id)));
+                },
+                setSelectedStudio: (s) => { selectedStudioId = s ? String(s) : null; },
+                setSelectedGroups: (s) => {
+                    selectedGroupIds.clear();
+                    if (s) s.forEach(id => selectedGroupIds.add(String(id)));
+                },
                 getSelectedTags: () => selectedTagIds,
                 getSelectedPerformers: () => selectedPerformerIds,
                 getSelectedStudio: () => selectedStudioId,
                 getSelectedGroups: () => selectedGroupIds,
-                setInitialTags: (s) => { initialTagIds = s; },
-                setInitialPerformers: (s) => { initialPerformerIds = s; },
-                setInitialStudio: (s) => { initialStudioId = s; },
-                setInitialGroups: (s) => { initialGroupIds = s; },
+                selectedTagIds,
+                selectedPerformerIds,
+                selectedGroupIds,
+                setInitialTags: (s) => {
+                    initialTagIds.clear();
+                    if (s) s.forEach(id => initialTagIds.add(String(id)));
+                },
+                setInitialPerformers: (s) => {
+                    initialPerformerIds.clear();
+                    if (s) s.forEach(id => initialPerformerIds.add(String(id)));
+                },
+                setInitialStudio: (s) => { initialStudioId = s ? String(s) : null; },
+                setInitialGroups: (s) => {
+                    initialGroupIds.clear();
+                    if (s) s.forEach(id => initialGroupIds.add(String(id)));
+                },
                 fetchColumnData,
                 renderStudioBar,
                 renderGroupBar,
@@ -14886,11 +14956,16 @@
 
         let smartSuggestions = [];
         const onRecentChipSelect = async () => {
-            filterInput.value = '';
-            updateVisibility();
+            if (filterInput && filterInput.value) {
+                filterInput.value = '';
+                updateVisibility();
+            }
+            refreshUI();
+            const savePromise = saveWithoutReload(sceneId, selectedIds);
             await fetchData('', true);
             refreshUI();
-            await saveWithoutReload(sceneId, selectedIds);
+            await savePromise;
+            if (filterInput) filterInput.focus({ preventScroll: true });
         };
 
         const refreshUI = () => {

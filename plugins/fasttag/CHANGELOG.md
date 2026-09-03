@@ -4,6 +4,16 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.2.4] - 2026-09-03
+
+### Fixed
+- **Recent Tag Pills Reliability & List Re-Sorting**:
+  - **In-Place Set Mutations**: Fixed a bug where `popup._context.setSelectedTags` reassigned `selectedTagIds = s`, orphaning references held by recent tag chips in Edit Everything and causing clicks to either fail to register or save an isolated set that stripped other tags from the scene.
+  - **Entity ID Healing**: Added fallback resolution by entity name against cached tags in `trySelectRecentChip`, `renderQuickActions`, and `renderColumnChips` to automatically heal missing or stale IDs from local storage.
+  - **Instant List Refresh & Smart Pinning**: Clicking a recent tag pill immediately saves the mutation in parallel and re-sorts the table list, pinning the selected tag to the top of the table with live checkmarks.
+  - **Event Isolation**: Added `preventDefault()` and `stopPropagation()` to quick action chip handlers to prevent clicks from bubbling to popup containers.
+  - **Unified Suggestions Fix**: Resolved an undefined reference in `loadUnifiedSuggestions` (`ctx.selectedTagIds` replaced with `ctx.getSelectedTags()`).
+
 ## [4.2.3] - 2026-09-03
 
 ### Added & Improved

@@ -3,8 +3,8 @@
 # ⚡ FastTag for Stash
 ### Lightning-Fast Scene Tagging Workflow & Backlog Manager for Stash
 
-![Version](https://img.shields.io/badge/version-4.2.3-6366f1?style=for-the-badge)
-[![Changelog](https://img.shields.io/badge/changelog-v4.2.3-8b5cf6?style=for-the-badge)](CHANGELOG.md)
+![Version](https://img.shields.io/badge/version-4.2.4-6366f1?style=for-the-badge)
+[![Changelog](https://img.shields.io/badge/changelog-v4.2.4-8b5cf6?style=for-the-badge)](CHANGELOG.md)
 ![Stash](https://img.shields.io/badge/Stash-v0.26+-f59e0b?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-10b981?style=for-the-badge)
 
