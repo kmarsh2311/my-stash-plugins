@@ -23,6 +23,8 @@
     if (!FastTagIntegrations) throw new Error('[FastTag] fasttag-integrations.js must load before fasttag.js');
     const FastTagGemini = window.FastTag?.gemini;
     if (!FastTagGemini) throw new Error('[FastTag] fasttag-gemini.js must load before fasttag.js');
+    const FastTagScraper = window.FastTag?.scraper;
+    if (!FastTagScraper) throw new Error('[FastTag] fasttag-scraper.js must load before fasttag.js');
     const {
         escapeHtml,
         cleanTitleForScraping,
@@ -93,6 +95,7 @@
         refreshSceneCardsDebounced
     } = FastTagIntegrations;
     const { callGeminiAPI, parseSceneWithGemini } = FastTagGemini;
+    const { fetchScraperMatchesForScene } = FastTagScraper;
 
     FastTagGemini.configure({
         fetchGQL: (...args) => fetchGQL(...args),
@@ -100,6 +103,10 @@
         getGeminiModel,
         getCachedOrNull: type => getCachedOrNull(type),
         log: (...args) => ftLog(...args)
+    });
+    FastTagScraper.configure({
+        fetchGQL: (...args) => fetchGQL(...args),
+        cleanTitleForScraping
     });
 
     console.log('[FastTag v4.2.8] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
@@ -5709,155 +5716,6 @@
 
     // Temporary in-memory session cache for active scrape results (cleared when popup is closed)
     const sessionScrapeCache = new Map();
-
-    async function fetchScraperMatchesForScene(sceneId, cardElement) {
-        let sceneTitle = '';
-        let sceneFileName = '';
-        let sceneFilePath = '';
-        let localDuration = null;
-        let localFingerprints = [];
-
-        try {
-            const query = `query ($id: ID!) { findScene(id: $id) { id title details files { path duration fingerprints { type value } } } }`;
-            const res = await fetchGQL(query, { id: sceneId });
-            const sc = res?.data?.findScene;
-            if (sc) {
-                sceneTitle = sc.title || '';
-                if (sc.files && sc.files.length > 0) {
-                    const f0 = sc.files[0];
-                    if (f0?.path) {
-                        sceneFilePath = f0.path;
-                        const parts = sceneFilePath.split(/[/\\]/);
-                        sceneFileName = parts[parts.length - 1] || '';
-                    }
-                    if (f0?.duration) localDuration = f0.duration;
-                    if (f0?.fingerprints) localFingerprints = f0.fingerprints;
-                }
-            }
-        } catch (e) {}
-
-        const SCRAPE_QUERY = `
-            query FastTagScrapeSingleScene($source: ScraperSourceInput!, $input: ScrapeSingleSceneInput!) {
-                scrapeSingleScene(source: $source, input: $input) {
-                    title
-                    code
-                    details
-                    director
-                    urls
-                    date
-                    image
-                    remote_site_id
-                    duration
-                    fingerprints {
-                        algorithm
-                        hash
-                        duration
-                    }
-                    studio {
-                        stored_id
-                        name
-                        image
-                    }
-                    tags {
-                        stored_id
-                        name
-                    }
-                    performers {
-                        stored_id
-                        name
-                        gender
-                        images
-                    }
-                }
-            }
-        `;
-
-        const enrichMatches = (matches, matchType, sourceName) => {
-            if (!Array.isArray(matches)) return [];
-            matches.forEach(m => {
-                m._matchType = matchType;
-                m._sourceName = sourceName;
-                m._localDuration = localDuration;
-                m._localFingerprints = localFingerprints;
-            });
-            return matches;
-        };
-
-        // 1. First try direct hash scrape on StashBox 0
-        try {
-            const res = await fetchGQL(SCRAPE_QUERY, {
-                source: { stash_box_index: 0 },
-                input: { scene_id: String(sceneId) }
-            });
-            const matches = res?.data?.scrapeSingleScene;
-            if (Array.isArray(matches) && matches.length > 0) {
-                return enrichMatches(matches, 'hash', 'StashDB');
-            }
-        } catch (err) {
-            console.log('[FastTag] Scrape by scene_id error/empty:', err);
-        }
-
-        // 2. Query StashBox by cleaned title/filename
-        const candidateQueries = [];
-        if (sceneTitle && sceneTitle.trim()) {
-            candidateQueries.push(cleanTitleForScraping(sceneTitle));
-        }
-        if (sceneFileName && sceneFileName.trim()) {
-            const cleanedFile = cleanTitleForScraping(sceneFileName);
-            if (cleanedFile && !candidateQueries.includes(cleanedFile)) {
-                candidateQueries.push(cleanedFile);
-            }
-        }
-        if (cardElement) {
-            const cardText = (cardElement.querySelector('.title, .card-title, .scene-card__title')?.textContent || '').trim();
-            if (cardText) {
-                const cleanedCard = cleanTitleForScraping(cardText);
-                if (cleanedCard && !candidateQueries.includes(cleanedCard)) {
-                    candidateQueries.push(cleanedCard);
-                }
-            }
-        }
-
-        for (const queryTerm of candidateQueries) {
-            if (!queryTerm || queryTerm.length < 2) continue;
-            try {
-                const res = await fetchGQL(SCRAPE_QUERY, {
-                    source: { stash_box_index: 0 },
-                    input: { query: queryTerm }
-                });
-                const matches = res?.data?.scrapeSingleScene;
-                if (Array.isArray(matches) && matches.length > 0) {
-                    return enrichMatches(matches, 'title', 'StashDB');
-                }
-            } catch (err) {
-                console.log('[FastTag] Scrape query error:', err);
-            }
-        }
-
-        // 3. Fallback: Query installed scene scrapers
-        try {
-            const listRes = await fetchGQL(`query { listScrapers(types: [SCENE]) { id name } }`);
-            const scrapers = listRes?.data?.listScrapers || [];
-            for (const sc of scrapers) {
-                if (sc.id === 'builtin_autotag') continue;
-                for (const queryTerm of candidateQueries) {
-                    if (!queryTerm || queryTerm.length < 2) continue;
-                    try {
-                        const res = await fetchGQL(SCRAPE_QUERY, {
-                            source: { scraper_id: sc.id },
-                            input: { query: queryTerm }
-                        });
-                        const matches = res?.data?.scrapeSingleScene;
-                        if (Array.isArray(matches) && matches.length > 0) {
-                            return enrichMatches(matches, 'scraper', sc.name || 'Scraper');
-                        }
-                    } catch (e) {}
-                }
-            }
-        } catch (e) {}
-
-        return [];
-    }
 
     function attachScraperHudResizeHandles(hudElement) {
         if (!hudElement) return;
