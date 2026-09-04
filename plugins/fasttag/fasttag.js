@@ -99,6 +99,8 @@
         analyzeScraperMatch,
         readScrapeFieldSelection,
         buildScrapeUpdateInput,
+        resolveScrapedStudio,
+        resolveScrapedEntityIds,
         fetchScraperMatchesForScene
     } = FastTagScraper;
 
@@ -112,7 +114,10 @@
     FastTagScraper.configure({
         fetchGQL: (...args) => fetchGQL(...args),
         cleanTitleForScraping,
-        parseDurationSec
+        parseDurationSec,
+        getEntityConfig: type => ENTITY_CONFIG[type],
+        getCachedOrNull: type => getCachedOrNull(type),
+        setCache: (type, data) => setCache(type, data)
     });
 
     console.log('[FastTag v4.2.8] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
@@ -6586,95 +6591,10 @@
 
             const scrapeSelection = readScrapeFieldSelection(container);
 
-            // 1. Studio Resolution
-            let studioIdToSet = null;
-            if (scrapeSelection.studio && match.studio?.name) {
-                if (match.studio.stored_id) {
-                    studioIdToSet = String(match.studio.stored_id);
-                } else {
-                    let cachedStudios = getCachedOrNull('studios');
-                    if (!cachedStudios) {
-                        const res = await fetchGQL(ENTITY_CONFIG.studios.fetchQuery);
-                        cachedStudios = ENTITY_CONFIG.studios.extractList(res.data);
-                        setCache('studios', cachedStudios);
-                    }
-                    const found = cachedStudios?.find(s => (s.name || '').trim().toLowerCase() === match.studio.name.trim().toLowerCase());
-                    if (found) {
-                        studioIdToSet = String(found.id);
-                    } else {
-                        const createRes = await fetchGQL(ENTITY_CONFIG.studios.createQuery, { name: match.studio.name.trim() });
-                        const newId = ENTITY_CONFIG.studios.createExtract(createRes.data);
-                        if (newId) {
-                            studioIdToSet = String(newId);
-                            setCache('studios', null);
-                        }
-                    }
-                }
-            }
-
-            // 2. Performers Resolution
-            const performerIdsToAdd = [];
-
-            if (scrapeSelection.performerIndices.length > 0 && match.performers) {
-                let cachedPerformers = getCachedOrNull('performers');
-                if (!cachedPerformers) {
-                    const res = await fetchGQL(ENTITY_CONFIG.performers.fetchQuery);
-                    cachedPerformers = ENTITY_CONFIG.performers.extractList(res.data);
-                    setCache('performers', cachedPerformers);
-                }
-
-                for (const idx of scrapeSelection.performerIndices) {
-                    const p = match.performers[idx];
-                    if (!p || !p.name) continue;
-                    if (p.stored_id) {
-                        performerIdsToAdd.push(String(p.stored_id));
-                    } else {
-                        const found = cachedPerformers?.find(cp => (cp.name || '').trim().toLowerCase() === p.name.trim().toLowerCase());
-                        if (found) {
-                            performerIdsToAdd.push(String(found.id));
-                        } else {
-                            const createRes = await fetchGQL(ENTITY_CONFIG.performers.createQuery, { name: p.name.trim() });
-                            const newId = ENTITY_CONFIG.performers.createExtract(createRes.data);
-                            if (newId) {
-                                performerIdsToAdd.push(String(newId));
-                                setCache('performers', null);
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 3. Tags Resolution
-            const tagIdsToAdd = [];
-
-            if (scrapeSelection.tagIndices.length > 0 && match.tags) {
-                let cachedTags = getCachedOrNull('tags');
-                if (!cachedTags) {
-                    const res = await fetchGQL(ENTITY_CONFIG.tags.fetchQuery);
-                    cachedTags = ENTITY_CONFIG.tags.extractList(res.data);
-                    setCache('tags', cachedTags);
-                }
-
-                for (const idx of scrapeSelection.tagIndices) {
-                    const t = match.tags[idx];
-                    if (!t || !t.name) continue;
-                    if (t.stored_id) {
-                        tagIdsToAdd.push(String(t.stored_id));
-                    } else {
-                        const found = cachedTags?.find(ct => (ct.name || '').trim().toLowerCase() === t.name.trim().toLowerCase());
-                        if (found) {
-                            tagIdsToAdd.push(String(found.id));
-                        } else {
-                            const createRes = await fetchGQL(ENTITY_CONFIG.tags.createQuery, { name: t.name.trim() });
-                            const newId = ENTITY_CONFIG.tags.createExtract(createRes.data);
-                            if (newId) {
-                                tagIdsToAdd.push(String(newId));
-                                setCache('tags', null);
-                            }
-                        }
-                    }
-                }
-            }
+            // 1–3. Resolve studio, performers and tags against stored IDs and the local library.
+            const studioIdToSet = await resolveScrapedStudio(match.studio, scrapeSelection.studio);
+            const performerIdsToAdd = await resolveScrapedEntityIds('performers', match.performers, scrapeSelection.performerIndices);
+            const tagIdsToAdd = await resolveScrapedEntityIds('tags', match.tags, scrapeSelection.tagIndices);
 
             // 4. Update Scene & Synchronize Context
             const effectiveCtx = ctx || popup?._context || activePopup?._context;

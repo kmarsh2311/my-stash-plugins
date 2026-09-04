@@ -172,9 +172,71 @@ async function testTitleThenInstalledScraperFallback() {
     assert.equal(calls.some(call => call.variables?.source?.scraper_id === 'builtin_autotag'), false);
 }
 
+async function testEntityResolution() {
+    const cache = new Map([
+        ['studios', [{ id: 10, name: 'Known Studio' }]],
+        ['performers', [{ id: 20, name: 'Known Person' }]]
+    ]);
+    const cacheWrites = [];
+    const configs = {
+        studios: {
+            fetchQuery: 'fetch studios',
+            extractList: data => data.studios,
+            createQuery: 'create studio',
+            createExtract: data => data.createdId
+        },
+        performers: {
+            fetchQuery: 'fetch performers',
+            extractList: data => data.performers,
+            createQuery: 'create performer',
+            createExtract: data => data.createdId
+        },
+        tags: {
+            fetchQuery: 'fetch tags',
+            extractList: data => data.tags,
+            createQuery: 'create tag',
+            createExtract: data => data.createdId
+        }
+    };
+    const fetchCalls = [];
+    scraper.configure({
+        cleanTitleForScraping,
+        parseDurationSec,
+        getEntityConfig: type => configs[type],
+        getCachedOrNull: type => cache.get(type) || null,
+        setCache: (type, data) => {
+            cacheWrites.push([type, data]);
+            cache.set(type, data);
+        },
+        fetchGQL: async (query, variables) => {
+            fetchCalls.push([query, variables]);
+            if (query === 'fetch tags') return { data: { tags: [{ id: 30, name: 'Known Tag' }] } };
+            if (query.startsWith('create')) return { data: { createdId: query.includes('studio') ? 11 : query.includes('performer') ? 21 : 31 } };
+            throw new Error(`Unexpected query: ${query}`);
+        }
+    });
+
+    assert.equal(await scraper.resolveScrapedStudio({ stored_id: 9, name: 'Remote Studio' }, true), '9');
+    assert.equal(await scraper.resolveScrapedStudio({ name: ' known studio ' }, true), '10');
+    assert.equal(await scraper.resolveScrapedStudio({ name: ' New Studio ' }, true), '11');
+    assert.equal(await scraper.resolveScrapedStudio({ name: 'Ignored' }, false), null);
+
+    assert.deepEqual(await scraper.resolveScrapedEntityIds('performers', [
+        { stored_id: 19, name: 'Remote Person' },
+        { name: ' known person ' },
+        { name: 'New Person' },
+        { name: '' }
+    ], [0, 1, 2, 3, 99]), ['19', '20', '21']);
+    assert.deepEqual(await scraper.resolveScrapedEntityIds('tags', [{ name: 'KNOWN TAG' }], [0]), ['30']);
+    assert.ok(fetchCalls.some(([query]) => query === 'fetch tags'), 'missing caches should be loaded');
+    assert.ok(cacheWrites.some(([type, data]) => type === 'studios' && data === null), 'creation should invalidate the studio cache');
+    assert.ok(cacheWrites.some(([type, data]) => type === 'performers' && data === null), 'creation should invalidate the performer cache');
+}
+
 Promise.resolve()
     .then(testHashMatch)
     .then(testTitleThenInstalledScraperFallback)
+    .then(testEntityResolution)
     .then(() => console.log('fasttag-scraper tests passed'))
     .catch(error => {
         console.error(error);
