@@ -8,8 +8,14 @@ const scraper = global.FastTag.scraper;
 assert.ok(scraper, 'FastTag scraper namespace should be installed');
 
 const cleanTitleForScraping = value => value.toLowerCase().replace(/\.mp4$/i, '').replace(/[^a-z0-9]+/g, ' ').trim();
+const parseDurationSec = value => {
+    if (typeof value === 'number') return value;
+    if (!value) return 0;
+    const parts = String(value).split(':').map(Number);
+    return parts.length === 2 ? parts[0] * 60 + parts[1] : Number(value) || 0;
+};
 
-scraper.configure({ fetchGQL: async () => ({}), cleanTitleForScraping });
+scraper.configure({ fetchGQL: async () => ({}), cleanTitleForScraping, parseDurationSec });
 assert.deepEqual(
     scraper.buildScrapeCandidateQueries('Same Title', 'same-title.mp4', 'Different Card'),
     ['same title', 'different card'],
@@ -27,10 +33,39 @@ assert.deepEqual(originalMatches[0], {
 });
 assert.deepEqual(scraper.enrichScraperMatches(null, 'hash', 'StashDB', null, []), []);
 
+const analysis = scraper.analyzeScraperMatch({
+    _matchType: 'title',
+    _localDuration: 120,
+    duration: '2:02',
+    _localFingerprints: [
+        { type: 'PHash', value: 'ABC' },
+        { type: 'oshash', value: 'DEF' }
+    ],
+    fingerprints: [
+        { algorithm: 'phash', hash: 'abc', duration: 119 },
+        { algorithm: 'md5', hash: 'def', duration: 140 }
+    ]
+});
+assert.equal(analysis.phashMatch, true);
+assert.equal(analysis.oshashMatch, true);
+assert.equal(analysis.md5Match, '');
+assert.equal(analysis.isHashMatch, true);
+assert.deepEqual(analysis.matchBadges, ['PHash is a match', 'MD5 Checksum is a match']);
+assert.equal(analysis.localDurSec, 120);
+assert.equal(analysis.scrapedDurSec, 122);
+assert.equal(analysis.totalFps, 2);
+assert.equal(analysis.matchingDurFps, 1);
+
+assert.deepEqual(
+    scraper.analyzeScraperMatch({ _matchType: 'hash', _localFingerprints: [], fingerprints: [] }).matchBadges,
+    ['Fingerprint is a match']
+);
+
 async function testHashMatch() {
     const calls = [];
     scraper.configure({
         cleanTitleForScraping,
+        parseDurationSec,
         fetchGQL: async (query, variables) => {
             calls.push({ query, variables });
             if (query.includes('findScene')) {
@@ -51,6 +86,7 @@ async function testTitleThenInstalledScraperFallback() {
     const calls = [];
     scraper.configure({
         cleanTitleForScraping,
+        parseDurationSec,
         fetchGQL: async (query, variables) => {
             calls.push({ query, variables });
             if (query.includes('findScene')) {

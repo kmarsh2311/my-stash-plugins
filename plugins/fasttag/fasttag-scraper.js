@@ -50,6 +50,43 @@
         return matches;
     }
 
+    function analyzeScraperMatch(match) {
+        const { parseDurationSec } = getDependencies();
+        const localFingerprints = match?._localFingerprints || [];
+        const localPhash = (localFingerprints.find(item => item.type?.toLowerCase() === 'phash')?.value || '').toLowerCase();
+        const localOshash = (localFingerprints.find(item => item.type?.toLowerCase() === 'oshash')?.value || '').toLowerCase();
+        const localMd5 = (localFingerprints.find(item => item.type?.toLowerCase() === 'md5')?.value || '').toLowerCase();
+        const remoteFingerprints = match?.fingerprints || [];
+        const phashMatch = localPhash && remoteFingerprints.some(item => item.algorithm?.toLowerCase() === 'phash' && (item.hash || '').toLowerCase() === localPhash);
+        const oshashMatch = localOshash && remoteFingerprints.some(item => (item.algorithm?.toLowerCase() === 'oshash' || item.algorithm?.toLowerCase() === 'md5') && (item.hash || '').toLowerCase() === localOshash);
+        const md5Match = localMd5 && remoteFingerprints.some(item => item.algorithm?.toLowerCase() === 'md5' && (item.hash || '').toLowerCase() === localMd5);
+        const isHashMatch = match?._matchType === 'hash' || phashMatch || oshashMatch || md5Match;
+        const matchBadges = [];
+        if (phashMatch) matchBadges.push('PHash is a match');
+        if (oshashMatch || md5Match) matchBadges.push('MD5 Checksum is a match');
+        if (matchBadges.length === 0 && isHashMatch) matchBadges.push('Fingerprint is a match');
+
+        const localDurSec = parseDurationSec(match?._localDuration);
+        const scrapedDurSec = parseDurationSec(match?.duration);
+        const totalFps = remoteFingerprints.length;
+        const matchingDurFps = remoteFingerprints.filter(item => {
+            const fingerprintDuration = parseDurationSec(item.duration);
+            return fingerprintDuration && localDurSec && Math.abs(fingerprintDuration - localDurSec) <= 15;
+        }).length;
+
+        return {
+            phashMatch,
+            oshashMatch,
+            md5Match,
+            isHashMatch,
+            matchBadges,
+            localDurSec,
+            scrapedDurSec,
+            totalFps,
+            matchingDurFps
+        };
+    }
+
     async function fetchScraperMatchesForScene(sceneId, cardElement) {
         const { fetchGQL } = getDependencies();
         let sceneTitle = '';
@@ -133,6 +170,7 @@
         configure,
         buildScrapeCandidateQueries,
         enrichScraperMatches,
+        analyzeScraperMatch,
         fetchScraperMatchesForScene
     });
 }(typeof window !== 'undefined' ? window : globalThis));

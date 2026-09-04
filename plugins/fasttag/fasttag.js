@@ -95,7 +95,7 @@
         refreshSceneCardsDebounced
     } = FastTagIntegrations;
     const { callGeminiAPI, parseSceneWithGemini } = FastTagGemini;
-    const { fetchScraperMatchesForScene } = FastTagScraper;
+    const { analyzeScraperMatch, fetchScraperMatchesForScene } = FastTagScraper;
 
     FastTagGemini.configure({
         fetchGQL: (...args) => fetchGQL(...args),
@@ -106,7 +106,8 @@
     });
     FastTagScraper.configure({
         fetchGQL: (...args) => fetchGQL(...args),
-        cleanTitleForScraping
+        cleanTitleForScraping,
+        parseDurationSec
     });
 
     console.log('[FastTag v4.2.8] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
@@ -5975,34 +5976,14 @@
             }
 
             // Calculate match likelihood & fingerprint verification (mirroring Stash's native scraper)
-            const localFps = match._localFingerprints || [];
-            const localPhash = (localFps.find(f => f.type?.toLowerCase() === 'phash')?.value || '').toLowerCase();
-            const localOshash = (localFps.find(f => f.type?.toLowerCase() === 'oshash')?.value || '').toLowerCase();
-            const localMd5 = (localFps.find(f => f.type?.toLowerCase() === 'md5')?.value || '').toLowerCase();
-
-            const remoteFps = match.fingerprints || [];
-            const phashMatch = localPhash && remoteFps.some(rf => rf.algorithm?.toLowerCase() === 'phash' && (rf.hash || '').toLowerCase() === localPhash);
-            const oshashMatch = localOshash && remoteFps.some(rf => (rf.algorithm?.toLowerCase() === 'oshash' || rf.algorithm?.toLowerCase() === 'md5') && (rf.hash || '').toLowerCase() === localOshash);
-            const md5Match = localMd5 && remoteFps.some(rf => rf.algorithm?.toLowerCase() === 'md5' && (rf.hash || '').toLowerCase() === localMd5);
-
-            const isHashMatch = match._matchType === 'hash' || phashMatch || oshashMatch || md5Match;
-
-            const matchBadges = [];
-            if (phashMatch) matchBadges.push('PHash is a match');
-            if (oshashMatch || md5Match) matchBadges.push('MD5 Checksum is a match');
-
-            if (matchBadges.length === 0 && isHashMatch) {
-                matchBadges.push('Fingerprint is a match');
-            }
-
-            const localDurSec = parseDurationSec(match._localDuration);
-            const scrapedDurSec = parseDurationSec(match.duration);
-
-            const totalFps = remoteFps.length;
-            const matchingDurFps = remoteFps.filter(rf => {
-                const fd = parseDurationSec(rf.duration);
-                return fd && localDurSec && Math.abs(fd - localDurSec) <= 15;
-            }).length;
+            const {
+                isHashMatch,
+                matchBadges,
+                localDurSec,
+                scrapedDurSec,
+                totalFps,
+                matchingDurFps
+            } = analyzeScraperMatch(match);
 
             let durationBadge = '';
             if (scrapedDurSec && localDurSec) {
