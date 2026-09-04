@@ -21,6 +21,8 @@
     if (!FastTagStorage) throw new Error('[FastTag] fasttag-storage.js must load before fasttag.js');
     const FastTagIntegrations = window.FastTag?.integrations;
     if (!FastTagIntegrations) throw new Error('[FastTag] fasttag-integrations.js must load before fasttag.js');
+    const FastTagGemini = window.FastTag?.gemini;
+    if (!FastTagGemini) throw new Error('[FastTag] fasttag-gemini.js must load before fasttag.js');
     const {
         escapeHtml,
         cleanTitleForScraping,
@@ -90,6 +92,15 @@
         refreshSceneCards,
         refreshSceneCardsDebounced
     } = FastTagIntegrations;
+    const { callGeminiAPI, parseSceneWithGemini } = FastTagGemini;
+
+    FastTagGemini.configure({
+        fetchGQL: (...args) => fetchGQL(...args),
+        getGeminiApiKey,
+        getGeminiModel,
+        getCachedOrNull: type => getCachedOrNull(type),
+        log: (...args) => ftLog(...args)
+    });
 
     console.log('[FastTag v4.2.8] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
 
@@ -1897,172 +1908,6 @@
             },
             get: () => currentOrganized
         };
-    }
-
-    let geminiSocket = null;
-    let geminiRequestId = 1;
-    const geminiPendingRequests = new Map();
-
-    function getGeminiSocketUrl() {
-        const host = window.location.hostname || '127.0.0.1';
-        return `ws://${host}:9998`;
-    }
-
-    async function ensureGeminiSocket() {
-        if (geminiSocket && geminiSocket.readyState === WebSocket.OPEN) {
-            return geminiSocket;
-        }
-
-        return new Promise(async (resolve, reject) => {
-            let socketUrl = getGeminiSocketUrl();
-            let settled = false;
-
-            const setupSocketHandlers = (ws) => {
-                ws.onmessage = (event) => {
-                    try {
-                        const data = JSON.parse(event.data);
-                        const id = data.id;
-                        if (id && geminiPendingRequests.has(id)) {
-                            const { resFn, rejFn } = geminiPendingRequests.get(id);
-                            geminiPendingRequests.delete(id);
-                            if (data.error) {
-                                rejFn(new Error(data.error));
-                            } else {
-                                resFn(data.result || data);
-                            }
-                        }
-                    } catch (e) {}
-                };
-                ws.onclose = () => {
-                    geminiSocket = null;
-                };
-            };
-
-            let ws;
-            try {
-                ws = new WebSocket(socketUrl);
-            } catch (e) {
-                // Ignore initial constructor error
-            }
-
-            const timeout = setTimeout(async () => {
-                if (!settled && (!ws || ws.readyState !== WebSocket.OPEN)) {
-                    if (ws) try { ws.close(); } catch (e) {}
-                    // Auto-start via Stash plugin task
-                    try {
-                        await fetchGQL(`mutation { runPluginTask(plugin_id: "mypluginrc", task_name: "Start Gemini Bridge") }`);
-                        await new Promise(r => setTimeout(r, 600));
-                        const wsRetry = new WebSocket(socketUrl);
-                        wsRetry.onopen = () => {
-                            if (!settled) {
-                                settled = true;
-                                geminiSocket = wsRetry;
-                                setupSocketHandlers(wsRetry);
-                                resolve(wsRetry);
-                            }
-                        };
-                        wsRetry.onerror = () => {
-                            if (!settled) {
-                                settled = true;
-                                reject(new Error('Cannot connect to FastTag Gemini Bridge. Click "Start Gemini Bridge" in Tasks.'));
-                            }
-                        };
-                    } catch (err) {
-                        if (!settled) {
-                            settled = true;
-                            reject(new Error('FastTag Gemini Bridge offline'));
-                        }
-                    }
-                }
-            }, 800);
-
-            if (ws) {
-                ws.onopen = () => {
-                    if (!settled) {
-                        settled = true;
-                        clearTimeout(timeout);
-                        geminiSocket = ws;
-                        setupSocketHandlers(ws);
-                        resolve(ws);
-                    }
-                };
-                ws.onerror = () => {
-                    // Fallback to timeout auto-starter
-                };
-            }
-        });
-    }
-
-    async function sendGeminiSocketRequest(payload) {
-        const socket = await ensureGeminiSocket();
-        const id = geminiRequestId++;
-        payload.id = id;
-
-        return new Promise((resFn, rejFn) => {
-            geminiPendingRequests.set(id, { resFn, rejFn });
-            socket.send(JSON.stringify(payload));
-            setTimeout(() => {
-                if (geminiPendingRequests.has(id)) {
-                    geminiPendingRequests.delete(id);
-                    rejFn(new Error('AI request took too long (>40s). Google API may be busy or rate-limited.'));
-                }
-            }, 40000);
-        });
-    }
-
-    async function callGeminiAPI(customApiKey = null, customModel = null) {
-        const apiKey = customApiKey || getGeminiApiKey();
-        if (!apiKey) throw new Error('No Gemini API key configured. Enter your key in Settings ➔ 🤖 AI');
-        const model = customModel || getGeminiModel();
-
-        const res = await sendGeminiSocketRequest({
-            type: "test",
-            api_key: apiKey,
-            model: model
-        });
-        return res;
-    }
-
-    const geminiSceneParseCache = new Map();
-
-    async function parseSceneWithGemini(sceneId, rawFilename, rawTitle) {
-        if (geminiSceneParseCache.has(sceneId)) {
-            return geminiSceneParseCache.get(sceneId);
-        }
-
-        const apiKey = getGeminiApiKey();
-        if (!apiKey) throw new Error('No Gemini API key configured. Enter your key in Settings ➔ 🤖 AI');
-
-        ftLog('ACTION', 'GeminiAI', `Running AI smart parser on scene #${sceneId}: "${rawFilename || rawTitle}"...`);
-
-        // Small library samples to guide fuzzy performer/studio matching
-        let performersContext = [];
-        let studiosContext = [];
-        try {
-            const cachedPerformers = getCachedOrNull('performers') || [];
-            if (cachedPerformers.length > 0) {
-                performersContext = cachedPerformers.map(p => p.name).slice(0, 150);
-            }
-            const cachedStudios = getCachedOrNull('studios') || [];
-            if (cachedStudios.length > 0) {
-                studiosContext = cachedStudios.map(s => s.name).slice(0, 60);
-            }
-        } catch (e) {}
-
-        const res = await sendGeminiSocketRequest({
-            type: "parse",
-            api_key: apiKey,
-            model: getGeminiModel(),
-            filename: rawFilename || '',
-            title: rawTitle || '',
-            performers_context: performersContext,
-            studios_context: studiosContext
-        });
-
-        ftLog('ACTION', 'GeminiAI', `Gemini AI parsed scene #${sceneId}: title="${res?.clean_title}", studio="${res?.studio}", performers=${JSON.stringify(res?.performers || [])}`);
-
-        geminiSceneParseCache.set(sceneId, res);
-        return res;
     }
 
     function getDefaultPopoutSize(hostContainer) {
