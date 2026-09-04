@@ -7,6 +7,8 @@ require('../plugins/fasttag/fasttag-preview.js');
 const preview = global.FastTag.preview;
 assert.ok(preview, 'FastTag preview namespace should be installed');
 
+global.location = { origin: 'http://stash.local:9999', href: 'http://stash.local:9999/scenes' };
+
 assert.equal(preview.getDominantWheelDelta(10, -20), -20);
 assert.equal(preview.getDominantWheelDelta(20, -10), 20);
 assert.equal(preview.getDominantWheelDelta(5, -5), -5, 'vertical delta should win a tie');
@@ -32,4 +34,50 @@ assert.equal(preview.calculateScrubTarget(50, 100, -1, 10), 60);
 assert.equal(preview.calculateScrubTarget(5, 100, 1, 10), 0);
 assert.equal(preview.calculateScrubTarget(95, 100, -1, 10), 100);
 
-console.log('fasttag-preview tests passed');
+const mediaNode = (source, poster = '') => ({
+    currentSrc: source,
+    src: source,
+    poster,
+    getAttribute: name => name === 'poster' ? poster : source
+});
+const card = {
+    querySelector: selector => selector === 'video' ? mediaNode('/card-preview.mp4', '/card-cover.jpg') : null,
+    querySelectorAll: () => []
+};
+assert.deepEqual(preview.extractMediaUrlsFromCard(card), {
+    previewUrl: '/card-preview.mp4',
+    coverUrl: '/card-cover.jpg'
+});
+assert.deepEqual(preview.extractMediaUrlsFromCard(null), { previewUrl: null, coverUrl: null });
+assert.equal(preview.toRelativeMediaUrl('https://other.host/video.mp4?x=1'), '/video.mp4?x=1');
+
+async function testMediaLookup() {
+    const calls = [];
+    preview.configure({
+        fetchGQL: async (query, variables) => {
+            calls.push({ query, variables });
+            if (calls.length === 1) return { errors: [{ message: 'webp unsupported' }] };
+            return { data: { findScene: { paths: { preview: '/generated-preview', screenshot: '/generated-cover', stream: '/generated-stream' } } } };
+        }
+    });
+    assert.deepEqual(await preview.fetchSceneMediaUrls('12', card), {
+        previewUrl: '/generated-preview',
+        coverUrl: '/generated-cover',
+        streamUrl: '/generated-stream'
+    });
+    assert.equal(calls.length, 2, 'schema compatibility queries should be tried in order');
+
+    preview.configure({ fetchGQL: async () => ({ data: { findScene: { paths: { preview: null, screenshot: null } } } }) });
+    assert.deepEqual(await preview.fetchSceneMediaUrls('13', null), {
+        previewUrl: null,
+        coverUrl: '/scene/13/screenshot',
+        streamUrl: '/scene/13/stream'
+    }, 'an explicitly missing preview should not be replaced by a guessed URL');
+}
+
+testMediaLookup()
+    .then(() => console.log('fasttag-preview tests passed'))
+    .catch(error => {
+        console.error(error);
+        process.exitCode = 1;
+    });

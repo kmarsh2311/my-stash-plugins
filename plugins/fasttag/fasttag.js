@@ -109,7 +109,8 @@
         getDominantWheelDelta,
         getWheelNotches,
         selectScrubStep,
-        calculateScrubTarget
+        calculateScrubTarget,
+        fetchSceneMediaUrls: fetchSceneMediaUrlsFromModule
     } = FastTagPreview;
 
     FastTagGemini.configure({
@@ -127,6 +128,7 @@
         getCachedOrNull: type => getCachedOrNull(type),
         setCache: (type, data) => setCache(type, data)
     });
+    FastTagPreview.configure({ fetchGQL: (...args) => fetchGQL(...args) });
 
     console.log('[FastTag v4.2.8] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
 
@@ -2975,7 +2977,7 @@
     }
 
     // --- Preview & Scrubbing ---
-    function extractMediaUrlsFromCard(cardElement) {
+    function legacyExtractMediaUrlsFromCard(cardElement) {
         if (!cardElement) return { previewUrl: null, coverUrl: null };
         let previewUrl = null;
         let coverUrl = null;
@@ -3029,8 +3031,8 @@
         return { previewUrl, coverUrl };
     }
 
-    async function fetchSceneMediaUrls(sceneId, cardElement) {
-        const cardMedia = extractMediaUrlsFromCard(cardElement);
+    async function legacyFetchSceneMediaUrls(sceneId, cardElement) {
+        const cardMedia = legacyExtractMediaUrlsFromCard(cardElement);
         let previewUrl = cardMedia.previewUrl;
         let coverUrl = cardMedia.coverUrl;
         let streamUrl = null;
@@ -3149,7 +3151,7 @@
             }
         };
 
-        const { previewUrl, coverUrl, streamUrl } = await fetchSceneMediaUrls(sceneId, cardElement);
+        const { previewUrl, coverUrl, streamUrl } = await fetchSceneMediaUrlsFromModule(sceneId, cardElement);
         if (signal.aborted) return;
 
         if (!previewUrl && !coverUrl && !streamUrl) {
