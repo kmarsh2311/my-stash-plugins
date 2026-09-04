@@ -115,4 +115,51 @@ for (const [getter, setter, key, defaultValue] of persistedBooleanPairs) {
     assert.equal(storage[getter](), !defaultValue);
 }
 
-console.log('fasttag-storage tests passed');
+async function testPersistentCache() {
+    assert.equal(await storage.idbGet('tags'), null, 'IndexedDB should fall back cleanly when unavailable');
+
+    const records = new Map();
+    const objectStore = {
+        get(type) {
+            const request = {};
+            queueMicrotask(() => {
+                request.result = records.get(type);
+                request.onsuccess();
+            });
+            return request;
+        },
+        put(item) { records.set(item.type, item); },
+        delete(type) { records.delete(type); },
+        clear() { records.clear(); }
+    };
+    const database = {
+        objectStoreNames: { contains: () => true },
+        createObjectStore: () => objectStore,
+        transaction: () => ({ objectStore: () => objectStore })
+    };
+    global.indexedDB = {
+        open(name, version) {
+            assert.equal(name, 'stash_fasttag_cache_db');
+            assert.equal(version, 1);
+            const request = {};
+            queueMicrotask(() => request.onsuccess({ target: { result: database } }));
+            return request;
+        }
+    };
+
+    await storage.idbSet('tags', [{ id: '1' }], 1234);
+    assert.deepEqual(await storage.idbGet('tags'), { type: 'tags', data: [{ id: '1' }], timestamp: 1234 });
+    await storage.idbDelete('tags');
+    assert.equal(await storage.idbGet('tags'), null);
+    await storage.idbSet('tags', [], 1);
+    await storage.idbSet('performers', [], 2);
+    await storage.idbDelete(null);
+    assert.equal(records.size, 0);
+}
+
+testPersistentCache()
+    .then(() => console.log('fasttag-storage tests passed'))
+    .catch((error) => {
+        console.error(error);
+        process.exitCode = 1;
+    });

@@ -36,6 +36,10 @@
         freeze: 1.0
     });
     const MAX_SCRUB_CUE_DISPLAYS = 5;
+    const IDB_NAME = 'stash_fasttag_cache_db';
+    const IDB_VERSION = 1;
+    const IDB_STORE = 'entity_cache';
+    let idbPromise = null;
 
     function readBoolean(key, defaultValue) {
         const value = root.localStorage.getItem(key);
@@ -137,6 +141,65 @@
         try { writeBoolean(KEYS.detachScraper, enabled); } catch (e) {}
     }
 
+    function getIDB() {
+        if (typeof root.indexedDB === 'undefined') return Promise.resolve(null);
+        if (idbPromise) return idbPromise;
+        idbPromise = new Promise((resolve) => {
+            try {
+                const req = root.indexedDB.open(IDB_NAME, IDB_VERSION);
+                req.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(IDB_STORE)) {
+                        db.createObjectStore(IDB_STORE, { keyPath: 'type' });
+                    }
+                };
+                req.onsuccess = (event) => resolve(event.target.result);
+                req.onerror = (error) => {
+                    console.warn('[FastTag] IndexedDB open error, falling back to memory cache:', error);
+                    resolve(null);
+                };
+            } catch (error) {
+                console.warn('[FastTag] IndexedDB initialization failed:', error);
+                resolve(null);
+            }
+        });
+        return idbPromise;
+    }
+
+    async function idbGet(type) {
+        try {
+            const db = await getIDB();
+            if (!db) return null;
+            return new Promise((resolve) => {
+                const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(type);
+                req.onsuccess = () => resolve(req.result || null);
+                req.onerror = () => resolve(null);
+            });
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async function idbSet(type, data, timestamp = Date.now()) {
+        try {
+            const db = await getIDB();
+            if (!db) return;
+            db.transaction(IDB_STORE, 'readwrite').objectStore(IDB_STORE).put({ type, data, timestamp });
+        } catch (error) {
+            console.warn('[FastTag] Error writing to IndexedDB:', error);
+        }
+    }
+
+    async function idbDelete(type) {
+        try {
+            const db = await getIDB();
+            if (!db) return;
+            const store = db.transaction(IDB_STORE, 'readwrite').objectStore(IDB_STORE);
+            if (type) store.delete(type);
+            else store.clear();
+        } catch (e) {}
+    }
+
     function readPinnedEntries(type) {
         try {
             const raw = root.localStorage.getItem(PINNED_PREFIX + type);
@@ -228,6 +291,9 @@
         setScraperHudPersistedOpen,
         getDetachScraper,
         setDetachScraper,
+        idbGet,
+        idbSet,
+        idbDelete,
         readPinnedEntries,
         writePinnedEntries,
         readRecentEntries,

@@ -72,6 +72,9 @@
         setScraperHudPersistedOpen,
         getDetachScraper,
         setDetachScraper,
+        idbGet,
+        idbSet,
+        idbDelete,
         readPinnedEntries,
         writePinnedEntries,
         readRecentEntries,
@@ -243,79 +246,6 @@
     const REVALIDATE_INTERVAL = 2 * 60 * 60 * 1000; // 2 hours background revalidation threshold
 
     // --- IndexedDB Persistent Caching Layer (0ms Remote Access) ---
-    const IDB_NAME = 'stash_fasttag_cache_db';
-    const IDB_VERSION = 1;
-    const IDB_STORE = 'entity_cache';
-    let idbPromise = null;
-
-    function getIDB() {
-        if (typeof indexedDB === 'undefined') return Promise.resolve(null);
-        if (idbPromise) return idbPromise;
-
-        idbPromise = new Promise((resolve) => {
-            try {
-                const req = indexedDB.open(IDB_NAME, IDB_VERSION);
-                req.onupgradeneeded = (e) => {
-                    const db = e.target.result;
-                    if (!db.objectStoreNames.contains(IDB_STORE)) {
-                        db.createObjectStore(IDB_STORE, { keyPath: 'type' });
-                    }
-                };
-                req.onsuccess = (e) => resolve(e.target.result);
-                req.onerror = (err) => {
-                    console.warn('[FastTag] IndexedDB open error, falling back to memory cache:', err);
-                    resolve(null);
-                };
-            } catch (e) {
-                console.warn('[FastTag] IndexedDB initialization failed:', e);
-                resolve(null);
-            }
-        });
-        return idbPromise;
-    }
-
-    async function idbGet(type) {
-        try {
-            const db = await getIDB();
-            if (!db) return null;
-            return new Promise((resolve) => {
-                const tx = db.transaction(IDB_STORE, 'readonly');
-                const store = tx.objectStore(IDB_STORE);
-                const req = store.get(type);
-                req.onsuccess = () => resolve(req.result || null);
-                req.onerror = () => resolve(null);
-            });
-        } catch (e) {
-            return null;
-        }
-    }
-
-    async function idbSet(type, data, timestamp = Date.now()) {
-        try {
-            const db = await getIDB();
-            if (!db) return;
-            const tx = db.transaction(IDB_STORE, 'readwrite');
-            const store = tx.objectStore(IDB_STORE);
-            store.put({ type, data, timestamp });
-        } catch (e) {
-            console.warn('[FastTag] Error writing to IndexedDB:', e);
-        }
-    }
-
-    async function idbDelete(type) {
-        try {
-            const db = await getIDB();
-            if (!db) return;
-            const tx = db.transaction(IDB_STORE, 'readwrite');
-            const store = tx.objectStore(IDB_STORE);
-            if (type) {
-                store.delete(type);
-            } else {
-                store.clear();
-            }
-        } catch (e) {}
-    }
-
     async function prewarmCacheFromIDB() {
         try {
             const types = ['tags', 'performers', 'studios', 'groups', 'galleries'];
