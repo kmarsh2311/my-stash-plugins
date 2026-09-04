@@ -6245,7 +6245,11 @@
 
                 const saveRes = await fetchGQL(`
                     mutation FastTagAcceptSave($input: SceneUpdateInput!) {
-                        sceneUpdate(input: $input) { id }
+                        sceneUpdate(input: $input) {
+                            ${SCENE_CARD_UPDATE_FIELDS}
+                            title
+                            date
+                        }
                     }
                 `, { input: updateInput });
 
@@ -6253,6 +6257,8 @@
                     const msg = saveRes?.errors?.map(e => e.message).join('; ') || 'Stash did not return a saved scene.';
                     throw new Error(msg);
                 }
+
+                syncSceneToApolloCache(saveRes.data.sceneUpdate);
 
                 // Save cover separately. If Stash rejects the image value, all other metadata is
                 // already safely committed and the user gets a warning rather than losing everything.

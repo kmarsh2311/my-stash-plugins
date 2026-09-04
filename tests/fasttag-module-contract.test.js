@@ -33,4 +33,12 @@ for (const namespace of ['Core', 'Entities', 'Storage', 'Integrations', 'Gemini'
 }
 assert.equal(mainSource.includes('LEGACY_'), false, 'legacy comparison declarations should be removed');
 
+const scraperSaveMutation = mainSource.match(/mutation FastTagAcceptSave[\s\S]*?`, \{ input: updateInput \}\);/)?.[0] || '';
+assert.ok(scraperSaveMutation.includes('title'), 'scraper save should return the updated title for live card refresh');
+assert.ok(scraperSaveMutation.includes('date'), 'scraper save should return the updated date for live card refresh');
+assert.ok(
+    mainSource.includes('syncSceneToApolloCache(saveRes.data.sceneUpdate);'),
+    'scraper save should synchronize returned metadata to the live scene-card cache'
+);
+
 console.log('fasttag-module-contract tests passed');
