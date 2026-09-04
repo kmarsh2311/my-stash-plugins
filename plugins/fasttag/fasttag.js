@@ -31,6 +31,8 @@
     if (!FastTagPreview) throw new Error('[FastTag] fasttag-preview.js must load before fasttag.js');
     const FastTagUi = window.FastTag?.ui;
     if (!FastTagUi) throw new Error('[FastTag] fasttag-ui.js must load before fasttag.js');
+    const FastTagEditors = window.FastTag?.editors;
+    if (!FastTagEditors) throw new Error('[FastTag] fasttag-editors.js must load before fasttag.js');
     const {
         escapeHtml,
         cleanTitleForScraping,
@@ -120,6 +122,11 @@
         fetchSceneMediaUrls: fetchSceneMediaUrlsFromModule
     } = FastTagPreview;
     const { getOptimalPopupSize, getDefaultEverythingPosition } = FastTagUi;
+    const {
+        hasSelectionSetChanged,
+        calculateBulkSelectionDelta,
+        applyBulkSelectionDelta
+    } = FastTagEditors;
 
     FastTagGemini.configure({
         fetchGQL: (...args) => fetchGQL(...args),
@@ -3650,13 +3657,8 @@
                 return false;
             }
         }
-        const currentSet = new Set(Array.from(selectedIds).map(String));
         const initialSet = sequentialEditState.initialSelectedIds || new Set();
-        if (currentSet.size !== initialSet.size) return true;
-        for (let id of currentSet) {
-            if (!initialSet.has(id)) return true;
-        }
-        return false;
+        return hasSelectionSetChanged(selectedIds, initialSet);
     }
 
     function updateSequentialEditUI(form, type, selectedIds) {
@@ -7966,8 +7968,7 @@
             );
             if (!confirmed) return;
 
-            const removedIds = new Set(Array.from(initialCommonIds).filter(id => !selectedIds.has(id)));
-            const addedIds = Array.from(selectedIds).filter(id => !initialCommonIds.has(id));
+            const { removedIds, addedIds } = calculateBulkSelectionDelta(initialCommonIds, selectedIds);
 
             saveBtn.disabled = true;
             let updatedCount = 0;
@@ -7980,9 +7981,7 @@
                         try {
                             const existRes = await fetchGQL(config.fetchExistingQuery, { id: scene.id });
                             const existIds = (config.extractExisting(existRes?.data) || []).map(String);
-                            const filtered = existIds.filter(id => !removedIds.has(id));
-                            const merged = new Set([...filtered, ...addedIds]);
-                            targetIds = Array.from(merged);
+                            targetIds = applyBulkSelectionDelta(existIds, removedIds, addedIds);
                         } catch (e) {}
                     }
                     const success = await updateEntityForScene(type, scene.id, targetIds);

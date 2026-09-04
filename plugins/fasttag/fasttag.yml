@@ -12,6 +12,7 @@ ui:
     - fasttag-scraper.js
     - fasttag-preview.js
     - fasttag-ui.js
+    - fasttag-editors.js
     - fasttag.js
   css:
     - tabulator.min.css
