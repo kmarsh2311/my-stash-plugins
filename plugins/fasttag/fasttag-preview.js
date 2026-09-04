@@ -40,6 +40,41 @@
         return { width: `${targetWidth}px`, height: `${Math.round(targetWidth * (9 / 16))}px` };
     }
 
+    function calculateVideoPopoutPosition(options) {
+        const {
+            formRect,
+            scraperRect = null,
+            hudWidth = 600,
+            hudHeight = 338,
+            screenWidth = root.innerWidth,
+            screenHeight = root.innerHeight,
+            margin = 14
+        } = options || {};
+        if (!formRect) return { left: '20px', top: '70px', width: `${hudWidth}px`, height: `${hudHeight}px` };
+
+        const spaceLeft = Math.max(0, formRect.left - margin);
+        const spaceRight = Math.max(0, screenWidth - formRect.right - margin);
+        const clampedTop = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(formRect.top)));
+        if (spaceLeft >= hudWidth + margin) {
+            return {
+                left: `${Math.round(formRect.left - hudWidth - margin)}px`,
+                top: `${clampedTop}px`,
+                width: `${hudWidth}px`,
+                height: `${hudHeight}px`
+            };
+        }
+        if (spaceRight >= hudWidth + margin && (!scraperRect || scraperRect.right <= formRect.left)) {
+            return {
+                left: `${Math.round(formRect.right + margin)}px`,
+                top: `${clampedTop}px`,
+                width: `${hudWidth}px`,
+                height: `${hudHeight}px`
+            };
+        }
+        const left = Math.max(margin, Math.min(screenWidth - hudWidth - margin, Math.round(formRect.left - hudWidth - margin)));
+        return { left: `${left}px`, top: `${clampedTop}px`, width: `${hudWidth}px`, height: `${hudHeight}px` };
+    }
+
     function extractMediaUrlsFromCard(cardElement) {
         if (!cardElement) return { previewUrl: null, coverUrl: null };
         let previewUrl = null;
@@ -135,6 +170,7 @@
         selectScrubStep,
         calculateScrubTarget,
         getDefaultPopoutSize,
+        calculateVideoPopoutPosition,
         extractMediaUrlsFromCard,
         toRelativeMediaUrl,
         fetchSceneMediaUrls

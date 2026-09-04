@@ -111,6 +111,7 @@
         selectScrubStep,
         calculateScrubTarget,
         getDefaultPopoutSize,
+        calculateVideoPopoutPosition,
         fetchSceneMediaUrls: fetchSceneMediaUrlsFromModule
     } = FastTagPreview;
 
@@ -1941,46 +1942,26 @@
 
     function getInitialPopoutPosition(hudWidth = 600, hudHeight = 338) {
         const activeForm = activePopup?.element || document.querySelector('#scenes-popup');
-        const margin = 14;
-        const screenWidth = window.innerWidth;
-        const screenHeight = window.innerHeight;
-
         const isScraperOpen = floatingScraperHudElement && document.body.contains(floatingScraperHudElement);
         const scraperRect = isScraperOpen ? floatingScraperHudElement.getBoundingClientRect() : null;
-
+        let rect = null;
         if (activeForm) {
-            let rect = activeForm.getBoundingClientRect();
+            rect = activeForm.getBoundingClientRect();
             if (!rect || rect.width <= 0 || rect.left <= 0) {
                 const formW = parseInt(activeForm.style.width, 10) || 760;
                 const formH = parseInt(activeForm.style.height, 10) || 760;
                 const defPos = getDefaultEverythingPosition(formW, formH);
                 rect = { left: defPos.x, right: defPos.x + formW, top: defPos.y, bottom: defPos.y + formH, width: formW, height: formH };
             }
-
-            const spaceLeft = Math.max(0, rect.left - margin);
-            const spaceRight = Math.max(0, screenWidth - rect.right - margin);
-
-            // 1. Primary: Place Video on the LEFT flank of the main modal
-            if (spaceLeft >= hudWidth + margin) {
-                const left = Math.round(rect.left - hudWidth - margin);
-                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return { left: `${left}px`, top: `${top}px`, width: `${hudWidth}px`, height: `${hudHeight}px` };
-            }
-
-            // 2. Secondary: If left flank is tight, try the RIGHT flank if not occupied by scraper
-            if (spaceRight >= hudWidth + margin && (!isScraperOpen || (scraperRect && scraperRect.right <= rect.left))) {
-                const left = Math.round(rect.right + margin);
-                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return { left: `${left}px`, top: `${top}px`, width: `${hudWidth}px`, height: `${hudHeight}px` };
-            }
-
-            // 3. Viewport fallback (flush with left screen edge)
-            const left = Math.max(margin, Math.min(screenWidth - hudWidth - margin, Math.round(rect.left - hudWidth - margin)));
-            const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-            return { left: `${left}px`, top: `${top}px`, width: `${hudWidth}px`, height: `${hudHeight}px` };
         }
-
-        return { left: '20px', top: '70px', width: `${hudWidth}px`, height: `${hudHeight}px` };
+        return calculateVideoPopoutPosition({
+            formRect: rect,
+            scraperRect,
+            hudWidth,
+            hudHeight,
+            screenWidth: window.innerWidth,
+            screenHeight: window.innerHeight
+        });
     }
 
     function closeFloatingVideoHud(fullReset = false) {

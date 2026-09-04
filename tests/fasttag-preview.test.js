@@ -46,6 +46,34 @@ for (const [screenWidth, expected] of [
     assert.deepEqual(preview.getDefaultPopoutSize(), expected);
 }
 
+assert.deepEqual(preview.calculateVideoPopoutPosition({
+    formRect: { left: 800, right: 1500, top: 100 },
+    hudWidth: 600,
+    hudHeight: 338,
+    screenWidth: 1920,
+    screenHeight: 1080
+}), { left: '186px', top: '100px', width: '600px', height: '338px' });
+assert.deepEqual(preview.calculateVideoPopoutPosition({
+    formRect: { left: 100, right: 800, top: 5 },
+    hudWidth: 600,
+    hudHeight: 338,
+    screenWidth: 1600,
+    screenHeight: 900
+}), { left: '814px', top: '14px', width: '600px', height: '338px' });
+assert.deepEqual(preview.calculateVideoPopoutPosition({
+    formRect: { left: 100, right: 800, top: 800 },
+    scraperRect: { right: 1200 },
+    hudWidth: 600,
+    hudHeight: 338,
+    screenWidth: 1600,
+    screenHeight: 900
+}), { left: '14px', top: '548px', width: '600px', height: '338px' });
+assert.deepEqual(preview.calculateVideoPopoutPosition({
+    formRect: null,
+    hudWidth: 520,
+    hudHeight: 293
+}), { left: '20px', top: '70px', width: '520px', height: '293px' });
+
 const mediaNode = (source, poster = '') => ({
     currentSrc: source,
     src: source,
