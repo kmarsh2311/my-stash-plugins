@@ -27,6 +27,8 @@
     if (!FastTagScraper) throw new Error('[FastTag] fasttag-scraper.js must load before fasttag.js');
     const FastTagPreview = window.FastTag?.preview;
     if (!FastTagPreview) throw new Error('[FastTag] fasttag-preview.js must load before fasttag.js');
+    const FastTagUi = window.FastTag?.ui;
+    if (!FastTagUi) throw new Error('[FastTag] fasttag-ui.js must load before fasttag.js');
     const {
         escapeHtml,
         cleanTitleForScraping,
@@ -114,6 +116,7 @@
         calculateVideoPopoutPosition,
         fetchSceneMediaUrls: fetchSceneMediaUrlsFromModule
     } = FastTagPreview;
+    const { getOptimalPopupSize, getDefaultEverythingPosition } = FastTagUi;
 
     FastTagGemini.configure({
         fetchGQL: (...args) => fetchGQL(...args),
@@ -131,6 +134,10 @@
         setCache: (type, data) => setCache(type, data)
     });
     FastTagPreview.configure({ fetchGQL: (...args) => fetchGQL(...args) });
+    FastTagUi.configure({
+        getDefaultPopoutSize,
+        log: (...args) => ftLog(...args)
+    });
 
     console.log('[FastTag v4.2.8] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
 
@@ -4897,25 +4904,6 @@
         }
     }
 
-    function getOptimalPopupSize(type = 'single') {
-        const screenW = window.innerWidth || 1920;
-        const screenH = window.innerHeight || 1080;
-
-        if (type === 'everything') {
-            const rawW = Math.round(screenW * 0.40);
-            const rawH = Math.round(screenH * 0.82);
-            const width = Math.max(720, Math.min(Math.min(screenW - 24, rawW), 760));
-            const height = Math.max(620, Math.min(Math.min(screenH - 24, rawH), 760));
-            return { width, height };
-        } else {
-            const rawW = Math.round(screenW * 0.18);
-            const rawH = Math.round(screenH * 0.74);
-            const width = Math.max(320, Math.min(Math.min(screenW - 24, rawW), 345));
-            const height = Math.max(540, Math.min(Math.min(screenH - 24, rawH), 660));
-            return { width, height };
-        }
-    }
-
     function getSavedPopupSize(type = 'single') {
         try {
             const key = type === 'everything' ? 'stash_fast_tag_popup_size_everything' : 'stash_fast_tag_popup_size_single';
@@ -4932,46 +4920,6 @@
             const key = type === 'everything' ? 'stash_fast_tag_popup_size_everything' : 'stash_fast_tag_popup_size_single';
             localStorage.setItem(key, JSON.stringify({ width: Math.round(width), height: Math.round(height) }));
         } catch (e) {}
-    }
-
-    function getDefaultEverythingPosition(formW, formH) {
-        const screenW = window.innerWidth || 1920;
-        const screenH = window.innerHeight || 1080;
-        const minTop = 8;
-        const minLeft = 8;
-
-        const defaultVideoSize = getDefaultPopoutSize();
-        const videoW = parseInt(defaultVideoSize.width, 10) || 600;
-        const scraperW = 390;
-        const margin = 14;
-
-        let posX = null;
-        let posY = null;
-
-        // If screen is wide enough to accommodate Video (Left) + Form (Center) + Scraper (Right)
-        // Balance the flanking spaces so both sidecars have comfortable, equal breathing room without any collision
-        if (screenW >= videoW + formW + scraperW + (margin * 3)) {
-            // Symmetrical balanced flanking: (screenW - formW + videoW - scraperW) / 2
-            posX = Math.round((screenW - formW + videoW - scraperW) / 2);
-        } else if (screenW >= videoW + formW + (margin * 2)) {
-            // Ensure Video HUD on the left has zero overlap
-            posX = Math.round(videoW + (margin * 2));
-        } else {
-            // Fallback for smaller screens: centered
-            posX = Math.round((screenW - formW) / 2);
-        }
-
-        // Keep strictly within screen bounds
-        const maxAllowedLeft = Math.max(minLeft, screenW - formW - 8);
-        const maxAllowedTop = Math.max(minTop, screenH - formH - 8);
-        posX = Math.max(minLeft, Math.min(maxAllowedLeft, posX));
-        posY = Math.max(minTop, Math.min(maxAllowedTop, Math.round((screenH - formH) / 2)));
-
-        ftLog('DEBUG', 'LAYOUT', `Default workstation position calculated: (${posX}, ${posY}) on ${screenW}x${screenH}`, {
-            screenW, screenH, formW, formH, videoW, scraperW, margin, posX, posY
-        });
-
-        return { x: posX, y: posY };
     }
 
     function resetAllLayoutsToDefault() {
