@@ -5,6 +5,7 @@ ui:
   javascript:
     - tabulator.min.js
     - fasttag-core.js
+    - fasttag-storage.js
     - fasttag.js
   css:
     - tabulator.min.css

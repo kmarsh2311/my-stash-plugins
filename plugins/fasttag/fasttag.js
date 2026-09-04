@@ -17,6 +17,8 @@
     'use strict';
     const FastTagCore = window.FastTag?.core;
     if (!FastTagCore) throw new Error('[FastTag] fasttag-core.js must load before fasttag.js');
+    const FastTagStorage = window.FastTag?.storage;
+    if (!FastTagStorage) throw new Error('[FastTag] fasttag-storage.js must load before fasttag.js');
     const {
         escapeHtml,
         cleanTitleForScraping,
@@ -30,6 +32,34 @@
         findSceneCardForContextTarget,
         isScenePreviewContextTarget
     } = FastTagCore;
+    const {
+        getAutoScrapeSequential,
+        setAutoScrapeSequential,
+        getThemePreference,
+        setThemePreference,
+        getShowIdColumns,
+        setShowIdColumns,
+        getEnableSuggestions,
+        setEnableSuggestions,
+        getEnableCardIconClicks,
+        setEnableCardIconClicks,
+        getAlwaysPlayFullVideo,
+        setAlwaysPlayFullVideo,
+        getShowRecentChips,
+        setShowRecentChips,
+        getShowPinnedChips,
+        setShowPinnedChips,
+        getGeminiApiKey,
+        setGeminiApiKey,
+        getGeminiModel,
+        setGeminiModel,
+        getGeminiAutoParse,
+        setGeminiAutoParse,
+        getGeminiSuggestions,
+        setGeminiSuggestions,
+        getAutoMarkOrganized,
+        setAutoMarkOrganized
+    } = FastTagStorage;
 
     console.log('[FastTag v4.2.8] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
 
@@ -298,26 +328,6 @@
         initialSelectedIds: new Set(),
         getSelectedIdsFn: null
     };
-
-    const THEME_STORAGE_KEY = 'stash_fast_tag_theme';
-    const SHOW_IDS_STORAGE_KEY = 'stash_fast_tag_show_ids';
-    const SUGGESTIONS_STORAGE_KEY = 'stash_fast_tag_enable_suggestions';
-    const AUTO_SCRAPE_STORAGE_KEY = 'stash_fast_tag_auto_scrape_sequential';
-
-    function getAutoScrapeSequential() {
-        try {
-            const val = localStorage.getItem(AUTO_SCRAPE_STORAGE_KEY);
-            return val === null ? true : val === 'true'; // Default true (ON)
-        } catch (e) {
-            return true;
-        }
-    }
-
-    function setAutoScrapeSequential(enabled) {
-        try {
-            localStorage.setItem(AUTO_SCRAPE_STORAGE_KEY, enabled ? 'true' : 'false');
-        } catch (e) {}
-    }
 
     const recentStorageKeys = {
         tags: 'stash_fast_tag_recent_tags',
@@ -1746,10 +1756,6 @@
     }
 
     // --- Theme & Storage Helpers ---
-    function getThemePreference() {
-        return localStorage.getItem(THEME_STORAGE_KEY) || 'dark';
-    }
-
     function getEffectiveTheme() {
         const pref = getThemePreference();
         if (pref === 'light' || pref === 'dark') return pref;
@@ -1757,10 +1763,6 @@
         if (htmlTheme === 'light' || htmlTheme === 'dark') return htmlTheme;
         if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
         return 'dark';
-    }
-
-    function setThemePreference(theme) {
-        localStorage.setItem(THEME_STORAGE_KEY, theme);
     }
 
     function getSceneTitle(sceneData, sceneId, cardElement) {
@@ -1818,65 +1820,6 @@
         });
     }
 
-    function getShowIdColumns() {
-        const val = localStorage.getItem(SHOW_IDS_STORAGE_KEY);
-        return val === null ? true : val === 'true'; // Default true (ON)
-    }
-
-    function setShowIdColumns(enabled) {
-        localStorage.setItem(SHOW_IDS_STORAGE_KEY, enabled ? 'true' : 'false');
-    }
-
-    function getEnableSuggestions() {
-        const val = localStorage.getItem(SUGGESTIONS_STORAGE_KEY);
-        return val === null ? true : val === 'true'; // Default true (ON)
-    }
-
-    function setEnableSuggestions(enabled) {
-        localStorage.setItem(SUGGESTIONS_STORAGE_KEY, enabled ? 'true' : 'false');
-    }
-
-    const SHOW_RECENT_STORAGE_KEY = 'fasttag_show_recent_chips';
-    const SHOW_PINNED_STORAGE_KEY = 'fasttag_show_pinned_chips';
-    const ALWAYS_PLAY_FULL_VIDEO_KEY = 'fasttag_always_play_full_video';
-    const ENABLE_CARD_ICON_CLICKS_KEY = 'fasttag_enable_card_icon_clicks';
-
-    function getEnableCardIconClicks() {
-        const val = localStorage.getItem(ENABLE_CARD_ICON_CLICKS_KEY);
-        return val === null ? true : val === 'true'; // Default true (ON)
-    }
-
-    function setEnableCardIconClicks(enabled) {
-        localStorage.setItem(ENABLE_CARD_ICON_CLICKS_KEY, enabled ? 'true' : 'false');
-    }
-
-    function getAlwaysPlayFullVideo() {
-        const val = localStorage.getItem(ALWAYS_PLAY_FULL_VIDEO_KEY);
-        return val === 'true'; // Default false (OFF)
-    }
-
-    function setAlwaysPlayFullVideo(enabled) {
-        localStorage.setItem(ALWAYS_PLAY_FULL_VIDEO_KEY, enabled ? 'true' : 'false');
-    }
-
-    function getShowRecentChips() {
-        const val = localStorage.getItem(SHOW_RECENT_STORAGE_KEY);
-        return val === null ? true : val === 'true'; // Default true (ON)
-    }
-
-    function setShowRecentChips(enabled) {
-        localStorage.setItem(SHOW_RECENT_STORAGE_KEY, enabled ? 'true' : 'false');
-    }
-
-    function getShowPinnedChips() {
-        const val = localStorage.getItem(SHOW_PINNED_STORAGE_KEY);
-        return val === null ? true : val === 'true'; // Default true (ON)
-    }
-
-    function setShowPinnedChips(enabled) {
-        localStorage.setItem(SHOW_PINNED_STORAGE_KEY, enabled ? 'true' : 'false');
-    }
-
     const SCRUB_SPEEDS_STORAGE_KEY = 'fasttag_scrub_speeds';
 
     const DEFAULT_SCRUB_SPEEDS = {
@@ -1926,47 +1869,7 @@
     let floatingHudPosition = null;
     let floatingHudSize = null;
     // --- Google Gemini AI Smart Metadata & Filename Parser ---
-    const GEMINI_API_KEY_KEY = 'fasttag_gemini_api_key';
-    const GEMINI_MODEL_KEY = 'fasttag_gemini_model';
-    const GEMINI_AUTO_PARSE_KEY = 'fasttag_gemini_auto_parse';
-    const GEMINI_SUGGESTIONS_KEY = 'fasttag_gemini_suggestions';
-
-    function getGeminiApiKey() {
-        return localStorage.getItem(GEMINI_API_KEY_KEY) || '';
-    }
-    function setGeminiApiKey(val) {
-        localStorage.setItem(GEMINI_API_KEY_KEY, (val || '').trim());
-    }
-    function getGeminiModel() {
-        return localStorage.getItem(GEMINI_MODEL_KEY) || 'gemini-flash-latest';
-    }
-    function setGeminiModel(val) {
-        localStorage.setItem(GEMINI_MODEL_KEY, val || 'gemini-flash-latest');
-    }
-    function getGeminiAutoParse() {
-        const val = localStorage.getItem(GEMINI_AUTO_PARSE_KEY);
-        return val === null ? true : val === 'true';
-    }
-    function setGeminiAutoParse(enabled) {
-        localStorage.setItem(GEMINI_AUTO_PARSE_KEY, enabled ? 'true' : 'false');
-    }
-    function getGeminiSuggestions() {
-        const val = localStorage.getItem(GEMINI_SUGGESTIONS_KEY);
-        return val === null ? true : val === 'true';
-    }
-    function setGeminiSuggestions(enabled) {
-        localStorage.setItem(GEMINI_SUGGESTIONS_KEY, enabled ? 'true' : 'false');
-    }
-
     // --- Organized Status Workflow Helpers ---
-    const AUTO_MARK_ORGANIZED_KEY = 'stash_fast_tag_auto_mark_organized';
-    function getAutoMarkOrganized() {
-        return localStorage.getItem(AUTO_MARK_ORGANIZED_KEY) === 'true';
-    }
-    function setAutoMarkOrganized(enabled) {
-        localStorage.setItem(AUTO_MARK_ORGANIZED_KEY, enabled ? 'true' : 'false');
-    }
-
     async function updateSceneOrganized(sceneId, isOrganized) {
         if (!sceneId) return false;
         try {
