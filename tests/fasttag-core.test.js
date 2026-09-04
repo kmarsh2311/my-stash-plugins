@@ -21,9 +21,10 @@ assert.equal(core.parseDurationSec('1:01:01'), 3661);
 assert.equal(core.parseDurationSec('01:05'), 65);
 assert.equal(core.parseDurationSec('65.6'), 66);
 
-assert.equal(core.cleanFilenameForSuggestions('MyScene_1080p.mp4'), 'MyScene_1080p');
-assert.equal(core.cleanFilenameForSuggestions('MyScene 1080p.mp4'), 'MyScene  ');
-assert.equal(core.normalizeTextForSuggestions('CaféScene4K'), 'cafescene 4 k');
+assert.equal(core.cleanFilenameForSuggestions('MyScene_1080p.mp4'), 'MyScene_');
+assert.equal(core.cleanFilenameForSuggestions('MyScene 1080p.mp4'), 'MyScene ');
+assert.equal(core.cleanFilenameForSuggestions('MyScene_1080p_x264.mkv'), 'MyScene__');
+assert.equal(core.normalizeTextForSuggestions('CaféScene4K'), 'cafe scene 4 k');
 assert.equal(core.normalizeTextForSuggestions('CafeScene4K'), 'cafe scene 4 k');
 
 const sceneLink = { href: 'http://localhost:9999/scenes/abc-123?continue=true' };

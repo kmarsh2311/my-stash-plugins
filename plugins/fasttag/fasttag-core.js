@@ -49,21 +49,25 @@
     function cleanFilenameForSuggestions(rawName) {
         if (!rawName) return '';
         let name = rawName.replace(/\.[^/.]+$/, '');
-        name = name.replace(/\b(1080p|720p|2160p|4k|uhd|fhd|hd|sd|x264|x265|h264|h265|hevc|aac|mp4|mkv|avi|wmv|60fps|120fps|fps|xxx|rip|webrip|bluray|dvdrip|sdh)\b/gi, ' ');
+        name = name.replace(/(^|[._\-\s])(1080p|720p|2160p|4k|uhd|fhd|hd|sd|x264|x265|h264|h265|hevc|aac|mp4|mkv|avi|wmv|60fps|120fps|fps|xxx|rip|webrip|bluray|dvdrip|sdh)(?=$|[._\-\s])/gi, '$1');
         return name;
     }
 
     function normalizeTextForSuggestions(str) {
         if (!str) return '';
-        let splitStr = String(str)
+        let splitStr = String(str);
+
+        // Strip combining marks before camel-case detection so accented lowercase
+        // letters retain the same word-boundary behaviour as plain ASCII letters.
+        try {
+            splitStr = splitStr.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        } catch (e) {}
+
+        splitStr = splitStr
             .replace(/([a-z])([A-Z])/g, '$1 $2')
             .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
             .replace(/([a-zA-Z])([0-9])/g, '$1 $2')
             .replace(/([0-9])([a-zA-Z])/g, '$1 $2');
-
-        try {
-            splitStr = splitStr.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        } catch (e) {}
 
         return splitStr.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
     }
