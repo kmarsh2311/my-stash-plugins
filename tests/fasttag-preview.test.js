@@ -34,6 +34,18 @@ assert.equal(preview.calculateScrubTarget(50, 100, -1, 10), 60);
 assert.equal(preview.calculateScrubTarget(5, 100, 1, 10), 0);
 assert.equal(preview.calculateScrubTarget(95, 100, -1, 10), 100);
 
+for (const [screenWidth, expected] of [
+    [2400, { width: '760px', height: '428px' }],
+    [1920, { width: '600px', height: '338px' }],
+    [1400, { width: '520px', height: '293px' }],
+    [1100, { width: '460px', height: '259px' }],
+    [800, { width: '320px', height: '180px' }],
+    [500, { width: '300px', height: '169px' }]
+]) {
+    global.innerWidth = screenWidth;
+    assert.deepEqual(preview.getDefaultPopoutSize(), expected);
+}
+
 const mediaNode = (source, poster = '') => ({
     currentSrc: source,
     src: source,

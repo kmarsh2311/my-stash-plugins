@@ -29,6 +29,17 @@
         return Math.min(duration, Math.max(0, currentTime + (direction * step)));
     }
 
+    function getDefaultPopoutSize() {
+        const screenWidth = root.innerWidth;
+        let targetWidth = 600;
+        if (screenWidth >= 2200) targetWidth = 760;
+        else if (screenWidth >= 1600) targetWidth = 600;
+        else if (screenWidth >= 1300) targetWidth = 520;
+        else if (screenWidth >= 1000) targetWidth = 460;
+        else targetWidth = Math.max(300, Math.round(screenWidth * 0.40));
+        return { width: `${targetWidth}px`, height: `${Math.round(targetWidth * (9 / 16))}px` };
+    }
+
     function extractMediaUrlsFromCard(cardElement) {
         if (!cardElement) return { previewUrl: null, coverUrl: null };
         let previewUrl = null;
@@ -123,6 +134,7 @@
         getWheelNotches,
         selectScrubStep,
         calculateScrubTarget,
+        getDefaultPopoutSize,
         extractMediaUrlsFromCard,
         toRelativeMediaUrl,
         fetchSceneMediaUrls

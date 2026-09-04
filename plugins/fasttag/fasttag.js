@@ -110,6 +110,7 @@
         getWheelNotches,
         selectScrubStep,
         calculateScrubTarget,
+        getDefaultPopoutSize,
         fetchSceneMediaUrls: fetchSceneMediaUrlsFromModule
     } = FastTagPreview;
 
@@ -1935,54 +1936,6 @@
                 renderBtn(currentOrganized);
             },
             get: () => currentOrganized
-        };
-    }
-
-    function getDefaultPopoutSize(hostContainer) {
-        const screenW = window.innerWidth;
-        const screenH = window.innerHeight;
-        
-        let targetWidth = 600;
-        if (screenW >= 2200) {
-            targetWidth = 760;
-        } else if (screenW >= 1600) { // 1080p standard (1920x1080)
-            targetWidth = 600;
-        } else if (screenW >= 1300) {
-            targetWidth = 520;
-        } else if (screenW >= 1000) {
-            targetWidth = 460;
-        } else {
-            targetWidth = Math.max(300, Math.round(screenW * 0.40));
-        }
-
-        const targetHeight = Math.round(targetWidth * (9 / 16));
-        return { width: `${targetWidth}px`, height: `${targetHeight}px` };
-    }
-
-    function enforceZeroOverlap(left, top, width, height, formRect, otherRect, screenWidth, screenHeight, margin = 14) {
-        let finalLeft = left;
-        let finalTop = top;
-
-        // If placed to the left of formRect, ensure right edge (finalLeft + width) does not collide with formRect.left
-        if (formRect && finalLeft < formRect.left) {
-            if (finalLeft + width > formRect.left - margin) {
-                finalLeft = Math.max(margin, formRect.left - width - margin);
-            }
-        }
-        // If placed to the right of formRect, ensure left edge does not collide with formRect.right
-        if (formRect && finalLeft < formRect.right && finalLeft + width > formRect.right) {
-            finalLeft = Math.min(screenWidth - width - margin, formRect.right + margin);
-        }
-
-        // Keep strictly inside viewport bounds
-        finalLeft = Math.max(margin, Math.min(screenWidth - width - margin, finalLeft));
-        finalTop = Math.max(margin, Math.min(screenHeight - height - margin, finalTop));
-
-        return {
-            left: `${Math.round(finalLeft)}px`,
-            top: `${Math.round(finalTop)}px`,
-            width: `${Math.round(width)}px`,
-            height: `${Math.round(height)}px`
         };
     }
 
