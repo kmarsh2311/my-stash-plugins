@@ -43,6 +43,7 @@ assert.deepEqual(performerRanked.map(match => match.title), ['Alias match', 'ID 
 assert.deepEqual(performerRanked[0]._performerOverlapNames, ['John Smith']);
 assert.equal(performerRanked[2]._hasLinkedPerformers, true);
 assert.equal(performerRanked[2]._performerOverlapCount, 0);
+assert.deepEqual(performerRanked[2]._additionalPerformerNames, ['Someone Else']);
 
 const evidenceRanked = scraper.rankScraperMatchesByEvidence([
     {
@@ -211,6 +212,26 @@ async function testTitleThenInstalledScraperFallback() {
     assert.equal(calls.some(call => call.variables?.source?.scraper_id === 'builtin_autotag'), false);
 }
 
+async function testManualSearchSkipsHashLookup() {
+    const calls = [];
+    scraper.configure({
+        cleanTitleForScraping,
+        parseDurationSec,
+        fetchGQL: async (query, variables) => {
+            calls.push({ query, variables });
+            if (query.includes('findScene')) {
+                return { data: { findScene: { title: 'Wrong Filename', performers: [], files: [{ path: 'wrong.mp4', duration: 90 }] } } };
+            }
+            return { data: { scrapeSingleScene: [{ title: 'Manual result' }] } };
+        }
+    });
+    const results = await scraper.fetchScraperMatchesForScene('9', null, 'Correct Search Words');
+    assert.equal(results[0].title, 'Manual result');
+    assert.equal(results[0]._searchQuery, 'correct search words');
+    assert.equal(calls.some(call => call.variables?.input?.scene_id), false);
+    assert.equal(calls.some(call => call.variables?.input?.query === 'correct search words'), true);
+}
+
 async function testEntityResolution() {
     const cache = new Map([
         ['studios', [{ id: 10, name: 'Known Studio' }]],
@@ -275,6 +296,7 @@ async function testEntityResolution() {
 Promise.resolve()
     .then(testHashMatch)
     .then(testTitleThenInstalledScraperFallback)
+    .then(testManualSearchSkipsHashLookup)
     .then(testEntityResolution)
     .then(() => console.log('fasttag-scraper tests passed'))
     .catch(error => {

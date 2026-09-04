@@ -5639,6 +5639,11 @@
                     <span>⚠</span><span>Studio Mismatch</span>
                 </span>
             ` : '';
+            const additionalPerformerBadge = match._additionalPerformerCount > 0 ? `
+                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #fbbf24; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="The scraped result contains additional performer(s) not currently linked to this scene: ${escapeHtml((match._additionalPerformerNames || []).join(', '))}">
+                    <span>＋</span><span>${match._additionalPerformerCount} Additional Performer${match._additionalPerformerCount === 1 ? '' : 's'}</span>
+                </span>
+            ` : '';
             const requiresReview = match._matchAssessment === 'unlikely';
 
             let durationBadge = '';
@@ -5707,6 +5712,7 @@
                                     <span>🔗</span><span>↗</span>
                                 </a>
                             ` : ''}
+                            <button type="button" id="fasttag-scrape-dismiss-match" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(248, 113, 113, 0.35); border-radius: 4px; padding: 2.5px 6px; font-size: 10px; font-weight: 700; color: #f87171; cursor: pointer; line-height: 1;" title="Dismiss this result for the current FastTag session">✕</button>
                             <button type="button" id="fasttag-scrape-popout-toggle" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 4px; padding: 2.5px 6px; font-size: 10px; font-weight: 700; color: #818cf8; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 3px; line-height: 1; transition: all 0.15s ease; white-space: nowrap;" data-micro-tooltip="${isDetached ? 'Dock scraper inside popup' : 'Pop out scraper into floating window'}">
                                 <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: block; pointer-events: none;">
                                     <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" fill="none" stroke-width="2"></rect>
@@ -5718,6 +5724,11 @@
                                 <span>${requiresReview ? '⚠ Review & Accept' : '✓ Accept'}</span>
                             </button>
                         </div>
+                    </div>
+
+                    <div id="fasttag-scrape-manual-search-form" style="display: flex; align-items: center; gap: 5px;">
+                        <input id="fasttag-scrape-manual-query" type="text" value="${escapeHtml(match._searchQuery || '')}" placeholder="Optional: correct the search words" style="flex: 1; min-width: 0; height: 25px; box-sizing: border-box; padding: 3px 7px; border-radius: 5px; border: 1px solid ${isDark ? 'rgba(129,140,248,0.45)' : '#a5b4fc'}; background: ${isDark ? 'rgba(15,23,42,0.8)' : '#ffffff'}; color: ${isDark ? '#e2e8f0' : '#1e293b'}; font-size: 10.5px; outline: none;">
+                        <button id="fasttag-scrape-manual-search-btn" type="button" style="height: 25px; padding: 3px 8px; border-radius: 5px; border: 1px solid rgba(129,140,248,0.55); background: rgba(99,102,241,0.18); color: ${isDark ? '#c7d2fe' : '#4338ca'}; font-size: 10px; font-weight: 700; cursor: pointer; white-space: nowrap;">Search</button>
                     </div>
 
                     <div id="fasttag-scrape-body-wrapper" style="display: flex; flex-direction: column; gap: 7px; ${isDetached ? 'flex: 1 1 auto; min-height: 0; overflow: hidden;' : 'height: auto;'} transition: all 0.15s ease;">
@@ -5734,6 +5745,7 @@
                                 </span>
                             `}
                             ${performerMatchBadge}
+                            ${additionalPerformerBadge}
                             ${studioMismatchBadge}
                             ${durationBadge}
                         </div>
@@ -5944,6 +5956,74 @@
             const previewBox = targetContainer.querySelector('#fasttag-scrape-items-preview');
             const perfPills = targetContainer.querySelector('#fasttag-scrape-perf-pills');
             const tagsPills = targetContainer.querySelector('#fasttag-scrape-tags-pills');
+
+            const runManualSearch = async () => {
+                const input = targetContainer.querySelector('#fasttag-scrape-manual-query');
+                const searchBtn = targetContainer.querySelector('#fasttag-scrape-manual-search-btn');
+                const query = (input?.value || '').trim();
+                if (!query) {
+                    toastError('Enter the words you want to search for.');
+                    input?.focus();
+                    return;
+                }
+                if (searchBtn) {
+                    searchBtn.disabled = true;
+                    searchBtn.textContent = 'Searching…';
+                }
+                try {
+                    const manualResults = await fetchScraperMatchesForScene(sceneId, null, query);
+                    if (!manualResults?.length) {
+                        toastError(`No scraper matches found for “${query}”`);
+                        if (searchBtn) {
+                            searchBtn.disabled = false;
+                            searchBtn.textContent = 'Search';
+                        }
+                        return;
+                    }
+                    results.splice(0, results.length, ...manualResults);
+                    sessionScrapeCache.set(sceneId, results);
+                    currentIndex = 0;
+                    hideScrapeCoverTooltip();
+                    updateCardView();
+                } catch (error) {
+                    toastError('Scrape search failed: ' + (error?.message || error));
+                    if (searchBtn) {
+                        searchBtn.disabled = false;
+                        searchBtn.textContent = 'Search';
+                    }
+                }
+            };
+
+            const manualSearchBtn = targetContainer.querySelector('#fasttag-scrape-manual-search-btn');
+            if (manualSearchBtn) manualSearchBtn.onclick = runManualSearch;
+            const manualSearchInput = targetContainer.querySelector('#fasttag-scrape-manual-query');
+            if (manualSearchInput) {
+                manualSearchInput.onkeydown = (event) => {
+                    if (event.key !== 'Enter') return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    runManualSearch();
+                };
+            }
+
+            const dismissMatchBtn = targetContainer.querySelector('#fasttag-scrape-dismiss-match');
+            if (dismissMatchBtn) {
+                dismissMatchBtn.onclick = (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    hideScrapeCoverTooltip();
+                    results.splice(currentIndex, 1);
+                    if (results.length === 0) {
+                        sessionScrapeCache.delete(sceneId);
+                        renderScraperMatchCard(container, results, sceneId, ctx, popup, onDismiss);
+                        if (typeof onDismiss === 'function') onDismiss();
+                        return;
+                    }
+                    currentIndex = Math.min(currentIndex, results.length - 1);
+                    sessionScrapeCache.set(sceneId, results);
+                    updateCardView();
+                };
+            }
 
             // Wire popout / dock button
             const popoutToggleBtn = targetContainer.querySelector('#fasttag-scrape-popout-toggle');

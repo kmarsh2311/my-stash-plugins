@@ -67,6 +67,7 @@
 
         const ranked = matches.map((match, originalIndex) => {
             const overlapNames = new Set();
+            const additionalNames = new Set();
             for (const remotePerformer of match?.performers || []) {
                 const storedId = String(remotePerformer?.stored_id || '');
                 const normalizedName = normalizePerformerName(remotePerformer?.name);
@@ -74,12 +75,16 @@
                     overlapNames.add(remotePerformer.name || `Performer #${storedId}`);
                 } else if (normalizedName && linkedNames.has(normalizedName)) {
                     overlapNames.add(linkedNames.get(normalizedName));
+                } else if (remotePerformer?.name) {
+                    additionalNames.add(remotePerformer.name);
                 }
             }
             match._hasLinkedPerformers = linked.length > 0;
             match._linkedPerformerCount = linked.length;
             match._performerOverlapNames = Array.from(overlapNames);
             match._performerOverlapCount = overlapNames.size;
+            match._additionalPerformerNames = Array.from(additionalNames);
+            match._additionalPerformerCount = additionalNames.size;
             return { match, originalIndex };
         });
 
@@ -342,7 +347,7 @@
         return resolvedIds;
     }
 
-    async function fetchScraperMatchesForScene(sceneId, cardElement) {
+    async function fetchScraperMatchesForScene(sceneId, cardElement, manualQuery = '') {
         const { fetchGQL } = getDependencies();
         let sceneTitle = '';
         let sceneFileName = '';
@@ -374,21 +379,26 @@
             { localStudio, localTitle: sceneTitle, localFileName: sceneFileName }
         );
 
-        try {
-            const response = await fetchGQL(SCRAPE_QUERY, {
-                source: { stash_box_index: 0 },
-                input: { scene_id: String(sceneId) }
-            });
-            const matches = response?.data?.scrapeSingleScene;
-            if (Array.isArray(matches) && matches.length > 0) return enrich(matches, 'hash', 'StashDB');
-        } catch (error) {
-            console.log('[FastTag] Scrape by scene_id error/empty:', error);
+        const cleanedManualQuery = manualQuery ? getDependencies().cleanTitleForScraping(manualQuery) : '';
+        if (!cleanedManualQuery) {
+            try {
+                const response = await fetchGQL(SCRAPE_QUERY, {
+                    source: { stash_box_index: 0 },
+                    input: { scene_id: String(sceneId) }
+                });
+                const matches = response?.data?.scrapeSingleScene;
+                if (Array.isArray(matches) && matches.length > 0) return enrich(matches, 'hash', 'StashDB');
+            } catch (error) {
+                console.log('[FastTag] Scrape by scene_id error/empty:', error);
+            }
         }
 
         const cardText = cardElement
             ? (cardElement.querySelector('.title, .card-title, .scene-card__title')?.textContent || '').trim()
             : '';
-        const candidateQueries = buildScrapeCandidateQueries(sceneTitle, sceneFileName, cardText);
+        const candidateQueries = cleanedManualQuery
+            ? [cleanedManualQuery]
+            : buildScrapeCandidateQueries(sceneTitle, sceneFileName, cardText);
 
         for (const queryTerm of candidateQueries) {
             if (!queryTerm || queryTerm.length < 2) continue;
@@ -398,7 +408,11 @@
                     input: { query: queryTerm }
                 });
                 const matches = response?.data?.scrapeSingleScene;
-                if (Array.isArray(matches) && matches.length > 0) return enrich(matches, 'title', 'StashDB');
+                if (Array.isArray(matches) && matches.length > 0) {
+                    const enriched = enrich(matches, 'title', 'StashDB');
+                    enriched.forEach(match => { match._searchQuery = queryTerm; });
+                    return enriched;
+                }
             } catch (error) {
                 console.log('[FastTag] Scrape query error:', error);
             }
@@ -417,7 +431,11 @@
                             input: { query: queryTerm }
                         });
                         const matches = scrapeResponse?.data?.scrapeSingleScene;
-                        if (Array.isArray(matches) && matches.length > 0) return enrich(matches, 'scraper', scraper.name || 'Scraper');
+                        if (Array.isArray(matches) && matches.length > 0) {
+                            const enriched = enrich(matches, 'scraper', scraper.name || 'Scraper');
+                            enriched.forEach(match => { match._searchQuery = queryTerm; });
+                            return enriched;
+                        }
                     } catch (e) {}
                 }
             }
