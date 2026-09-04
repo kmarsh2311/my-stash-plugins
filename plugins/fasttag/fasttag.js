@@ -59,6 +59,19 @@
         setGeminiSuggestions,
         getAutoMarkOrganized,
         setAutoMarkOrganized,
+        DEFAULT_SCRUB_SPEEDS,
+        MAX_SCRUB_CUE_DISPLAYS,
+        getScrubSpeeds,
+        setScrubSpeeds,
+        getScrubCueCount,
+        incrementScrubCueCount,
+        resetScrubCueCount,
+        isVideoHudPersistedOpen,
+        setVideoHudPersistedOpen,
+        isScraperHudPersistedOpen,
+        setScraperHudPersistedOpen,
+        getDetachScraper,
+        setDetachScraper,
         readPinnedEntries,
         writePinnedEntries,
         readRecentEntries,
@@ -1818,49 +1831,7 @@
         });
     }
 
-    const SCRUB_SPEEDS_STORAGE_KEY = 'fasttag_scrub_speeds';
-
-    const DEFAULT_SCRUB_SPEEDS = {
-        slow: 5.0,
-        normal: 10.0,
-        fast: 20.0,
-        freeze: 1.0
-    };
-
-    function getScrubSpeeds() {
-        try {
-            const raw = localStorage.getItem(SCRUB_SPEEDS_STORAGE_KEY);
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                return {
-                    slow: Math.max(0, Math.min(30, Number(parsed.slow) !== undefined && !isNaN(Number(parsed.slow)) ? Number(parsed.slow) : DEFAULT_SCRUB_SPEEDS.slow)),
-                    normal: Math.max(0, Math.min(60, Number(parsed.normal) !== undefined && !isNaN(Number(parsed.normal)) ? Number(parsed.normal) : DEFAULT_SCRUB_SPEEDS.normal)),
-                    fast: Math.max(0, Math.min(120, Number(parsed.fast) !== undefined && !isNaN(Number(parsed.fast)) ? Number(parsed.fast) : DEFAULT_SCRUB_SPEEDS.fast)),
-                    freeze: Math.max(0.1, Math.min(10, Number(parsed.freeze) || DEFAULT_SCRUB_SPEEDS.freeze))
-                };
-            }
-        } catch (e) {}
-        return { ...DEFAULT_SCRUB_SPEEDS };
-    }
-
     let hasShownScrubCueThisSession = false;
-    const SCRUB_CUE_COUNT_KEY = 'stash_fast_tag_scrub_cue_count_v6';
-    const MAX_SCRUB_CUE_DISPLAYS = 5;
-
-    function getScrubCueCount() {
-        try {
-            return parseInt(localStorage.getItem(SCRUB_CUE_COUNT_KEY) || '0', 10) || 0;
-        } catch (e) {
-            return 0;
-        }
-    }
-
-    function incrementScrubCueCount() {
-        try {
-            const current = getScrubCueCount();
-            localStorage.setItem(SCRUB_CUE_COUNT_KEY, String(current + 1));
-        } catch (e) {}
-    }
 
     let isVideoPoppedOut = false;
     let floatingHudElement = null;
@@ -2248,18 +2219,6 @@
         return { left: '20px', top: '70px', width: `${hudWidth}px`, height: `${hudHeight}px` };
     }
 
-    const VIDEO_HUD_OPEN_KEY = 'fasttag_video_hud_open_state';
-    function isVideoHudPersistedOpen() {
-        try {
-            return localStorage.getItem(VIDEO_HUD_OPEN_KEY) === 'true';
-        } catch (e) { return false; }
-    }
-    function setVideoHudPersistedOpen(val) {
-        try {
-            localStorage.setItem(VIDEO_HUD_OPEN_KEY, val ? 'true' : 'false');
-        } catch (e) {}
-    }
-
     function closeFloatingVideoHud(fullReset = false) {
         if (floatingHudElement) {
             floatingHudElement.remove();
@@ -2268,36 +2227,9 @@
         isVideoPoppedOut = false;
     }
 
-    const DETACH_SCRAPER_STORAGE_KEY = 'fasttag_detach_scraper_v1';
-    const SCRAPER_HUD_OPEN_KEY = 'fasttag_scraper_hud_open_state';
     let floatingScraperHudElement = null;
     let floatingScraperHudPosition = null;
     let floatingScraperHudSize = null;
-
-    function isScraperHudPersistedOpen() {
-        try {
-            return localStorage.getItem(SCRAPER_HUD_OPEN_KEY) === 'true';
-        } catch (e) { return false; }
-    }
-    function setScraperHudPersistedOpen(val) {
-        try {
-            localStorage.setItem(SCRAPER_HUD_OPEN_KEY, val ? 'true' : 'false');
-        } catch (e) {}
-    }
-
-    function getDetachScraper() {
-        try {
-            const val = localStorage.getItem(DETACH_SCRAPER_STORAGE_KEY);
-            return val === null ? true : val === 'true'; // Default true (ON)
-        } catch (e) {}
-        return true;
-    }
-
-    function setDetachScraper(enabled) {
-        try {
-            localStorage.setItem(DETACH_SCRAPER_STORAGE_KEY, enabled ? 'true' : 'false');
-        } catch (e) {}
-    }
 
     function closeFloatingScraperHud(fullReset = false) {
         if (floatingScraperHudElement) {
@@ -2348,10 +2280,6 @@
         }
 
         return { right: '20px', top: '70px', width: `${hudWidth}px`, height: `${hudHeight}px` };
-    }
-
-    function setScrubSpeeds(speeds) {
-        localStorage.setItem(SCRUB_SPEEDS_STORAGE_KEY, JSON.stringify(speeds));
     }
 
     function promptDebugModeWarningDialog() {
@@ -2956,7 +2884,7 @@
             resetSpeedsBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 setScrubSpeeds(DEFAULT_SCRUB_SPEEDS);
-                localStorage.removeItem(SCRUB_CUE_COUNT_KEY);
+                resetScrubCueCount();
                 if (speedSlowInput) speedSlowInput.value = DEFAULT_SCRUB_SPEEDS.slow;
                 if (speedNormalInput) speedNormalInput.value = DEFAULT_SCRUB_SPEEDS.normal;
                 if (speedFastInput) speedFastInput.value = DEFAULT_SCRUB_SPEEDS.fast;

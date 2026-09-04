@@ -81,4 +81,38 @@ assert.deepEqual(storage.readPinnedEntries('tags'), [{ id: 1, name: 'Pinned Tag'
 storage.writePinnedEntries('tags', { invalid: true });
 assert.deepEqual(storage.readPinnedEntries('tags'), []);
 
+values.delete('fasttag_scrub_speeds');
+assert.deepEqual(storage.getScrubSpeeds(), { slow: 5, normal: 10, fast: 20, freeze: 1 });
+assert.ok(Object.isFrozen(storage.DEFAULT_SCRUB_SPEEDS));
+assert.equal(storage.MAX_SCRUB_CUE_DISPLAYS, 5);
+
+storage.setScrubSpeeds({ slow: -5, normal: 80, fast: 500, freeze: 0 });
+assert.deepEqual(storage.getScrubSpeeds(), { slow: 0, normal: 60, fast: 120, freeze: 1 });
+values.set('fasttag_scrub_speeds', JSON.stringify({ slow: '12.5', normal: 'bad', fast: 0, freeze: 0.05 }));
+assert.deepEqual(storage.getScrubSpeeds(), { slow: 12.5, normal: 10, fast: 0, freeze: 0.1 });
+values.set('fasttag_scrub_speeds', '{invalid json');
+assert.deepEqual(storage.getScrubSpeeds(), { slow: 5, normal: 10, fast: 20, freeze: 1 });
+
+values.delete('stash_fast_tag_scrub_cue_count_v6');
+assert.equal(storage.getScrubCueCount(), 0);
+storage.incrementScrubCueCount();
+storage.incrementScrubCueCount();
+assert.equal(storage.getScrubCueCount(), 2);
+storage.resetScrubCueCount();
+assert.equal(values.has('stash_fast_tag_scrub_cue_count_v6'), false);
+
+const persistedBooleanPairs = [
+    ['isVideoHudPersistedOpen', 'setVideoHudPersistedOpen', 'fasttag_video_hud_open_state', false],
+    ['isScraperHudPersistedOpen', 'setScraperHudPersistedOpen', 'fasttag_scraper_hud_open_state', false],
+    ['getDetachScraper', 'setDetachScraper', 'fasttag_detach_scraper_v1', true]
+];
+
+for (const [getter, setter, key, defaultValue] of persistedBooleanPairs) {
+    values.delete(key);
+    assert.equal(storage[getter](), defaultValue, `${getter} should use its existing default`);
+    storage[setter](!defaultValue);
+    assert.equal(values.get(key), String(!defaultValue));
+    assert.equal(storage[getter](), !defaultValue);
+}
+
 console.log('fasttag-storage tests passed');

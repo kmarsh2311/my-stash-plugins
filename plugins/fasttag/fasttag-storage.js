@@ -14,7 +14,12 @@
         geminiModel: 'fasttag_gemini_model',
         geminiAutoParse: 'fasttag_gemini_auto_parse',
         geminiSuggestions: 'fasttag_gemini_suggestions',
-        autoMarkOrganized: 'stash_fast_tag_auto_mark_organized'
+        autoMarkOrganized: 'stash_fast_tag_auto_mark_organized',
+        scrubSpeeds: 'fasttag_scrub_speeds',
+        scrubCueCount: 'stash_fast_tag_scrub_cue_count_v6',
+        videoHudOpen: 'fasttag_video_hud_open_state',
+        detachScraper: 'fasttag_detach_scraper_v1',
+        scraperHudOpen: 'fasttag_scraper_hud_open_state'
     });
     const RECENT_KEYS = Object.freeze({
         tags: 'stash_fast_tag_recent_tags',
@@ -24,6 +29,13 @@
         groups: 'stash_fast_tag_recent_groups'
     });
     const PINNED_PREFIX = 'stash_fast_tag_pinned_';
+    const DEFAULT_SCRUB_SPEEDS = Object.freeze({
+        slow: 5.0,
+        normal: 10.0,
+        fast: 20.0,
+        freeze: 1.0
+    });
+    const MAX_SCRUB_CUE_DISPLAYS = 5;
 
     function readBoolean(key, defaultValue) {
         const value = root.localStorage.getItem(key);
@@ -67,6 +79,63 @@
     function setGeminiSuggestions(enabled) { writeBoolean(KEYS.geminiSuggestions, enabled); }
     function getAutoMarkOrganized() { return root.localStorage.getItem(KEYS.autoMarkOrganized) === 'true'; }
     function setAutoMarkOrganized(enabled) { writeBoolean(KEYS.autoMarkOrganized, enabled); }
+
+    function getScrubSpeeds() {
+        try {
+            const raw = root.localStorage.getItem(KEYS.scrubSpeeds);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                return {
+                    slow: Math.max(0, Math.min(30, Number(parsed.slow) !== undefined && !isNaN(Number(parsed.slow)) ? Number(parsed.slow) : DEFAULT_SCRUB_SPEEDS.slow)),
+                    normal: Math.max(0, Math.min(60, Number(parsed.normal) !== undefined && !isNaN(Number(parsed.normal)) ? Number(parsed.normal) : DEFAULT_SCRUB_SPEEDS.normal)),
+                    fast: Math.max(0, Math.min(120, Number(parsed.fast) !== undefined && !isNaN(Number(parsed.fast)) ? Number(parsed.fast) : DEFAULT_SCRUB_SPEEDS.fast)),
+                    freeze: Math.max(0.1, Math.min(10, Number(parsed.freeze) || DEFAULT_SCRUB_SPEEDS.freeze))
+                };
+            }
+        } catch (e) {}
+        return { ...DEFAULT_SCRUB_SPEEDS };
+    }
+
+    function setScrubSpeeds(speeds) {
+        root.localStorage.setItem(KEYS.scrubSpeeds, JSON.stringify(speeds));
+    }
+
+    function getScrubCueCount() {
+        try {
+            return parseInt(root.localStorage.getItem(KEYS.scrubCueCount) || '0', 10) || 0;
+        } catch (e) {
+            return 0;
+        }
+    }
+
+    function incrementScrubCueCount() {
+        try {
+            root.localStorage.setItem(KEYS.scrubCueCount, String(getScrubCueCount() + 1));
+        } catch (e) {}
+    }
+
+    function resetScrubCueCount() {
+        try { root.localStorage.removeItem(KEYS.scrubCueCount); } catch (e) {}
+    }
+
+    function isVideoHudPersistedOpen() {
+        try { return root.localStorage.getItem(KEYS.videoHudOpen) === 'true'; } catch (e) { return false; }
+    }
+    function setVideoHudPersistedOpen(enabled) {
+        try { writeBoolean(KEYS.videoHudOpen, enabled); } catch (e) {}
+    }
+    function isScraperHudPersistedOpen() {
+        try { return root.localStorage.getItem(KEYS.scraperHudOpen) === 'true'; } catch (e) { return false; }
+    }
+    function setScraperHudPersistedOpen(enabled) {
+        try { writeBoolean(KEYS.scraperHudOpen, enabled); } catch (e) {}
+    }
+    function getDetachScraper() {
+        try { return readBoolean(KEYS.detachScraper, true); } catch (e) { return true; }
+    }
+    function setDetachScraper(enabled) {
+        try { writeBoolean(KEYS.detachScraper, enabled); } catch (e) {}
+    }
 
     function readPinnedEntries(type) {
         try {
@@ -146,6 +215,19 @@
         setGeminiSuggestions,
         getAutoMarkOrganized,
         setAutoMarkOrganized,
+        DEFAULT_SCRUB_SPEEDS,
+        MAX_SCRUB_CUE_DISPLAYS,
+        getScrubSpeeds,
+        setScrubSpeeds,
+        getScrubCueCount,
+        incrementScrubCueCount,
+        resetScrubCueCount,
+        isVideoHudPersistedOpen,
+        setVideoHudPersistedOpen,
+        isScraperHudPersistedOpen,
+        setScraperHudPersistedOpen,
+        getDetachScraper,
+        setDetachScraper,
         readPinnedEntries,
         writePinnedEntries,
         readRecentEntries,
