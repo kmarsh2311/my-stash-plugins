@@ -17,6 +17,8 @@
     'use strict';
     const FastTagCore = window.FastTag?.core;
     if (!FastTagCore) throw new Error('[FastTag] fasttag-core.js must load before fasttag.js');
+    const FastTagEntities = window.FastTag?.entities;
+    if (!FastTagEntities) throw new Error('[FastTag] fasttag-entities.js must load before fasttag.js');
     const FastTagStorage = window.FastTag?.storage;
     if (!FastTagStorage) throw new Error('[FastTag] fasttag-storage.js must load before fasttag.js');
     const FastTagIntegrations = window.FastTag?.integrations;
@@ -42,6 +44,7 @@
         findSceneCardForContextTarget,
         isScenePreviewContextTarget
     } = FastTagCore;
+    const { SCENE_CARD_UPDATE_FIELDS, ENTITY_CONFIG } = FastTagEntities;
     const {
         getAutoScrapeSequential,
         setAutoScrapeSequential,
@@ -142,7 +145,7 @@
     console.log('[FastTag v4.2.8] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
 
     // Selection set of fields to update Apollo's in-memory SceneCard directly (0ms latency, eliminates 40-scene FindScenes refetch)
-    const SCENE_CARD_UPDATE_FIELDS = `
+    const LEGACY_SCENE_CARD_UPDATE_FIELDS = `
         id
         organized
         tags { id name }
@@ -151,7 +154,7 @@
     `;
 
     // --- Entity Configuration & Schema Registry ---
-    const ENTITY_CONFIG = {
+    const LEGACY_ENTITY_CONFIG = {
         tags: {
             icon: '🏷️',
             title: 'Tag',
@@ -169,7 +172,7 @@
             createQuery: `mutation ($name: String!) { tagCreate(input: { name: $name }) { id name } }`,
             createExtract: data => data?.tagCreate?.id,
             createVariables: val => ({ name: val }),
-            updateQuery: `mutation ($scene_id: ID!, $tag_ids: [ID!]!) { sceneUpdate(input: { id: $scene_id, tag_ids: $tag_ids }) { ${SCENE_CARD_UPDATE_FIELDS} } }`,
+            updateQuery: `mutation ($scene_id: ID!, $tag_ids: [ID!]!) { sceneUpdate(input: { id: $scene_id, tag_ids: $tag_ids }) { ${LEGACY_SCENE_CARD_UPDATE_FIELDS} } }`,
             updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), tag_ids: ids.map(String) })
         },
         performers: {
@@ -190,7 +193,7 @@
             createQuery: `mutation ($name: String!) { performerCreate(input: { name: $name }) { id name } }`,
             createExtract: data => data?.performerCreate?.id,
             createVariables: val => ({ name: val }),
-            updateQuery: `mutation ($scene_id: ID!, $performer_ids: [ID!]!) { sceneUpdate(input: { id: $scene_id, performer_ids: $performer_ids }) { ${SCENE_CARD_UPDATE_FIELDS} } }`,
+            updateQuery: `mutation ($scene_id: ID!, $performer_ids: [ID!]!) { sceneUpdate(input: { id: $scene_id, performer_ids: $performer_ids }) { ${LEGACY_SCENE_CARD_UPDATE_FIELDS} } }`,
             updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), performer_ids: ids.map(String) })
         },
         galleries: {
@@ -228,7 +231,7 @@
             createQuery: `mutation ($title: String!) { galleryCreate(input: { title: $title }) { id title } }`,
             createExtract: data => data?.galleryCreate?.id,
             createVariables: val => ({ title: val }),
-            updateQuery: `mutation ($scene_id: ID!, $gallery_ids: [ID!]!) { sceneUpdate(input: { id: $scene_id, gallery_ids: $gallery_ids }) { ${SCENE_CARD_UPDATE_FIELDS} } }`,
+            updateQuery: `mutation ($scene_id: ID!, $gallery_ids: [ID!]!) { sceneUpdate(input: { id: $scene_id, gallery_ids: $gallery_ids }) { ${LEGACY_SCENE_CARD_UPDATE_FIELDS} } }`,
             updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), gallery_ids: ids.map(String) })
         },
         studios: {
@@ -257,7 +260,7 @@
             createQuery: `mutation ($name: String!) { studioCreate(input: { name: $name }) { id name } }`,
             createExtract: data => data?.studioCreate?.id,
             createVariables: val => ({ name: val }),
-            updateQuery: `mutation ($scene_id: ID!, $studio_id: ID) { sceneUpdate(input: { id: $scene_id, studio_id: $studio_id }) { ${SCENE_CARD_UPDATE_FIELDS} } }`,
+            updateQuery: `mutation ($scene_id: ID!, $studio_id: ID) { sceneUpdate(input: { id: $scene_id, studio_id: $studio_id }) { ${LEGACY_SCENE_CARD_UPDATE_FIELDS} } }`,
             updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), studio_id: ids.length > 0 ? String(ids[0]) : null })
         },
         groups: {
@@ -277,7 +280,7 @@
             createQuery: `mutation ($name: String!) { groupCreate(input: { name: $name }) { id name } }`,
             createExtract: data => data?.groupCreate?.id,
             createVariables: val => ({ name: val }),
-            updateQuery: `mutation ($scene_id: ID!, $groups: [SceneGroupInput!]) { sceneUpdate(input: { id: $scene_id, groups: $groups }) { ${SCENE_CARD_UPDATE_FIELDS} } }`,
+            updateQuery: `mutation ($scene_id: ID!, $groups: [SceneGroupInput!]) { sceneUpdate(input: { id: $scene_id, groups: $groups }) { ${LEGACY_SCENE_CARD_UPDATE_FIELDS} } }`,
             updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), groups: ids.map(id => ({ group_id: String(id) })) })
         }
     };
