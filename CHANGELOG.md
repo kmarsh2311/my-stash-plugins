@@ -4,6 +4,26 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.2.8] - 2026-09-04
+
+### Fixed
+- **Consistent Scene-Card Right-Click Area**: FastTag now recognizes verified scene-card wrappers used by different Stash layouts and themes, making the context menu reliable across the card information area.
+- **Native Media Context Menu Preserved**: Right-clicking preview images, videos, or media controls continues to open the browser's normal context menu.
+- **Theme Compatibility**: The expanded card detection supports Refract-style card structure without changing FastTag's existing real-time Refract refresh integration or left-click entity shortcuts.
+
+## [4.2.7] - 2026-09-04
+
+### Added
+- **Optional Scraped Date and Cover**: Date and cover image checkboxes now let users choose whether those fields are saved when accepting a scraper result.
+
+### Changed
+- **Safer Scraper Placement**: Scraping is now available only in Edit Everything, where every returned metadata field can be reviewed before saving.
+- **Clearer Selection States**: Recent-item pills now use `+` for unselected items and `✓` for selected items, with matching tooltips and accessibility state.
+- **Muted Selected Colours**: Selected recent items and Studio pills now match the table's dark indigo selection colour; Group pills retain a distinct but more subdued purple.
+
+### Fixed
+- **Edit Everything Suggestions**: Clicking a suggested tag or performer now updates the editor's authoritative selection and table instead of merely dismissing the suggestion.
+
 ## [4.2.6] - 2026-09-04
 
 ### Fixed
