@@ -25,6 +25,8 @@
     if (!FastTagGemini) throw new Error('[FastTag] fasttag-gemini.js must load before fasttag.js');
     const FastTagScraper = window.FastTag?.scraper;
     if (!FastTagScraper) throw new Error('[FastTag] fasttag-scraper.js must load before fasttag.js');
+    const FastTagPreview = window.FastTag?.preview;
+    if (!FastTagPreview) throw new Error('[FastTag] fasttag-preview.js must load before fasttag.js');
     const {
         escapeHtml,
         cleanTitleForScraping,
@@ -103,6 +105,12 @@
         resolveScrapedEntityIds,
         fetchScraperMatchesForScene
     } = FastTagScraper;
+    const {
+        getDominantWheelDelta,
+        getWheelNotches,
+        selectScrubStep,
+        calculateScrubTarget
+    } = FastTagPreview;
 
     FastTagGemini.configure({
         fetchGQL: (...args) => fetchGQL(...args),
@@ -3600,8 +3608,8 @@
             if (!currentMedia || currentMedia.tagName !== 'VIDEO' || currentMedia.duration <= 0 || !isFinite(currentMedia.duration)) return;
 
             // Handle both vertical deltaY and horizontal deltaX across all mouse types
-            const rawDelta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-            if (!rawDelta || isNaN(rawDelta)) return;
+            const rawDelta = getDominantWheelDelta(e.deltaX, e.deltaY);
+            if (rawDelta === null) return;
 
             const now = performance.now();
             const timeDelta = lastWheelTimestamp > 0 ? (now - lastWheelTimestamp) : 300;
@@ -3609,26 +3617,9 @@
 
             const scrubSpeeds = getScrubSpeeds();
 
-            // Step size calculation:
-            // When Shift is held -> fixed precision frame step from settings
-            // When Shift is NOT held -> velocity-based dynamic step size with 0-disabled tier fallbacks
-            let step = scrubSpeeds.freeze;
-            if (!shiftHeld) {
-                const s = scrubSpeeds.slow > 0 ? scrubSpeeds.slow : 0;
-                const n = scrubSpeeds.normal > 0 ? scrubSpeeds.normal : 0;
-                const f = scrubSpeeds.fast > 0 ? scrubSpeeds.fast : 0;
-
-                if (timeDelta < 80) {
-                    step = f || n || s || 10.0;
-                } else if (timeDelta < 200) {
-                    step = n || s || f || 10.0;
-                } else {
-                    step = s || n || f || 10.0;
-                }
-            }
-
-            const notches = e.deltaMode === 1 ? rawDelta : (rawDelta / 60);
-            if (Math.abs(notches) < 0.05) return;
+            const step = selectScrubStep(scrubSpeeds, timeDelta, shiftHeld);
+            const notches = getWheelNotches(rawDelta, e.deltaMode);
+            if (notches === null) return;
 
             if (!scrubbing) {
                 scrubbing = true;
@@ -3641,9 +3632,7 @@
                 try { currentMedia.pause(); } catch (err) {}
             }
 
-            const direction = -Math.sign(notches);
-            const scrubSeconds = direction * step;
-            currentMedia.currentTime = Math.min(currentMedia.duration, Math.max(0, currentMedia.currentTime + scrubSeconds));
+            currentMedia.currentTime = calculateScrubTarget(currentMedia.currentTime, currentMedia.duration, notches, step);
             clearTimeout(resumeTimer);
 
             showProgressBar();
