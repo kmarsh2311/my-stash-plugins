@@ -87,6 +87,50 @@
         };
     }
 
+    function readScrapeFieldSelection(container) {
+        const checkedIndices = selector => Array.from(container.querySelectorAll(selector))
+            .map(element => parseInt(element.getAttribute('data-idx'), 10));
+        return {
+            studio: container.querySelector('#fasttag-scrape-chk-studio')?.checked ?? false,
+            title: container.querySelector('#fasttag-scrape-chk-title')?.checked ?? false,
+            date: container.querySelector('#fasttag-scrape-chk-date')?.checked ?? false,
+            cover: container.querySelector('#fasttag-scrape-chk-cover')?.checked ?? false,
+            details: container.querySelector('#fasttag-scrape-chk-details')?.checked ?? false,
+            performerIndices: checkedIndices('.fasttag-scrape-perf-item:checked'),
+            tagIndices: checkedIndices('.fasttag-scrape-tag-item:checked')
+        };
+    }
+
+    function mergeUniqueIds(existingIds, addedIds) {
+        return Array.from(new Set([...(existingIds || []).map(String), ...(addedIds || []).map(String)]));
+    }
+
+    function buildScrapeUpdateInput(options) {
+        const {
+            sceneId,
+            match,
+            selection,
+            studioIdToSet,
+            performerIdsToAdd = [],
+            tagIdsToAdd = [],
+            existingPerformerIds = [],
+            existingTagIds = [],
+            includeCover = false,
+            onlyChangedCollections = true
+        } = options;
+        const mergedPerformerIds = mergeUniqueIds(existingPerformerIds, performerIdsToAdd);
+        const mergedTagIds = mergeUniqueIds(existingTagIds, tagIdsToAdd);
+        const updateInput = { id: sceneId };
+        if (studioIdToSet) updateInput.studio_id = studioIdToSet;
+        if ((onlyChangedCollections ? performerIdsToAdd : mergedPerformerIds).length > 0) updateInput.performer_ids = mergedPerformerIds;
+        if ((onlyChangedCollections ? tagIdsToAdd : mergedTagIds).length > 0) updateInput.tag_ids = mergedTagIds;
+        if (selection.date && match.date) updateInput.date = match.date;
+        if (selection.details && match.details) updateInput.details = match.details;
+        if (includeCover && selection.cover && match.image) updateInput.cover_image = match.image;
+        if (selection.title && match.title) updateInput.title = match.title;
+        return { updateInput, mergedPerformerIds, mergedTagIds };
+    }
+
     async function fetchScraperMatchesForScene(sceneId, cardElement) {
         const { fetchGQL } = getDependencies();
         let sceneTitle = '';
@@ -171,6 +215,9 @@
         buildScrapeCandidateQueries,
         enrichScraperMatches,
         analyzeScraperMatch,
+        readScrapeFieldSelection,
+        mergeUniqueIds,
+        buildScrapeUpdateInput,
         fetchScraperMatchesForScene
     });
 }(typeof window !== 'undefined' ? window : globalThis));

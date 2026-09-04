@@ -95,7 +95,12 @@
         refreshSceneCardsDebounced
     } = FastTagIntegrations;
     const { callGeminiAPI, parseSceneWithGemini } = FastTagGemini;
-    const { analyzeScraperMatch, fetchScraperMatchesForScene } = FastTagScraper;
+    const {
+        analyzeScraperMatch,
+        readScrapeFieldSelection,
+        buildScrapeUpdateInput,
+        fetchScraperMatchesForScene
+    } = FastTagScraper;
 
     FastTagGemini.configure({
         fetchGQL: (...args) => fetchGQL(...args),
@@ -6579,15 +6584,11 @@
                 date: match.date
             });
 
-            const isStudioChecked = container.querySelector('#fasttag-scrape-chk-studio')?.checked ?? false;
-            const isTitleChecked = container.querySelector('#fasttag-scrape-chk-title')?.checked ?? false;
-            const isDateChecked = container.querySelector('#fasttag-scrape-chk-date')?.checked ?? false;
-            const isCoverChecked = container.querySelector('#fasttag-scrape-chk-cover')?.checked ?? false;
-            const isDetailsChecked = container.querySelector('#fasttag-scrape-chk-details')?.checked ?? false;
+            const scrapeSelection = readScrapeFieldSelection(container);
 
             // 1. Studio Resolution
             let studioIdToSet = null;
-            if (isStudioChecked && match.studio?.name) {
+            if (scrapeSelection.studio && match.studio?.name) {
                 if (match.studio.stored_id) {
                     studioIdToSet = String(match.studio.stored_id);
                 } else {
@@ -6612,10 +6613,9 @@
             }
 
             // 2. Performers Resolution
-            const checkedPerfIndices = Array.from(container.querySelectorAll('.fasttag-scrape-perf-item:checked')).map(el => parseInt(el.getAttribute('data-idx'), 10));
             const performerIdsToAdd = [];
 
-            if (checkedPerfIndices.length > 0 && match.performers) {
+            if (scrapeSelection.performerIndices.length > 0 && match.performers) {
                 let cachedPerformers = getCachedOrNull('performers');
                 if (!cachedPerformers) {
                     const res = await fetchGQL(ENTITY_CONFIG.performers.fetchQuery);
@@ -6623,7 +6623,7 @@
                     setCache('performers', cachedPerformers);
                 }
 
-                for (const idx of checkedPerfIndices) {
+                for (const idx of scrapeSelection.performerIndices) {
                     const p = match.performers[idx];
                     if (!p || !p.name) continue;
                     if (p.stored_id) {
@@ -6645,10 +6645,9 @@
             }
 
             // 3. Tags Resolution
-            const checkedTagIndices = Array.from(container.querySelectorAll('.fasttag-scrape-tag-item:checked')).map(el => parseInt(el.getAttribute('data-idx'), 10));
             const tagIdsToAdd = [];
 
-            if (checkedTagIndices.length > 0 && match.tags) {
+            if (scrapeSelection.tagIndices.length > 0 && match.tags) {
                 let cachedTags = getCachedOrNull('tags');
                 if (!cachedTags) {
                     const res = await fetchGQL(ENTITY_CONFIG.tags.fetchQuery);
@@ -6656,7 +6655,7 @@
                     setCache('tags', cachedTags);
                 }
 
-                for (const idx of checkedTagIndices) {
+                for (const idx of scrapeSelection.tagIndices) {
                     const t = match.tags[idx];
                     if (!t || !t.name) continue;
                     if (t.stored_id) {
@@ -6705,16 +6704,16 @@
 
                 const existingPerformerIds = (sceneRes?.data?.findScene?.performers || []).map(p => String(p.id));
                 const existingTagIds = (sceneRes?.data?.findScene?.tags || []).map(t => String(t.id));
-                const mergedPerformerIds = Array.from(new Set([...existingPerformerIds, ...performerIdsToAdd]));
-                const mergedTagIds = Array.from(new Set([...existingTagIds, ...tagIdsToAdd]));
-
-                const updateInput = { id: sceneId };
-                if (studioIdToSet) updateInput.studio_id = studioIdToSet;
-                if (performerIdsToAdd.length > 0) updateInput.performer_ids = mergedPerformerIds;
-                if (tagIdsToAdd.length > 0) updateInput.tag_ids = mergedTagIds;
-                if (isDateChecked && match.date) updateInput.date = match.date;
-                if (isDetailsChecked && match.details) updateInput.details = match.details;
-                if (isTitleChecked && match.title) updateInput.title = match.title;
+                const { updateInput, mergedPerformerIds, mergedTagIds } = buildScrapeUpdateInput({
+                    sceneId,
+                    match,
+                    selection: scrapeSelection,
+                    studioIdToSet,
+                    performerIdsToAdd,
+                    tagIdsToAdd,
+                    existingPerformerIds,
+                    existingTagIds
+                });
 
                 const saveRes = await fetchGQL(`
                     mutation FastTagAcceptSave($input: SceneUpdateInput!) {
@@ -6730,7 +6729,7 @@
                 // Save cover separately. If Stash rejects the image value, all other metadata is
                 // already safely committed and the user gets a warning rather than losing everything.
                 let coverSaved = true;
-                if (isCoverChecked && match.image) {
+                if (scrapeSelection.cover && match.image) {
                     const coverRes = await fetchGQL(`
                         mutation FastTagAcceptCover($input: SceneUpdateInput!) {
                             sceneUpdate(input: $input) { id }
@@ -6795,18 +6794,22 @@
                 const sceneRes = await fetchGQL(`query ($id: ID!) { findScene(id: $id) { id performers { id } tags { id } studio { id } } }`, { id: sceneId });
                 const existingPerformerIds = (sceneRes?.data?.findScene?.performers || []).map(p => String(p.id));
                 const existingTagIds = (sceneRes?.data?.findScene?.tags || []).map(t => String(t.id));
-
-                const mergedPerformerIds = Array.from(new Set([...existingPerformerIds, ...performerIdsToAdd]));
-                const mergedTagIds = Array.from(new Set([...existingTagIds, ...tagIdsToAdd]));
-
-                const updateVars = { id: sceneId };
-                if (studioIdToSet) updateVars.studio_id = studioIdToSet;
-                if (mergedPerformerIds.length > 0) updateVars.performer_ids = mergedPerformerIds;
-                if (mergedTagIds.length > 0) updateVars.tag_ids = mergedTagIds;
-                if (isDateChecked && match.date) updateVars.date = match.date;
-                if (isDetailsChecked && match.details) updateVars.details = match.details;
-                if (isCoverChecked && match.image) updateVars.cover_image = match.image;
-                if (isTitleChecked && match.title) updateVars.title = match.title;
+                const {
+                    updateInput: updateVars,
+                    mergedPerformerIds,
+                    mergedTagIds
+                } = buildScrapeUpdateInput({
+                    sceneId,
+                    match,
+                    selection: scrapeSelection,
+                    studioIdToSet,
+                    performerIdsToAdd,
+                    tagIdsToAdd,
+                    existingPerformerIds,
+                    existingTagIds,
+                    includeCover: true,
+                    onlyChangedCollections: false
+                });
 
                 const updateRes = await fetchGQL(`
                     mutation DirectSceneUpdate($input: SceneUpdateInput!) {

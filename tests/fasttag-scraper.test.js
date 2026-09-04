@@ -61,6 +61,67 @@ assert.deepEqual(
     ['Fingerprint is a match']
 );
 
+const checkboxes = new Map([
+    ['#fasttag-scrape-chk-studio', { checked: true }],
+    ['#fasttag-scrape-chk-title', { checked: false }],
+    ['#fasttag-scrape-chk-date', { checked: true }],
+    ['#fasttag-scrape-chk-cover', { checked: true }],
+    ['#fasttag-scrape-chk-details', { checked: false }]
+]);
+const selection = scraper.readScrapeFieldSelection({
+    querySelector: selector => checkboxes.get(selector) || null,
+    querySelectorAll: selector => selector.includes('perf')
+        ? [{ getAttribute: () => '2' }, { getAttribute: () => '0' }]
+        : [{ getAttribute: () => '1' }]
+});
+assert.deepEqual(selection, {
+    studio: true,
+    title: false,
+    date: true,
+    cover: true,
+    details: false,
+    performerIndices: [2, 0],
+    tagIndices: [1]
+});
+assert.deepEqual(scraper.mergeUniqueIds([1, '2'], ['2', 3]), ['1', '2', '3']);
+
+const payloadOptions = {
+    sceneId: 'scene-9',
+    match: { title: 'New title', date: '2026-09-04', details: 'Details', image: 'cover-data' },
+    selection: { title: true, date: true, details: true, cover: true },
+    studioIdToSet: '10',
+    performerIdsToAdd: ['2', '3'],
+    tagIdsToAdd: [],
+    existingPerformerIds: ['1', '2'],
+    existingTagIds: ['8']
+};
+assert.deepEqual(scraper.buildScrapeUpdateInput(payloadOptions), {
+    updateInput: {
+        id: 'scene-9',
+        studio_id: '10',
+        performer_ids: ['1', '2', '3'],
+        date: '2026-09-04',
+        details: 'Details',
+        title: 'New title'
+    },
+    mergedPerformerIds: ['1', '2', '3'],
+    mergedTagIds: ['8']
+});
+assert.deepEqual(scraper.buildScrapeUpdateInput({
+    ...payloadOptions,
+    includeCover: true,
+    onlyChangedCollections: false
+}).updateInput, {
+    id: 'scene-9',
+    studio_id: '10',
+    performer_ids: ['1', '2', '3'],
+    tag_ids: ['8'],
+    date: '2026-09-04',
+    details: 'Details',
+    cover_image: 'cover-data',
+    title: 'New title'
+});
+
 async function testHashMatch() {
     const calls = [];
     scraper.configure({
