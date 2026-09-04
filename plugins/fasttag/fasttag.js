@@ -19,6 +19,8 @@
     if (!FastTagCore) throw new Error('[FastTag] fasttag-core.js must load before fasttag.js');
     const FastTagStorage = window.FastTag?.storage;
     if (!FastTagStorage) throw new Error('[FastTag] fasttag-storage.js must load before fasttag.js');
+    const FastTagIntegrations = window.FastTag?.integrations;
+    if (!FastTagIntegrations) throw new Error('[FastTag] fasttag-integrations.js must load before fasttag.js');
     const {
         escapeHtml,
         cleanTitleForScraping,
@@ -82,6 +84,12 @@
         addRecentEntry,
         addRecentEntriesFromSelection
     } = FastTagStorage;
+    const {
+        resetRefractSceneCards,
+        syncSceneToApolloCache,
+        refreshSceneCards,
+        refreshSceneCardsDebounced
+    } = FastTagIntegrations;
 
     console.log('[FastTag v4.2.8] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
 
@@ -4209,154 +4217,6 @@
         }
     }
 
-    const apolloSceneSyncSuccess = new Set();
-
-    function syncSceneToApolloCache(sceneData) {
-        if (!sceneData || !sceneData.id) return false;
-        const sceneIdStr = String(sceneData.id);
-
-        // Refract Theme compatibility: strip its "already processed" marker on this specific card
-        try {
-            document.querySelectorAll(
-                `.scene-card a[href^="/scenes/${sceneIdStr}?"], ` +
-                `.scene-card a[href="/scenes/${sceneIdStr}"], ` +
-                `.scene-card a[href^="/scenes/${sceneIdStr}/"]`
-            ).forEach(a => {
-                const card = a.closest('.scene-card');
-                if (card) {
-                    card.removeAttribute('data-stash-sc');
-                    card.querySelectorAll('.stash-performer-circles').forEach(el => el.remove());
-                }
-            });
-        } catch (e) {}
-
-        const apollo = window.__APOLLO_CLIENT__;
-        if (!apollo || !apollo.cache) return false;
-
-        try {
-            const cacheId = (typeof apollo.cache.identify === 'function' && apollo.cache.identify({ __typename: 'Scene', id: sceneIdStr })) || `Scene:${sceneIdStr}`;
-
-            const fieldsToUpdate = {};
-
-            if (sceneData.tags !== undefined) {
-                fieldsToUpdate.tags = (existing, { toReference }) => {
-                    return (sceneData.tags || []).map(t => {
-                        const ref = typeof toReference === 'function' ? toReference({ __typename: 'Tag', id: String(t.id), name: t.name }) : null;
-                        return ref || { __typename: 'Tag', id: String(t.id), name: t.name };
-                    });
-                };
-            }
-
-            if (sceneData.performers !== undefined) {
-                fieldsToUpdate.performers = (existing, { toReference }) => {
-                    return (sceneData.performers || []).map(p => {
-                        const perfObj = {
-                            __typename: 'Performer',
-                            id: String(p.id),
-                            name: p.name,
-                            disambiguation: p.disambiguation || null,
-                            gender: p.gender || null,
-                            image_path: p.image_path || null
-                        };
-                        const ref = typeof toReference === 'function' ? toReference(perfObj) : null;
-                        return ref || perfObj;
-                    });
-                };
-            }
-
-            if (sceneData.studio !== undefined) {
-                fieldsToUpdate.studio = (existing, { toReference }) => {
-                    if (!sceneData.studio) return null;
-                    const stObj = {
-                        __typename: 'Studio',
-                        id: String(sceneData.studio.id),
-                        name: sceneData.studio.name,
-                        image_path: sceneData.studio.image_path || null
-                    };
-                    const ref = typeof toReference === 'function' ? toReference(stObj) : null;
-                    return ref || stObj;
-                };
-            }
-
-            if (sceneData.organized !== undefined) {
-                fieldsToUpdate.organized = () => Boolean(sceneData.organized);
-            }
-
-            if (sceneData.title !== undefined) {
-                fieldsToUpdate.title = () => sceneData.title;
-            }
-
-            if (sceneData.date !== undefined) {
-                fieldsToUpdate.date = () => sceneData.date;
-            }
-
-            if (Object.keys(fieldsToUpdate).length > 0) {
-                apollo.cache.modify({
-                    id: cacheId,
-                    fields: fieldsToUpdate
-                });
-                apolloSceneSyncSuccess.add(sceneIdStr);
-                return true;
-            }
-        } catch (err) {
-            console.warn('[FastTag] Error updating Apollo scene cache directly:', err);
-        }
-        return false;
-    }
-
-    async function refreshSceneCards(sceneId = null) {
-        const resetRefractCards = () => {
-            try {
-                if (sceneId) {
-                    const sIdStr = String(sceneId);
-                    document.querySelectorAll(
-                        `.scene-card a[href^="/scenes/${sIdStr}?"], ` +
-                        `.scene-card a[href="/scenes/${sIdStr}"], ` +
-                        `.scene-card a[href^="/scenes/${sIdStr}/"]`
-                    ).forEach(a => {
-                        const card = a.closest('.scene-card');
-                        if (card) {
-                            card.removeAttribute('data-stash-sc');
-                            card.querySelectorAll('.stash-performer-circles').forEach(el => el.remove());
-                        }
-                    });
-                } else {
-                    document.querySelectorAll('.scene-card').forEach(card => {
-                        card.removeAttribute('data-stash-sc');
-                        card.querySelectorAll('.stash-performer-circles').forEach(el => el.remove());
-                    });
-                }
-            } catch (e) {}
-        };
-
-        resetRefractCards();
-
-        const apollo = window.__APOLLO_CLIENT__;
-        if (!apollo || typeof apollo.getObservableQueries !== 'function') return false;
-
-        const sceneQueries = [...apollo.getObservableQueries().values()].filter(query => {
-            const queryName = query.queryName || query.options?.query?.definitions?.[0]?.name?.value || '';
-            const queryText = query.options?.query?.loc?.source?.body || '';
-            return (queryName === 'FindScenes' || queryText.includes('FindScenes') || queryName.includes('Scene')) && typeof query.refetch === 'function';
-        });
-
-        if (!sceneQueries.length) return false;
-        await Promise.all(sceneQueries.map(query => query.refetch()));
-
-        // Also clean after Apollo refetch resolves and React updates the DOM
-        setTimeout(resetRefractCards, 60);
-        setTimeout(resetRefractCards, 300);
-        return true;
-    }
-
-    let refreshSceneCardsTimer = null;
-    function refreshSceneCardsDebounced(sceneId = null, delayMs = 150) {
-        clearTimeout(refreshSceneCardsTimer);
-        refreshSceneCardsTimer = setTimeout(() => {
-            refreshSceneCards(sceneId);
-        }, delayMs);
-    }
-
     async function updateEntityForScene(type, sceneId, selectedIds) {
         const config = ENTITY_CONFIG[type];
         const res = await fetchGQL(config.updateQuery, config.updateVariables(sceneId, selectedIds));
@@ -4367,22 +4227,7 @@
         if (res?.data?.sceneUpdate) {
             syncSceneToApolloCache(res.data.sceneUpdate);
         }
-        // Refract Theme compatibility: strip its "already processed" marker and circles
-        // so it re-queries fresh data for this card on its next MutationObserver pass.
-        try {
-            const sceneIdStr = String(sceneId);
-            document.querySelectorAll(
-                `.scene-card a[href^="/scenes/${sceneIdStr}?"], ` +
-                `.scene-card a[href="/scenes/${sceneIdStr}"], ` +
-                `.scene-card a[href^="/scenes/${sceneIdStr}/"]`
-            ).forEach(a => {
-                const card = a.closest('.scene-card');
-                if (card) {
-                    card.removeAttribute('data-stash-sc');
-                    card.querySelectorAll('.stash-performer-circles').forEach(el => el.remove());
-                }
-            });
-        } catch (e) {}
+        resetRefractSceneCards(sceneId);
         return true;
     }
 
@@ -12442,21 +12287,7 @@
                                 if (grp) addRecentEntry('groups', grp);
                             });
 
-                            // Refract Theme compatibility: strip its "already processed" marker and circles
-                            try {
-                                const sIdStr = String(currentSceneId);
-                                document.querySelectorAll(
-                                    `.scene-card a[href^="/scenes/${sIdStr}?"], ` +
-                                    `.scene-card a[href="/scenes/${sIdStr}"], ` +
-                                    `.scene-card a[href^="/scenes/${sIdStr}/"]`
-                                ).forEach(a => {
-                                    const card = a.closest('.scene-card');
-                                    if (card) {
-                                        card.removeAttribute('data-stash-sc');
-                                        card.querySelectorAll('.stash-performer-circles').forEach(el => el.remove());
-                                    }
-                                });
-                            } catch (e) {}
+                            resetRefractSceneCards(currentSceneId);
 
                             refreshSceneCardsDebounced(currentSceneId);
                             recordSaveUsage();
