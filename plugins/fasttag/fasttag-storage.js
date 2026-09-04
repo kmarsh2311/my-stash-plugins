@@ -16,6 +16,14 @@
         geminiSuggestions: 'fasttag_gemini_suggestions',
         autoMarkOrganized: 'stash_fast_tag_auto_mark_organized'
     });
+    const RECENT_KEYS = Object.freeze({
+        tags: 'stash_fast_tag_recent_tags',
+        performers: 'stash_fast_tag_recent_performers',
+        galleries: 'stash_fast_tag_recent_galleries',
+        studios: 'stash_fast_tag_recent_studios',
+        groups: 'stash_fast_tag_recent_groups'
+    });
+    const PINNED_PREFIX = 'stash_fast_tag_pinned_';
 
     function readBoolean(key, defaultValue) {
         const value = root.localStorage.getItem(key);
@@ -60,6 +68,56 @@
     function getAutoMarkOrganized() { return root.localStorage.getItem(KEYS.autoMarkOrganized) === 'true'; }
     function setAutoMarkOrganized(enabled) { writeBoolean(KEYS.autoMarkOrganized, enabled); }
 
+    function readPinnedEntries(type) {
+        try {
+            const raw = root.localStorage.getItem(PINNED_PREFIX + type);
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function writePinnedEntries(type, value) {
+        try {
+            root.localStorage.setItem(PINNED_PREFIX + type, JSON.stringify(Array.isArray(value) ? value : []));
+        } catch (e) {}
+    }
+
+    function readRecentEntries(type) {
+        try {
+            const key = RECENT_KEYS[type];
+            if (!key) return [];
+            const raw = root.localStorage.getItem(key);
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function writeRecentEntries(type, value) {
+        try {
+            const key = RECENT_KEYS[type];
+            if (!key) return;
+            root.localStorage.setItem(key, JSON.stringify((Array.isArray(value) ? value : []).slice(0, 24)));
+        } catch (e) {}
+    }
+
+    function addRecentEntry(type, item) {
+        if (!item) return;
+        const name = item.name || item.title;
+        if (!name) return;
+        const list = readRecentEntries(type).filter(entry => entry && (entry.name || entry.title) && (entry.name || entry.title) !== name);
+        list.unshift({ id: item.id, name });
+        writeRecentEntries(type, list);
+    }
+
+    function addRecentEntriesFromSelection(type, selectedItems) {
+        if (!Array.isArray(selectedItems)) return;
+        selectedItems.filter(Boolean).forEach(item => addRecentEntry(type, item));
+    }
+
     root.FastTag = root.FastTag || {};
     root.FastTag.storage = Object.freeze({
         getAutoScrapeSequential,
@@ -87,6 +145,12 @@
         getGeminiSuggestions,
         setGeminiSuggestions,
         getAutoMarkOrganized,
-        setAutoMarkOrganized
+        setAutoMarkOrganized,
+        readPinnedEntries,
+        writePinnedEntries,
+        readRecentEntries,
+        writeRecentEntries,
+        addRecentEntry,
+        addRecentEntriesFromSelection
     });
 }(typeof window !== 'undefined' ? window : globalThis));

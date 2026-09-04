@@ -58,7 +58,13 @@
         getGeminiSuggestions,
         setGeminiSuggestions,
         getAutoMarkOrganized,
-        setAutoMarkOrganized
+        setAutoMarkOrganized,
+        readPinnedEntries,
+        writePinnedEntries,
+        readRecentEntries,
+        writeRecentEntries,
+        addRecentEntry,
+        addRecentEntriesFromSelection
     } = FastTagStorage;
 
     console.log('[FastTag v4.2.8] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
@@ -327,14 +333,6 @@
         popupPosition: { left: 0, top: 0 },
         initialSelectedIds: new Set(),
         getSelectedIdsFn: null
-    };
-
-    const recentStorageKeys = {
-        tags: 'stash_fast_tag_recent_tags',
-        performers: 'stash_fast_tag_recent_performers',
-        galleries: 'stash_fast_tag_recent_galleries',
-        studios: 'stash_fast_tag_recent_studios',
-        groups: 'stash_fast_tag_recent_groups'
     };
 
     // --- Scroll Restoration ---
@@ -3207,23 +3205,6 @@
         }
     }
 
-    const PINNED_STORAGE_PREFIX = 'stash_fast_tag_pinned_';
-    function readPinnedEntries(type) {
-        try {
-            const raw = localStorage.getItem(PINNED_STORAGE_PREFIX + type);
-            const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-            return [];
-        }
-    }
-
-    function writePinnedEntries(type, value) {
-        try {
-            localStorage.setItem(PINNED_STORAGE_PREFIX + type, JSON.stringify(Array.isArray(value) ? value : []));
-        } catch (e) {}
-    }
-
     function togglePinnedEntry(type, item) {
         if (!item || !item.id) return;
         const name = item.name || item.title;
@@ -3237,36 +3218,6 @@
             showToast(`Pinned ${name} 📌`, 'success');
         }
         writePinnedEntries(type, list);
-    }
-
-    function readRecentEntries(type) {
-        try {
-            const raw = localStorage.getItem(recentStorageKeys[type]);
-            const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-            return [];
-        }
-    }
-
-    function writeRecentEntries(type, value) {
-        try {
-            localStorage.setItem(recentStorageKeys[type], JSON.stringify((Array.isArray(value) ? value : []).slice(0, 24)));
-        } catch (e) {}
-    }
-
-    function addRecentEntry(type, item) {
-        if (!item) return;
-        const name = item.name || item.title;
-        if (!name) return;
-        const list = readRecentEntries(type).filter(entry => entry && (entry.name || entry.title) && (entry.name || entry.title) !== name);
-        list.unshift({ id: item.id, name: name });
-        writeRecentEntries(type, list);
-    }
-
-    function addRecentEntriesFromSelection(type, selectedItems) {
-        if (!Array.isArray(selectedItems)) return;
-        selectedItems.filter(Boolean).forEach(item => addRecentEntry(type, item));
     }
 
     // --- Bulk Scene Selection Detection ---
