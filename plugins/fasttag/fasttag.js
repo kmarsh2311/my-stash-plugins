@@ -19,11 +19,13 @@
     if (!FastTagCore) throw new Error('[FastTag] fasttag-core.js must load before fasttag.js');
     const {
         escapeHtml,
+        cleanTitleForScraping,
         formatTime,
         formatDurationSec,
         parseDurationSec,
         cleanFilenameForSuggestions,
         normalizeTextForSuggestions,
+        isSuggestionMatch,
         extractSceneId,
         findSceneCardForContextTarget,
         isScenePreviewContextTarget
@@ -6303,16 +6305,6 @@
         }
     }, true);
 
-    function cleanTitleForScraping(rawStr) {
-        if (!rawStr) return '';
-        let clean = String(rawStr).replace(/\.[a-zA-Z0-9]{2,5}$/, '');
-        clean = clean.replace(/[\b\._-](2160p|1080p|720p|480p|4k|uhd|hd|sd|fhd|hevc|x264|x265|h264|h265|aac|dvdrip|webrip|bluray|mp4|mkv|avi|wmv)[\b\._-]/gi, ' ');
-        clean = clean.replace(/[\b\._-](2160p|1080p|720p|480p|4k|uhd|hd|sd|fhd|hevc|x264|x265|h264|h265|aac|dvdrip|webrip|bluray|mp4|mkv|avi|wmv)$/gi, '');
-        clean = clean.replace(/[\._\-+]/g, ' ');
-        clean = clean.replace(/\s+/g, ' ').trim();
-        return clean;
-    }
-
     // Temporary in-memory session cache for active scrape results (cleared when popup is closed)
     const sessionScrapeCache = new Map();
 
@@ -7628,89 +7620,6 @@
     }
 
     // --- Smart Suggestions Engine ---
-    const SUGGESTION_STOP_WORDS = new Set([
-        'a', 'an', 'and', 'the', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
-        'from', 'as', 'is', 'it', 'or', 'be', 'are', 'was', 'were', 'not', 'no',
-        'he', 'she', 'his', 'her', 'my', 'me', 'you', 'your', 'we', 'our', 'they',
-        'them', 'their', 'this', 'that', 'these', 'those', 'all', 'any', 'some',
-        'new', 'top', 'hot', 'big', 'get', 'set', 'out', 'up', 'down', 'man', 'men',
-        'full', 'clip', 'part', 'scene', 'video', 'best', 'good', 'raw', 'free', 'one', 'two'
-    ]);
-
-    function isSuggestionMatch(item, normalizedSpaced, tokenSet, tokens = null) {
-        if (!item) return false;
-        if (!tokens) {
-            tokens = normalizedSpaced.trim().split(/\s+/).filter(Boolean);
-        }
-        const namesToCheck = [];
-        if (item.name) namesToCheck.push({ name: item.name, isPrimary: true });
-        if (item.title && item.title !== item.name) namesToCheck.push({ name: item.title, isPrimary: true });
-        if (item.sort_name && item.sort_name !== item.name) namesToCheck.push({ name: item.sort_name, isPrimary: false });
-
-        if (Array.isArray(item.alias_list)) {
-            item.alias_list.forEach(a => { if (a && typeof a === 'string') namesToCheck.push({ name: a, isPrimary: false }); });
-        } else if (typeof item.alias_list === 'string' && item.alias_list.trim()) {
-            item.alias_list.split(',').forEach(a => { if (a.trim()) namesToCheck.push({ name: a.trim(), isPrimary: false }); });
-        }
-
-        if (Array.isArray(item.aliases)) {
-            item.aliases.forEach(a => { if (a && typeof a === 'string') namesToCheck.push({ name: a, isPrimary: false }); });
-        } else if (typeof item.aliases === 'string' && item.aliases.trim()) {
-            item.aliases.split(',').forEach(a => { if (a.trim()) namesToCheck.push({ name: a.trim(), isPrimary: false }); });
-        }
-
-        const primaryWords = normalizeTextForSuggestions(item.name || item.title || '').split(/\s+/).filter(Boolean);
-        const isPrimaryMultiWord = primaryWords.length > 1;
-
-        for (const { name: raw, isPrimary } of namesToCheck) {
-            const clean = normalizeTextForSuggestions(raw);
-            if (!clean || clean.length < 2) continue;
-
-            if (!isPrimary) {
-                const aliasWords = clean.split(/\s+/).filter(Boolean);
-                if (isPrimaryMultiWord && aliasWords.length === 1) {
-                    continue;
-                }
-                if (clean.length <= 3 || SUGGESTION_STOP_WORDS.has(clean)) {
-                    continue;
-                }
-            }
-
-            if (normalizedSpaced.includes(' ' + clean + ' ')) return true;
-
-            const words = clean.split(/\s+/).filter(Boolean);
-            const compact = clean.replace(/\s+/g, '');
-            if (words.length > 1) {
-                if (compact.length >= 4 && tokenSet.has(compact)) return true;
-                if (words.every(w => tokenSet.has(w))) return true;
-            } else if (words.length === 1 && clean.length >= 3 && !SUGGESTION_STOP_WORDS.has(clean)) {
-                if (tokenSet.has(clean)) return true;
-            }
-
-            // Check if adjacent tokens in scene text combine to match compact (e.g. "only" + "fans" matches "onlyfans")
-            if (compact.length >= 4 && tokens && tokens.length > 1) {
-                for (let i = 0; i < tokens.length - 1; i++) {
-                    if (tokens[i] + tokens[i + 1] === compact) return true;
-                    if (i < tokens.length - 2 && tokens[i] + tokens[i + 1] + tokens[i + 2] === compact) return true;
-                }
-            }
-
-            // Plural / singular stemming check (e.g. "Tattoo" matches "tattoos", "Piercings" matches "piercing")
-            if (clean.length >= 4 && !SUGGESTION_STOP_WORDS.has(clean)) {
-                if (clean.endsWith('s')) {
-                    const singular = clean.slice(0, -1);
-                    if (singular.length >= 3 && (tokenSet.has(singular) || normalizedSpaced.includes(' ' + singular + ' '))) return true;
-                } else {
-                    const plural = clean + 's';
-                    if (tokenSet.has(plural) || normalizedSpaced.includes(' ' + plural + ' ')) return true;
-                    const pluralEs = clean + 'es';
-                    if (tokenSet.has(pluralEs) || normalizedSpaced.includes(' ' + pluralEs + ' ')) return true;
-                }
-            }
-        }
-        return false;
-    }
-
     async function fetchSceneSmartSuggestions(type, sceneId, allAvailableItems, existingIds, cardElement) {
         if (!getEnableSuggestions() || !sceneId || !allAvailableItems || !allAvailableItems.length) return [];
         try {

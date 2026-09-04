@@ -26,6 +26,23 @@ assert.equal(core.cleanFilenameForSuggestions('MyScene 1080p.mp4'), 'MyScene ');
 assert.equal(core.cleanFilenameForSuggestions('MyScene_1080p_x264.mkv'), 'MyScene__');
 assert.equal(core.normalizeTextForSuggestions('CaféScene4K'), 'cafe scene 4 k');
 assert.equal(core.normalizeTextForSuggestions('CafeScene4K'), 'cafe scene 4 k');
+assert.equal(core.cleanTitleForScraping('Example.Scene_1080p.mp4'), 'Example Scene');
+
+function matches(item, text) {
+    const normalized = core.normalizeTextForSuggestions(text);
+    const tokens = normalized.split(/\s+/).filter(Boolean);
+    return core.isSuggestionMatch(item, ` ${normalized} `, new Set(tokens), tokens);
+}
+
+assert.equal(matches({ name: 'Onlyfans' }, 'Only Fans'), true);
+assert.equal(matches({ name: 'Deep Throat' }, 'Deepthroat'), true);
+assert.equal(matches({ name: 'Tattoo' }, 'Tattoos'), true);
+assert.equal(matches({ name: 'Piercings' }, 'Piercing'), true);
+assert.equal(matches({ name: 'Robert', alias_list: ['Bobby'] }, 'Bobby arrives'), true);
+assert.equal(matches({ name: 'Angel of Bogota', alias_list: ['Angel'] }, 'Angel arrives'), false);
+assert.equal(matches({ name: 'Café Scene' }, 'CafeScene'), true);
+// Existing behaviour: primary tag names can exact-match even when listed as stop words.
+assert.equal(matches({ name: 'Man' }, 'A man arrives'), true);
 
 const sceneLink = { href: 'http://localhost:9999/scenes/abc-123?continue=true' };
 const sceneCard = {
