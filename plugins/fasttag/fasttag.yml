@@ -10,9 +10,11 @@ ui:
     - fasttag-integrations.js
     - fasttag-gemini.js
     - fasttag-scraper.js
+    - fasttag-scraper-ui.js
     - fasttag-preview.js
     - fasttag-ui.js
     - fasttag-editors.js
+    - fasttag-workflows.js
     - fasttag.js
   css:
     - tabulator.min.css

@@ -27,12 +27,16 @@
     if (!FastTagGemini) throw new Error('[FastTag] fasttag-gemini.js must load before fasttag.js');
     const FastTagScraper = window.FastTag?.scraper;
     if (!FastTagScraper) throw new Error('[FastTag] fasttag-scraper.js must load before fasttag.js');
+    const FastTagScraperUi = window.FastTag?.scraperUi;
+    if (!FastTagScraperUi) throw new Error('[FastTag] fasttag-scraper-ui.js must load before fasttag.js');
     const FastTagPreview = window.FastTag?.preview;
     if (!FastTagPreview) throw new Error('[FastTag] fasttag-preview.js must load before fasttag.js');
     const FastTagUi = window.FastTag?.ui;
     if (!FastTagUi) throw new Error('[FastTag] fasttag-ui.js must load before fasttag.js');
     const FastTagEditors = window.FastTag?.editors;
     if (!FastTagEditors) throw new Error('[FastTag] fasttag-editors.js must load before fasttag.js');
+    const FastTagWorkflows = window.FastTag?.workflows;
+    if (!FastTagWorkflows) throw new Error('[FastTag] fasttag-workflows.js must load before fasttag.js');
     const {
         escapeHtml,
         cleanTitleForScraping,
@@ -113,6 +117,11 @@
         fetchScraperMatchesForScene
     } = FastTagScraper;
     const {
+        getAssessmentPresentation,
+        getAcceptPresentation,
+        getPerformerPresentation
+    } = FastTagScraperUi;
+    const {
         getDominantWheelDelta,
         getWheelNotches,
         selectScrubStep,
@@ -122,6 +131,7 @@
         fetchSceneMediaUrls: fetchSceneMediaUrlsFromModule
     } = FastTagPreview;
     const { getOptimalPopupSize, getDefaultEverythingPosition } = FastTagUi;
+    const { dismissIndexedResult, replaceResults } = FastTagWorkflows;
     const {
         hasSelectionSetChanged,
         calculateBulkSelectionDelta,
@@ -5603,34 +5613,29 @@
                 matchingDurFps
             } = analyzeScraperMatch(match);
 
+            const performerPresentation = getPerformerPresentation(match);
             let performerMatchBadge = '';
-            if (match._hasLinkedPerformers) {
-                const overlapNames = match._performerOverlapNames || [];
+            if (performerPresentation) {
+                const overlapNames = performerPresentation.overlapNames;
                 if (overlapNames.length > 0) {
                     performerMatchBadge = `
                         <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #34d399; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="Matches performer already linked to this scene: ${escapeHtml(overlapNames.join(', '))}">
-                            <span>★</span><span>Performer Match (${match._performerOverlapCount}/${match._linkedPerformerCount})</span>
+                            <span>★</span><span>Performer Match (${performerPresentation.overlapCount}/${performerPresentation.linkedCount})</span>
                         </span>
                     `;
                 } else {
                     performerMatchBadge = `
-                        <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #fbbf24; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="None of this result's performers match the ${match._linkedPerformerCount} performer(s) already linked to your scene. Check the result carefully before accepting it.">
+                        <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #fbbf24; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="None of this result's performers match the ${performerPresentation.linkedCount} performer(s) already linked to your scene. Check the result carefully before accepting it.">
                             <span>⚠</span><span>No Linked Performer Match</span>
                         </span>
                     `;
                 }
             }
 
-            const assessmentLabels = {
-                strong: ['Strong Match', '#34d399', 'rgba(16, 185, 129, 0.15)', 'rgba(16, 185, 129, 0.35)'],
-                likely: ['Likely Match', '#34d399', 'rgba(16, 185, 129, 0.15)', 'rgba(16, 185, 129, 0.35)'],
-                possible: ['Possible Match', '#fbbf24', 'rgba(245, 158, 11, 0.15)', 'rgba(245, 158, 11, 0.4)'],
-                unlikely: ['Likely Wrong Scene', '#f87171', 'rgba(239, 68, 68, 0.15)', 'rgba(239, 68, 68, 0.4)']
-            };
-            const assessment = assessmentLabels[match._matchAssessment];
+            const assessment = getAssessmentPresentation(match);
             const assessmentBadge = assessment ? `
-                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 700; color: ${assessment[1]}; background: ${assessment[2]}; border: 1px solid ${assessment[3]}; padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="${escapeHtml((match._matchReasons || []).join(' • '))}">
-                    <span>${match._matchAssessment === 'unlikely' ? '⚠' : '✓'}</span><span>${assessment[0]}</span>
+                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 700; color: ${assessment.color}; background: ${assessment.background}; border: 1px solid ${assessment.border}; padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="${escapeHtml(assessment.tooltip)}">
+                    <span>${assessment.icon}</span><span>${assessment.label}</span>
                 </span>
             ` : '';
 
@@ -5639,12 +5644,12 @@
                     <span>⚠</span><span>Studio Mismatch</span>
                 </span>
             ` : '';
-            const additionalPerformerBadge = match._additionalPerformerCount > 0 ? `
-                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #fbbf24; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="The scraped result contains additional performer(s) not currently linked to this scene: ${escapeHtml((match._additionalPerformerNames || []).join(', '))}">
-                    <span>＋</span><span>${match._additionalPerformerCount} Additional Performer${match._additionalPerformerCount === 1 ? '' : 's'}</span>
+            const additionalPerformerBadge = performerPresentation?.additionalCount > 0 ? `
+                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #fbbf24; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="The scraped result contains additional performer(s) not currently linked to this scene: ${escapeHtml(performerPresentation.additionalNames.join(', '))}">
+                    <span>＋</span><span>${performerPresentation.additionalCount} Additional Performer${performerPresentation.additionalCount === 1 ? '' : 's'}</span>
                 </span>
             ` : '';
-            const requiresReview = match._matchAssessment === 'unlikely';
+            const acceptPresentation = getAcceptPresentation(match);
 
             let durationBadge = '';
             if (scrapedDurSec && localDurSec) {
@@ -5720,8 +5725,8 @@
                                 </svg>
                                 <span>${isDetached ? 'Dock' : 'Pop Out'}</span>
                             </button>
-                            <button type="button" id="fasttag-scrape-accept-btn" style="background: ${requiresReview ? '#b45309' : '#059669'}; border: 1px solid ${requiresReview ? '#f59e0b' : '#10b981'}; color: #ffffff; padding: 2.5px 7px; border-radius: 4px; font-size: 10px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 2px; box-shadow: 0 1px 4px ${requiresReview ? 'rgba(180,83,9,0.4)' : 'rgba(5,150,105,0.4)'}; line-height: 1.2; transition: all 0.15s ease; white-space: nowrap; flex-shrink: 0;" title="${requiresReview ? 'This result has conflicting evidence; review it carefully before saving' : 'Accept match and save metadata'}">
-                                <span>${requiresReview ? '⚠ Review & Accept' : '✓ Accept'}</span>
+                            <button type="button" id="fasttag-scrape-accept-btn" style="background: ${acceptPresentation.background}; border: 1px solid ${acceptPresentation.border}; color: #ffffff; padding: 2.5px 7px; border-radius: 4px; font-size: 10px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 2px; box-shadow: 0 1px 4px ${acceptPresentation.shadow}; line-height: 1.2; transition: all 0.15s ease; white-space: nowrap; flex-shrink: 0;" title="${acceptPresentation.title}">
+                                <span>${acceptPresentation.label}</span>
                             </button>
                         </div>
                     </div>
@@ -5980,7 +5985,7 @@
                         }
                         return;
                     }
-                    results.splice(0, results.length, ...manualResults);
+                    replaceResults(results, manualResults);
                     sessionScrapeCache.set(sceneId, results);
                     currentIndex = 0;
                     hideScrapeCoverTooltip();
@@ -6012,14 +6017,14 @@
                     event.preventDefault();
                     event.stopPropagation();
                     hideScrapeCoverTooltip();
-                    results.splice(currentIndex, 1);
-                    if (results.length === 0) {
+                    const dismissal = dismissIndexedResult(results, currentIndex);
+                    if (dismissal.results.length === 0) {
                         sessionScrapeCache.delete(sceneId);
                         renderScraperMatchCard(container, results, sceneId, ctx, popup, onDismiss);
                         if (typeof onDismiss === 'function') onDismiss();
                         return;
                     }
-                    currentIndex = Math.min(currentIndex, results.length - 1);
+                    currentIndex = dismissal.index;
                     sessionScrapeCache.set(sceneId, results);
                     updateCardView();
                 };

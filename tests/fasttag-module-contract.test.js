@@ -16,9 +16,11 @@ const expectedOrder = [
     'fasttag-integrations.js',
     'fasttag-gemini.js',
     'fasttag-scraper.js',
+    'fasttag-scraper-ui.js',
     'fasttag-preview.js',
     'fasttag-ui.js',
     'fasttag-editors.js',
+    'fasttag-workflows.js',
     'fasttag.js'
 ];
 const javascriptSection = yaml.match(/javascript:\s*\n([\s\S]*?)\n\s*css:/)?.[1] || '';
@@ -28,7 +30,7 @@ assert.deepEqual(configuredOrder, expectedOrder, 'Stash must load FastTag module
 for (const file of expectedOrder) {
     assert.ok(fs.existsSync(path.join(pluginDirectory, file)), `${file} should exist`);
 }
-for (const namespace of ['Core', 'Entities', 'Storage', 'Integrations', 'Gemini', 'Scraper', 'Preview', 'Ui', 'Editors']) {
+for (const namespace of ['Core', 'Entities', 'Storage', 'Integrations', 'Gemini', 'Scraper', 'ScraperUi', 'Preview', 'Ui', 'Editors', 'Workflows']) {
     assert.ok(mainSource.includes(`FastTag${namespace}`), `main entry point should require FastTag${namespace}`);
 }
 assert.equal(mainSource.includes('LEGACY_'), false, 'legacy comparison declarations should be removed');

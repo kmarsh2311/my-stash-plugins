@@ -12,12 +12,16 @@ has passed.
 - `fasttag-integrations.js`: Apollo cache updates and Refract refresh handling
 - `fasttag-gemini.js`: Gemini bridge transport and scene parsing
 - `fasttag-scraper.js`: discovery, match analysis, entity resolution, and save payloads
+- `fasttag-scraper-ui.js`: scraper assessment and review presentation models
 - `fasttag-preview.js`: media discovery, scrubbing calculations, and HUD layout
 - `fasttag-ui.js`: shared popup sizing and workstation positioning
 - `fasttag-editors.js`: selection normalization and bulk-selection deltas
+- `fasttag-workflows.js`: tested result-list and navigation state transitions
 
 `fasttag.js` remains the runtime coordinator and owns DOM-heavy popup rendering,
 event wiring, navigation, and save orchestration.
+
+See `ARCHITECTURE.md` for the permanent ownership rules used for future work.
 
 ## Automated verification
 
