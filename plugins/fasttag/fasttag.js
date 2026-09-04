@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash FastTag
 // @namespace    http://tampermonkey.net/
-// @version      4.2.7
+// @version      4.2.8
 // @description  Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
@@ -15,7 +15,7 @@
 
 (async function() {
     'use strict';
-    console.log('[FastTag v4.2.7] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
+    console.log('[FastTag v4.2.8] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
 
     // Selection set of fields to update Apollo's in-memory SceneCard directly (0ms latency, eliminates 40-scene FindScenes refetch)
     const SCENE_CARD_UPDATE_FIELDS = `
@@ -15776,11 +15776,47 @@
     }
 
     // --- Global DOM Triggers ---
+    function findSceneCardForContextTarget(target) {
+        const element = target?.nodeType === Node.ELEMENT_NODE ? target : target?.parentElement;
+        if (!element || typeof element.closest !== 'function') return null;
+
+        const knownCard = element.closest('.scene-card, [class*="scene-card"], [class*="SceneCard"]');
+        if (knownCard && extractSceneId(knownCard)) return knownCard;
+
+        // Theme fallback: accept only a generic card that contains a real scene link.
+        // This avoids capturing right-clicks on unrelated cards elsewhere in Stash.
+        const genericCard = element.closest('.card, [class*="grid-card"]');
+        return genericCard && extractSceneId(genericCard) ? genericCard : null;
+    }
+
+    function isScenePreviewContextTarget(target, sceneCard) {
+        const element = target?.nodeType === Node.ELEMENT_NODE ? target : target?.parentElement;
+        if (!element || !sceneCard || typeof element.closest !== 'function') return false;
+
+        const mediaArea = element.closest([
+            '.thumbnail-section',
+            '.scene-card-preview',
+            '[class*="scene-card-preview"]',
+            '[class*="video-preview"]',
+            '[class*="media-preview"]',
+            '.video-js',
+            '[class*="video-controls"]',
+            '[class*="player-controls"]',
+            'video',
+            'audio'
+        ].join(', '));
+
+        return Boolean(mediaArea && sceneCard.contains(mediaArea));
+    }
+
     document.addEventListener('contextmenu', function(event) {
         if (activePopup) return;
         closeMenu();
-        const sceneCard = event.target.closest('.scene-card, [class*="scene-card"], [class*="SceneCard"]');
+        const sceneCard = findSceneCardForContextTarget(event.target);
         if (!sceneCard) return;
+
+        // Keep the browser's native menu on preview images, videos and media controls.
+        if (isScenePreviewContextTarget(event.target, sceneCard)) return;
 
         const sceneId = extractSceneId(sceneCard);
         if (sceneId) {

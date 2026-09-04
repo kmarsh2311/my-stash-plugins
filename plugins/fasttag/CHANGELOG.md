@@ -4,6 +4,13 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.2.8] - 2026-09-04
+
+### Fixed
+- **Consistent Scene-Card Right-Click Area**: FastTag now recognizes verified scene-card wrappers used by different Stash layouts and themes, making the context menu reliable across the card information area.
+- **Native Media Context Menu Preserved**: Right-clicking preview images, videos, or media controls continues to open the browser's normal context menu.
+- **Theme Compatibility**: The expanded card detection supports Refract-style card structure without changing FastTag's existing real-time Refract refresh integration or left-click entity shortcuts.
+
 ## [4.2.7] - 2026-09-04
 
 ### Added
