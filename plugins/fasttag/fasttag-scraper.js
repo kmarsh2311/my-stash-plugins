@@ -39,7 +39,58 @@
         return candidates;
     }
 
-    function enrichScraperMatches(matches, matchType, sourceName, localDuration, localFingerprints) {
+    function normalizePerformerName(value) {
+        if (!value) return '';
+        let normalized = String(value);
+        try {
+            normalized = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        } catch (e) {}
+        return normalized.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    }
+
+    function rankMatchesByLinkedPerformers(matches, linkedPerformers = []) {
+        if (!Array.isArray(matches)) return [];
+        const linked = (linkedPerformers || []).filter(Boolean);
+        if (linked.length === 0) return matches;
+        const linkedIds = new Set(linked.map(item => String(item.id || '')).filter(Boolean));
+        const linkedNames = new Map();
+
+        for (const performer of linked) {
+            const names = [performer.name];
+            if (Array.isArray(performer.alias_list)) names.push(...performer.alias_list);
+            else if (typeof performer.alias_list === 'string') names.push(...performer.alias_list.split(','));
+            for (const name of names) {
+                const normalized = normalizePerformerName(name);
+                if (normalized) linkedNames.set(normalized, performer.name || name);
+            }
+        }
+
+        const ranked = matches.map((match, originalIndex) => {
+            const overlapNames = new Set();
+            for (const remotePerformer of match?.performers || []) {
+                const storedId = String(remotePerformer?.stored_id || '');
+                const normalizedName = normalizePerformerName(remotePerformer?.name);
+                if (storedId && linkedIds.has(storedId)) {
+                    overlapNames.add(remotePerformer.name || `Performer #${storedId}`);
+                } else if (normalizedName && linkedNames.has(normalizedName)) {
+                    overlapNames.add(linkedNames.get(normalizedName));
+                }
+            }
+            match._hasLinkedPerformers = linked.length > 0;
+            match._linkedPerformerCount = linked.length;
+            match._performerOverlapNames = Array.from(overlapNames);
+            match._performerOverlapCount = overlapNames.size;
+            return { match, originalIndex };
+        });
+
+        ranked.sort((a, b) =>
+            b.match._performerOverlapCount - a.match._performerOverlapCount ||
+            a.originalIndex - b.originalIndex
+        );
+        return ranked.map(entry => entry.match);
+    }
+
+    function enrichScraperMatches(matches, matchType, sourceName, localDuration, localFingerprints, linkedPerformers = []) {
         if (!Array.isArray(matches)) return [];
         matches.forEach(match => {
             match._matchType = matchType;
@@ -47,7 +98,7 @@
             match._localDuration = localDuration;
             match._localFingerprints = localFingerprints;
         });
-        return matches;
+        return rankMatchesByLinkedPerformers(matches, linkedPerformers);
     }
 
     function analyzeScraperMatch(match) {
@@ -192,9 +243,10 @@
         let sceneFileName = '';
         let localDuration = null;
         let localFingerprints = [];
+        let linkedPerformers = [];
 
         try {
-            const query = 'query ($id: ID!) { findScene(id: $id) { id title details files { path duration fingerprints { type value } } } }';
+            const query = 'query ($id: ID!) { findScene(id: $id) { id title details performers { id name alias_list } files { path duration fingerprints { type value } } } }';
             const response = await fetchGQL(query, { id: sceneId });
             const scene = response?.data?.findScene;
             if (scene) {
@@ -206,11 +258,12 @@
                 }
                 if (firstFile?.duration) localDuration = firstFile.duration;
                 if (firstFile?.fingerprints) localFingerprints = firstFile.fingerprints;
+                linkedPerformers = scene.performers || [];
             }
         } catch (e) {}
 
         const enrich = (matches, matchType, sourceName) => enrichScraperMatches(
-            matches, matchType, sourceName, localDuration, localFingerprints
+            matches, matchType, sourceName, localDuration, localFingerprints, linkedPerformers
         );
 
         try {
@@ -268,6 +321,7 @@
     root.FastTag.scraper = Object.freeze({
         configure,
         buildScrapeCandidateQueries,
+        rankMatchesByLinkedPerformers,
         enrichScraperMatches,
         analyzeScraperMatch,
         readScrapeFieldSelection,

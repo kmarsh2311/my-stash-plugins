@@ -33,6 +33,19 @@ assert.deepEqual(originalMatches[0], {
 });
 assert.deepEqual(scraper.enrichScraperMatches(null, 'hash', 'StashDB', null, []), []);
 
+const performerRanked = scraper.rankMatchesByLinkedPerformers([
+    { title: 'Unrelated', performers: [{ name: 'Someone Else' }] },
+    { title: 'Alias match', performers: [{ name: 'Johnny' }] },
+    { title: 'ID match', performers: [{ stored_id: '12', name: 'Different Remote Name' }] }
+], [
+    { id: 12, name: 'John Smith', alias_list: ['Johnny'] },
+    { id: 13, name: 'Jane Doe', alias_list: [] }
+]);
+assert.deepEqual(performerRanked.map(match => match.title), ['Alias match', 'ID match', 'Unrelated']);
+assert.deepEqual(performerRanked[0]._performerOverlapNames, ['John Smith']);
+assert.equal(performerRanked[2]._hasLinkedPerformers, true);
+assert.equal(performerRanked[2]._performerOverlapCount, 0);
+
 const analysis = scraper.analyzeScraperMatch({
     _matchType: 'title',
     _localDuration: 120,
@@ -130,9 +143,9 @@ async function testHashMatch() {
         fetchGQL: async (query, variables) => {
             calls.push({ query, variables });
             if (query.includes('findScene')) {
-                return { data: { findScene: { title: 'Scene', files: [{ path: '/media/file.mp4', duration: 90, fingerprints: [{ type: 'phash', value: 'abc' }] }] } } };
+                return { data: { findScene: { title: 'Scene', performers: [{ id: 4, name: 'Local Person', alias_list: [] }], files: [{ path: '/media/file.mp4', duration: 90, fingerprints: [{ type: 'phash', value: 'abc' }] }] } } };
             }
-            return { data: { scrapeSingleScene: [{ title: 'Hash result' }] } };
+            return { data: { scrapeSingleScene: [{ title: 'Hash result', performers: [{ stored_id: 4, name: 'Local Person' }] }] } };
         }
     });
     const results = await scraper.fetchScraperMatchesForScene(7, null);
@@ -141,6 +154,7 @@ async function testHashMatch() {
     assert.equal(results[0]._matchType, 'hash');
     assert.equal(results[0]._localDuration, 90);
     assert.deepEqual(results[0]._localFingerprints, [{ type: 'phash', value: 'abc' }]);
+    assert.deepEqual(results[0]._performerOverlapNames, ['Local Person']);
 }
 
 async function testTitleThenInstalledScraperFallback() {

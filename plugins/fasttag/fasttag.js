@@ -5603,6 +5603,24 @@
                 matchingDurFps
             } = analyzeScraperMatch(match);
 
+            let performerMatchBadge = '';
+            if (match._hasLinkedPerformers) {
+                const overlapNames = match._performerOverlapNames || [];
+                if (overlapNames.length > 0) {
+                    performerMatchBadge = `
+                        <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #34d399; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="Matches performer already linked to this scene: ${escapeHtml(overlapNames.join(', '))}">
+                            <span>★</span><span>Linked Performer Match</span>
+                        </span>
+                    `;
+                } else {
+                    performerMatchBadge = `
+                        <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #fbbf24; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="None of this result's performers match the ${match._linkedPerformerCount} performer(s) already linked to your scene. Check the result carefully before accepting it.">
+                            <span>⚠</span><span>No Linked Performer Match</span>
+                        </span>
+                    `;
+                }
+            }
+
             let durationBadge = '';
             if (scrapedDurSec && localDurSec) {
                 const diff = Math.abs(scrapedDurSec - localDurSec);
@@ -5688,6 +5706,7 @@
                                     <span>✕</span><span>No Hash Match (Keyword Search)</span>
                                 </span>
                             `}
+                            ${performerMatchBadge}
                             ${durationBadge}
                         </div>
 
