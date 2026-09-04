@@ -4,6 +4,7 @@ version: "4.2.8"
 ui:
   javascript:
     - tabulator.min.js
+    - fasttag-core.js
     - fasttag.js
   css:
     - tabulator.min.css
