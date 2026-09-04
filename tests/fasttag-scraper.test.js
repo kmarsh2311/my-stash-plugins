@@ -24,13 +24,11 @@ assert.deepEqual(
 
 const originalMatches = [{ title: 'Match' }];
 assert.strictEqual(scraper.enrichScraperMatches(originalMatches, 'hash', 'StashDB', 120, [{ type: 'phash' }]), originalMatches);
-assert.deepEqual(originalMatches[0], {
-    title: 'Match',
-    _matchType: 'hash',
-    _sourceName: 'StashDB',
-    _localDuration: 120,
-    _localFingerprints: [{ type: 'phash' }]
-});
+assert.equal(originalMatches[0]._matchType, 'hash');
+assert.equal(originalMatches[0]._sourceName, 'StashDB');
+assert.equal(originalMatches[0]._localDuration, 120);
+assert.deepEqual(originalMatches[0]._localFingerprints, [{ type: 'phash' }]);
+assert.equal(originalMatches[0]._matchAssessment, 'strong');
 assert.deepEqual(scraper.enrichScraperMatches(null, 'hash', 'StashDB', null, []), []);
 
 const performerRanked = scraper.rankMatchesByLinkedPerformers([
@@ -45,6 +43,33 @@ assert.deepEqual(performerRanked.map(match => match.title), ['Alias match', 'ID 
 assert.deepEqual(performerRanked[0]._performerOverlapNames, ['John Smith']);
 assert.equal(performerRanked[2]._hasLinkedPerformers, true);
 assert.equal(performerRanked[2]._performerOverlapCount, 0);
+
+const evidenceRanked = scraper.rankScraperMatchesByEvidence([
+    {
+        title: 'Seth, Jeremy & Kaiden',
+        duration: 1220,
+        studio: { name: 'Different Studio' },
+        performers: [{ stored_id: '12', name: 'John Smith' }],
+        _matchType: 'title'
+    },
+    {
+        title: 'Correct Production',
+        duration: 1540,
+        studio: { stored_id: '20', name: 'Local Studio' },
+        performers: [{ stored_id: '12', name: 'John Smith' }],
+        _matchType: 'title'
+    }
+], {
+    linkedPerformers: [{ id: 12, name: 'John Smith', alias_list: [] }],
+    localStudio: { id: 20, name: 'Local Studio' },
+    localDuration: 1544,
+    localTitle: 'Correct Production John Smith'
+});
+assert.equal(evidenceRanked[0].title, 'Correct Production');
+assert.equal(evidenceRanked[0]._matchAssessment, 'likely');
+assert.equal(evidenceRanked[1]._matchAssessment, 'unlikely');
+assert.ok(evidenceRanked[1]._matchReasons.includes('Studio differs'));
+assert.ok(evidenceRanked[1]._matchReasons.includes('Duration differs substantially'));
 
 const analysis = scraper.analyzeScraperMatch({
     _matchType: 'title',

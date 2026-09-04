@@ -5609,7 +5609,7 @@
                 if (overlapNames.length > 0) {
                     performerMatchBadge = `
                         <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #34d399; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="Matches performer already linked to this scene: ${escapeHtml(overlapNames.join(', '))}">
-                            <span>★</span><span>Linked Performer Match</span>
+                            <span>★</span><span>Performer Match (${match._performerOverlapCount}/${match._linkedPerformerCount})</span>
                         </span>
                     `;
                 } else {
@@ -5621,6 +5621,26 @@
                 }
             }
 
+            const assessmentLabels = {
+                strong: ['Strong Match', '#34d399', 'rgba(16, 185, 129, 0.15)', 'rgba(16, 185, 129, 0.35)'],
+                likely: ['Likely Match', '#34d399', 'rgba(16, 185, 129, 0.15)', 'rgba(16, 185, 129, 0.35)'],
+                possible: ['Possible Match', '#fbbf24', 'rgba(245, 158, 11, 0.15)', 'rgba(245, 158, 11, 0.4)'],
+                unlikely: ['Likely Wrong Scene', '#f87171', 'rgba(239, 68, 68, 0.15)', 'rgba(239, 68, 68, 0.4)']
+            };
+            const assessment = assessmentLabels[match._matchAssessment];
+            const assessmentBadge = assessment ? `
+                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 700; color: ${assessment[1]}; background: ${assessment[2]}; border: 1px solid ${assessment[3]}; padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="${escapeHtml((match._matchReasons || []).join(' • '))}">
+                    <span>${match._matchAssessment === 'unlikely' ? '⚠' : '✓'}</span><span>${assessment[0]}</span>
+                </span>
+            ` : '';
+
+            const studioMismatchBadge = match._studioComparison === 'mismatch' ? `
+                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #f87171; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="The scraped studio (${escapeHtml(studioName)}) differs from the studio already linked to this scene.">
+                    <span>⚠</span><span>Studio Mismatch</span>
+                </span>
+            ` : '';
+            const requiresReview = match._matchAssessment === 'unlikely';
+
             let durationBadge = '';
             if (scrapedDurSec && localDurSec) {
                 const diff = Math.abs(scrapedDurSec - localDurSec);
@@ -5630,10 +5650,16 @@
                             <span>⏱</span><span>${formatDurationSec(scrapedDurSec)} (Exact Match)</span>
                         </span>
                     `;
-                } else {
+                } else if (diff <= 60) {
                     durationBadge = `
                         <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 500; color: ${isDark ? '#cbd5e1' : '#475569'}; background: rgba(148, 163, 184, 0.12); border: 1px solid rgba(148, 163, 184, 0.25); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="Scraped duration is ${formatDurationSec(scrapedDurSec)}, local is ${formatDurationSec(localDurSec)}">
                             <span>⏱</span><span>${formatDurationSec(scrapedDurSec)} (Local: ${formatDurationSec(localDurSec)})</span>
+                        </span>
+                    `;
+                } else {
+                    durationBadge = `
+                        <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #f87171; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="Scraped duration is ${formatDurationSec(scrapedDurSec)}, local is ${formatDurationSec(localDurSec)}; the difference is ${formatDurationSec(diff)}.">
+                            <span>⚠</span><span>Duration Mismatch (${formatDurationSec(diff)})</span>
                         </span>
                     `;
                 }
@@ -5688,8 +5714,8 @@
                                 </svg>
                                 <span>${isDetached ? 'Dock' : 'Pop Out'}</span>
                             </button>
-                            <button type="button" id="fasttag-scrape-accept-btn" style="background: #059669; border: 1px solid #10b981; color: #ffffff; padding: 2.5px 7px; border-radius: 4px; font-size: 10px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 2px; box-shadow: 0 1px 4px rgba(5,150,105,0.4); line-height: 1.2; transition: all 0.15s ease; white-space: nowrap; flex-shrink: 0;" title="Accept match and save metadata">
-                                <span>✓ Accept</span>
+                            <button type="button" id="fasttag-scrape-accept-btn" style="background: ${requiresReview ? '#b45309' : '#059669'}; border: 1px solid ${requiresReview ? '#f59e0b' : '#10b981'}; color: #ffffff; padding: 2.5px 7px; border-radius: 4px; font-size: 10px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 2px; box-shadow: 0 1px 4px ${requiresReview ? 'rgba(180,83,9,0.4)' : 'rgba(5,150,105,0.4)'}; line-height: 1.2; transition: all 0.15s ease; white-space: nowrap; flex-shrink: 0;" title="${requiresReview ? 'This result has conflicting evidence; review it carefully before saving' : 'Accept match and save metadata'}">
+                                <span>${requiresReview ? '⚠ Review & Accept' : '✓ Accept'}</span>
                             </button>
                         </div>
                     </div>
@@ -5697,6 +5723,7 @@
                     <div id="fasttag-scrape-body-wrapper" style="display: flex; flex-direction: column; gap: 7px; ${isDetached ? 'flex: 1 1 auto; min-height: 0; overflow: hidden;' : 'height: auto;'} transition: all 0.15s ease;">
                         <!-- Dedicated Verification Badges Row -->
                         <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap; padding: 3px 6px; background: ${isDark ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.03)'}; border-radius: 5px; border: 1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}; flex-shrink: 0;">
+                            ${assessmentBadge}
                             ${isHashMatch ? matchBadges.map(b => `
                                 <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #34d399; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="Direct file fingerprint match on StashDB">
                                     <span>✓</span><span>${b}</span>
@@ -5707,6 +5734,7 @@
                                 </span>
                             `}
                             ${performerMatchBadge}
+                            ${studioMismatchBadge}
                             ${durationBadge}
                         </div>
 

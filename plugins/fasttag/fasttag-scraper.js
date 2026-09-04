@@ -90,7 +90,112 @@
         return ranked.map(entry => entry.match);
     }
 
-    function enrichScraperMatches(matches, matchType, sourceName, localDuration, localFingerprints, linkedPerformers = []) {
+    const SCRAPE_TITLE_STOP_WORDS = new Set([
+        'a', 'an', 'and', 'the', 'of', 'in', 'on', 'at', 'to', 'for', 'with',
+        'scene', 'video', 'file', 'part', 'episode', '1080p', '720p', '2160p',
+        '4k', 'hd', 'uhd', 'fhd', 'xxx', 'mp4', 'mkv', 'avi'
+    ]);
+
+    function titleTokens(value, linkedPerformers = []) {
+        const performerWords = new Set();
+        for (const performer of linkedPerformers || []) {
+            const names = [performer?.name];
+            if (Array.isArray(performer?.alias_list)) names.push(...performer.alias_list);
+            for (const name of names) {
+                normalizePerformerName(name).split(/\s+/).filter(Boolean).forEach(word => performerWords.add(word));
+            }
+        }
+        return new Set(normalizePerformerName(value).split(/\s+/).filter(word =>
+            word.length >= 3 && !SCRAPE_TITLE_STOP_WORDS.has(word) && !performerWords.has(word)
+        ));
+    }
+
+    function calculateTitleSimilarity(localValue, remoteValue, linkedPerformers = []) {
+        const localTokens = titleTokens(localValue, linkedPerformers);
+        const remoteTokens = titleTokens(remoteValue, linkedPerformers);
+        if (!localTokens.size || !remoteTokens.size) return null;
+        let overlap = 0;
+        localTokens.forEach(token => { if (remoteTokens.has(token)) overlap++; });
+        return overlap / Math.min(localTokens.size, remoteTokens.size);
+    }
+
+    function rankScraperMatchesByEvidence(matches, context = {}) {
+        if (!Array.isArray(matches)) return [];
+        const { parseDurationSec } = getDependencies();
+        const linkedPerformers = context.linkedPerformers || [];
+        const localStudio = context.localStudio || null;
+        const localDuration = parseDurationSec(context.localDuration);
+        const localTitles = [context.localTitle, context.localFileName].filter(Boolean);
+        const performerRanked = rankMatchesByLinkedPerformers(matches, linkedPerformers);
+
+        const ranked = performerRanked.map((match, originalIndex) => {
+            let score = 0;
+            const reasons = [];
+            const isHashMatch = match?._matchType === 'hash';
+            if (isHashMatch) {
+                score += 1000;
+                reasons.push('Fingerprint match');
+            }
+
+            if (linkedPerformers.length > 0) {
+                const overlap = match._performerOverlapCount || 0;
+                if (overlap > 0) {
+                    const coverage = overlap / linkedPerformers.length;
+                    score += 30 + Math.round(30 * coverage);
+                    reasons.push(`${overlap}/${linkedPerformers.length} linked performer${linkedPerformers.length === 1 ? '' : 's'} matched`);
+                } else {
+                    score -= 35;
+                    reasons.push('No linked performers matched');
+                }
+            }
+
+            match._studioComparison = 'unknown';
+            if (localStudio?.name && match?.studio?.name) {
+                const sameId = match.studio.stored_id && String(match.studio.stored_id) === String(localStudio.id);
+                const sameName = normalizePerformerName(match.studio.name) === normalizePerformerName(localStudio.name);
+                match._studioComparison = sameId || sameName ? 'match' : 'mismatch';
+                score += match._studioComparison === 'match' ? 35 : -35;
+                reasons.push(match._studioComparison === 'match' ? 'Studio matched' : 'Studio differs');
+            }
+
+            const remoteDuration = parseDurationSec(match?.duration);
+            match._durationDifference = localDuration && remoteDuration ? Math.abs(localDuration - remoteDuration) : null;
+            if (match._durationDifference !== null) {
+                if (match._durationDifference <= 15) {
+                    score += 30;
+                    reasons.push('Duration closely matched');
+                } else if (match._durationDifference <= 60) {
+                    score += 10;
+                    reasons.push('Duration reasonably close');
+                } else {
+                    score -= match._durationDifference > 300 ? 55 : 30;
+                    reasons.push('Duration differs substantially');
+                }
+            }
+
+            const titleSimilarities = localTitles
+                .map(value => calculateTitleSimilarity(value, match?.title || '', linkedPerformers))
+                .filter(value => value !== null);
+            match._titleSimilarity = titleSimilarities.length > 0 ? Math.max(...titleSimilarities) : null;
+            if (match._titleSimilarity !== null) {
+                if (match._titleSimilarity >= 0.6) score += 30;
+                else if (match._titleSimilarity >= 0.3) score += 15;
+                else score -= 20;
+                reasons.push(match._titleSimilarity >= 0.6 ? 'Title closely matched' : match._titleSimilarity >= 0.3 ? 'Title partly matched' : 'Title differs');
+            }
+
+            match._matchScore = score;
+            match._matchReasons = reasons;
+            match._matchAssessment = isHashMatch ? 'strong' : score >= 60 ? 'likely' : score >= 15 ? 'possible' : 'unlikely';
+            return { match, originalIndex };
+        });
+
+        ranked.sort((a, b) => b.match._matchScore - a.match._matchScore || a.originalIndex - b.originalIndex);
+        matches.splice(0, matches.length, ...ranked.map(entry => entry.match));
+        return matches;
+    }
+
+    function enrichScraperMatches(matches, matchType, sourceName, localDuration, localFingerprints, linkedPerformers = [], localContext = {}) {
         if (!Array.isArray(matches)) return [];
         matches.forEach(match => {
             match._matchType = matchType;
@@ -98,7 +203,7 @@
             match._localDuration = localDuration;
             match._localFingerprints = localFingerprints;
         });
-        return rankMatchesByLinkedPerformers(matches, linkedPerformers);
+        return rankScraperMatchesByEvidence(matches, { ...localContext, linkedPerformers, localDuration });
     }
 
     function analyzeScraperMatch(match) {
@@ -244,9 +349,10 @@
         let localDuration = null;
         let localFingerprints = [];
         let linkedPerformers = [];
+        let localStudio = null;
 
         try {
-            const query = 'query ($id: ID!) { findScene(id: $id) { id title details performers { id name alias_list } files { path duration fingerprints { type value } } } }';
+            const query = 'query ($id: ID!) { findScene(id: $id) { id title details studio { id name } performers { id name alias_list } files { path duration fingerprints { type value } } } }';
             const response = await fetchGQL(query, { id: sceneId });
             const scene = response?.data?.findScene;
             if (scene) {
@@ -259,11 +365,13 @@
                 if (firstFile?.duration) localDuration = firstFile.duration;
                 if (firstFile?.fingerprints) localFingerprints = firstFile.fingerprints;
                 linkedPerformers = scene.performers || [];
+                localStudio = scene.studio || null;
             }
         } catch (e) {}
 
         const enrich = (matches, matchType, sourceName) => enrichScraperMatches(
-            matches, matchType, sourceName, localDuration, localFingerprints, linkedPerformers
+            matches, matchType, sourceName, localDuration, localFingerprints, linkedPerformers,
+            { localStudio, localTitle: sceneTitle, localFileName: sceneFileName }
         );
 
         try {
@@ -322,6 +430,8 @@
         configure,
         buildScrapeCandidateQueries,
         rankMatchesByLinkedPerformers,
+        calculateTitleSimilarity,
+        rankScraperMatchesByEvidence,
         enrichScraperMatches,
         analyzeScraperMatch,
         readScrapeFieldSelection,
