@@ -143,8 +143,23 @@ Extract and return a valid JSON object matching this schema:
             req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
             with urllib.request.urlopen(req, timeout=5) as resp: # 5s fast timeout
                 resp_data = json.loads(resp.read().decode("utf-8"))
-                raw_text = resp_data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "{}")
+                candidates_data = resp_data.get("candidates") or []
+                parts = candidates_data[0].get("content", {}).get("parts", []) if candidates_data else []
+                raw_text = parts[0].get("text", "") if parts else ""
+                if not raw_text.strip():
+                    raise ValueError("Gemini returned no JSON content")
                 parsed = json.loads(raw_text)
+                if not isinstance(parsed, dict):
+                    raise ValueError("Gemini returned an invalid metadata response")
+                has_suggestion = any([
+                    str(parsed.get("clean_title") or "").strip(),
+                    str(parsed.get("date") or "").strip(),
+                    str(parsed.get("studio") or "").strip(),
+                    parsed.get("performers") or [],
+                    parsed.get("tags") or [],
+                ])
+                if not has_suggestion:
+                    raise ValueError("Gemini returned no usable metadata suggestions")
                 elapsed = time.time() - start_t
                 log(f"Model {chosen_model} SUCCEEDED in {elapsed:.2f}s!")
                 return {"status": "ok", "result": parsed, "model_used": chosen_model}
