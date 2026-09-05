@@ -112,8 +112,8 @@
         analyzeScraperMatch,
         readScrapeFieldSelection,
         buildScrapeUpdateInput,
-        resolveScrapedStudio,
-        resolveScrapedEntityIds,
+        resolveScrapedStudioResult,
+        resolveScrapedEntityIdsResult,
         fetchScraperMatchesForScene
     } = FastTagScraper;
     const {
@@ -131,7 +131,7 @@
         fetchSceneMediaUrls: fetchSceneMediaUrlsFromModule
     } = FastTagPreview;
     const { getOptimalPopupSize, getDefaultEverythingPosition } = FastTagUi;
-    const { dismissIndexedResult, replaceResults } = FastTagWorkflows;
+    const { dismissIndexedResult, replaceResults, createSerialTaskQueue } = FastTagWorkflows;
     const {
         hasSelectionSetChanged,
         calculateBulkSelectionDelta,
@@ -6332,9 +6332,17 @@
             const scrapeSelection = readScrapeFieldSelection(container);
 
             // 1–3. Resolve studio, performers and tags against stored IDs and the local library.
-            const studioIdToSet = await resolveScrapedStudio(match.studio, scrapeSelection.studio);
-            const performerIdsToAdd = await resolveScrapedEntityIds('performers', match.performers, scrapeSelection.performerIndices);
-            const tagIdsToAdd = await resolveScrapedEntityIds('tags', match.tags, scrapeSelection.tagIndices);
+            const studioResolution = await resolveScrapedStudioResult(match.studio, scrapeSelection.studio);
+            const performerResolution = await resolveScrapedEntityIdsResult('performers', match.performers, scrapeSelection.performerIndices);
+            const tagResolution = await resolveScrapedEntityIdsResult('tags', match.tags, scrapeSelection.tagIndices);
+            const studioIdToSet = studioResolution.id;
+            const performerIdsToAdd = performerResolution.ids;
+            const tagIdsToAdd = tagResolution.ids;
+            const resolutionFailures = [
+                ...studioResolution.failures.map(name => `studio “${name}”`),
+                ...performerResolution.failures.map(name => `performer “${name}”`),
+                ...tagResolution.failures.map(name => `tag “${name}”`)
+            ];
 
             // 4. Update Scene & Synchronize Context
             const effectiveCtx = ctx || popup?._context || activePopup?._context;
@@ -6441,88 +6449,27 @@
                 window._fastTagEverythingScraperOpen = true;
                 const acceptBtn = container ? container.querySelector('#fasttag-scrape-accept-btn') : null;
                 if (acceptBtn) {
-                    acceptBtn.innerHTML = coverSaved ? '<span>✓ Saved</span>' : '<span>✓ Saved (cover failed)</span>';
+                    acceptBtn.innerHTML = resolutionFailures.length > 0
+                        ? '<span>⚠ Saved with warnings</span>'
+                        : (coverSaved ? '<span>✓ Saved</span>' : '<span>✓ Saved (cover failed)</span>');
                     acceptBtn.disabled = true;
                     acceptBtn.style.opacity = '0.7';
                     acceptBtn.style.cursor = 'default';
                     acceptBtn.style.background = '#059669';
                 }
 
-                if (coverSaved) {
+                if (resolutionFailures.length > 0) {
+                    const coverNote = coverSaved ? '' : ' The cover also failed to save.';
+                    toastError(`Metadata saved, but FastTag could not create: ${resolutionFailures.join(', ')}.${coverNote}`);
+                } else if (coverSaved) {
                     toastSuccess('Matched & Saved from StashDB!');
                 } else {
                     toastError('Metadata saved, but Stash rejected the cover image.');
                 }
                 return;
             } else {
-                // In Single-Column Popup (Edit Tags, Edit Performers, Edit Studio):
-                // Fetch current scene tags and performers first to safely MERGE without overwriting existing data
-                const sceneRes = await fetchGQL(`query ($id: ID!) { findScene(id: $id) { id performers { id } tags { id } studio { id } } }`, { id: sceneId });
-                const existingPerformerIds = (sceneRes?.data?.findScene?.performers || []).map(p => String(p.id));
-                const existingTagIds = (sceneRes?.data?.findScene?.tags || []).map(t => String(t.id));
-                const {
-                    updateInput: updateVars,
-                    mergedPerformerIds,
-                    mergedTagIds
-                } = buildScrapeUpdateInput({
-                    sceneId,
-                    match,
-                    selection: scrapeSelection,
-                    studioIdToSet,
-                    performerIdsToAdd,
-                    tagIdsToAdd,
-                    existingPerformerIds,
-                    existingTagIds,
-                    includeCover: true,
-                    onlyChangedCollections: false
-                });
-
-                const updateRes = await fetchGQL(`
-                    mutation DirectSceneUpdate($input: SceneUpdateInput!) {
-                        sceneUpdate(input: $input) { ${SCENE_CARD_UPDATE_FIELDS} }
-                    }
-                `, { input: updateVars });
-                if (updateRes?.data?.sceneUpdate) {
-                    syncSceneToApolloCache(updateRes.data.sceneUpdate);
-                }
-                await refreshSceneCards(sceneId);
-                toastSuccess('Matched & Saved from StashDB!');
-
-                sessionScrapeCache.delete(sceneId);
-
-                // If in sequential edit mode, navigate to next scene; otherwise close popup cleanly
-                if (sequentialEditState.enabled && popup && popup.element) {
-                    const formEl = popup.element;
-                    const type = formEl.getAttribute('data-entity-type') || 'tags';
-                    if (sequentialEditState.currentIndex < sequentialEditState.allSceneCards.length - 1) {
-                        let currentSelectedSet = new Set(mergedTagIds);
-                        if (type === 'performers') currentSelectedSet = new Set(mergedPerformerIds);
-                        else if (type === 'studios') currentSelectedSet = new Set(studioIdToSet ? [studioIdToSet] : []);
-                        navigateToNextScene(formEl, type, 1, () => currentSelectedSet);
-                        return;
-                    }
-                }
-                closePopup();
-                return;
+                throw new Error('Scraping is only supported from Edit Everything.');
             }
-
-            const popupEl = popup?.element || (container ? container.closest('#scenes-popup') : null);
-            if (popupEl && popupEl._savedPreScrapeSize) {
-                popupEl.style.transition = 'width 0.22s cubic-bezier(0.4, 0, 0.2, 1), height 0.22s cubic-bezier(0.4, 0, 0.2, 1)';
-                popupEl.style.width = popupEl._savedPreScrapeSize.width;
-                popupEl.style.height = popupEl._savedPreScrapeSize.height;
-                popupEl._savedPreScrapeSize = null;
-            }
-
-            closeFloatingScraperHud();
-            container.innerHTML = '';
-            container.style.display = 'none';
-            if (popup && popup.scrapeBtn) {
-                popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
-                popup.scrapeBtn.innerHTML = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
-                popup.scrapeBtn.title = 'Scrape scene metadata';
-            }
-            sessionScrapeCache.delete(sceneId);
         } catch (err) {
             console.error('[FastTag] Error accepting scrape match:', err);
             toastError('Failed to apply match: ' + (err?.message || err));
@@ -11569,9 +11516,22 @@
                     } catch (e) {}
                 };
 
-                let pendingEverythingSaveSeq = 0;
-            const doSave = async (customSuccessMessage = null, shouldCloseScraper = false) => {
+            let pendingEverythingSaveSeq = 0;
+            const enqueueEverythingSave = createSerialTaskQueue();
+            const doSave = (customSuccessMessage = null, shouldCloseScraper = false) => {
                 const saveSeq = ++pendingEverythingSaveSeq;
+                const targetSceneId = currentSceneId;
+                const autoMarkOrg = getAutoMarkOrganized();
+                const variables = {
+                    id: targetSceneId,
+                    tag_ids: Array.from(selectedTagIds),
+                    performer_ids: Array.from(selectedPerformerIds),
+                    studio_id: selectedStudioId || null,
+                    groups: Array.from(selectedGroupIds).map(gid => ({ group_id: gid }))
+                };
+                if (autoMarkOrg) variables.organized = true;
+
+                const runSave = async () => {
                     if (shouldCloseScraper && !window._fastTagEverythingScraperOpen) {
                         if (popup.scraperCardContainer) {
                             popup.scraperCardContainer.innerHTML = '';
@@ -11580,7 +11540,6 @@
                         hideScrapeCoverTooltip();
                     }
 
-                    const autoMarkOrg = getAutoMarkOrganized();
                     const mutation = `
                         mutation SceneUpdateEverything($id: ID!, $tag_ids: [ID!], $performer_ids: [ID!], $studio_id: ID, $groups: [SceneGroupInput!]${autoMarkOrg ? ', $organized: Boolean' : ''}) {
                             sceneUpdate(input: {
@@ -11595,16 +11554,6 @@
                         }
                     `;
                     try {
-                        const variables = {
-                            id: currentSceneId,
-                            tag_ids: Array.from(selectedTagIds),
-                            performer_ids: Array.from(selectedPerformerIds),
-                            studio_id: selectedStudioId || null,
-                            groups: Array.from(selectedGroupIds).map(gid => ({ group_id: gid }))
-                        };
-                        if (autoMarkOrg) {
-                            variables.organized = true;
-                        }
                         const res = await fetchGQL(mutation, variables);
 
                         if (res?.data?.sceneUpdate?.id) {
@@ -11637,9 +11586,9 @@
                                 if (grp) addRecentEntry('groups', grp);
                             });
 
-                            resetRefractSceneCards(currentSceneId);
+                            resetRefractSceneCards(targetSceneId);
 
-                            refreshSceneCardsDebounced(currentSceneId);
+                            refreshSceneCardsDebounced(targetSceneId);
                             recordSaveUsage();
                             toastSuccess(customSuccessMessage || 'Scene saved successfully');
                             updateSaveButton();
@@ -11649,6 +11598,9 @@
                         toastError('Failed to save scene', e);
                     }
                     return false;
+                };
+
+                return enqueueEverythingSave(runSave);
                 };
 
                 const onSuggestionActivated = async (sug) => {

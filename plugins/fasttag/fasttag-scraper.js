@@ -304,26 +304,31 @@
         return { cachedEntities, config };
     }
 
-    async function resolveScrapedStudio(studio, selected) {
-        if (!selected || !studio?.name) return null;
-        if (studio.stored_id) return String(studio.stored_id);
+    async function resolveScrapedStudioResult(studio, selected) {
+        if (!selected || !studio?.name) return { id: null, failures: [] };
+        if (studio.stored_id) return { id: String(studio.stored_id), failures: [] };
         const deps = getDependencies();
         const { cachedEntities, config } = await loadCachedEntities('studios');
         const normalizedName = studio.name.trim().toLowerCase();
         const found = cachedEntities?.find(item => (item.name || '').trim().toLowerCase() === normalizedName);
-        if (found) return String(found.id);
+        if (found) return { id: String(found.id), failures: [] };
         const response = await deps.fetchGQL(config.createQuery, { name: studio.name.trim() });
-        const newId = config.createExtract(response.data);
-        if (!newId) return null;
+        const newId = config.createExtract(response?.data);
+        if (!newId) return { id: null, failures: [studio.name.trim()] };
         deps.setCache('studios', null);
-        return String(newId);
+        return { id: String(newId), failures: [] };
     }
 
-    async function resolveScrapedEntityIds(type, items, selectedIndices) {
-        if (!selectedIndices?.length || !items) return [];
+    async function resolveScrapedStudio(studio, selected) {
+        return (await resolveScrapedStudioResult(studio, selected)).id;
+    }
+
+    async function resolveScrapedEntityIdsResult(type, items, selectedIndices) {
+        if (!selectedIndices?.length || !items) return { ids: [], failures: [] };
         const deps = getDependencies();
         const { cachedEntities, config } = await loadCachedEntities(type);
         const resolvedIds = [];
+        const failures = [];
         for (const index of selectedIndices) {
             const item = items[index];
             if (!item || !item.name) continue;
@@ -338,13 +343,19 @@
                 continue;
             }
             const response = await deps.fetchGQL(config.createQuery, { name: item.name.trim() });
-            const newId = config.createExtract(response.data);
+            const newId = config.createExtract(response?.data);
             if (newId) {
                 resolvedIds.push(String(newId));
                 deps.setCache(type, null);
+            } else {
+                failures.push(item.name.trim());
             }
         }
-        return resolvedIds;
+        return { ids: resolvedIds, failures };
+    }
+
+    async function resolveScrapedEntityIds(type, items, selectedIndices) {
+        return (await resolveScrapedEntityIdsResult(type, items, selectedIndices)).ids;
     }
 
     async function fetchScraperMatchesForScene(sceneId, cardElement, manualQuery = '') {
@@ -455,7 +466,9 @@
         readScrapeFieldSelection,
         mergeUniqueIds,
         buildScrapeUpdateInput,
+        resolveScrapedStudioResult,
         resolveScrapedStudio,
+        resolveScrapedEntityIdsResult,
         resolveScrapedEntityIds,
         fetchScraperMatchesForScene
     });

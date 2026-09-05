@@ -21,4 +21,32 @@ const target = [{ id: 'old' }];
 assert.strictEqual(workflows.replaceResults(target, [{ id: 'new' }]), target);
 assert.deepEqual(target, [{ id: 'new' }]);
 
-console.log('fasttag-workflows tests passed');
+async function testSerialTaskQueue() {
+    const enqueue = workflows.createSerialTaskQueue();
+    const events = [];
+    let releaseFirst;
+    const firstGate = new Promise(resolve => { releaseFirst = resolve; });
+    const first = enqueue(async () => {
+        events.push('first-start');
+        await firstGate;
+        events.push('first-end');
+        return 1;
+    });
+    const second = enqueue(async () => {
+        events.push('second-start');
+        events.push('second-end');
+        return 2;
+    });
+    await Promise.resolve();
+    assert.deepEqual(events, ['first-start']);
+    releaseFirst();
+    assert.deepEqual(await Promise.all([first, second]), [1, 2]);
+    assert.deepEqual(events, ['first-start', 'first-end', 'second-start', 'second-end']);
+}
+
+testSerialTaskQueue()
+    .then(() => console.log('fasttag-workflows tests passed'))
+    .catch(error => {
+        console.error(error);
+        process.exitCode = 1;
+    });

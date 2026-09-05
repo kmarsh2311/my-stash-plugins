@@ -42,5 +42,12 @@ assert.ok(
     mainSource.includes('syncSceneToApolloCache(saveRes.data.sceneUpdate);'),
     'scraper save should synchronize returned metadata to the live scene-card cache'
 );
+assert.equal(
+    mainSource.includes('In Single-Column Popup (Edit Tags, Edit Performers, Edit Studio)'),
+    false,
+    'obsolete single-popup scraper save path should remain removed'
+);
+assert.ok(mainSource.includes('createSerialTaskQueue()'), 'Edit Everything saves should use the serial workflow queue');
+assert.ok(mainSource.includes('resolutionFailures'), 'scraper saves should report unresolved selected entities');
 
 console.log('fasttag-module-contract tests passed');

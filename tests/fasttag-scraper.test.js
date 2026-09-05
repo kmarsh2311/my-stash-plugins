@@ -243,19 +243,19 @@ async function testEntityResolution() {
             fetchQuery: 'fetch studios',
             extractList: data => data.studios,
             createQuery: 'create studio',
-            createExtract: data => data.createdId
+            createExtract: data => data?.createdId
         },
         performers: {
             fetchQuery: 'fetch performers',
             extractList: data => data.performers,
             createQuery: 'create performer',
-            createExtract: data => data.createdId
+            createExtract: data => data?.createdId
         },
         tags: {
             fetchQuery: 'fetch tags',
             extractList: data => data.tags,
             createQuery: 'create tag',
-            createExtract: data => data.createdId
+            createExtract: data => data?.createdId
         }
     };
     const fetchCalls = [];
@@ -288,6 +288,23 @@ async function testEntityResolution() {
         { name: '' }
     ], [0, 1, 2, 3, 99]), ['19', '20', '21']);
     assert.deepEqual(await scraper.resolveScrapedEntityIds('tags', [{ name: 'KNOWN TAG' }], [0]), ['30']);
+
+    scraper.configure({
+        cleanTitleForScraping,
+        parseDurationSec,
+        getEntityConfig: type => configs[type],
+        getCachedOrNull: type => cache.get(type) || null,
+        setCache: () => {},
+        fetchGQL: async query => query === 'create performer' ? { errors: [{ message: 'creation failed' }] } : { data: {} }
+    });
+    assert.deepEqual(
+        await scraper.resolveScrapedEntityIdsResult('performers', [{ name: 'Failed Person' }], [0]),
+        { ids: [], failures: ['Failed Person'] }
+    );
+    assert.deepEqual(
+        await scraper.resolveScrapedStudioResult({ name: 'Failed Studio' }, true),
+        { id: null, failures: ['Failed Studio'] }
+    );
     assert.ok(fetchCalls.some(([query]) => query === 'fetch tags'), 'missing caches should be loaded');
     assert.ok(cacheWrites.some(([type, data]) => type === 'studios' && data === null), 'creation should invalidate the studio cache');
     assert.ok(cacheWrites.some(([type, data]) => type === 'performers' && data === null), 'creation should invalidate the performer cache');

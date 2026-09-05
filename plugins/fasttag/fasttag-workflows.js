@@ -19,6 +19,15 @@
         return target;
     }
 
+    function createSerialTaskQueue() {
+        let tail = Promise.resolve();
+        return task => {
+            const queued = tail.then(task, task);
+            tail = queued.then(() => undefined, () => undefined);
+            return queued;
+        };
+    }
+
     root.FastTag = root.FastTag || {};
-    root.FastTag.workflows = Object.freeze({ clampIndex, dismissIndexedResult, replaceResults });
+    root.FastTag.workflows = Object.freeze({ clampIndex, dismissIndexedResult, replaceResults, createSerialTaskQueue });
 }(typeof window !== 'undefined' ? window : globalThis));
