@@ -104,7 +104,8 @@ assert.equal(values.has('stash_fast_tag_scrub_cue_count_v6'), false);
 const persistedBooleanPairs = [
     ['isVideoHudPersistedOpen', 'setVideoHudPersistedOpen', 'fasttag_video_hud_open_state', false],
     ['isScraperHudPersistedOpen', 'setScraperHudPersistedOpen', 'fasttag_scraper_hud_open_state', false],
-    ['getDetachScraper', 'setDetachScraper', 'fasttag_detach_scraper_v1', true]
+    ['getDetachScraper', 'setDetachScraper', 'fasttag_detach_scraper_v1', true],
+    ['getHideObviousFalsePositives', 'setHideObviousFalsePositives', 'fasttag_hide_obvious_false_positives_v1', true]
 ];
 
 for (const [getter, setter, key, defaultValue] of persistedBooleanPairs) {

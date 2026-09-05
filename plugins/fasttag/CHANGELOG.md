@@ -4,6 +4,23 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.2.11] - 2026-09-05
+
+### Added
+- **Contextual Rescraping**: The refresh control now saves pending scene edits and reruns the active scrape so newly linked studios and performers are used immediately.
+- **False-Positive Filtering**: An enabled-by-default Workflow setting hides keyword results only when performer, studio, title, and available duration evidence strongly conflict; hidden results remain reviewable.
+- **Context-Prefilled Search**: The editable scraper search contains the linked studio and all linked performers, with combined multi-performer searches tried before individual fallbacks.
+
+### Changed
+- **Broader Recovery Searches**: Opaque recovery filenames trigger cleaner fallback queries, while weak or merely possible matches no longer prevent stronger contextual searches.
+- **Accurate Scraper Sources**: FastTag resolves the configured StashDB source instead of assuming the first stash box, labels result sources correctly, and links to the matched source entry.
+- **External ID Preservation**: Accepted configured stash-box results save their source-specific scene ID while retaining existing external IDs.
+
+### Fixed
+- **Live Scraped Titles**: Titles accepted from scraper results update the open FastTag header and scene-card cache immediately.
+- **Safer Result Links**: StashDB result links prioritise the StashDB scene ID rather than an unrelated external URL returned with the scene.
+- **Incomplete-Duration Filtering**: Clearly unrelated results can be hidden when duration is unavailable, while close durations, direct scene lookups, and verified fingerprints remain protected.
+
 ## [4.2.10] - 2026-09-05
 
 ### Added

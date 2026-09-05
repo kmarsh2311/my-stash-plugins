@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash FastTag
 // @namespace    http://tampermonkey.net/
-// @version      4.2.10
+// @version      4.2.11
 // @description  Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
@@ -95,6 +95,8 @@
         setScraperHudPersistedOpen,
         getDetachScraper,
         setDetachScraper,
+        getHideObviousFalsePositives,
+        setHideObviousFalsePositives,
         idbGet,
         idbSet,
         idbDelete,
@@ -117,6 +119,8 @@
         readScrapeFieldSelection,
         buildScrapeUpdateInput,
         buildAcceptedSceneStashIds,
+        getScraperResultUrl,
+        partitionObviousFalsePositiveMatches,
         resolveScrapedStudioResult,
         resolveScrapedEntityIdsResult,
         fetchScraperMatchesForScene
@@ -139,8 +143,6 @@
     } = FastTagPreview;
     const { getOptimalPopupSize, getDefaultEverythingPosition } = FastTagUi;
     const {
-        dismissIndexedResult,
-        replaceResults,
         createSerialTaskQueue,
         createRandomSceneHistory,
         appendRandomSceneHistory,
@@ -173,7 +175,7 @@
         log: (...args) => ftLog(...args)
     });
 
-    console.log('[FastTag v4.2.10] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
+    console.log('[FastTag v4.2.11] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
 
     let fastTagHelpLoadPromise = null;
     function loadFastTagHelpModule() {
@@ -1728,6 +1730,19 @@
         return `Scene #${sceneId || ''}`;
     }
 
+    function setLiveEverythingPopupTitle(popup, title) {
+        const nextTitle = String(title || '').trim();
+        if (!popup || !nextTitle) return;
+        if (!popup.sceneData) popup.sceneData = {};
+        popup.sceneData.title = nextTitle;
+        if (typeof popup._refreshHeaderTitle === 'function') {
+            popup._refreshHeaderTitle();
+        } else if (popup.titleSpan) {
+            popup.titleSpan.textContent = nextTitle;
+            applyMarqueeAnimation(popup.titleSpan);
+        }
+    }
+
     function applyMarqueeAnimation(titleEl) {
         if (!titleEl) return;
         const box = titleEl.querySelector('.fasttag-marquee-box') || titleEl;
@@ -2286,6 +2301,17 @@
 
                         <div style="height: 1px; background: ${border};"></div>
 
+                        <!-- Conservative false-positive filtering -->
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 13px;">Hide Obvious False Positives</div>
+                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Hide keyword results when performer, studio and title evidence all strongly conflict. A close duration keeps a result visible; missing duration does not prevent filtering.</div>
+                            </div>
+                            <input type="checkbox" id="fasttag-setting-hide-obvious-false-positives" ${getHideObviousFalsePositives() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                        </div>
+
+                        <div style="height: 1px; background: ${border};"></div>
+
                         <!-- Detach Scraper Window setting -->
                         <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
                             <div style="flex: 1;">
@@ -2535,6 +2561,14 @@
             });
         }
 
+        const falsePositiveToggle = modal.querySelector('#fasttag-setting-hide-obvious-false-positives');
+        if (falsePositiveToggle) {
+            falsePositiveToggle.addEventListener('change', (e) => {
+                setHideObviousFalsePositives(e.target.checked);
+                showToast(`Obvious scraper false-positive filtering ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
+            });
+        }
+
         const alwaysFullVideoToggle = modal.querySelector('#fasttag-setting-always-full-video');
         if (alwaysFullVideoToggle) {
             alwaysFullVideoToggle.addEventListener('change', (e) => {
@@ -2763,7 +2797,7 @@
             helpBtn.textContent = '⏳ Loading Guide…';
             try {
                 const help = await loadFastTagHelpModule();
-                help.openGuide({ theme: getEffectiveTheme(), version: '4.2.10' });
+                help.openGuide({ theme: getEffectiveTheme(), version: '4.2.11' });
             } catch (error) {
                 toastError(`Unable to open help: ${error.message}`);
             } finally {
@@ -5543,8 +5577,16 @@
         });
     }
 
-    async function renderScraperMatchCard(container, results, sceneId, ctx, popup, onDismiss, emptySearchQuery = '') {
-        const hasResults = Array.isArray(results) && results.length > 0;
+    async function renderScraperMatchCard(container, incomingResults, sceneId, ctx, popup, onDismiss, emptySearchQuery = '') {
+        const allResults = Array.isArray(incomingResults) ? incomingResults : [];
+        const filterFalsePositives = getHideObviousFalsePositives();
+        const falsePositivePartition = partitionObviousFalsePositiveMatches(allResults);
+        const showingHiddenResults = filterFalsePositives && allResults._fastTagShowHidden === true;
+        const results = filterFalsePositives && !showingHiddenResults
+            ? falsePositivePartition.visible
+            : allResults;
+        const hiddenResultCount = falsePositivePartition.hidden.length;
+        const hasResults = results.length > 0;
         const isDetached = getDetachScraper();
         let targetContainer = container;
 
@@ -5740,13 +5782,7 @@
 
             const isStudioNew = studioName ? !(match.studio?.stored_id || cachedStudios.some(s => (s.name || '').trim().toLowerCase() === studioName.trim().toLowerCase())) : false;
 
-            let stashDbUrl = '';
-            if (match.remote_site_id && match.remote_site_id.trim()) {
-                const rid = match.remote_site_id.trim();
-                stashDbUrl = rid.startsWith('http') ? rid : `https://stashdb.org/scenes/${rid}`;
-            } else if (Array.isArray(urls)) {
-                stashDbUrl = urls.find(u => u && u.includes('stashdb.org')) || '';
-            }
+            const remoteResultUrl = getScraperResultUrl(match);
 
             // Calculate match likelihood & fingerprint verification (mirroring Stash's native scraper)
             const {
@@ -5876,8 +5912,8 @@
                             ` : ''}
                         </div>
                         <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0; white-space: nowrap;">
-                            ${stashDbUrl ? `
-                                <a href="${stashDbUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 600; color: #818cf8; text-decoration: none; padding: 2.5px 6px; border-radius: 4px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); transition: background 0.15s ease; white-space: nowrap; line-height: 1;" title="Open in StashDB in new tab">
+                            ${remoteResultUrl ? `
+                                <a href="${remoteResultUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 600; color: #818cf8; text-decoration: none; padding: 2.5px 6px; border-radius: 4px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); transition: background 0.15s ease; white-space: nowrap; line-height: 1;" title="Open in ${escapeHtml(match._sourceName || 'source')} in new tab">
                                     <span>🔗</span><span>↗</span>
                                 </a>
                             ` : ''}
@@ -5899,6 +5935,13 @@
                         <input id="fasttag-scrape-manual-query" type="text" value="${escapeHtml(match._searchQuery || '')}" placeholder="Optional: correct the search words" style="flex: 1; min-width: 0; height: 25px; box-sizing: border-box; padding: 3px 7px; border-radius: 5px; border: 1px solid ${isDark ? 'rgba(129,140,248,0.45)' : '#a5b4fc'}; background: ${isDark ? 'rgba(15,23,42,0.8)' : '#ffffff'}; color: ${isDark ? '#e2e8f0' : '#1e293b'}; font-size: 10.5px; outline: none;">
                         <button id="fasttag-scrape-manual-search-btn" type="button" style="height: 25px; padding: 3px 8px; border-radius: 5px; border: 1px solid rgba(129,140,248,0.55); background: rgba(99,102,241,0.18); color: ${isDark ? '#c7d2fe' : '#4338ca'}; font-size: 10px; font-weight: 700; cursor: pointer; white-space: nowrap;">Search</button>
                     </div>
+
+                    ${filterFalsePositives && hiddenResultCount > 0 ? `
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 6px; border-radius: 5px; background: rgba(245,158,11,0.09); border: 1px solid rgba(245,158,11,0.25); color: ${isDark ? '#fcd34d' : '#92400e'}; font-size: 9.5px; line-height: 1.25;">
+                            <span>${hiddenResultCount} obvious false positive${hiddenResultCount === 1 ? '' : 's'} ${showingHiddenResults ? 'shown' : 'hidden'}</span>
+                            <button id="fasttag-scrape-toggle-hidden" type="button" style="border: 1px solid rgba(245,158,11,0.45); border-radius: 4px; background: rgba(245,158,11,0.12); color: inherit; padding: 2px 6px; font-size: 9.5px; font-weight: 700; cursor: pointer; white-space: nowrap;">${showingHiddenResults ? 'Hide again' : 'Show hidden'}</button>
+                        </div>
+                    ` : ''}
 
                     <div id="fasttag-scrape-body-wrapper" style="display: flex; flex-direction: column; gap: 7px; ${isDetached ? 'flex: 1 1 auto; min-height: 0; overflow: hidden;' : 'height: auto;'} transition: all 0.15s ease;">
                         <!-- Dedicated Verification Badges Row -->
@@ -6147,11 +6190,9 @@
                         }
                         return;
                     }
-                    replaceResults(results, manualResults);
-                    sessionScrapeCache.set(sceneId, results);
-                    currentIndex = 0;
+                    sessionScrapeCache.set(sceneId, manualResults);
                     hideScrapeCoverTooltip();
-                    updateCardView();
+                    await renderScraperMatchCard(container, manualResults, sceneId, ctx, popup, onDismiss);
                 } catch (error) {
                     toastError('Scrape search failed: ' + (error?.message || error));
                     if (searchBtn) {
@@ -6173,22 +6214,34 @@
                 };
             }
 
+            const toggleHiddenBtn = targetContainer.querySelector('#fasttag-scrape-toggle-hidden');
+            if (toggleHiddenBtn) {
+                toggleHiddenBtn.onclick = (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    allResults._fastTagShowHidden = !showingHiddenResults;
+                    hideScrapeCoverTooltip();
+                    renderScraperMatchCard(container, allResults, sceneId, ctx, popup, onDismiss);
+                };
+            }
+
             const dismissMatchBtn = targetContainer.querySelector('#fasttag-scrape-dismiss-match');
             if (dismissMatchBtn) {
                 dismissMatchBtn.onclick = (event) => {
                     event.preventDefault();
                     event.stopPropagation();
                     hideScrapeCoverTooltip();
-                    const dismissal = dismissIndexedResult(results, currentIndex);
-                    if (dismissal.results.length === 0) {
+                    const selectedMatch = results[currentIndex];
+                    const sourceIndex = allResults.indexOf(selectedMatch);
+                    if (sourceIndex >= 0) allResults.splice(sourceIndex, 1);
+                    if (allResults.length === 0) {
                         sessionScrapeCache.delete(sceneId);
-                        renderScraperMatchCard(container, results, sceneId, ctx, popup, onDismiss);
+                        renderScraperMatchCard(container, allResults, sceneId, ctx, popup, onDismiss);
                         if (typeof onDismiss === 'function') onDismiss();
                         return;
                     }
-                    currentIndex = dismissal.index;
-                    sessionScrapeCache.set(sceneId, results);
-                    updateCardView();
+                    sessionScrapeCache.set(sceneId, allResults);
+                    renderScraperMatchCard(container, allResults, sceneId, ctx, popup, onDismiss);
                 };
             }
 
@@ -6209,7 +6262,7 @@
                     } else {
                         closeFloatingScraperHud();
                     }
-                    renderScraperMatchCard(popup?.scraperCardContainer || container, results, sceneId, ctx, popup, onDismiss);
+                    renderScraperMatchCard(popup?.scraperCardContainer || container, allResults, sceneId, ctx, popup, onDismiss);
                 };
             }
 
@@ -6505,6 +6558,8 @@
                 ...performerResolution.failures.map(name => `performer “${name}”`),
                 ...tagResolution.failures.map(name => `tag “${name}”`)
             ];
+            const scraperSourceName = String(match?._sourceName || 'scraper source');
+            const scraperIdLabel = `${scraperSourceName} ID`;
 
             // 4. Update Scene & Synchronize Context
             const effectiveCtx = ctx || popup?._context || activePopup?._context;
@@ -6544,11 +6599,11 @@
                         configRes?.data?.configuration?.general?.stashBoxes
                     );
                 } catch (error) {
-                    if (match?.remote_site_id || match?.urls?.some?.(url => /stashdb\.org/i.test(url))) {
-                        stashIdResolution.reason = 'the configured StashDB endpoint could not be loaded';
+                    if (match?.remote_site_id || match?.urls?.some?.(url => /^https?:\/\//i.test(url))) {
+                        stashIdResolution.reason = 'the configured scraper endpoint could not be loaded';
                     }
                 }
-                if (stashIdResolution.reason) resolutionFailures.push(`StashDB ID (${stashIdResolution.reason})`);
+                if (stashIdResolution.reason) resolutionFailures.push(`${scraperIdLabel} (${stashIdResolution.reason})`);
                 const { updateInput, mergedPerformerIds, mergedTagIds } = buildScrapeUpdateInput({
                     sceneId,
                     match,
@@ -6576,6 +6631,9 @@
                 }
 
                 syncSceneToApolloCache(saveRes.data.sceneUpdate);
+                if (scrapeSelection.title && match.title) {
+                    setLiveEverythingPopupTitle(popup, match.title);
+                }
 
                 // Save and verify the StashDB ID independently. Keeping this separate from the
                 // metadata mutation makes any endpoint/ID problem visible without rolling back
@@ -6599,7 +6657,7 @@
                     if (stashIdSaveRes?.errors?.length || !idWasSaved) {
                         const reason = stashIdSaveRes?.errors?.map(error => error.message).join('; ')
                             || 'Stash did not return the accepted ID after saving';
-                        resolutionFailures.push(`StashDB ID (${reason})`);
+                        resolutionFailures.push(`${scraperIdLabel} (${reason})`);
                     }
                 }
 
@@ -6665,7 +6723,7 @@
                     const coverNote = coverSaved ? '' : ' The cover also failed to save.';
                     toastError(`Metadata saved, but FastTag could not apply: ${resolutionFailures.join(', ')}.${coverNote}`);
                 } else if (coverSaved) {
-                    toastSuccess('Matched & Saved from StashDB!');
+                    toastSuccess(`Matched & Saved from ${scraperSourceName}!`);
                 } else {
                     toastError('Metadata saved, but Stash rejected the cover image.');
                 }
@@ -9340,6 +9398,8 @@
             }
         };
 
+        popup._refreshHeaderTitle = updateUI;
+
         try {
             if (!popup._isRandomMode) {
                 const savedPref = localStorage.getItem('fasttag_sequential_edit_mode');
@@ -9756,10 +9816,7 @@
                         throw new Error(titleRes?.errors?.map(error => error.message).join('; ') || 'Stash did not return the updated scene.');
                     }
                     syncSceneToApolloCache(titleRes.data.sceneUpdate);
-                    if (popup?.titleSpan) {
-                        popup.titleSpan.textContent = aiResult.clean_title;
-                        applyMarqueeAnimation(popup.titleSpan);
-                    }
+                    setLiveEverythingPopupTitle(popup, aiResult.clean_title);
                     applyTitleBtn.textContent = '✓ Set';
                     applyTitleBtn.disabled = true;
                     applyTitleBtn.style.background = '#059669';
@@ -10056,10 +10113,7 @@
                             throw new Error(metadataRes?.errors?.map(error => error.message).join('; ') || 'Stash did not return the updated scene.');
                         }
                         syncSceneToApolloCache(metadataRes.data.sceneUpdate);
-                        if (aiResult.clean_title && popup?.titleSpan) {
-                            popup.titleSpan.textContent = aiResult.clean_title;
-                            applyMarqueeAnimation(popup.titleSpan);
-                        }
+                        if (aiResult.clean_title) setLiveEverythingPopupTitle(popup, aiResult.clean_title);
                     }
 
                     if (typeof ctx.renderStudioBar === 'function') {
@@ -11702,6 +11756,47 @@
             };
 
             popup.refreshBtn.onclick = async () => {
+                const scraperIsOpen = (popup.scraperCardContainer
+                    && popup.scraperCardContainer.style.display !== 'none'
+                    && popup.scraperCardContainer.innerHTML.trim() !== '')
+                    || (floatingScraperHudElement && document.body.contains(floatingScraperHudElement));
+                if (scraperIsOpen) {
+                    if (isDirty()) {
+                        let saved = await latestEverythingSavePromise;
+                        if (saved && isDirty()) {
+                            saved = await doSave('Scene changes saved before searching again');
+                        }
+                        if (!saved) {
+                            toastError('Could not save the latest scene changes, so the scrape was not restarted.');
+                            return;
+                        }
+                    }
+                    const activeSceneId = popup.currentSceneId || currentSceneId;
+                    const previousResults = (sessionScrapeCache.get(activeSceneId) || []).slice();
+                    sessionScrapeCache.delete(activeSceneId);
+                    popup.refreshBtn.disabled = true;
+                    popup.refreshBtn.textContent = '⟳';
+                    popup.refreshBtn.title = 'Searching again using current scene metadata';
+                    try {
+                        const succeeded = await popup.triggerScrape?.(true, activeSceneId, popup.currentCardElement || cardElement);
+                        if (succeeded === false && previousResults.length > 0) {
+                            sessionScrapeCache.set(activeSceneId, previousResults);
+                            await renderScraperMatchCard(
+                                popup.scraperCardContainer,
+                                previousResults,
+                                activeSceneId,
+                                popup._context,
+                                popup,
+                                () => popup.globalSearch?.focus({ preventScroll: true })
+                            );
+                        }
+                    } finally {
+                        popup.refreshBtn.disabled = false;
+                        popup.refreshBtn.textContent = '↻';
+                        popup.refreshBtn.title = 'Search again using current scene metadata';
+                    }
+                    return;
+                }
                 popup.refreshBtn.classList.remove('fasttag-refresh-pulse');
                 popup.refreshBtn.title = 'Refresh all caches';
                 invalidateCache('tags');
@@ -11779,6 +11874,7 @@
 
             let pendingEverythingSaveSeq = 0;
             const enqueueEverythingSave = createSerialTaskQueue();
+            let latestEverythingSavePromise = Promise.resolve(true);
             const doSave = (customSuccessMessage = null, shouldCloseScraper = false) => {
                 const saveSeq = ++pendingEverythingSaveSeq;
                 const targetSceneId = currentSceneId;
@@ -11861,7 +11957,8 @@
                     return false;
                 };
 
-                return enqueueEverythingSave(runSave);
+                latestEverythingSavePromise = enqueueEverythingSave(runSave);
+                return latestEverythingSavePromise;
                 };
 
                 const onSuggestionActivated = async (sug) => {
@@ -11964,12 +12061,14 @@
                     popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
                     popup.scrapeBtn.innerHTML = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
                     popup.scrapeBtn.title = 'Scrape scene metadata';
+                    popup.refreshBtn.title = 'Refresh all caches';
                     hideScrapeCoverTooltip();
                     return;
                 }
 
                 window._fastTagEverythingScraperOpen = true;
                 setScraperHudPersistedOpen(true);
+                popup.refreshBtn.title = 'Search again using current scene metadata';
                 ftLog('ACTION', 'SCRAPER', 'Scraper HUD opened');
 
                 // If already scraped for this scene during this active session, reopen instantly with 0ms lag!
@@ -12002,17 +12101,20 @@
                             () => popup.globalSearch?.focus({ preventScroll: true }),
                             initialSearch
                         );
+                        return true;
                     } else {
                         sessionScrapeCache.set(activeSceneId, matches);
                         popup.scrapeBtn.disabled = false;
                         renderScraperMatchCard(popup.scraperCardContainer, matches, activeSceneId, popup._context, popup, () => {
                             popup.globalSearch?.focus({ preventScroll: true });
                         });
+                        return true;
                     }
                 } catch (err) {
                     popup.scrapeBtn.disabled = false;
                     popup.scrapeBtn.innerHTML = origHtml;
                     toastError('Scrape error: ' + (err?.message || err));
+                    return false;
                 }
             };
 

@@ -1,6 +1,6 @@
 # FastTag User Guide
 
-FastTag adds rapid scene-card metadata editing to Stash. This guide covers version 4.2.10 and is also available as a searchable offline guide from FastTag Settings.
+FastTag adds rapid scene-card metadata editing to Stash. This guide covers version 4.2.11 and is also available as a searchable offline guide from FastTag Settings.
 
 ## Opening FastTag
 
@@ -36,7 +36,7 @@ The scrubbing instruction overlay appears once per browser session and no more t
 
 ## StashDB scraping
 
-Scraping is restricted to Edit Everything so all returned fields can be reviewed. FastTag attempts Stash scene lookup, then cleaned title/filename keyword searches. A manual search phrase is available for difficult filenames.
+Scraping is restricted to Edit Everything so all returned fields can be reviewed. FastTag attempts Stash scene lookup, then cleaned title/filename and contextual keyword searches. When a studio or performers are linked, the editable search box is prefilled with the studio and all linked performer names; individual-performer searches remain automatic fallbacks.
 
 - **Verified Fingerprint** means a returned fingerprint matched the local file.
 - **Scene Lookup** is not automatically treated as fingerprint verification.
@@ -44,6 +44,8 @@ Scraping is restricted to Edit Everything so all returned fields can be reviewed
 - Performer, studio, duration, and title evidence contribute to ordering and assessment.
 - **Limited Comparison** means local evidence was unavailable.
 - **Review & Accept** warns about conflicting evidence without hiding the result.
+
+With **Hide Obvious False Positives** enabled in Workflow settings, FastTag hides only keyword results with no linked performer match, a different known studio, and very weak title similarity. A close duration keeps a result visible; when duration is available, it must also conflict substantially. Direct scene lookups and verified fingerprints are never hidden, at least one result always remains visible, and **Show hidden** reveals the filtered results at any time.
 
 Field checkboxes determine what is saved. Existing tags and performers are merged with selected scraped values. Covers save separately so a rejected image cannot prevent other metadata from saving.
 

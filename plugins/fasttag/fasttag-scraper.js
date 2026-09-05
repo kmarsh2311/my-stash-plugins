@@ -21,8 +21,12 @@
         }
     `;
     let dependencies = null;
+    let preferredStashBoxCache = null;
 
-    function configure(options) { dependencies = options; }
+    function configure(options) {
+        dependencies = options;
+        preferredStashBoxCache = null;
+    }
     function getDependencies() {
         if (!dependencies) throw new Error('[FastTag] Scraper integration is not configured');
         return dependencies;
@@ -67,6 +71,115 @@
             performerNames.forEach(name => add(`${name} ${usefulWords.join(' ')}`));
         }
         return fallbacks;
+    }
+
+    function buildStudioPerformerFallbackQueries(localStudio, linkedPerformers, primaryQueries = []) {
+        const { cleanTitleForScraping } = getDependencies();
+        const studioName = String(localStudio?.name || '').trim();
+        if (!studioName) return [];
+        const primaryKeys = new Set((primaryQueries || []).map(value => normalizePerformerName(value)));
+        const fallbacks = [];
+        const add = (value) => {
+            const cleaned = cleanTitleForScraping(value || '');
+            const key = normalizePerformerName(cleaned);
+            if (key.length >= 3 && !primaryKeys.has(key) && !fallbacks.some(item => normalizePerformerName(item) === key)) {
+                fallbacks.push(cleaned);
+            }
+        };
+        const performerNames = (linkedPerformers || [])
+            .map(performer => String(performer?.name || '').trim())
+            .filter(Boolean);
+        if (performerNames.length > 1) add(`${studioName} ${performerNames.join(' ')}`);
+        performerNames.forEach(name => add(`${studioName} ${name}`));
+        return fallbacks;
+    }
+
+    function buildContextualSearchQuery(localStudio, linkedPerformers) {
+        const { cleanTitleForScraping } = getDependencies();
+        const studioName = String(localStudio?.name || '').trim();
+        const performerNames = (linkedPerformers || [])
+            .map(performer => String(performer?.name || '').trim())
+            .filter(Boolean);
+        return cleanTitleForScraping([studioName, ...performerNames].filter(Boolean).join(' '));
+    }
+
+    function buildOpaqueRecoveryFallbackQueries(primaryQueries = []) {
+        const fallbacks = [];
+        for (const query of primaryQueries || []) {
+            const original = String(query || '').trim();
+            if (!original) continue;
+            const cleaned = original
+                .split(/\s+/)
+                .filter(token => !/^(?:[a-z]\d{7,}|\d{10,})$/i.test(token))
+                .join(' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+            if (cleaned.length >= 2 && normalizePerformerName(cleaned) !== normalizePerformerName(original)
+                && !fallbacks.some(value => normalizePerformerName(value) === normalizePerformerName(cleaned))) {
+                fallbacks.push(cleaned);
+            }
+        }
+        return fallbacks;
+    }
+
+    function mergeScraperMatchResults(...resultSets) {
+        const merged = [];
+        const seen = new Set();
+        for (const match of resultSets.flat()) {
+            if (!match) continue;
+            const stashUrl = (Array.isArray(match.urls) ? match.urls : []).find(url => /stashdb\.org\/scenes\//i.test(String(url || ''))) || '';
+            const key = String(match.remote_site_id || stashUrl || `${match.title || ''}|${match.date || ''}|${match.studio?.name || ''}`).trim().toLowerCase();
+            if (key && seen.has(key)) continue;
+            if (key) seen.add(key);
+            merged.push(match);
+        }
+        return merged.sort((a, b) => Number(b?._matchScore || 0) - Number(a?._matchScore || 0));
+    }
+
+    function hasDecisiveScraperMatch(matches) {
+        return (Array.isArray(matches) ? matches : []).some(match =>
+            match?._matchAssessment === 'strong' || match?._matchAssessment === 'likely'
+        );
+    }
+
+    function resolvePreferredStashBox(stashBoxes) {
+        const boxes = Array.isArray(stashBoxes) ? stashBoxes : [];
+        const stashDbIndex = boxes.findIndex(box =>
+            /stashdb\.org/i.test(String(box?.endpoint || '')) || /stashdb/i.test(String(box?.name || ''))
+        );
+        const index = stashDbIndex >= 0 ? stashDbIndex : (boxes.length > 0 ? 0 : 0);
+        const box = boxes[index] || null;
+        return {
+            index,
+            name: String(box?.name || (stashDbIndex >= 0 || boxes.length === 0 ? 'StashDB' : `Stash Box ${index + 1}`)),
+            endpoint: String(box?.endpoint || '')
+        };
+    }
+
+    function getScraperResultUrl(match) {
+        const urls = Array.isArray(match?.urls) ? match.urls.filter(url => /^https?:\/\//i.test(String(url || ''))) : [];
+        const remoteId = String(match?.remote_site_id || '').trim();
+        const isStashDbSource = /stashdb/i.test(String(match?._sourceName || ''))
+            || /stashdb\.org/i.test(String(match?._sourceEndpoint || ''));
+        if (isStashDbSource && remoteId) {
+            if (/^https?:\/\/stashdb\.org\/scenes\//i.test(remoteId)) return remoteId;
+            if (!/^https?:\/\//i.test(remoteId)) return `https://stashdb.org/scenes/${encodeURIComponent(remoteId)}`;
+        }
+        return urls[0] || (/^https?:\/\//i.test(remoteId) ? remoteId : '');
+    }
+
+    async function loadPreferredStashBox() {
+        if (preferredStashBoxCache) return preferredStashBoxCache;
+        const { fetchGQL } = getDependencies();
+        try {
+            const response = await fetchGQL('query FastTagScraperSources { configuration { general { stashBoxes { endpoint name } } } }');
+            const boxes = response?.data?.configuration?.general?.stashBoxes;
+            if (Array.isArray(boxes) && boxes.length > 0) {
+                preferredStashBoxCache = resolvePreferredStashBox(boxes);
+                return preferredStashBoxCache;
+            }
+        } catch (error) {}
+        return resolvePreferredStashBox([]);
     }
 
     function normalizePerformerName(value) {
@@ -184,6 +297,7 @@
             let score = 0;
             const reasons = [];
             const isHashMatch = hasVerifiedFingerprint(match);
+            match._hasVerifiedFingerprint = isHashMatch;
             if (isHashMatch) {
                 score += 1000;
                 reasons.push('Fingerprint match');
@@ -247,11 +361,47 @@
         return matches;
     }
 
-    function enrichScraperMatches(matches, matchType, sourceName, localDuration, localFingerprints, linkedPerformers = [], localContext = {}) {
+    function isObviousFalsePositive(match) {
+        if (!match || match._matchType === 'scene-id' || match._hasVerifiedFingerprint || hasVerifiedFingerprint(match)) return false;
+        const comparison = match._comparisonContext || {};
+        const { parseDurationSec } = getDependencies();
+        const localDuration = parseDurationSec(match._localDuration);
+        const durationThreshold = Math.max(300, localDuration ? localDuration * 0.25 : 0);
+        const durationDifference = Number(match._durationDifference);
+        const durationUnavailable = match._durationDifference === null
+            || match._durationDifference === undefined
+            || !Number.isFinite(durationDifference);
+        const durationStronglyConflicts = !durationUnavailable && durationDifference > durationThreshold;
+        return match._matchAssessment === 'unlikely'
+            && comparison.scene === true
+            && comparison.performers === true
+            && comparison.studio === true
+            && Number(match._performerOverlapCount || 0) === 0
+            && match._studioComparison === 'mismatch'
+            && typeof match._titleSimilarity === 'number'
+            && match._titleSimilarity < 0.2
+            && (durationUnavailable || durationStronglyConflicts);
+    }
+
+    function partitionObviousFalsePositiveMatches(matches) {
+        const visible = [];
+        const hidden = [];
+        if (!Array.isArray(matches)) return { visible, hidden };
+        matches.forEach(match => {
+            (isObviousFalsePositive(match) ? hidden : visible).push(match);
+        });
+        // Never present an empty result set merely because every result was weak.
+        if (visible.length === 0 && hidden.length > 0) visible.push(hidden.shift());
+        return { visible, hidden };
+    }
+
+    function enrichScraperMatches(matches, matchType, sourceName, localDuration, localFingerprints, linkedPerformers = [], localContext = {}, sourceInfo = null) {
         if (!Array.isArray(matches)) return [];
         matches.forEach(match => {
             match._matchType = matchType;
             match._sourceName = sourceName;
+            match._sourceEndpoint = String(sourceInfo?.endpoint || '');
+            match._sourceIndex = Number.isInteger(sourceInfo?.index) ? sourceInfo.index : null;
             match._localDuration = localDuration;
             match._localFingerprints = localFingerprints;
             match._comparisonContext = {
@@ -325,25 +475,32 @@
             .filter(item => item?.endpoint && item?.stash_id)
             .map(item => ({ endpoint: String(item.endpoint), stash_id: String(item.stash_id) }));
         const urls = Array.isArray(match?.urls) ? match.urls.filter(value => typeof value === 'string') : [];
-        const stashDbSceneUrl = urls.find(value => /stashdb\.org\/scenes\//i.test(value)) || '';
+        const remoteSceneUrl = urls.find(value => /\/scenes\//i.test(value)) || '';
         const rawRemoteId = String(match?.remote_site_id || '').trim();
-        const remoteUrl = /^https?:\/\//i.test(rawRemoteId) ? rawRemoteId : stashDbSceneUrl;
+        const remoteUrl = /^https?:\/\//i.test(rawRemoteId) ? rawRemoteId : remoteSceneUrl;
         const urlIdMatch = remoteUrl.match(/\/scenes\/([^/?#]+)/i);
         const stashId = urlIdMatch ? decodeURIComponent(urlIdMatch[1]) : (/^[a-z0-9-]+$/i.test(rawRemoteId) ? rawRemoteId : '');
-        const isStashDbResult = /stashdb/i.test(String(match?._sourceName || '')) || /stashdb\.org/i.test(remoteUrl);
-        if (!isStashDbResult || !stashId) return { stashIds: existing, added: false, reason: null };
-
         const boxes = Array.isArray(stashBoxes) ? stashBoxes : [];
-        const endpoint = boxes.find(box => /stashdb\.org/i.test(String(box?.endpoint || '')))?.endpoint
+        const reportedEndpoint = /^https?:\/\//i.test(String(match?._sourceEndpoint || '')) ? String(match._sourceEndpoint) : '';
+        const sourceName = String(match?._sourceName || '').trim();
+        const configuredSource = boxes.find(box => sourceName && String(box?.name || '').trim().toLowerCase() === sourceName.toLowerCase());
+        const isConfiguredStashBoxResult = Boolean(reportedEndpoint || configuredSource)
+            || /stashdb/i.test(sourceName)
+            || /stashdb\.org/i.test(remoteUrl);
+        if (!isConfiguredStashBoxResult || !stashId) return { stashIds: existing, added: false, reason: null };
+
+        const endpoint = reportedEndpoint
+            || configuredSource?.endpoint
+            || boxes.find(box => /stashdb\.org/i.test(String(box?.endpoint || '')))?.endpoint
             || boxes.find(box => /stashdb/i.test(String(box?.name || '')))?.endpoint
             || '';
-        if (!endpoint) return { stashIds: existing, added: false, reason: 'the configured StashDB endpoint could not be resolved' };
+        if (!endpoint) return { stashIds: existing, added: false, reason: 'the configured scraper endpoint could not be resolved' };
 
         const endpointKey = String(endpoint).replace(/\/+$/, '').toLowerCase();
         const sameEndpoint = existing.find(item => item.endpoint.replace(/\/+$/, '').toLowerCase() === endpointKey);
         if (sameEndpoint) {
             if (sameEndpoint.stash_id === stashId) return { stashIds: existing, added: false, reason: null };
-            return { stashIds: existing, added: false, reason: 'the scene already has a different StashDB ID' };
+            return { stashIds: existing, added: false, reason: 'the scene already has a different ID for this scraper source' };
         }
         return { stashIds: [...existing, { endpoint: String(endpoint), stash_id: stashId }], added: true, reason: null };
     }
@@ -442,6 +599,7 @@
 
     async function fetchScraperMatchesForScene(sceneId, cardElement, manualQuery = '') {
         const { fetchGQL } = getDependencies();
+        const preferredSourcePromise = loadPreferredStashBox();
         let sceneTitle = '';
         let sceneFileName = '';
         let localDuration = null;
@@ -469,20 +627,21 @@
             }
         } catch (e) {}
 
-        const enrich = (matches, matchType, sourceName) => enrichScraperMatches(
+        const preferredSource = await preferredSourcePromise;
+        const enrich = (matches, matchType, sourceName, sourceInfo = null) => enrichScraperMatches(
             matches, matchType, sourceName, localDuration, localFingerprints, linkedPerformers,
-            { localStudio, localTitle: sceneTitle, localFileName: sceneFileName, sceneContextLoaded }
+            { localStudio, localTitle: sceneTitle, localFileName: sceneFileName, sceneContextLoaded }, sourceInfo
         );
 
         const cleanedManualQuery = manualQuery ? getDependencies().cleanTitleForScraping(manualQuery) : '';
         if (!cleanedManualQuery) {
             try {
                 const response = await fetchGQL(SCRAPE_QUERY, {
-                    source: { stash_box_index: 0 },
+                    source: { stash_box_index: preferredSource.index },
                     input: { scene_id: String(sceneId) }
                 });
                 const matches = response?.data?.scrapeSingleScene;
-                if (Array.isArray(matches) && matches.length > 0) return enrich(matches, 'scene-id', 'StashDB');
+                if (Array.isArray(matches) && matches.length > 0) return enrich(matches, 'scene-id', preferredSource.name, preferredSource);
             } catch (error) {
                 console.log('[FastTag] Scrape by scene_id error/empty:', error);
             }
@@ -494,27 +653,52 @@
         const primaryQueries = cleanedManualQuery
             ? [cleanedManualQuery]
             : buildScrapeCandidateQueries(sceneTitle, sceneFileName, cardText);
+        const studioPerformerQueries = cleanedManualQuery
+            ? []
+            : buildStudioPerformerFallbackQueries(localStudio, linkedPerformers, primaryQueries);
+        const contextualSearchQuery = cleanedManualQuery
+            ? ''
+            : buildContextualSearchQuery(localStudio, linkedPerformers);
+        const editableSearchQuery = cleanedManualQuery
+            || contextualSearchQuery
+            || primaryQueries[0]
+            || '';
         const candidateQueries = cleanedManualQuery
             ? primaryQueries
-            : primaryQueries.concat(buildLinkedPerformerFallbackQueries(linkedPerformers, primaryQueries));
+            : Array.from(new Set([
+                ...primaryQueries,
+                ...buildOpaqueRecoveryFallbackQueries(primaryQueries),
+                ...studioPerformerQueries,
+                contextualSearchQuery,
+                ...buildLinkedPerformerFallbackQueries(linkedPerformers, primaryQueries)
+            ].filter(Boolean)));
+
+        let weakStashDbMatches = [];
 
         for (const queryTerm of candidateQueries) {
             if (!queryTerm || queryTerm.length < 2) continue;
             try {
                 const response = await fetchGQL(SCRAPE_QUERY, {
-                    source: { stash_box_index: 0 },
+                    source: { stash_box_index: preferredSource.index },
                     input: { query: queryTerm }
                 });
                 const matches = response?.data?.scrapeSingleScene;
                 if (Array.isArray(matches) && matches.length > 0) {
-                    const enriched = enrich(matches, 'title', 'StashDB');
-                    enriched.forEach(match => { match._searchQuery = queryTerm; });
-                    return enriched;
+                    const enriched = enrich(matches, 'title', preferredSource.name, preferredSource);
+                    enriched.forEach(match => {
+                        match._matchedSearchQuery = queryTerm;
+                        match._searchQuery = editableSearchQuery || queryTerm;
+                    });
+                    const combined = mergeScraperMatchResults(weakStashDbMatches, enriched);
+                    if (hasDecisiveScraperMatch(enriched)) return combined;
+                    weakStashDbMatches = combined;
                 }
             } catch (error) {
                 console.log('[FastTag] Scrape query error:', error);
             }
         }
+
+        if (weakStashDbMatches.length > 0) return weakStashDbMatches;
 
         try {
             const response = await fetchGQL('query { listScrapers(types: [SCENE]) { id name } }');
@@ -531,7 +715,10 @@
                         const matches = scrapeResponse?.data?.scrapeSingleScene;
                         if (Array.isArray(matches) && matches.length > 0) {
                             const enriched = enrich(matches, 'scraper', scraper.name || 'Scraper');
-                            enriched.forEach(match => { match._searchQuery = queryTerm; });
+                            enriched.forEach(match => {
+                                match._matchedSearchQuery = queryTerm;
+                                match._searchQuery = editableSearchQuery || queryTerm;
+                            });
                             return enriched;
                         }
                     } catch (e) {}
@@ -546,9 +733,18 @@
         configure,
         buildScrapeCandidateQueries,
         buildLinkedPerformerFallbackQueries,
+        buildStudioPerformerFallbackQueries,
+        buildContextualSearchQuery,
+        buildOpaqueRecoveryFallbackQueries,
+        mergeScraperMatchResults,
+        hasDecisiveScraperMatch,
+        resolvePreferredStashBox,
+        getScraperResultUrl,
         rankMatchesByLinkedPerformers,
         calculateTitleSimilarity,
         rankScraperMatchesByEvidence,
+        isObviousFalsePositive,
+        partitionObviousFalsePositiveMatches,
         enrichScraperMatches,
         analyzeScraperMatch,
         readScrapeFieldSelection,

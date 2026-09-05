@@ -215,6 +215,14 @@
 ### Install / Update
 - Repository index: `https://kmarsh2311.github.io/my-stash-plugins/index.yml`
 - Full changelog: See [CHANGELOG.md](CHANGELOG.md)
+## FastTag 4.2.11 - Context-Aware Scraping
+
+FastTag 4.2.11 makes StashDB searches more precise without adding routine work. Scraping now uses the configured source, recovered-filename cleanup, linked studios, and every linked performer; the editable query remains prefilled with that context for quick corrections.
+
+An enabled-by-default conservative filter hides results only when the available evidence makes them clearly unrelated. Hidden matches can always be restored, and direct scene lookups, verified fingerprints, matching performers, matching studios, meaningful titles, and close durations remain protected. Refreshing an open scraper now saves pending edits and searches again with the updated scene metadata.
+
+Accepted titles update immediately, result links target the correct source entry, and accepted configured stash-box IDs are saved and verified while existing external IDs are preserved.
+
 ## FastTag 4.2.10 - Verified Scraping and Workflow Polish
 
 FastTag 4.2.10 makes scraper acceptance safer and easier to diagnose. Accepted StashDB scene IDs are now saved independently, existing external IDs are preserved, and FastTag verifies the exact returned endpoint and ID before showing a complete success state.

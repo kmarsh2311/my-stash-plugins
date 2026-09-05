@@ -19,6 +19,7 @@
         scrubCueCount: 'stash_fast_tag_scrub_cue_count_v6',
         videoHudOpen: 'fasttag_video_hud_open_state',
         detachScraper: 'fasttag_detach_scraper_v1',
+        hideObviousFalsePositives: 'fasttag_hide_obvious_false_positives_v1',
         scraperHudOpen: 'fasttag_scraper_hud_open_state'
     });
     const RECENT_KEYS = Object.freeze({
@@ -139,6 +140,12 @@
     }
     function setDetachScraper(enabled) {
         try { writeBoolean(KEYS.detachScraper, enabled); } catch (e) {}
+    }
+    function getHideObviousFalsePositives() {
+        try { return readBoolean(KEYS.hideObviousFalsePositives, true); } catch (e) { return true; }
+    }
+    function setHideObviousFalsePositives(enabled) {
+        try { writeBoolean(KEYS.hideObviousFalsePositives, enabled); } catch (e) {}
     }
 
     function getIDB() {
@@ -291,6 +298,8 @@
         setScraperHudPersistedOpen,
         getDetachScraper,
         setDetachScraper,
+        getHideObviousFalsePositives,
+        setHideObviousFalsePositives,
         idbGet,
         idbSet,
         idbDelete,

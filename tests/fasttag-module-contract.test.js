@@ -51,6 +51,14 @@ assert.ok(
     mainSource.includes('syncSceneToApolloCache(saveRes.data.sceneUpdate);'),
     'scraper save should synchronize returned metadata to the live scene-card cache'
 );
+assert.ok(
+    mainSource.includes('setLiveEverythingPopupTitle(popup, match.title);'),
+    'scraper acceptance should update the open popup title immediately'
+);
+assert.ok(
+    mainSource.includes('popup._refreshHeaderTitle = updateUI;'),
+    'live title updates should preserve sequential and random header controls'
+);
 assert.equal(
     mainSource.includes('In Single-Column Popup (Edit Tags, Edit Performers, Edit Studio)'),
     false,
@@ -71,6 +79,24 @@ assert.ok(
     mainSource.includes('renderScraperMatchCard(\n                            popup.scraperCardContainer,\n                            [],'),
     'Edit Everything should open the scraper search panel when automatic scraping returns no results'
 );
+assert.ok(
+    mainSource.includes('sessionScrapeCache.delete(activeSceneId);')
+        && mainSource.includes('popup.triggerScrape?.(true, activeSceneId'),
+    'refreshing an open scraper should clear only the active scene cache and force a new automatic search'
+);
+assert.ok(
+    mainSource.includes('await latestEverythingSavePromise')
+        && mainSource.includes("doSave('Scene changes saved before searching again')"),
+    'scraper refresh should wait for automatic scene saving before searching again'
+);
+assert.ok(
+    mainSource.includes('sessionScrapeCache.set(activeSceneId, previousResults);'),
+    'failed scraper refreshes should restore the previous result set'
+);
+assert.ok(mainSource.includes('fasttag-setting-hide-obvious-false-positives'), 'Workflow settings should expose conservative false-positive filtering');
+assert.ok(mainSource.includes('partitionObviousFalsePositiveMatches(allResults)'), 'scraper rendering should preserve and partition the complete result set');
+assert.ok(mainSource.includes('fasttag-scrape-toggle-hidden'), 'filtered scraper results must remain available through a show-hidden control');
+assert.ok(mainSource.includes("value=\"${escapeHtml(match._searchQuery || '')}\""), 'manual scraper search should retain the complete contextual query');
 const aiApplyMetadataBlock = mainSource.match(/mutation FastTagAIApplyMetadata[\s\S]*?syncSceneToApolloCache\(metadataRes\.data\.sceneUpdate\);/)?.[0] || '';
 assert.ok(aiApplyMetadataBlock.includes('title date'), 'AI Apply All should return updated title and date');
 assert.ok(aiApplyMetadataBlock.includes('syncSceneToApolloCache'), 'AI Apply All should synchronize metadata to live scene cards');
