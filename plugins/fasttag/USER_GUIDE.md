@@ -1,6 +1,6 @@
 # FastTag User Guide
 
-FastTag adds rapid scene-card metadata editing to Stash. This guide covers version 4.2.11 and is also available as a searchable offline guide from FastTag Settings.
+FastTag adds rapid scene-card metadata editing to Stash. This guide covers version 4.2.12 and is also available as a searchable offline guide from FastTag Settings.
 
 ## Opening FastTag
 

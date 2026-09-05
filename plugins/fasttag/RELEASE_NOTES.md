@@ -215,17 +215,19 @@
 ### Install / Update
 - Repository index: `https://kmarsh2311.github.io/my-stash-plugins/index.yml`
 - Full changelog: See [CHANGELOG.md](CHANGELOG.md)
+## FastTag 4.2.12 - Configurable Scraper Matching
+
+FastTag 4.2.12 adds a dedicated Match settings tab with Conservative, Balanced, Strict, and automatically detected Custom behaviour. Users can tune alias handling, cast conflicts, studio requirements, title and duration tolerances, and the initial result count; Restore Defaults returns only these controls to Balanced behaviour.
+
+Ambiguous single-word aliases now provide weak evidence rather than confirmed performer matches. Completely different multi-performer casts outweigh studio-and-duration similarity, possible matches use amber acceptance controls, and large searches initially show the best 25 candidates with every remaining result available through **Show all**.
+
+Title-confidence analysis excludes linked performers, the known local studio, technical filename clutter, and a short documented list of generic descriptors without removing those words from the actual scraper query. Scraper navigation remains stable between results, and closing an editor now reliably closes its detached scraper HUD even when asynchronous work is still finishing.
+
 ## FastTag 4.2.11 - Context-Aware Scraping
 
 FastTag 4.2.11 makes StashDB searches more precise without adding routine work. Scraping now uses the configured source, recovered-filename cleanup, linked studios, and every linked performer; the editable query remains prefilled with that context for quick corrections.
 
 An enabled-by-default conservative filter hides results only when the available evidence makes them clearly unrelated. Hidden matches can always be restored, and direct scene lookups, verified fingerprints, matching performers, matching studios, meaningful titles, and close durations remain protected. Refreshing an open scraper now saves pending edits and searches again with the updated scene metadata.
-
-Ambiguous single-word aliases are shown as possible alias evidence rather than confirmed performer matches, preventing a common first name plus a close duration from producing false confidence. Completely different multi-performer casts now outweigh studio-and-duration similarity, and possible matches use amber rather than green acceptance controls. Large aggregate searches show the best 25 candidates first, with every lower-ranked result available through **Show all**.
-
-A dedicated Match settings tab now offers Conservative, Balanced, Strict, and Custom behaviour. Users can tune alias handling, cast conflicts, studio requirements, title and duration tolerances, and the initial result count; Restore Defaults returns only these controls to FastTag's Balanced behaviour.
-
-Title-confidence analysis now ignores linked performers, the known local studio, technical filename clutter, and a short documented list of generic descriptors. Scraper searches retain the original words, so this improves assessment without reducing search coverage.
 
 Accepted titles update immediately, result links target the correct source entry, and accepted configured stash-box IDs are saved and verified while existing external IDs are preserved.
 
