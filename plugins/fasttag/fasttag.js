@@ -174,16 +174,11 @@
         if (fastTagHelpLoadPromise) return fastTagHelpLoadPromise;
 
         fastTagHelpLoadPromise = new Promise((resolve, reject) => {
-            const mainScript = Array.from(document.scripts).find(script => /\/fasttag\.js(?:[?#]|$)/.test(script.src || ''));
-            if (!mainScript?.src) {
-                reject(new Error('Could not determine the FastTag plugin file location.'));
-                return;
-            }
             const existingScript = document.getElementById('fasttag-help-script');
             if (existingScript) existingScript.remove();
             const script = document.createElement('script');
             script.id = 'fasttag-help-script';
-            script.src = new URL('fasttag-help.js', mainScript.src).href;
+            script.src = new URL('/plugin/mypluginrc/assets/fasttag-help.js', window.location.origin).href;
             script.async = true;
             script.onload = () => {
                 if (window.FastTag?.help?.openGuide) resolve(window.FastTag.help);

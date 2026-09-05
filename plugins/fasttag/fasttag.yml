@@ -18,6 +18,8 @@ ui:
     - fasttag.js
   css:
     - tabulator.min.css
+  assets:
+    /: .
 exec:
   - python3
   - "{pluginDir}/fasttag_task.py"
