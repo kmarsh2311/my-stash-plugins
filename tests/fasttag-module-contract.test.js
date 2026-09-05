@@ -18,6 +18,7 @@ const expectedOrder = [
     'fasttag-gemini.js',
     'fasttag-scraper.js',
     'fasttag-scraper-ui.js',
+    'fasttag-help.js',
     'fasttag-preview.js',
     'fasttag-ui.js',
     'fasttag-editors.js',
@@ -31,12 +32,14 @@ assert.deepEqual(configuredOrder, expectedOrder, 'Stash must load FastTag module
 for (const file of expectedOrder) {
     assert.ok(fs.existsSync(path.join(pluginDirectory, file)), `${file} should exist`);
 }
-for (const namespace of ['Core', 'Entities', 'Storage', 'Integrations', 'Gemini', 'Scraper', 'ScraperUi', 'Preview', 'Ui', 'Editors', 'Workflows']) {
+for (const namespace of ['Core', 'Entities', 'Storage', 'Integrations', 'Gemini', 'Scraper', 'ScraperUi', 'Help', 'Preview', 'Ui', 'Editors', 'Workflows']) {
     assert.ok(mainSource.includes(`FastTag${namespace}`), `main entry point should require FastTag${namespace}`);
 }
 assert.equal(mainSource.includes('LEGACY_'), false, 'legacy comparison declarations should be removed');
 assert.ok(runnerSource.includes('(?:-[a-z]+)*'), 'test runner should discover multi-hyphen FastTag modules');
 assert.ok(mainSource.includes('__fastTagRuntimeInitialized'), 'FastTag should guard duplicate runtime initialization');
+assert.ok(mainSource.includes('openFastTagGuide'), 'Settings should open the standalone FastTag help module');
+assert.ok(fs.existsSync(path.join(pluginDirectory, 'USER_GUIDE.md')), 'offline Markdown user guide should ship with FastTag');
 
 const scraperSaveMutation = mainSource.match(/mutation FastTagAcceptSave[\s\S]*?`, \{ input: updateInput \}\);/)?.[0] || '';
 assert.ok(scraperSaveMutation.includes('title'), 'scraper save should return the updated title for live card refresh');

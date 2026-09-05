@@ -11,6 +11,7 @@ ui:
     - fasttag-gemini.js
     - fasttag-scraper.js
     - fasttag-scraper-ui.js
+    - fasttag-help.js
     - fasttag-preview.js
     - fasttag-ui.js
     - fasttag-editors.js

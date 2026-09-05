@@ -29,6 +29,8 @@
     if (!FastTagScraper) throw new Error('[FastTag] fasttag-scraper.js must load before fasttag.js');
     const FastTagScraperUi = window.FastTag?.scraperUi;
     if (!FastTagScraperUi) throw new Error('[FastTag] fasttag-scraper-ui.js must load before fasttag.js');
+    const FastTagHelp = window.FastTag?.help;
+    if (!FastTagHelp) throw new Error('[FastTag] fasttag-help.js must load before fasttag.js');
     const FastTagPreview = window.FastTag?.preview;
     if (!FastTagPreview) throw new Error('[FastTag] fasttag-preview.js must load before fasttag.js');
     const FastTagUi = window.FastTag?.ui;
@@ -128,6 +130,7 @@
         getSourcePresentation,
         getUnavailableContextPresentation
     } = FastTagScraperUi;
+    const { openGuide: openFastTagGuide } = FastTagHelp;
     const {
         getDominantWheelDelta,
         getWheelNotches,
@@ -2367,7 +2370,8 @@
                     </div>
                 </div>
 
-                <div style="padding: 12px 18px; background: ${cardBg}; border-top: 1px solid ${border}; display: flex; justify-content: flex-end;">
+                <div style="padding: 12px 18px; background: ${cardBg}; border-top: 1px solid ${border}; display: flex; justify-content: space-between; gap: 8px;">
+                    <button id="fasttag-settings-help" type="button" style="background: ${isDark ? 'rgba(99,102,241,.16)' : '#eef2ff'}; color: ${isDark ? '#c7d2fe' : '#3730a3'}; border: 1px solid ${isDark ? 'rgba(129,140,248,.45)' : '#a5b4fc'}; padding: 7px 13px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;">❓ Help &amp; User Guide</button>
                     <button id="fasttag-settings-done" style="background: #6366f1; color: white; border: none; padding: 7px 18px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer;">Done</button>
                 </div>
             </div>
@@ -2708,6 +2712,13 @@
 
         const doneBtn = modal.querySelector('#fasttag-settings-done');
         if (doneBtn) doneBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); closeModal(); };
+
+        const helpBtn = modal.querySelector('#fasttag-settings-help');
+        if (helpBtn) helpBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openFastTagGuide({ theme: getEffectiveTheme(), version: '4.2.9' });
+        };
 
         modal.onclick = (e) => {
             if (e.target === modal) {
