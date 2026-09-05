@@ -8756,6 +8756,11 @@
             const config = ENTITY_CONFIG[type];
             if (!config) continue;
             let cached = getCachedOrNull(type);
+            const loadedTable = type === 'tags' ? ctx?.tagsTable : type === 'performers' ? ctx?.performersTable : null;
+            const loadedTableData = loadedTable && typeof loadedTable.getData === 'function' ? loadedTable.getData() : null;
+            if (Array.isArray(loadedTableData) && loadedTableData.length > 0) {
+                cached = loadedTableData;
+            }
             if (!cached) {
                 try {
                     const res = await fetchGQL(config.fetchQuery);
@@ -8787,15 +8792,21 @@
                 }
             }
 
-            for (const item of cached) {
+            const matchingItems = [];
+            for (const [originalIndex, item] of cached.entries()) {
                 if (!item || !item.id) continue;
                 if (existingSet && (existingSet.has(String(item.id)) || existingSet.has(Number(item.id)))) continue;
 
                 if (isSuggestionMatch(item, normalizedSpaced, tokenSet, tokens)) {
-                    allSuggestions.push({ type, icon, item });
-                    if (allSuggestions.length >= 30) break;
+                    const primaryName = normalizeTextForSuggestions(item.name || item.title || '');
+                    const exactPrimaryMatch = primaryName && normalizedSpaced.includes(` ${primaryName} `);
+                    matchingItems.push({ item, originalIndex, exactPrimaryMatch });
                 }
             }
+            matchingItems
+                .sort((a, b) => Number(b.exactPrimaryMatch) - Number(a.exactPrimaryMatch) || a.originalIndex - b.originalIndex)
+                .slice(0, 20)
+                .forEach(entry => allSuggestions.push({ type, icon, item: entry.item }));
         }
 
         const tagsBox = container.querySelector('#everything-sugg-tags-box');

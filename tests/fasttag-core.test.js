@@ -38,8 +38,12 @@ assert.equal(matches({ name: 'Onlyfans' }, 'Only Fans'), true);
 assert.equal(matches({ name: 'Deep Throat' }, 'Deepthroat'), true);
 assert.equal(matches({ name: 'Tattoo' }, 'Tattoos'), true);
 assert.equal(matches({ name: 'Piercings' }, 'Piercing'), true);
-assert.equal(matches({ name: 'Robert', alias_list: ['Bobby'] }, 'Bobby arrives'), true);
+assert.equal(matches({ name: 'Robert', alias_list: ['Bobby'] }, 'Bobby arrives'), false);
 assert.equal(matches({ name: 'Angel of Bogota', alias_list: ['Angel'] }, 'Angel arrives'), false);
+assert.equal(matches({ name: 'Clayton', alias_list: ['Danny'] }, 'Danny Boy Fucks'), false);
+assert.equal(matches({ name: 'Benny Fox' }, 'Papi Kocic and Reece Beresford fuck Benny Fox'), true);
+assert.equal(matches({ name: 'Cher' }, 'Cher performs live'), true);
+assert.equal(matches({ name: 'Clayton', alias_list: ['Danny Clayton'] }, 'Danny Clayton performs'), true);
 assert.equal(matches({ name: 'Café Scene' }, 'CafeScene'), true);
 // Existing behaviour: primary tag names can exact-match even when listed as stop words.
 assert.equal(matches({ name: 'Man' }, 'A man arrives'), true);
