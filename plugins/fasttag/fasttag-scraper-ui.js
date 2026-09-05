@@ -52,11 +52,48 @@
         };
     }
 
+    function getSourcePresentation(match, isVerifiedFingerprint = false) {
+        if (isVerifiedFingerprint) {
+            return { label: 'Verified Fingerprint', tone: 'success', tooltip: 'A returned fingerprint matches the local file' };
+        }
+        if (match?._matchType === 'scene-id') {
+            return { label: 'Scene Lookup', tone: 'neutral', tooltip: 'Found using Stash’s scene lookup; no returned fingerprint was verified against the local file' };
+        }
+        if (match?._matchType === 'title') {
+            return { label: 'Keyword Search', tone: 'warning', tooltip: `Found by searching title or filename words${match?._searchQuery ? `: ${match._searchQuery}` : ''}` };
+        }
+        if (match?._matchType === 'scraper') {
+            return { label: `${match._sourceName || 'Installed Scraper'} Search`, tone: 'warning', tooltip: 'Found by an installed scraper keyword search' };
+        }
+        return null;
+    }
+
+    function getUnavailableContextPresentation(match) {
+        const context = match?._comparisonContext;
+        if (!context) return null;
+        if (!context.scene) {
+            return { label: 'Local Comparison Unavailable', missing: ['scene details'], tooltip: 'FastTag could not load the local scene details used to assess this result' };
+        }
+        const missing = [];
+        if (!context.performers) missing.push('linked performers');
+        if (!context.studio) missing.push('studio');
+        if (!context.duration) missing.push('duration');
+        if (!context.fingerprints) missing.push('fingerprints');
+        if (!missing.length) return null;
+        return {
+            label: 'Limited Comparison',
+            missing,
+            tooltip: `No local ${missing.join(', ')} available for comparison`
+        };
+    }
+
     root.FastTag = root.FastTag || {};
     root.FastTag.scraperUi = Object.freeze({
         ASSESSMENT_STYLES,
         getAssessmentPresentation,
         getAcceptPresentation,
-        getPerformerPresentation
+        getPerformerPresentation,
+        getSourcePresentation,
+        getUnavailableContextPresentation
     });
 }(typeof window !== 'undefined' ? window : globalThis));

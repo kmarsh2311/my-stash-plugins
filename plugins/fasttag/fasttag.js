@@ -37,6 +37,11 @@
     if (!FastTagEditors) throw new Error('[FastTag] fasttag-editors.js must load before fasttag.js');
     const FastTagWorkflows = window.FastTag?.workflows;
     if (!FastTagWorkflows) throw new Error('[FastTag] fasttag-workflows.js must load before fasttag.js');
+    if (window.__fastTagRuntimeInitialized) {
+        console.warn('[FastTag] Runtime is already initialized; skipped duplicate event-handler registration.');
+        return;
+    }
+    window.__fastTagRuntimeInitialized = true;
     const {
         escapeHtml,
         cleanTitleForScraping,
@@ -119,7 +124,9 @@
     const {
         getAssessmentPresentation,
         getAcceptPresentation,
-        getPerformerPresentation
+        getPerformerPresentation,
+        getSourcePresentation,
+        getUnavailableContextPresentation
     } = FastTagScraperUi;
     const {
         getDominantWheelDelta,
@@ -5639,6 +5646,25 @@
                 </span>
             ` : '';
 
+            const sourcePresentation = getSourcePresentation(match, isHashMatch);
+            const sourceTone = sourcePresentation?.tone === 'success'
+                ? { color: '#34d399', background: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', icon: '✓' }
+                : sourcePresentation?.tone === 'warning'
+                    ? { color: '#fbbf24', background: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.4)', icon: '⌕' }
+                    : { color: isDark ? '#cbd5e1' : '#475569', background: 'rgba(148, 163, 184, 0.12)', border: 'rgba(148, 163, 184, 0.3)', icon: '↗' };
+            const sourceBadge = sourcePresentation ? `
+                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: ${sourceTone.color}; background: ${sourceTone.background}; border: 1px solid ${sourceTone.border}; padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="${escapeHtml(sourcePresentation.tooltip)}">
+                    <span>${sourceTone.icon}</span><span>${escapeHtml(sourcePresentation.label)}</span>
+                </span>
+            ` : '';
+
+            const unavailableContext = getUnavailableContextPresentation(match);
+            const unavailableContextBadge = unavailableContext ? `
+                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 500; color: ${isDark ? '#94a3b8' : '#64748b'}; background: rgba(148, 163, 184, 0.1); border: 1px dashed rgba(148, 163, 184, 0.4); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="${escapeHtml(unavailableContext.tooltip)}">
+                    <span>ⓘ</span><span>${escapeHtml(unavailableContext.label)}</span>
+                </span>
+            ` : '';
+
             const studioMismatchBadge = match._studioComparison === 'mismatch' ? `
                 <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #f87171; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="The scraped studio (${escapeHtml(studioName)}) differs from the studio already linked to this scene.">
                     <span>⚠</span><span>Studio Mismatch</span>
@@ -5740,15 +5766,13 @@
                         <!-- Dedicated Verification Badges Row -->
                         <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap; padding: 3px 6px; background: ${isDark ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.03)'}; border-radius: 5px; border: 1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}; flex-shrink: 0;">
                             ${assessmentBadge}
+                            ${sourceBadge}
                             ${isHashMatch ? matchBadges.map(b => `
                                 <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #34d399; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="Direct file fingerprint match on StashDB">
                                     <span>✓</span><span>${b}</span>
                                 </span>
-                            `).join('') : `
-                                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #f87171; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="No file hash/fingerprint match found on StashDB. This scene was found by searching words from your filename/title. Please check the preview to confirm it is the correct scene before saving.">
-                                    <span>✕</span><span>No Hash Match (Keyword Search)</span>
-                                </span>
-                            `}
+                            `).join('') : ''}
+                            ${unavailableContextBadge}
                             ${performerMatchBadge}
                             ${additionalPerformerBadge}
                             ${studioMismatchBadge}

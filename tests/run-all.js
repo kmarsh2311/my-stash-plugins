@@ -7,7 +7,7 @@ const { spawnSync } = require('node:child_process');
 const repositoryRoot = path.resolve(__dirname, '..');
 const pluginDirectory = path.join(repositoryRoot, 'plugins', 'fasttag');
 const javascriptFiles = fs.readdirSync(pluginDirectory)
-    .filter(name => /^fasttag(?:-[a-z]+)?\.js$/.test(name))
+    .filter(name => /^fasttag(?:-[a-z]+)*\.js$/.test(name))
     .sort();
 const testFiles = fs.readdirSync(__dirname)
     .filter(name => name.endsWith('.test.js'))

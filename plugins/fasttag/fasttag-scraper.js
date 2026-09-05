@@ -124,6 +124,23 @@
         return overlap / Math.min(localTokens.size, remoteTokens.size);
     }
 
+    function hasVerifiedFingerprint(match, localFingerprints = match?._localFingerprints || []) {
+        const remoteFingerprints = match?.fingerprints || [];
+        return localFingerprints.some(local => {
+            const localType = String(local?.type || local?.algorithm || '').toLowerCase();
+            const localValue = String(local?.value || local?.hash || '').toLowerCase();
+            if (!localType || !localValue) return false;
+            return remoteFingerprints.some(remote => {
+                const remoteType = String(remote?.algorithm || remote?.type || '').toLowerCase();
+                const remoteValue = String(remote?.hash || remote?.value || '').toLowerCase();
+                const compatibleType = localType === remoteType
+                    || (localType === 'oshash' && remoteType === 'md5')
+                    || (localType === 'md5' && remoteType === 'oshash');
+                return compatibleType && remoteValue === localValue;
+            });
+        });
+    }
+
     function rankScraperMatchesByEvidence(matches, context = {}) {
         if (!Array.isArray(matches)) return [];
         const { parseDurationSec } = getDependencies();
@@ -136,7 +153,7 @@
         const ranked = performerRanked.map((match, originalIndex) => {
             let score = 0;
             const reasons = [];
-            const isHashMatch = match?._matchType === 'hash';
+            const isHashMatch = hasVerifiedFingerprint(match);
             if (isHashMatch) {
                 score += 1000;
                 reasons.push('Fingerprint match');
@@ -207,6 +224,13 @@
             match._sourceName = sourceName;
             match._localDuration = localDuration;
             match._localFingerprints = localFingerprints;
+            match._comparisonContext = {
+                scene: localContext.sceneContextLoaded === true,
+                performers: linkedPerformers.length > 0,
+                studio: Boolean(localContext.localStudio?.name),
+                duration: Boolean(getDependencies().parseDurationSec(localDuration)),
+                fingerprints: localFingerprints.length > 0
+            };
         });
         return rankScraperMatchesByEvidence(matches, { ...localContext, linkedPerformers, localDuration });
     }
@@ -221,7 +245,7 @@
         const phashMatch = localPhash && remoteFingerprints.some(item => item.algorithm?.toLowerCase() === 'phash' && (item.hash || '').toLowerCase() === localPhash);
         const oshashMatch = localOshash && remoteFingerprints.some(item => (item.algorithm?.toLowerCase() === 'oshash' || item.algorithm?.toLowerCase() === 'md5') && (item.hash || '').toLowerCase() === localOshash);
         const md5Match = localMd5 && remoteFingerprints.some(item => item.algorithm?.toLowerCase() === 'md5' && (item.hash || '').toLowerCase() === localMd5);
-        const isHashMatch = match?._matchType === 'hash' || phashMatch || oshashMatch || md5Match;
+        const isHashMatch = Boolean(phashMatch || oshashMatch || md5Match);
         const matchBadges = [];
         if (phashMatch) matchBadges.push('PHash is a match');
         if (oshashMatch || md5Match) matchBadges.push('MD5 Checksum is a match');
@@ -366,12 +390,14 @@
         let localFingerprints = [];
         let linkedPerformers = [];
         let localStudio = null;
+        let sceneContextLoaded = false;
 
         try {
             const query = 'query ($id: ID!) { findScene(id: $id) { id title details studio { id name } performers { id name alias_list } files { path duration fingerprints { type value } } } }';
             const response = await fetchGQL(query, { id: sceneId });
             const scene = response?.data?.findScene;
             if (scene) {
+                sceneContextLoaded = true;
                 sceneTitle = scene.title || '';
                 const firstFile = scene.files?.[0];
                 if (firstFile?.path) {
@@ -387,7 +413,7 @@
 
         const enrich = (matches, matchType, sourceName) => enrichScraperMatches(
             matches, matchType, sourceName, localDuration, localFingerprints, linkedPerformers,
-            { localStudio, localTitle: sceneTitle, localFileName: sceneFileName }
+            { localStudio, localTitle: sceneTitle, localFileName: sceneFileName, sceneContextLoaded }
         );
 
         const cleanedManualQuery = manualQuery ? getDependencies().cleanTitleForScraping(manualQuery) : '';
@@ -398,7 +424,7 @@
                     input: { scene_id: String(sceneId) }
                 });
                 const matches = response?.data?.scrapeSingleScene;
-                if (Array.isArray(matches) && matches.length > 0) return enrich(matches, 'hash', 'StashDB');
+                if (Array.isArray(matches) && matches.length > 0) return enrich(matches, 'scene-id', 'StashDB');
             } catch (error) {
                 console.log('[FastTag] Scrape by scene_id error/empty:', error);
             }

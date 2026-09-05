@@ -27,4 +27,17 @@ assert.deepEqual(ui.getPerformerPresentation({
 });
 assert.equal(ui.getPerformerPresentation({}), null);
 
+assert.equal(ui.getSourcePresentation({ _matchType: 'scene-id' }).label, 'Scene Lookup');
+assert.equal(ui.getSourcePresentation({ _matchType: 'title', _searchQuery: 'scene words' }).label, 'Keyword Search');
+assert.equal(ui.getSourcePresentation({ _matchType: 'scraper', _sourceName: 'Custom' }).label, 'Custom Search');
+assert.equal(ui.getSourcePresentation({}, true).label, 'Verified Fingerprint');
+
+assert.deepEqual(ui.getUnavailableContextPresentation({
+    _comparisonContext: { scene: true, performers: false, studio: true, duration: false, fingerprints: false }
+}).missing, ['linked performers', 'duration', 'fingerprints']);
+assert.equal(ui.getUnavailableContextPresentation({
+    _comparisonContext: { scene: true, performers: true, studio: true, duration: true, fingerprints: true }
+}), null);
+assert.equal(ui.getUnavailableContextPresentation({ _comparisonContext: { scene: false } }).label, 'Local Comparison Unavailable');
+
 console.log('fasttag-scraper-ui tests passed');

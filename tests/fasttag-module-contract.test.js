@@ -8,6 +8,7 @@ const repositoryRoot = path.resolve(__dirname, '..');
 const pluginDirectory = path.join(repositoryRoot, 'plugins', 'fasttag');
 const yaml = fs.readFileSync(path.join(pluginDirectory, 'fasttag.yml'), 'utf8');
 const mainSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag.js'), 'utf8');
+const runnerSource = fs.readFileSync(path.join(__dirname, 'run-all.js'), 'utf8');
 const expectedOrder = [
     'tabulator.min.js',
     'fasttag-core.js',
@@ -34,6 +35,8 @@ for (const namespace of ['Core', 'Entities', 'Storage', 'Integrations', 'Gemini'
     assert.ok(mainSource.includes(`FastTag${namespace}`), `main entry point should require FastTag${namespace}`);
 }
 assert.equal(mainSource.includes('LEGACY_'), false, 'legacy comparison declarations should be removed');
+assert.ok(runnerSource.includes('(?:-[a-z]+)*'), 'test runner should discover multi-hyphen FastTag modules');
+assert.ok(mainSource.includes('__fastTagRuntimeInitialized'), 'FastTag should guard duplicate runtime initialization');
 
 const scraperSaveMutation = mainSource.match(/mutation FastTagAcceptSave[\s\S]*?`, \{ input: updateInput \}\);/)?.[0] || '';
 assert.ok(scraperSaveMutation.includes('title'), 'scraper save should return the updated title for live card refresh');

@@ -22,14 +22,14 @@ assert.deepEqual(
     'candidate queries should be cleaned and deduplicated in title, filename, card order'
 );
 
-const originalMatches = [{ title: 'Match' }];
-assert.strictEqual(scraper.enrichScraperMatches(originalMatches, 'hash', 'StashDB', 120, [{ type: 'phash' }]), originalMatches);
-assert.equal(originalMatches[0]._matchType, 'hash');
+const originalMatches = [{ title: 'Match', fingerprints: [{ algorithm: 'phash', hash: 'abc' }] }];
+assert.strictEqual(scraper.enrichScraperMatches(originalMatches, 'scene-id', 'StashDB', 120, [{ type: 'phash', value: 'abc' }]), originalMatches);
+assert.equal(originalMatches[0]._matchType, 'scene-id');
 assert.equal(originalMatches[0]._sourceName, 'StashDB');
 assert.equal(originalMatches[0]._localDuration, 120);
-assert.deepEqual(originalMatches[0]._localFingerprints, [{ type: 'phash' }]);
+assert.deepEqual(originalMatches[0]._localFingerprints, [{ type: 'phash', value: 'abc' }]);
 assert.equal(originalMatches[0]._matchAssessment, 'strong');
-assert.deepEqual(scraper.enrichScraperMatches(null, 'hash', 'StashDB', null, []), []);
+assert.deepEqual(scraper.enrichScraperMatches(null, 'scene-id', 'StashDB', null, []), []);
 
 const performerRanked = scraper.rankMatchesByLinkedPerformers([
     { title: 'Unrelated', performers: [{ name: 'Someone Else' }] },
@@ -96,8 +96,8 @@ assert.equal(analysis.totalFps, 2);
 assert.equal(analysis.matchingDurFps, 1);
 
 assert.deepEqual(
-    scraper.analyzeScraperMatch({ _matchType: 'hash', _localFingerprints: [], fingerprints: [] }).matchBadges,
-    ['Fingerprint is a match']
+    scraper.analyzeScraperMatch({ _matchType: 'scene-id', _localFingerprints: [], fingerprints: [] }).matchBadges,
+    []
 );
 
 const checkboxes = new Map([
@@ -177,10 +177,13 @@ async function testHashMatch() {
     const results = await scraper.fetchScraperMatchesForScene(7, null);
     assert.equal(calls.length, 2);
     assert.deepEqual(calls[1].variables, { source: { stash_box_index: 0 }, input: { scene_id: '7' } });
-    assert.equal(results[0]._matchType, 'hash');
+    assert.equal(results[0]._matchType, 'scene-id');
     assert.equal(results[0]._localDuration, 90);
     assert.deepEqual(results[0]._localFingerprints, [{ type: 'phash', value: 'abc' }]);
     assert.deepEqual(results[0]._performerOverlapNames, ['Local Person']);
+    assert.deepEqual(results[0]._comparisonContext, {
+        scene: true, performers: true, studio: false, duration: true, fingerprints: true
+    });
 }
 
 async function testTitleThenInstalledScraperFallback() {
