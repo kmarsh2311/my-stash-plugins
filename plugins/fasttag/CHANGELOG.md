@@ -4,6 +4,26 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.2.9] - 2026-09-05
+
+### Added
+- **Modular FastTag Foundation**: Split core matching, entity operations, caching, integrations, Gemini transport, scraper analysis, scraper presentation, preview calculations, popup layout, editor selection, and workflow state into separately tested modules.
+- **Scraper Match Assessment**: Scraper results now combine verified fingerprints, linked performers, studio, duration, and title evidence when ranking and labelling potential matches.
+- **Scraper Review Signals**: Added clear Verified Fingerprint, Scene Lookup, Keyword Search, Studio Mismatch, Duration Mismatch, additional-performer, and limited-comparison indicators.
+
+### Changed
+- **Safer Performer Suggestions**: Exact primary performer names are prioritised using the fully loaded table data. Ambiguous single-word aliases no longer create automatic suggestions, while genuine single-name performers remain supported.
+- **Clearer Scraper Acceptance**: Results with conflicting evidence use Review & Accept while preserving every result for user review.
+
+### Fixed
+- **Reliable Edit Everything Saves**: Serialised queued updates and scene snapshots prevent rapid edits or sequential navigation from overwriting newer selections.
+- **Accurate Partial-Save Reporting**: Failed scraper entity creation is reported instead of presenting incomplete metadata as a complete success.
+- **Live Title Updates**: Titles applied through AI Parse or scraper acceptance now update scene cards and the open popup immediately.
+- **Empty Gemini Responses**: Empty or unusable model responses are no longer cached or shown as successful; the bridge tries fallback models before reporting an error.
+- **Performer Suggestion Refresh**: Exact names such as Benny Fox are available from the loaded performer table rather than being missed through cache timing or result ordering.
+- **Duplicate Runtime Protection**: Repeated plugin initialisation no longer registers duplicate global handlers.
+- **Complete Module Verification**: The test runner now includes multi-hyphen module names and verifies all FastTag JavaScript modules.
+
 ## [4.2.8] - 2026-09-04
 
 ### Fixed

@@ -215,3 +215,12 @@
 ### Install / Update
 - Repository index: `https://kmarsh2311.github.io/my-stash-plugins/index.yml`
 - Full changelog: See [CHANGELOG.md](CHANGELOG.md)
+## FastTag 4.2.9 - Modular Reliability and Safer Matching
+
+FastTag 4.2.9 introduces a tested modular foundation while preserving the established editing workflow and performance. Core matching, caching, integrations, Gemini communication, scraper analysis, and workflow helpers are now separated into dedicated modules with automated coverage.
+
+Scraper results now distinguish verified fingerprints from scene-ID lookups and keyword searches, rank matches using performer, studio, duration, title, and fingerprint evidence, and clearly warn when local comparison information is unavailable. Metadata acceptance remains entirely under the user's control.
+
+This release also fixes queued Edit Everything saves, partial scraper-save reporting, live title updates, empty Gemini results, Gemini model fallback, duplicate runtime initialisation, and performer suggestions missed because of cache timing or ordering. Exact primary performer names are prioritised; ambiguous single-word aliases are no longer used for automatic suggestions.
+
+---
