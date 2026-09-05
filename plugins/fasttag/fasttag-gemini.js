@@ -119,6 +119,32 @@
         });
     }
 
+    function normalizeSceneParseResult(result) {
+        if (!result || typeof result !== 'object' || Array.isArray(result)) {
+            throw new Error('Gemini returned an invalid response. Please try AI Parse again.');
+        }
+
+        const cleanString = value => typeof value === 'string' ? value.trim() : '';
+        const cleanList = value => Array.isArray(value)
+            ? value.map(cleanString).filter(Boolean)
+            : [];
+        const normalized = {
+            clean_title: cleanString(result.clean_title),
+            date: cleanString(result.date),
+            studio: cleanString(result.studio),
+            performers: cleanList(result.performers),
+            tags: cleanList(result.tags),
+            confidence: Number.isFinite(Number(result.confidence)) ? Number(result.confidence) : null
+        };
+
+        const hasSuggestion = normalized.clean_title || normalized.date || normalized.studio
+            || normalized.performers.length > 0 || normalized.tags.length > 0;
+        if (!hasSuggestion) {
+            throw new Error('Gemini found no usable metadata suggestions for this scene. Try adjusting the title or filename, then run AI Parse again.');
+        }
+        return normalized;
+    }
+
     async function parseSceneWithGemini(sceneId, rawFilename, rawTitle) {
         if (geminiSceneParseCache.has(sceneId)) return geminiSceneParseCache.get(sceneId);
         const deps = getDependencies();
@@ -135,7 +161,7 @@
             if (cachedStudios.length > 0) studiosContext = cachedStudios.map(studio => studio.name).slice(0, 60);
         } catch (e) {}
 
-        const result = await sendGeminiSocketRequest({
+        const rawResult = await sendGeminiSocketRequest({
             type: 'parse',
             api_key: apiKey,
             model: deps.getGeminiModel(),
@@ -144,6 +170,7 @@
             performers_context: performersContext,
             studios_context: studiosContext
         });
+        const result = normalizeSceneParseResult(rawResult);
         deps.log('ACTION', 'GeminiAI', `Gemini AI parsed scene #${sceneId}: title="${result?.clean_title}", studio="${result?.studio}", performers=${JSON.stringify(result?.performers || [])}`);
         geminiSceneParseCache.set(sceneId, result);
         return result;

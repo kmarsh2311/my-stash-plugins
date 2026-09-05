@@ -9326,7 +9326,14 @@
 
     function renderEverythingAIMatchCard(container, aiResult, sceneId, popup, ctx) {
         if (!container) return;
-        if (!aiResult) {
+        const hasSuggestion = aiResult && (
+            (typeof aiResult.clean_title === 'string' && aiResult.clean_title.trim())
+            || (typeof aiResult.date === 'string' && aiResult.date.trim())
+            || (typeof aiResult.studio === 'string' && aiResult.studio.trim())
+            || (Array.isArray(aiResult.performers) && aiResult.performers.length > 0)
+            || (Array.isArray(aiResult.tags) && aiResult.tags.length > 0)
+        );
+        if (!hasSuggestion) {
             container.style.display = 'none';
             container.innerHTML = '';
             return;

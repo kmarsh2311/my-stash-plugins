@@ -27,6 +27,8 @@ class FakeWebSocket {
         sentPayloads.push(payload);
         const result = payload.type === 'test'
             ? { connected: true }
+            : payload.filename === 'empty.mp4'
+                ? {}
             : { clean_title: 'Clean title', studio: 'Studio One', performers: ['Person One'] };
         queueMicrotask(() => this.onmessage({ data: JSON.stringify({ id: payload.id, result }) }));
     }
@@ -70,6 +72,16 @@ async function runTests() {
     assert.strictEqual(cachedResult, parseResult);
     assert.equal(sentPayloads.length, 2, 'a cached scene parse should not send another request');
     assert.equal(requestTimeouts.length, 2);
+
+    await assert.rejects(
+        () => gemini.parseSceneWithGemini('empty-scene', 'empty.mp4', ''),
+        /no usable metadata suggestions/i
+    );
+    await assert.rejects(
+        () => gemini.parseSceneWithGemini('empty-scene', 'empty.mp4', ''),
+        /no usable metadata suggestions/i
+    );
+    assert.equal(sentPayloads.length, 4, 'an empty parse result should not be cached and must remain retryable');
 
     gemini.configure({
         fetchGQL: async () => ({}),
