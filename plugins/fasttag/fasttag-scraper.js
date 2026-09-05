@@ -31,6 +31,24 @@
         if (!dependencies) throw new Error('[FastTag] Scraper integration is not configured');
         return dependencies;
     }
+    function getMatchingSettings() {
+        const defaults = {
+            hideObviousFalsePositives: true,
+            singleWordAliasMode: 'weak',
+            majorCastConflict: true,
+            requireStudioMismatch: true,
+            closeDurationProtects: true,
+            titleSimilarityThreshold: 0.2,
+            durationMismatchThreshold: 300,
+            durationMismatchPercent: 25,
+            initialResultLimit: 25
+        };
+        try {
+            return { ...defaults, ...(getDependencies().getScraperMatchingSettings?.() || {}) };
+        } catch (e) {
+            return defaults;
+        }
+    }
 
     function buildScrapeCandidateQueries(sceneTitle, sceneFileName, cardText = '') {
         const { cleanTitleForScraping } = getDependencies();
@@ -196,28 +214,42 @@
         const linked = (linkedPerformers || []).filter(Boolean);
         if (linked.length === 0) return matches;
         const linkedIds = new Set(linked.map(item => String(item.id || '')).filter(Boolean));
-        const linkedNames = new Map();
+        const strongLinkedNames = new Map();
+        const weakAliasNames = new Map();
+        const aliasMode = getMatchingSettings().singleWordAliasMode;
 
         for (const performer of linked) {
-            const names = [performer.name];
-            if (Array.isArray(performer.alias_list)) names.push(...performer.alias_list);
-            else if (typeof performer.alias_list === 'string') names.push(...performer.alias_list.split(','));
-            for (const name of names) {
+            const primaryName = normalizePerformerName(performer.name);
+            if (primaryName) strongLinkedNames.set(primaryName, performer.name);
+            let aliases = [];
+            if (Array.isArray(performer.alias_list)) aliases = performer.alias_list;
+            else if (typeof performer.alias_list === 'string') aliases = performer.alias_list.split(',');
+            for (const name of aliases) {
                 const normalized = normalizePerformerName(name);
-                if (normalized) linkedNames.set(normalized, performer.name || name);
+                if (!normalized) continue;
+                if (normalized.split(/\s+/).length > 1 || aliasMode === 'strong') {
+                    if (!strongLinkedNames.has(normalized)) strongLinkedNames.set(normalized, performer.name || name);
+                } else if (aliasMode === 'weak' && !strongLinkedNames.has(normalized)) {
+                    const owners = weakAliasNames.get(normalized) || new Set();
+                    owners.add(performer.name || name);
+                    weakAliasNames.set(normalized, owners);
+                }
             }
         }
 
         const ranked = matches.map((match, originalIndex) => {
             const overlapNames = new Set();
+            const weakOverlapNames = new Set();
             const additionalNames = new Set();
             for (const remotePerformer of match?.performers || []) {
                 const storedId = String(remotePerformer?.stored_id || '');
                 const normalizedName = normalizePerformerName(remotePerformer?.name);
                 if (storedId && linkedIds.has(storedId)) {
                     overlapNames.add(remotePerformer.name || `Performer #${storedId}`);
-                } else if (normalizedName && linkedNames.has(normalizedName)) {
-                    overlapNames.add(linkedNames.get(normalizedName));
+                } else if (normalizedName && strongLinkedNames.has(normalizedName)) {
+                    overlapNames.add(strongLinkedNames.get(normalizedName));
+                } else if (normalizedName && weakAliasNames.has(normalizedName)) {
+                    weakAliasNames.get(normalizedName).forEach(name => weakOverlapNames.add(name));
                 } else if (remotePerformer?.name) {
                     additionalNames.add(remotePerformer.name);
                 }
@@ -226,6 +258,8 @@
             match._linkedPerformerCount = linked.length;
             match._performerOverlapNames = Array.from(overlapNames);
             match._performerOverlapCount = overlapNames.size;
+            match._weakPerformerOverlapNames = Array.from(weakOverlapNames);
+            match._weakPerformerOverlapCount = weakOverlapNames.size;
             match._additionalPerformerNames = Array.from(additionalNames);
             match._additionalPerformerCount = additionalNames.size;
             return { match, originalIndex };
@@ -233,6 +267,7 @@
 
         ranked.sort((a, b) =>
             b.match._performerOverlapCount - a.match._performerOverlapCount ||
+            b.match._weakPerformerOverlapCount - a.match._weakPerformerOverlapCount ||
             a.originalIndex - b.originalIndex
         );
         return ranked.map(entry => entry.match);
@@ -243,24 +278,33 @@
         'scene', 'video', 'file', 'part', 'episode', '1080p', '720p', '2160p',
         '4k', 'hd', 'uhd', 'fhd', 'xxx', 'mp4', 'mkv', 'avi'
     ]);
+    const SCRAPE_TITLE_SCORING_STOP_WORDS = new Set([
+        ...SCRAPE_TITLE_STOP_WORDS,
+        'from', 'by', 'is', 'are', 'get', 'gets',
+        'sex', 'porn', 'fuck', 'fucks', 'fucked', 'fucking', 'raw', 'twink'
+    ]);
 
-    function titleTokens(value, linkedPerformers = []) {
-        const performerWords = new Set();
+    function titleTokens(value, linkedPerformers = [], ignoredValues = []) {
+        const ignoredWords = new Set();
         for (const performer of linkedPerformers || []) {
             const names = [performer?.name];
             if (Array.isArray(performer?.alias_list)) names.push(...performer.alias_list);
+            else if (typeof performer?.alias_list === 'string') names.push(...performer.alias_list.split(','));
             for (const name of names) {
-                normalizePerformerName(name).split(/\s+/).filter(Boolean).forEach(word => performerWords.add(word));
+                normalizePerformerName(name).split(/\s+/).filter(Boolean).forEach(word => ignoredWords.add(word));
             }
         }
+        for (const ignoredValue of ignoredValues || []) {
+            normalizePerformerName(ignoredValue).split(/\s+/).filter(Boolean).forEach(word => ignoredWords.add(word));
+        }
         return new Set(normalizePerformerName(value).split(/\s+/).filter(word =>
-            word.length >= 3 && !SCRAPE_TITLE_STOP_WORDS.has(word) && !performerWords.has(word)
+            word.length >= 3 && !SCRAPE_TITLE_SCORING_STOP_WORDS.has(word) && !ignoredWords.has(word)
         ));
     }
 
-    function calculateTitleSimilarity(localValue, remoteValue, linkedPerformers = []) {
-        const localTokens = titleTokens(localValue, linkedPerformers);
-        const remoteTokens = titleTokens(remoteValue, linkedPerformers);
+    function calculateTitleSimilarity(localValue, remoteValue, linkedPerformers = [], ignoredValues = []) {
+        const localTokens = titleTokens(localValue, linkedPerformers, ignoredValues);
+        const remoteTokens = titleTokens(remoteValue, linkedPerformers, ignoredValues);
         if (!localTokens.size || !remoteTokens.size) return null;
         let overlap = 0;
         localTokens.forEach(token => { if (remoteTokens.has(token)) overlap++; });
@@ -291,6 +335,7 @@
         const localStudio = context.localStudio || null;
         const localDuration = parseDurationSec(context.localDuration);
         const localTitles = [context.localTitle, context.localFileName].filter(Boolean);
+        const matchingSettings = getMatchingSettings();
         const performerRanked = rankMatchesByLinkedPerformers(matches, linkedPerformers);
 
         const ranked = performerRanked.map((match, originalIndex) => {
@@ -305,14 +350,30 @@
 
             if (linkedPerformers.length > 0) {
                 const overlap = match._performerOverlapCount || 0;
+                const weakOverlap = match._weakPerformerOverlapCount || 0;
+                const remotePerformerCount = Array.isArray(match?.performers) ? match.performers.length : 0;
+                const performerSetConflict = overlap === 0
+                    && weakOverlap === 0
+                    && matchingSettings.majorCastConflict
+                    && linkedPerformers.length >= 2
+                    && remotePerformerCount >= 2;
+                match._performerSetConflict = performerSetConflict;
                 if (overlap > 0) {
                     const coverage = overlap / linkedPerformers.length;
                     score += 30 + Math.round(30 * coverage);
                     reasons.push(`${overlap}/${linkedPerformers.length} linked performer${linkedPerformers.length === 1 ? '' : 's'} matched`);
+                } else if (weakOverlap > 0) {
+                    score += Math.min(10, weakOverlap * 5);
+                    reasons.push(`${weakOverlap} possible single-word performer alias${weakOverlap === 1 ? '' : 'es'} matched`);
+                } else if (performerSetConflict) {
+                    score -= 70;
+                    reasons.push(`All ${remotePerformerCount} returned performers differ from the ${linkedPerformers.length} linked performers`);
                 } else {
                     score -= 35;
                     reasons.push('No linked performers matched');
                 }
+            } else {
+                match._performerSetConflict = false;
             }
 
             match._studioComparison = 'unknown';
@@ -340,7 +401,7 @@
             }
 
             const titleSimilarities = localTitles
-                .map(value => calculateTitleSimilarity(value, match?.title || '', linkedPerformers))
+                .map(value => calculateTitleSimilarity(value, match?.title || '', linkedPerformers, [localStudio?.name]))
                 .filter(value => value !== null);
             match._titleSimilarity = titleSimilarities.length > 0 ? Math.max(...titleSimilarities) : null;
             if (match._titleSimilarity !== null) {
@@ -361,12 +422,17 @@
         return matches;
     }
 
-    function isObviousFalsePositive(match) {
+    function isObviousFalsePositive(match, providedMatchingSettings = null) {
         if (!match || match._matchType === 'scene-id' || match._hasVerifiedFingerprint || hasVerifiedFingerprint(match)) return false;
+        const matchingSettings = providedMatchingSettings || getMatchingSettings();
+        if (!matchingSettings.hideObviousFalsePositives) return false;
         const comparison = match._comparisonContext || {};
         const { parseDurationSec } = getDependencies();
         const localDuration = parseDurationSec(match._localDuration);
-        const durationThreshold = Math.max(300, localDuration ? localDuration * 0.25 : 0);
+        const durationThreshold = Math.max(
+            Number(matchingSettings.durationMismatchThreshold) || 0,
+            localDuration ? localDuration * ((Number(matchingSettings.durationMismatchPercent) || 0) / 100) : 0
+        );
         const durationDifference = Number(match._durationDifference);
         const durationUnavailable = match._durationDifference === null
             || match._durationDifference === undefined
@@ -375,20 +441,20 @@
         return match._matchAssessment === 'unlikely'
             && comparison.scene === true
             && comparison.performers === true
-            && comparison.studio === true
             && Number(match._performerOverlapCount || 0) === 0
-            && match._studioComparison === 'mismatch'
+            && (!matchingSettings.requireStudioMismatch || (comparison.studio === true && match._studioComparison === 'mismatch'))
             && typeof match._titleSimilarity === 'number'
-            && match._titleSimilarity < 0.2
-            && (durationUnavailable || durationStronglyConflicts);
+            && match._titleSimilarity < Number(matchingSettings.titleSimilarityThreshold)
+            && (!matchingSettings.closeDurationProtects || durationUnavailable || durationStronglyConflicts);
     }
 
     function partitionObviousFalsePositiveMatches(matches) {
         const visible = [];
         const hidden = [];
         if (!Array.isArray(matches)) return { visible, hidden };
+        const matchingSettings = getMatchingSettings();
         matches.forEach(match => {
-            (isObviousFalsePositive(match) ? hidden : visible).push(match);
+            (isObviousFalsePositive(match, matchingSettings) ? hidden : visible).push(match);
         });
         // Never present an empty result set merely because every result was weak.
         if (visible.length === 0 && hidden.length > 0) visible.push(hidden.shift());

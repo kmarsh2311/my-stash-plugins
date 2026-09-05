@@ -93,10 +93,20 @@ assert.ok(
     mainSource.includes('sessionScrapeCache.set(activeSceneId, previousResults);'),
     'failed scraper refreshes should restore the previous result set'
 );
-assert.ok(mainSource.includes('fasttag-setting-hide-obvious-false-positives'), 'Workflow settings should expose conservative false-positive filtering');
+assert.ok(mainSource.includes('fasttag-tab-pane-matching'), 'Settings should provide a dedicated scraper-matching tab');
+assert.ok(mainSource.includes('fasttag-match-restore-defaults'), 'scraper-matching settings should provide a restore-defaults action');
+assert.ok(mainSource.includes("setScraperMatchingPreset(matchingPresetSelect.value)"), 'matching presets should update the persisted analysis criteria');
+assert.ok(mainSource.includes('<option value="custom" disabled'), 'Custom matching should be an automatic status rather than a selectable preset');
 assert.ok(mainSource.includes('partitionObviousFalsePositiveMatches(allResults)'), 'scraper rendering should preserve and partition the complete result set');
 assert.ok(mainSource.includes('fasttag-scrape-toggle-hidden'), 'filtered scraper results must remain available through a show-hidden control');
+assert.ok(mainSource.includes('fasttag-scrape-toggle-overflow'), 'lower-ranked scraper results must remain available through a show-all control');
+assert.ok(mainSource.includes('const initialResultLimit = getScraperMatchingSettings().initialResultLimit;'), 'large scraper result limits should use the matching preference');
+assert.ok(mainSource.includes('font-variant-numeric: tabular-nums'), 'scraper navigation counters should use stable-width numerals');
+assert.ok(mainSource.includes('>✕ Dismiss</button>'), 'result dismissal should be clearly labelled away from the navigation arrows');
 assert.ok(mainSource.includes("value=\"${escapeHtml(match._searchQuery || '')}\""), 'manual scraper search should retain the complete contextual query');
+assert.ok(mainSource.includes('function isScraperPopupActive(popup)'), 'scraper rendering should reject stale popup work');
+assert.ok(mainSource.includes('watchFloatingScraperHudOwner(popup);'), 'detached scraper HUD should monitor its owning popup');
+assert.ok(mainSource.includes('activePopup._fastTagClosed = true;'), 'popup closure should invalidate pending scraper work');
 const aiApplyMetadataBlock = mainSource.match(/mutation FastTagAIApplyMetadata[\s\S]*?syncSceneToApolloCache\(metadataRes\.data\.sceneUpdate\);/)?.[0] || '';
 assert.ok(aiApplyMetadataBlock.includes('title date'), 'AI Apply All should return updated title and date');
 assert.ok(aiApplyMetadataBlock.includes('syncSceneToApolloCache'), 'AI Apply All should synchronize metadata to live scene cards');

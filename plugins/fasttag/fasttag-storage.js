@@ -20,6 +20,7 @@
         videoHudOpen: 'fasttag_video_hud_open_state',
         detachScraper: 'fasttag_detach_scraper_v1',
         hideObviousFalsePositives: 'fasttag_hide_obvious_false_positives_v1',
+        scraperMatching: 'fasttag_scraper_matching_settings_v1',
         scraperHudOpen: 'fasttag_scraper_hud_open_state'
     });
     const RECENT_KEYS = Object.freeze({
@@ -37,6 +38,12 @@
         freeze: 1.0
     });
     const MAX_SCRUB_CUE_DISPLAYS = 5;
+    const SCRAPER_MATCHING_PRESETS = Object.freeze({
+        conservative: Object.freeze({ preset: 'conservative', hideObviousFalsePositives: true, singleWordAliasMode: 'weak', majorCastConflict: false, requireStudioMismatch: true, closeDurationProtects: true, titleSimilarityThreshold: 0.1, durationMismatchThreshold: 600, durationMismatchPercent: 35, initialResultLimit: 40 }),
+        balanced: Object.freeze({ preset: 'balanced', hideObviousFalsePositives: true, singleWordAliasMode: 'weak', majorCastConflict: true, requireStudioMismatch: true, closeDurationProtects: true, titleSimilarityThreshold: 0.2, durationMismatchThreshold: 300, durationMismatchPercent: 25, initialResultLimit: 25 }),
+        strict: Object.freeze({ preset: 'strict', hideObviousFalsePositives: true, singleWordAliasMode: 'ignore', majorCastConflict: true, requireStudioMismatch: false, closeDurationProtects: false, titleSimilarityThreshold: 0.35, durationMismatchThreshold: 120, durationMismatchPercent: 15, initialResultLimit: 15 })
+    });
+    const DEFAULT_SCRAPER_MATCHING_SETTINGS = SCRAPER_MATCHING_PRESETS.balanced;
     const IDB_NAME = 'stash_fasttag_cache_db';
     const IDB_VERSION = 1;
     const IDB_STORE = 'entity_cache';
@@ -142,10 +149,62 @@
         try { writeBoolean(KEYS.detachScraper, enabled); } catch (e) {}
     }
     function getHideObviousFalsePositives() {
-        try { return readBoolean(KEYS.hideObviousFalsePositives, true); } catch (e) { return true; }
+        return getScraperMatchingSettings().hideObviousFalsePositives;
     }
     function setHideObviousFalsePositives(enabled) {
-        try { writeBoolean(KEYS.hideObviousFalsePositives, enabled); } catch (e) {}
+        setScraperMatchingSettings({ hideObviousFalsePositives: Boolean(enabled), preset: 'custom' });
+    }
+    function normalizeScraperMatchingSettings(settings = {}) {
+        const merged = { ...DEFAULT_SCRAPER_MATCHING_SETTINGS, ...settings };
+        const aliasMode = ['ignore', 'weak', 'strong'].includes(merged.singleWordAliasMode)
+            ? merged.singleWordAliasMode
+            : DEFAULT_SCRAPER_MATCHING_SETTINGS.singleWordAliasMode;
+        const numberInRange = (value, fallback, min, max) => {
+            const number = Number(value);
+            return Number.isFinite(number) ? Math.max(min, Math.min(max, number)) : fallback;
+        };
+        return {
+            preset: ['conservative', 'balanced', 'strict', 'custom'].includes(merged.preset) ? merged.preset : 'custom',
+            hideObviousFalsePositives: merged.hideObviousFalsePositives !== false,
+            singleWordAliasMode: aliasMode,
+            majorCastConflict: merged.majorCastConflict !== false,
+            requireStudioMismatch: merged.requireStudioMismatch !== false,
+            closeDurationProtects: merged.closeDurationProtects !== false,
+            titleSimilarityThreshold: numberInRange(merged.titleSimilarityThreshold, 0.2, 0, 1),
+            durationMismatchThreshold: Math.round(numberInRange(merged.durationMismatchThreshold, 300, 0, 3600)),
+            durationMismatchPercent: Math.round(numberInRange(merged.durationMismatchPercent, 25, 0, 100)),
+            initialResultLimit: Math.round(numberInRange(merged.initialResultLimit, 25, 5, 100))
+        };
+    }
+    function getScraperMatchingSettings() {
+        try {
+            const raw = root.localStorage.getItem(KEYS.scraperMatching);
+            if (raw) return normalizeScraperMatchingSettings(JSON.parse(raw));
+            const legacyHideSetting = readBoolean(KEYS.hideObviousFalsePositives, true);
+            return normalizeScraperMatchingSettings({
+                preset: legacyHideSetting === DEFAULT_SCRAPER_MATCHING_SETTINGS.hideObviousFalsePositives ? 'balanced' : 'custom',
+                hideObviousFalsePositives: legacyHideSetting
+            });
+        } catch (e) {
+            return { ...DEFAULT_SCRAPER_MATCHING_SETTINGS };
+        }
+    }
+    function setScraperMatchingSettings(settings) {
+        try {
+            const normalized = normalizeScraperMatchingSettings({ ...getScraperMatchingSettings(), ...(settings || {}) });
+            root.localStorage.setItem(KEYS.scraperMatching, JSON.stringify(normalized));
+            writeBoolean(KEYS.hideObviousFalsePositives, normalized.hideObviousFalsePositives);
+            return normalized;
+        } catch (e) {
+            return getScraperMatchingSettings();
+        }
+    }
+    function setScraperMatchingPreset(presetName) {
+        const preset = SCRAPER_MATCHING_PRESETS[presetName] || DEFAULT_SCRAPER_MATCHING_SETTINGS;
+        return setScraperMatchingSettings(preset);
+    }
+    function resetScraperMatchingSettings() {
+        return setScraperMatchingPreset('balanced');
     }
 
     function getIDB() {
@@ -300,6 +359,12 @@
         setDetachScraper,
         getHideObviousFalsePositives,
         setHideObviousFalsePositives,
+        SCRAPER_MATCHING_PRESETS,
+        DEFAULT_SCRAPER_MATCHING_SETTINGS,
+        getScraperMatchingSettings,
+        setScraperMatchingSettings,
+        setScraperMatchingPreset,
+        resetScraperMatchingSettings,
         idbGet,
         idbSet,
         idbDelete,

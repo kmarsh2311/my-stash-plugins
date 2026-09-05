@@ -19,10 +19,20 @@
 
     function getAcceptPresentation(match) {
         const requiresReview = match?._matchAssessment === 'unlikely';
+        if (match?._matchAssessment === 'possible') {
+            return {
+                requiresReview: true,
+                label: '? Accept',
+                title: 'This is only a possible match; review the evidence before saving',
+                background: '#a16207',
+                border: '#fbbf24',
+                shadow: 'rgba(161,98,7,0.4)'
+            };
+        }
         return requiresReview
             ? {
                 requiresReview: true,
-                label: '⚠ Review & Accept',
+                label: '⚠ Accept',
                 title: 'This result has conflicting evidence; review it carefully before saving',
                 background: '#b45309',
                 border: '#f59e0b',
@@ -41,14 +51,19 @@
     function getPerformerPresentation(match) {
         if (!match?._hasLinkedPerformers) return null;
         const overlapNames = match._performerOverlapNames || [];
+        const weakOverlapNames = match._weakPerformerOverlapNames || [];
         const additionalNames = match._additionalPerformerNames || [];
         return {
             overlapNames,
             overlapCount: match._performerOverlapCount || 0,
+            weakOverlapNames,
+            weakOverlapCount: match._weakPerformerOverlapCount || 0,
+            performerSetConflict: match._performerSetConflict === true,
             linkedCount: match._linkedPerformerCount || 0,
             additionalNames,
             additionalCount: match._additionalPerformerCount || 0,
-            hasOverlap: overlapNames.length > 0
+            hasOverlap: overlapNames.length > 0,
+            hasWeakOverlap: weakOverlapNames.length > 0
         };
     }
 
@@ -60,7 +75,8 @@
             return { label: 'Scene Lookup', tone: 'neutral', tooltip: 'Found using Stash’s scene lookup; no returned fingerprint was verified against the local file' };
         }
         if (match?._matchType === 'title') {
-            return { label: 'Keyword Search', tone: 'warning', tooltip: `Found by searching title or filename words${match?._searchQuery ? `: ${match._searchQuery}` : ''}` };
+            const matchedQuery = match?._matchedSearchQuery || match?._searchQuery;
+            return { label: 'Keyword Search', tone: 'warning', tooltip: `Found by searching title or filename words${matchedQuery ? `: ${matchedQuery}` : ''}` };
         }
         if (match?._matchType === 'scraper') {
             return { label: `${match._sourceName || 'Installed Scraper'} Search`, tone: 'warning', tooltip: 'Found by an installed scraper keyword search' };

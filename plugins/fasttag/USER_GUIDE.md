@@ -38,6 +38,10 @@ The scrubbing instruction overlay appears once per browser session and no more t
 
 Scraping is restricted to Edit Everything so all returned fields can be reviewed. FastTag attempts Stash scene lookup, then cleaned title/filename and contextual keyword searches. When a studio or performers are linked, the editable search box is prefilled with the studio and all linked performer names; individual-performer searches remain automatic fallbacks.
 
+Use the scraper header's **Dock** control to move the results between the editor and a draggable, resizable HUD. The detached scraper HUD belongs to the open Edit Everything popup: closing that popup also closes its scraper HUD, including when a search is still running. Reopen Edit Everything and scrape again if you want to resume reviewing the session's cached results.
+
+While the scraper is open, the circular refresh button first waits for pending automatic scene saves and then searches again using the scene's current title, studio, and linked performers. This lets newly selected or deselected metadata influence the next scrape without closing the editor. When the scraper is closed, the same button retains its normal cache-refresh behaviour.
+
 - **Verified Fingerprint** means a returned fingerprint matched the local file.
 - **Scene Lookup** is not automatically treated as fingerprint verification.
 - **Keyword Search** identifies search-derived results.
@@ -45,7 +49,11 @@ Scraping is restricted to Edit Everything so all returned fields can be reviewed
 - **Limited Comparison** means local evidence was unavailable.
 - **Review & Accept** warns about conflicting evidence without hiding the result.
 
-With **Hide Obvious False Positives** enabled in Workflow settings, FastTag hides only keyword results with no linked performer match, a different known studio, and very weak title similarity. A close duration keeps a result visible; when duration is available, it must also conflict substantially. Direct scene lookups and verified fingerprints are never hidden, at least one result always remains visible, and **Show hidden** reveals the filtered results at any time.
+With **Hide false positives** enabled in Match settings, FastTag hides only keyword results that conflict according to the selected matching preset or custom criteria. A close duration can protect a result when that option is enabled. Direct scene lookups and verified fingerprints are never hidden, at least one result always remains visible, and **Show hidden** reveals the filtered results at any time.
+
+Exact stored performer IDs, full names, and multi-word aliases count as confirmed performer evidence. Ambiguous single-word aliases are labelled **Possible Alias Match** and contribute only weak supporting evidence. Completely different multi-performer casts are treated as a major conflict that normally outweighs studio and duration matches. Large combined searches initially show the top 25 ranked results; **Show all** reveals every remaining candidate. Possible matches use an amber acceptance control; green is reserved for likely or strong matches.
+
+Title-confidence scoring ignores linked performer names, the known local studio name, connecting words, technical filename markers, and this deliberately short generic descriptor list: `sex`, `porn`, `fuck`, `fucks`, `fucked`, `fucking`, `raw`, `twink`, and `xxx`. These words are removed only from confidence analysis and remain in the actual scraper search.
 
 Field checkboxes determine what is saved. Existing tags and performers are merged with selected scraped values. Covers save separately so a rejected image cannot prevent other metadata from saving.
 
@@ -61,7 +69,7 @@ FastTag caches entity lists in IndexedDB so popups open immediately. Page reload
 
 ## Settings and troubleshooting
 
-Display controls theme, IDs, suggestions, recents, pins, and card-icon actions. Video controls playback defaults and scrubbing. Workflow controls organisation and sequential scraping. AI controls Gemini. System provides layout reset, cache management, debug mode, and diagnostic log export.
+Display controls theme, IDs, suggestions, recents, pins, and card-icon actions. Video controls playback defaults and scrubbing. Workflow controls organisation and sequential scraping. **Match** provides Conservative, Balanced, and Strict scraper-analysis templates; changing any template value automatically marks it **Custom (modified)**. **Restore Defaults** resets only those criteria to Balanced—the behaviour shipped by FastTag—without changing scene metadata, AI, scraper-source, or other plugin settings. AI controls Gemini. System provides layout reset, cache management, debug mode, and diagnostic log export.
 
 If FastTag does not load, verify that it is enabled, choose **Reload Plugins**, and hard-refresh Stash. For reproducible errors, temporarily enable Debug Mode, reproduce the issue, export the log, and disable Debug Mode again.
 

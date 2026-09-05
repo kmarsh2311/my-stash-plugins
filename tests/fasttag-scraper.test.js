@@ -31,6 +31,13 @@ assert.deepEqual(
     [],
     'plausible studio codes and shorter numbers should remain untouched'
 );
+assert.ok(
+    scraper.buildLinkedPerformerFallbackQueries(
+        [{ name: 'Example Performer' }],
+        ['PVC Twink fucked raw']
+    ).includes('example performer pvc twink fucked raw'),
+    'generic scoring words must remain available to actual scraper fallback searches'
+);
 const weakMatch = { remote_site_id: 'weak-1', _matchScore: -10, _matchAssessment: 'unlikely' };
 const possibleMatch = { remote_site_id: 'possible-1', _matchScore: 25, _matchAssessment: 'possible' };
 const strongMatch = { remote_site_id: 'strong-1', _matchScore: 80, _matchAssessment: 'strong' };
@@ -110,8 +117,10 @@ const performerRanked = scraper.rankMatchesByLinkedPerformers([
     { id: 12, name: 'John Smith', alias_list: ['Johnny'] },
     { id: 13, name: 'Jane Doe', alias_list: [] }
 ]);
-assert.deepEqual(performerRanked.map(match => match.title), ['Alias match', 'ID match', 'Unrelated']);
-assert.deepEqual(performerRanked[0]._performerOverlapNames, ['John Smith']);
+assert.deepEqual(performerRanked.map(match => match.title), ['ID match', 'Alias match', 'Unrelated']);
+assert.deepEqual(performerRanked[0]._performerOverlapNames, ['Different Remote Name']);
+assert.deepEqual(performerRanked[1]._weakPerformerOverlapNames, ['John Smith']);
+assert.equal(performerRanked[1]._performerOverlapCount, 0, 'single-word aliases must not be reported as confirmed performer matches');
 assert.equal(performerRanked[2]._hasLinkedPerformers, true);
 assert.equal(performerRanked[2]._performerOverlapCount, 0);
 assert.deepEqual(performerRanked[2]._additionalPerformerNames, ['Someone Else']);
@@ -142,6 +151,58 @@ assert.equal(evidenceRanked[0]._matchAssessment, 'likely');
 assert.equal(evidenceRanked[1]._matchAssessment, 'unlikely');
 assert.ok(evidenceRanked[1]._matchReasons.includes('Studio differs'));
 assert.ok(evidenceRanked[1]._matchReasons.includes('Duration differs substantially'));
+assert.equal(
+    scraper.calculateTitleSimilarity(
+        'My Dirtiest Fantasy PVC Twink fucked raw Part 2',
+        'Angel gets brutally face-fucked and fucked raw',
+        [],
+        ['My Dirtiest Fantasy']
+    ),
+    0,
+    'generic descriptors and the known studio must not create title similarity'
+);
+assert.equal(
+    scraper.calculateTitleSimilarity('Example Studio Summer Holiday', 'Summer Holiday', [], ['Example Studio']),
+    1,
+    'distinctive title words should still produce a strong comparison'
+);
+
+const ambiguousAliasEvidence = scraper.rankScraperMatchesByEvidence([{
+    title: 'Cabana Boys',
+    duration: 1829,
+    performers: [{ name: 'Aaron' }, { name: 'Sabian' }],
+    _matchType: 'title'
+}], {
+    linkedPerformers: [
+        { id: 1, name: 'Alex Silvers', alias_list: [] },
+        { id: 2, name: 'Aaron Aurora', alias_list: ['Aaron'] }
+    ],
+    localDuration: 1829,
+    localTitle: 'F1911707904'
+})[0];
+assert.equal(ambiguousAliasEvidence._performerOverlapCount, 0);
+assert.deepEqual(ambiguousAliasEvidence._weakPerformerOverlapNames, ['Aaron Aurora']);
+assert.equal(ambiguousAliasEvidence._matchAssessment, 'possible', 'an ambiguous alias plus duration alone must not produce a likely match');
+
+const disjointPerformerEvidence = scraper.rankScraperMatchesByEvidence([{
+    title: 'Angel gets brutally face-fucked',
+    duration: 1024,
+    studio: { stored_id: '20', name: 'My Dirtiest Fantasy' },
+    performers: [{ name: 'Angel Black' }, { name: 'Erik Devil' }],
+    _matchType: 'title'
+}], {
+    linkedPerformers: [
+        { id: 1, name: 'Rodion Taxa', alias_list: [] },
+        { id: 2, name: 'Peter Polloc', alias_list: [] }
+    ],
+    localStudio: { id: '20', name: 'My Dirtiest Fantasy' },
+    localDuration: 1016,
+    localTitle: 'My Dirtiest Fantasy PVC Twink fucked raw Part 2 Rodion Taxa Peter Polloc'
+})[0];
+assert.equal(disjointPerformerEvidence._performerSetConflict, true);
+assert.equal(disjointPerformerEvidence._titleSimilarity, 0);
+assert.equal(disjointPerformerEvidence._matchAssessment, 'unlikely', 'a completely different multi-performer cast must outweigh studio and duration matches');
+assert.ok(disjointPerformerEvidence._matchReasons.some(reason => reason.includes('returned performers differ')));
 
 const obviouslyWrong = {
     _matchType: 'title',
@@ -177,6 +238,34 @@ const falsePositivePartition = scraper.partitionObviousFalsePositiveMatches([
 assert.equal(falsePositivePartition.visible.length, 1, 'at least the highest-ranked result must remain visible');
 assert.equal(falsePositivePartition.visible[0].title, 'Best of weak results');
 assert.equal(falsePositivePartition.hidden.length, 1);
+
+scraper.configure({
+    fetchGQL: async () => ({}), cleanTitleForScraping, parseDurationSec,
+    getScraperMatchingSettings: () => ({
+        hideObviousFalsePositives: true,
+        singleWordAliasMode: 'ignore',
+        majorCastConflict: true,
+        requireStudioMismatch: false,
+        closeDurationProtects: false,
+        titleSimilarityThreshold: 0.35,
+        durationMismatchThreshold: 120,
+        durationMismatchPercent: 15
+    })
+});
+const strictAliasResult = scraper.rankMatchesByLinkedPerformers(
+    [{ performers: [{ name: 'Aaron' }] }],
+    [{ id: 2, name: 'Aaron Aurora', alias_list: ['Aaron'] }]
+)[0];
+assert.equal(strictAliasResult._weakPerformerOverlapCount, 0, 'Strict alias handling should ignore ambiguous single-word aliases');
+assert.deepEqual(strictAliasResult._additionalPerformerNames, ['Aaron']);
+assert.equal(scraper.isObviousFalsePositive({
+    ...obviouslyWrong,
+    _comparisonContext: { scene: true, performers: true, studio: false, duration: true },
+    _studioComparison: 'unknown',
+    _durationDifference: 8,
+    _titleSimilarity: 0.25
+}), true, 'Strict filtering should not require studio conflict or duration disagreement');
+scraper.configure({ fetchGQL: async () => ({}), cleanTitleForScraping, parseDurationSec });
 
 const analysis = scraper.analyzeScraperMatch({
     _matchType: 'title',

@@ -96,7 +96,10 @@
         getDetachScraper,
         setDetachScraper,
         getHideObviousFalsePositives,
-        setHideObviousFalsePositives,
+        getScraperMatchingSettings,
+        setScraperMatchingSettings,
+        setScraperMatchingPreset,
+        resetScraperMatchingSettings,
         idbGet,
         idbSet,
         idbDelete,
@@ -165,6 +168,7 @@
         fetchGQL: (...args) => fetchGQL(...args),
         cleanTitleForScraping,
         parseDurationSec,
+        getScraperMatchingSettings,
         getEntityConfig: type => ENTITY_CONFIG[type],
         getCachedOrNull: type => getCachedOrNull(type),
         setCache: (type, data) => setCache(type, data)
@@ -1945,8 +1949,39 @@
     let floatingScraperHudElement = null;
     let floatingScraperHudPosition = null;
     let floatingScraperHudSize = null;
+    let floatingScraperHudOwnerPopup = null;
+    let floatingScraperHudOwnerObserver = null;
+
+    function isScraperPopupActive(popup) {
+        if (!popup) return true;
+        return popup === activePopup
+            && popup._fastTagClosed !== true
+            && Boolean(popup.element?.isConnected);
+    }
+
+    function watchFloatingScraperHudOwner(popup) {
+        if (floatingScraperHudOwnerObserver) {
+            floatingScraperHudOwnerObserver.disconnect();
+            floatingScraperHudOwnerObserver = null;
+        }
+        floatingScraperHudOwnerPopup = popup || null;
+        const ownerParent = popup?.element?.parentNode;
+        if (!popup || !ownerParent || typeof MutationObserver === 'undefined') return;
+
+        floatingScraperHudOwnerObserver = new MutationObserver(() => {
+            if (!isScraperPopupActive(popup) && floatingScraperHudOwnerPopup === popup) {
+                closeFloatingScraperHud();
+            }
+        });
+        floatingScraperHudOwnerObserver.observe(ownerParent, { childList: true });
+    }
 
     function closeFloatingScraperHud(fullReset = false) {
+        if (floatingScraperHudOwnerObserver) {
+            floatingScraperHudOwnerObserver.disconnect();
+            floatingScraperHudOwnerObserver = null;
+        }
+        floatingScraperHudOwnerPopup = null;
         if (floatingScraperHudElement) {
             floatingScraperHudElement.remove();
             floatingScraperHudElement = null;
@@ -2103,6 +2138,7 @@
         const enableSug = getEnableSuggestions();
         const autoScrape = getAutoScrapeSequential();
         const scrubSpeeds = getScrubSpeeds();
+        const scraperMatching = getScraperMatchingSettings();
 
         const modal = document.createElement('div');
         modal.id = 'fasttag-settings-modal';
@@ -2145,6 +2181,9 @@
                     </button>
                     <button type="button" class="fasttag-settings-tab-btn" data-tab="scraper" style="flex: 1; padding: 6px 4px; font-size: 11.5px; font-weight: 600; border: none; border-radius: 7px; background: transparent; color: ${textMuted}; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.15s ease;">
                         <span>⚡</span> Workflow
+                    </button>
+                    <button type="button" class="fasttag-settings-tab-btn" data-tab="matching" title="Scraper Matching" style="flex: 1; padding: 6px 4px; font-size: 11.5px; font-weight: 600; border: none; border-radius: 7px; background: transparent; color: ${textMuted}; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: all 0.15s ease;">
+                        <span>🎯</span> Match
                     </button>
                     <button type="button" class="fasttag-settings-tab-btn" data-tab="ai" style="flex: 1; padding: 6px 4px; font-size: 11.5px; font-weight: 600; border: none; border-radius: 7px; background: transparent; color: ${textMuted}; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: all 0.15s ease;">
                         <span>🤖</span> AI <span style="font-size: 8px; padding: 1px 4px; border-radius: 3px; background: rgba(245, 158, 11, 0.2); color: #f59e0b; font-weight: 800; line-height: 1.1;">BETA</span>
@@ -2301,17 +2340,6 @@
 
                         <div style="height: 1px; background: ${border};"></div>
 
-                        <!-- Conservative false-positive filtering -->
-                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
-                            <div style="flex: 1;">
-                                <div style="font-weight: 600; font-size: 13px;">Hide Obvious False Positives</div>
-                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Hide keyword results when performer, studio and title evidence all strongly conflict. A close duration keeps a result visible; missing duration does not prevent filtering.</div>
-                            </div>
-                            <input type="checkbox" id="fasttag-setting-hide-obvious-false-positives" ${getHideObviousFalsePositives() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
-                        </div>
-
-                        <div style="height: 1px; background: ${border};"></div>
-
                         <!-- Detach Scraper Window setting -->
                         <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
                             <div style="flex: 1;">
@@ -2322,7 +2350,67 @@
                         </div>
                     </div>
 
-                    <!-- TAB 4: AI (GEMINI) -->
+                    <!-- TAB 4: SCRAPER MATCHING -->
+                    <div id="fasttag-tab-pane-matching" class="fasttag-tab-pane" style="display: none; flex-direction: column; gap: 12px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                            <div>
+                                <div style="font-weight: 700; font-size: 13px;">Matching preset</div>
+                                <div id="fasttag-matching-preset-summary" style="font-size: 10.5px; color: ${textMuted}; margin-top: 2px;">Balanced is the FastTag default.</div>
+                            </div>
+                            <select id="fasttag-setting-matching-preset" style="padding: 6px 8px; border-radius: 6px; border: 1px solid ${border}; background: ${cardBg}; color: ${text}; font-size: 11.5px; cursor: pointer;">
+                                <option value="conservative" ${scraperMatching.preset === 'conservative' ? 'selected' : ''}>Conservative</option>
+                                <option value="balanced" ${scraperMatching.preset === 'balanced' ? 'selected' : ''}>Balanced (Default)</option>
+                                <option value="strict" ${scraperMatching.preset === 'strict' ? 'selected' : ''}>Strict</option>
+                                <option value="custom" disabled ${scraperMatching.preset === 'custom' ? 'selected' : ''}>Custom (modified)</option>
+                            </select>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; background:${cardBg}; border:1px solid ${border}; border-radius:7px; padding:8px; font-size:11px;">
+                                <span><strong>Hide false positives</strong><br><span style="color:${textMuted};">Keep them under Show hidden.</span></span>
+                                <input type="checkbox" id="fasttag-match-hide" ${scraperMatching.hideObviousFalsePositives ? 'checked' : ''} style="accent-color:#6366f1;">
+                            </label>
+                            <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; background:${cardBg}; border:1px solid ${border}; border-radius:7px; padding:8px; font-size:11px;">
+                                <span><strong>Major cast conflict</strong><br><span style="color:${textMuted};">Penalise disjoint multi-person casts.</span></span>
+                                <input type="checkbox" id="fasttag-match-cast-conflict" ${scraperMatching.majorCastConflict ? 'checked' : ''} style="accent-color:#6366f1;">
+                            </label>
+                            <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; background:${cardBg}; border:1px solid ${border}; border-radius:7px; padding:8px; font-size:11px;">
+                                <span><strong>Require studio conflict</strong><br><span style="color:${textMuted};">Needed before automatic hiding.</span></span>
+                                <input type="checkbox" id="fasttag-match-require-studio" ${scraperMatching.requireStudioMismatch ? 'checked' : ''} style="accent-color:#6366f1;">
+                            </label>
+                            <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; background:${cardBg}; border:1px solid ${border}; border-radius:7px; padding:8px; font-size:11px;">
+                                <span><strong>Close duration protects</strong><br><span style="color:${textMuted};">Retain results inside tolerance.</span></span>
+                                <input type="checkbox" id="fasttag-match-duration-protects" ${scraperMatching.closeDurationProtects ? 'checked' : ''} style="accent-color:#6366f1;">
+                            </label>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; background:${cardBg}; border:1px solid ${border}; border-radius:8px; padding:10px;">
+                            <label style="font-size:10.5px; color:${textMuted};">Single-word aliases
+                                <select id="fasttag-match-alias-mode" style="display:block; width:100%; margin-top:4px; padding:5px; border-radius:5px; border:1px solid ${border}; background:${bg}; color:${text};">
+                                    <option value="ignore" ${scraperMatching.singleWordAliasMode === 'ignore' ? 'selected' : ''}>Ignore</option>
+                                    <option value="weak" ${scraperMatching.singleWordAliasMode === 'weak' ? 'selected' : ''}>Weak evidence</option>
+                                    <option value="strong" ${scraperMatching.singleWordAliasMode === 'strong' ? 'selected' : ''}>Confirmed match</option>
+                                </select>
+                            </label>
+                            <label style="font-size:10.5px; color:${textMuted};">Initial results shown
+                                <input id="fasttag-match-result-limit" type="number" min="5" max="100" step="5" value="${scraperMatching.initialResultLimit}" style="display:block; width:100%; box-sizing:border-box; margin-top:4px; padding:5px; border-radius:5px; border:1px solid ${border}; background:${bg}; color:${text};">
+                            </label>
+                            <label style="font-size:10.5px; color:${textMuted};">Title similarity below (%)
+                                <input id="fasttag-match-title-threshold" type="number" min="0" max="100" step="5" value="${Math.round(scraperMatching.titleSimilarityThreshold * 100)}" style="display:block; width:100%; box-sizing:border-box; margin-top:4px; padding:5px; border-radius:5px; border:1px solid ${border}; background:${bg}; color:${text};">
+                            </label>
+                            <label style="font-size:10.5px; color:${textMuted};">Duration difference (sec)
+                                <input id="fasttag-match-duration-threshold" type="number" min="0" max="3600" step="30" value="${scraperMatching.durationMismatchThreshold}" style="display:block; width:100%; box-sizing:border-box; margin-top:4px; padding:5px; border-radius:5px; border:1px solid ${border}; background:${bg}; color:${text};">
+                            </label>
+                            <label style="font-size:10.5px; color:${textMuted}; grid-column:1 / -1;">Duration difference (% of local scene)
+                                <input id="fasttag-match-duration-percent" type="number" min="0" max="100" step="5" value="${scraperMatching.durationMismatchPercent}" style="display:block; width:100%; box-sizing:border-box; margin-top:4px; padding:5px; border-radius:5px; border:1px solid ${border}; background:${bg}; color:${text};">
+                            </label>
+                        </div>
+
+                        <div style="font-size:10.5px; color:${textMuted}; line-height:1.4; padding:8px; border:1px dashed ${border}; border-radius:7px;">Safety rules are fixed: verified fingerprints and direct scene-ID matches are never hidden, at least one result remains visible, and Show hidden/Show all always restores candidates.</div>
+                        <div style="display:flex; justify-content:flex-end;"><button type="button" id="fasttag-match-restore-defaults" style="background:rgba(99,102,241,.14); border:1px solid rgba(129,140,248,.45); color:#818cf8; font-size:11px; font-weight:700; padding:6px 10px; border-radius:6px; cursor:pointer;">↺ Restore Defaults</button></div>
+                    </div>
+
+                    <!-- TAB 5: AI (GEMINI) -->
                     <div id="fasttag-tab-pane-ai" class="fasttag-tab-pane" style="display: none; flex-direction: column; gap: 14px;">
                         <!-- Prominent Experimental Feature Banner -->
                         <div style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; padding: 10px 12px; display: flex; align-items: flex-start; gap: 10px;">
@@ -2386,7 +2474,7 @@
 
                     </div>
 
-                    <!-- TAB 5: SYSTEM -->
+                    <!-- TAB 6: SYSTEM -->
                     <div id="fasttag-tab-pane-system" class="fasttag-tab-pane" style="display: none; flex-direction: column; gap: 14px;">
                         <!-- Reset Layouts & Sizes setting -->
                         <div style="display: flex; flex-direction: column; gap: 8px; background: ${cardBg}; padding: 12px; border-radius: 8px; border: 1px solid ${border};">
@@ -2561,13 +2649,69 @@
             });
         }
 
-        const falsePositiveToggle = modal.querySelector('#fasttag-setting-hide-obvious-false-positives');
-        if (falsePositiveToggle) {
-            falsePositiveToggle.addEventListener('change', (e) => {
-                setHideObviousFalsePositives(e.target.checked);
-                showToast(`Obvious scraper false-positive filtering ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
+        const matchingPresetSelect = modal.querySelector('#fasttag-setting-matching-preset');
+        const matchingControls = {
+            hide: modal.querySelector('#fasttag-match-hide'),
+            castConflict: modal.querySelector('#fasttag-match-cast-conflict'),
+            requireStudio: modal.querySelector('#fasttag-match-require-studio'),
+            durationProtects: modal.querySelector('#fasttag-match-duration-protects'),
+            aliasMode: modal.querySelector('#fasttag-match-alias-mode'),
+            resultLimit: modal.querySelector('#fasttag-match-result-limit'),
+            titleThreshold: modal.querySelector('#fasttag-match-title-threshold'),
+            durationThreshold: modal.querySelector('#fasttag-match-duration-threshold'),
+            durationPercent: modal.querySelector('#fasttag-match-duration-percent')
+        };
+        const matchingSummary = modal.querySelector('#fasttag-matching-preset-summary');
+        const matchingPresetDescriptions = {
+            conservative: 'Shows more uncertain candidates and requires stronger conflicts before hiding.',
+            balanced: 'FastTag default: cautious filtering with strong cast-conflict handling.',
+            strict: 'Shows fewer candidates and filters aggressively when evidence is weak.',
+            custom: 'Custom is selected automatically because one or more preset values were modified.'
+        };
+        const populateMatchingControls = (settings) => {
+            if (matchingPresetSelect) matchingPresetSelect.value = settings.preset;
+            if (matchingControls.hide) matchingControls.hide.checked = settings.hideObviousFalsePositives;
+            if (matchingControls.castConflict) matchingControls.castConflict.checked = settings.majorCastConflict;
+            if (matchingControls.requireStudio) matchingControls.requireStudio.checked = settings.requireStudioMismatch;
+            if (matchingControls.durationProtects) matchingControls.durationProtects.checked = settings.closeDurationProtects;
+            if (matchingControls.aliasMode) matchingControls.aliasMode.value = settings.singleWordAliasMode;
+            if (matchingControls.resultLimit) matchingControls.resultLimit.value = settings.initialResultLimit;
+            if (matchingControls.titleThreshold) matchingControls.titleThreshold.value = Math.round(settings.titleSimilarityThreshold * 100);
+            if (matchingControls.durationThreshold) matchingControls.durationThreshold.value = settings.durationMismatchThreshold;
+            if (matchingControls.durationPercent) matchingControls.durationPercent.value = settings.durationMismatchPercent;
+            if (matchingSummary) matchingSummary.textContent = matchingPresetDescriptions[settings.preset] || matchingPresetDescriptions.custom;
+        };
+        const saveCustomMatchingControls = () => {
+            const updated = setScraperMatchingSettings({
+                preset: 'custom',
+                hideObviousFalsePositives: Boolean(matchingControls.hide?.checked),
+                majorCastConflict: Boolean(matchingControls.castConflict?.checked),
+                requireStudioMismatch: Boolean(matchingControls.requireStudio?.checked),
+                closeDurationProtects: Boolean(matchingControls.durationProtects?.checked),
+                singleWordAliasMode: matchingControls.aliasMode?.value || 'weak',
+                initialResultLimit: matchingControls.resultLimit?.value,
+                titleSimilarityThreshold: Number(matchingControls.titleThreshold?.value || 0) / 100,
+                durationMismatchThreshold: matchingControls.durationThreshold?.value,
+                durationMismatchPercent: matchingControls.durationPercent?.value
             });
-        }
+            populateMatchingControls(updated);
+        };
+        Object.values(matchingControls).forEach(control => {
+            control?.addEventListener('change', saveCustomMatchingControls);
+        });
+        matchingPresetSelect?.addEventListener('change', () => {
+            if (matchingPresetSelect.value === 'custom') return;
+            const updated = setScraperMatchingPreset(matchingPresetSelect.value);
+            populateMatchingControls(updated);
+            showToast(`${matchingPresetSelect.options[matchingPresetSelect.selectedIndex].text} scraper matching applied`, 'info');
+        });
+        modal.querySelector('#fasttag-match-restore-defaults')?.addEventListener('click', (event) => {
+            event.preventDefault();
+            const defaults = resetScraperMatchingSettings();
+            populateMatchingControls(defaults);
+            showToast('Scraper matching restored to Balanced defaults', 'success');
+        });
+        populateMatchingControls(scraperMatching);
 
         const alwaysFullVideoToggle = modal.querySelector('#fasttag-setting-always-full-video');
         if (alwaysFullVideoToggle) {
@@ -4705,6 +4849,7 @@
         isModalClosing = true;
         try {
             if (activePopup) {
+                activePopup._fastTagClosed = true;
                 if (activePopup.tagsTable) {
                     try {
                         activePopup.tagsTable.off("rowSelected");
@@ -5578,13 +5723,21 @@
     }
 
     async function renderScraperMatchCard(container, incomingResults, sceneId, ctx, popup, onDismiss, emptySearchQuery = '') {
+        if (!isScraperPopupActive(popup)) {
+            if (floatingScraperHudOwnerPopup === popup) closeFloatingScraperHud();
+            return;
+        }
+        const initialResultLimit = getScraperMatchingSettings().initialResultLimit;
         const allResults = Array.isArray(incomingResults) ? incomingResults : [];
         const filterFalsePositives = getHideObviousFalsePositives();
         const falsePositivePartition = partitionObviousFalsePositiveMatches(allResults);
         const showingHiddenResults = filterFalsePositives && allResults._fastTagShowHidden === true;
-        const results = filterFalsePositives && !showingHiddenResults
+        const filteredResults = filterFalsePositives && !showingHiddenResults
             ? falsePositivePartition.visible
             : allResults;
+        const showingAllResults = allResults._fastTagShowAllResults === true;
+        const overflowResultCount = Math.max(0, filteredResults.length - initialResultLimit);
+        const results = showingAllResults ? filteredResults : filteredResults.slice(0, initialResultLimit);
         const hiddenResultCount = falsePositivePartition.hidden.length;
         const hasResults = results.length > 0;
         const isDetached = getDetachScraper();
@@ -5651,6 +5804,7 @@
                 scraperResizeObserver.observe(floatingScraperHudElement);
             }
             targetContainer = floatingScraperHudElement;
+            watchFloatingScraperHudOwner(popup);
             targetContainer.style.display = 'flex';
         } else {
             closeFloatingScraperHud();
@@ -5681,6 +5835,13 @@
                     console.log('[FastTag] Error pre-caching ' + type, e);
                 }
             }));
+        }
+
+        // Cache loading and scraper requests can finish after the owning popup closes.
+        // Do not let a stale continuation recreate or update a detached HUD.
+        if (!isScraperPopupActive(popup)) {
+            if (floatingScraperHudOwnerPopup === popup) closeFloatingScraperHud();
+            return;
         }
 
         let currentIndex = 0;
@@ -5804,6 +5965,18 @@
                             <span>★</span><span>Performer Match (${performerPresentation.overlapCount}/${performerPresentation.linkedCount})</span>
                         </span>
                     `;
+                } else if (performerPresentation.performerSetConflict) {
+                    performerMatchBadge = `
+                        <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #f87171; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="The returned performer set is completely different from the performers linked to this scene.">
+                            <span>⚠</span><span>Performer Set Conflict</span>
+                        </span>
+                    `;
+                } else if (performerPresentation.hasWeakOverlap) {
+                    performerMatchBadge = `
+                        <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #fbbf24; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="A returned single-word name could be an alias of ${escapeHtml(performerPresentation.weakOverlapNames.join(', '))}, but it is too ambiguous to confirm a performer match.">
+                            <span>?</span><span>Possible Alias Match</span>
+                        </span>
+                    `;
                 } else {
                     performerMatchBadge = `
                         <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #fbbf24; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="None of this result's performers match the ${performerPresentation.linkedCount} performer(s) already linked to your scene. Check the result carefully before accepting it.">
@@ -5900,13 +6073,13 @@
                 <div style="background: ${isDark ? 'rgba(15, 23, 42, 0.95)' : '#f8fafc'}; border: ${isDetached ? 'none' : (isDark ? '1px solid rgba(99, 102, 241, 0.5)' : '1px solid #818cf8')}; border-radius: 8px; box-shadow: ${isDetached ? 'none' : '0 10px 25px rgba(0,0,0,0.5)'}, inset 0 0 0 1px rgba(255,255,255,0.06); padding: 9px 12px 6px 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 7px; ${isDetached ? 'height: 100%; min-height: 0; flex: 1 1 auto;' : 'height: auto;'} font-family: system-ui, -apple-system, sans-serif; transition: all 0.2s ease;">
                     <!-- Top Navigation & Link Header -->
                     <div id="fasttag-scrape-header" style="display: flex; align-items: center; justify-content: space-between; gap: 6px; user-select: none; white-space: nowrap; overflow: visible; min-height: 26px; padding: 1px 0;">
-                        <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: ${isDark ? '#e0e7ff' : '#312e81'}; min-width: 0; flex: 1; overflow: visible;">
+                        <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: ${isDark ? '#e0e7ff' : '#312e81'}; min-width: 0; flex: 0 0 auto; overflow: visible;">
                             <span style="font-size: 13px; line-height: 1; flex-shrink: 0;">⚡</span>
-                            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1;">${escapeHtml(match._sourceName || 'StashDB')} Match</span>
+                            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 0 48px; width: 48px;" title="${escapeHtml(match._sourceName || 'StashDB')} Match">${escapeHtml(match._sourceName || 'StashDB')} Match</span>
                             ${results.length > 1 ? `
-                                <div class="fasttag-match-counter-pulse" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: ${isDark ? '#e0e7ff' : '#312e81'}; background: ${isDark ? 'rgba(99, 102, 241, 0.25)' : 'rgba(99, 102, 241, 0.12)'}; border: 1px solid ${isDark ? 'rgba(129, 140, 248, 0.75)' : '#818cf8'}; padding: 2px 6px; border-radius: 5px; margin-left: 2px; user-select: none; flex-shrink: 0; white-space: nowrap; line-height: 1;">
+                                <div class="fasttag-match-counter-pulse" style="display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 92px; box-sizing: border-box; font-size: 11px; font-weight: 700; color: ${isDark ? '#e0e7ff' : '#312e81'}; background: ${isDark ? 'rgba(99, 102, 241, 0.25)' : 'rgba(99, 102, 241, 0.12)'}; border: 1px solid ${isDark ? 'rgba(129, 140, 248, 0.75)' : '#818cf8'}; padding: 2px 5px; border-radius: 5px; margin-left: 2px; user-select: none; flex: 0 0 92px; white-space: nowrap; line-height: 1;">
                                     <button type="button" id="fasttag-scrape-prev" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(148,163,184,0.4); border-radius: 3px; cursor: pointer; color: inherit; padding: 1px 5px; font-size: 9.5px; line-height: 1; transition: all 0.15s ease;" ${currentIndex === 0 ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''} title="Previous match (Left Arrow)">◀</button>
-                                    <span style="letter-spacing: 0.2px; font-size: 11px; font-weight: 700; white-space: nowrap;">${currentIndex + 1}/${results.length}</span>
+                                    <span style="min-width: 29px; text-align: center; font-variant-numeric: tabular-nums; letter-spacing: 0.2px; font-size: 11px; font-weight: 700; white-space: nowrap;">${currentIndex + 1}/${results.length}</span>
                                     <button type="button" id="fasttag-scrape-next" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(148,163,184,0.4); border-radius: 3px; cursor: pointer; color: inherit; padding: 1px 5px; font-size: 9.5px; line-height: 1; transition: all 0.15s ease;" ${currentIndex === results.length - 1 ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''} title="Next match (Right Arrow)">▶</button>
                                 </div>
                             ` : ''}
@@ -5917,7 +6090,6 @@
                                     <span>🔗</span><span>↗</span>
                                 </a>
                             ` : ''}
-                            <button type="button" id="fasttag-scrape-dismiss-match" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(248, 113, 113, 0.35); border-radius: 4px; padding: 2.5px 6px; font-size: 10px; font-weight: 700; color: #f87171; cursor: pointer; line-height: 1;" title="Dismiss this result for the current FastTag session">✕</button>
                             <button type="button" id="fasttag-scrape-popout-toggle" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 4px; padding: 2.5px 6px; font-size: 10px; font-weight: 700; color: #818cf8; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 3px; line-height: 1; transition: all 0.15s ease; white-space: nowrap;" data-micro-tooltip="${isDetached ? 'Dock scraper inside popup' : 'Pop out scraper into floating window'}">
                                 <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: block; pointer-events: none;">
                                     <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" fill="none" stroke-width="2"></rect>
@@ -5943,6 +6115,13 @@
                         </div>
                     ` : ''}
 
+                    ${overflowResultCount > 0 ? `
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 6px; border-radius: 5px; background: rgba(99,102,241,0.09); border: 1px solid rgba(129,140,248,0.25); color: ${isDark ? '#c7d2fe' : '#3730a3'}; font-size: 9.5px; line-height: 1.25;">
+                            <span>${overflowResultCount} lower-ranked result${overflowResultCount === 1 ? '' : 's'} ${showingAllResults ? 'shown' : 'not shown initially'}</span>
+                            <button id="fasttag-scrape-toggle-overflow" type="button" style="border: 1px solid rgba(129,140,248,0.45); border-radius: 4px; background: rgba(99,102,241,0.12); color: inherit; padding: 2px 6px; font-size: 9.5px; font-weight: 700; cursor: pointer; white-space: nowrap;">${showingAllResults ? 'Show top 25' : 'Show all'}</button>
+                        </div>
+                    ` : ''}
+
                     <div id="fasttag-scrape-body-wrapper" style="display: flex; flex-direction: column; gap: 7px; ${isDetached ? 'flex: 1 1 auto; min-height: 0; overflow: hidden;' : 'height: auto;'} transition: all 0.15s ease;">
                         <!-- Dedicated Verification Badges Row -->
                         <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap; padding: 3px 6px; background: ${isDark ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.03)'}; border-radius: 5px; border: 1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}; flex-shrink: 0;">
@@ -5958,6 +6137,7 @@
                             ${additionalPerformerBadge}
                             ${studioMismatchBadge}
                             ${durationBadge}
+                            <button type="button" id="fasttag-scrape-dismiss-match" style="margin-left: auto; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(248, 113, 113, 0.32); border-radius: 4px; padding: 2px 6px; font-size: 9.5px; font-weight: 700; color: #f87171; cursor: pointer; line-height: 1.2; white-space: nowrap;" title="Remove this result from the current FastTag session">✕ Dismiss</button>
                         </div>
 
                     <!-- Items Preview Box with Relative Wrapper for Scroll Indicator -->
@@ -6220,6 +6400,18 @@
                     event.preventDefault();
                     event.stopPropagation();
                     allResults._fastTagShowHidden = !showingHiddenResults;
+                    allResults._fastTagShowAllResults = !showingHiddenResults;
+                    hideScrapeCoverTooltip();
+                    renderScraperMatchCard(container, allResults, sceneId, ctx, popup, onDismiss);
+                };
+            }
+
+            const toggleOverflowBtn = targetContainer.querySelector('#fasttag-scrape-toggle-overflow');
+            if (toggleOverflowBtn) {
+                toggleOverflowBtn.onclick = (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    allResults._fastTagShowAllResults = !showingAllResults;
                     hideScrapeCoverTooltip();
                     renderScraperMatchCard(container, allResults, sceneId, ctx, popup, onDismiss);
                 };

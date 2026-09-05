@@ -116,6 +116,23 @@ for (const [getter, setter, key, defaultValue] of persistedBooleanPairs) {
     assert.equal(storage[getter](), !defaultValue);
 }
 
+values.delete('fasttag_scraper_matching_settings_v1');
+const balancedMatching = storage.resetScraperMatchingSettings();
+assert.equal(balancedMatching.preset, 'balanced');
+assert.deepEqual(balancedMatching, storage.DEFAULT_SCRAPER_MATCHING_SETTINGS);
+const strictMatching = storage.setScraperMatchingPreset('strict');
+assert.equal(strictMatching.preset, 'strict');
+assert.equal(strictMatching.singleWordAliasMode, 'ignore');
+assert.equal(strictMatching.requireStudioMismatch, false);
+const customMatching = storage.setScraperMatchingSettings({
+    preset: 'custom', initialResultLimit: 500, titleSimilarityThreshold: -1, durationMismatchPercent: 150
+});
+assert.equal(customMatching.preset, 'custom');
+assert.equal(customMatching.initialResultLimit, 100, 'custom result limit should be clamped');
+assert.equal(customMatching.titleSimilarityThreshold, 0, 'custom title threshold should be clamped');
+assert.equal(customMatching.durationMismatchPercent, 100, 'custom duration percentage should be clamped');
+assert.equal(storage.resetScraperMatchingSettings().preset, 'balanced');
+
 async function testPersistentCache() {
     assert.equal(await storage.idbGet('tags'), null, 'IndexedDB should fall back cleanly when unavailable');
 

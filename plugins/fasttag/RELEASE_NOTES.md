@@ -221,6 +221,12 @@ FastTag 4.2.11 makes StashDB searches more precise without adding routine work. 
 
 An enabled-by-default conservative filter hides results only when the available evidence makes them clearly unrelated. Hidden matches can always be restored, and direct scene lookups, verified fingerprints, matching performers, matching studios, meaningful titles, and close durations remain protected. Refreshing an open scraper now saves pending edits and searches again with the updated scene metadata.
 
+Ambiguous single-word aliases are shown as possible alias evidence rather than confirmed performer matches, preventing a common first name plus a close duration from producing false confidence. Completely different multi-performer casts now outweigh studio-and-duration similarity, and possible matches use amber rather than green acceptance controls. Large aggregate searches show the best 25 candidates first, with every lower-ranked result available through **Show all**.
+
+A dedicated Match settings tab now offers Conservative, Balanced, Strict, and Custom behaviour. Users can tune alias handling, cast conflicts, studio requirements, title and duration tolerances, and the initial result count; Restore Defaults returns only these controls to FastTag's Balanced behaviour.
+
+Title-confidence analysis now ignores linked performers, the known local studio, technical filename clutter, and a short documented list of generic descriptors. Scraper searches retain the original words, so this improves assessment without reducing search coverage.
+
 Accepted titles update immediately, result links target the correct source entry, and accepted configured stash-box IDs are saved and verified while existing external IDs are preserved.
 
 ## FastTag 4.2.10 - Verified Scraping and Workflow Polish

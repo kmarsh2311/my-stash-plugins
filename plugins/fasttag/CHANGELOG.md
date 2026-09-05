@@ -8,15 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 - **Contextual Rescraping**: The refresh control now saves pending scene edits and reruns the active scrape so newly linked studios and performers are used immediately.
-- **False-Positive Filtering**: An enabled-by-default Workflow setting hides keyword results only when performer, studio, title, and available duration evidence strongly conflict; hidden results remain reviewable.
+- **False-Positive Filtering**: An enabled-by-default Match setting hides keyword results only when performer, studio, title, and available duration evidence strongly conflict; hidden results remain reviewable.
 - **Context-Prefilled Search**: The editable scraper search contains the linked studio and all linked performers, with combined multi-performer searches tried before individual fallbacks.
+- **Scraper Matching Settings**: A dedicated settings tab provides Conservative, Balanced, Strict, and Custom criteria plus a scoped Restore Defaults action; fixed safety rules always preserve direct and fingerprint matches and access to hidden candidates.
 
 ### Changed
 - **Broader Recovery Searches**: Opaque recovery filenames trigger cleaner fallback queries, while weak or merely possible matches no longer prevent stronger contextual searches.
 - **Accurate Scraper Sources**: FastTag resolves the configured StashDB source instead of assuming the first stash box, labels result sources correctly, and links to the matched source entry.
 - **External ID Preservation**: Accepted configured stash-box results save their source-specific scene ID while retaining existing external IDs.
+- **Safer Performer Scoring**: Ambiguous single-word aliases provide weak evidence, completely disjoint multi-performer casts outweigh studio-and-duration similarity, and large combined result sets initially show the top 25 with an option to reveal all.
+- **Meaningful Title Scoring**: Confidence comparison now excludes the known studio, linked performer names, technical clutter, and a short documented list of generic descriptors without changing the actual scraper query.
+- **Stable Scraper Navigation**: Previous and next controls retain a fixed position between results, while the session-only dismissal action is clearly labelled in the evidence row.
 
 ### Fixed
+- **Detached Scraper Cleanup**: Closing or externally removing the owning editor popup now also closes its scraper HUD, and late asynchronous scrape responses can no longer reopen it.
 - **Live Scraped Titles**: Titles accepted from scraper results update the open FastTag header and scene-card cache immediately.
 - **Safer Result Links**: StashDB result links prioritise the StashDB scene ID rather than an unrelated external URL returned with the scene.
 - **Incomplete-Duration Filtering**: Clearly unrelated results can be hidden when duration is unavailable, while close durations, direct scene lookups, and verified fingerprints remain protected.
