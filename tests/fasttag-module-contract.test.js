@@ -49,5 +49,8 @@ assert.equal(
 );
 assert.ok(mainSource.includes('createSerialTaskQueue()'), 'Edit Everything saves should use the serial workflow queue');
 assert.ok(mainSource.includes('resolutionFailures'), 'scraper saves should report unresolved selected entities');
+const aiApplyMetadataBlock = mainSource.match(/mutation FastTagAIApplyMetadata[\s\S]*?syncSceneToApolloCache\(metadataRes\.data\.sceneUpdate\);/)?.[0] || '';
+assert.ok(aiApplyMetadataBlock.includes('title date'), 'AI Apply All should return updated title and date');
+assert.ok(aiApplyMetadataBlock.includes('syncSceneToApolloCache'), 'AI Apply All should synchronize metadata to live scene cards');
 
 console.log('fasttag-module-contract tests passed');

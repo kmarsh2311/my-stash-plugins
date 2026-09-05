@@ -9508,8 +9508,13 @@
                     const titleRes = await fetchGQL(`mutation DirectSceneUpdate($input: SceneUpdateInput!) { sceneUpdate(input: $input) { ${SCENE_CARD_UPDATE_FIELDS} title } }`, {
                         input: { id: sceneId, title: aiResult.clean_title }
                     });
-                    if (titleRes?.data?.sceneUpdate) {
-                        syncSceneToApolloCache(titleRes.data.sceneUpdate);
+                    if (titleRes?.errors?.length || !titleRes?.data?.sceneUpdate?.id) {
+                        throw new Error(titleRes?.errors?.map(error => error.message).join('; ') || 'Stash did not return the updated scene.');
+                    }
+                    syncSceneToApolloCache(titleRes.data.sceneUpdate);
+                    if (popup?.titleSpan) {
+                        popup.titleSpan.textContent = aiResult.clean_title;
+                        applyMarqueeAnimation(popup.titleSpan);
                     }
                     applyTitleBtn.textContent = '✓ Set';
                     applyTitleBtn.disabled = true;
@@ -9800,9 +9805,17 @@
                     }
 
                     if (updateVars.title || updateVars.date) {
-                        await fetchGQL(`mutation DirectSceneUpdate($input: SceneUpdateInput!) { sceneUpdate(input: $input) { id } }`, {
+                        const metadataRes = await fetchGQL(`mutation FastTagAIApplyMetadata($input: SceneUpdateInput!) { sceneUpdate(input: $input) { ${SCENE_CARD_UPDATE_FIELDS} title date } }`, {
                             input: updateVars
                         });
+                        if (metadataRes?.errors?.length || !metadataRes?.data?.sceneUpdate?.id) {
+                            throw new Error(metadataRes?.errors?.map(error => error.message).join('; ') || 'Stash did not return the updated scene.');
+                        }
+                        syncSceneToApolloCache(metadataRes.data.sceneUpdate);
+                        if (aiResult.clean_title && popup?.titleSpan) {
+                            popup.titleSpan.textContent = aiResult.clean_title;
+                            applyMarqueeAnimation(popup.titleSpan);
+                        }
                     }
 
                     if (typeof ctx.renderStudioBar === 'function') {
