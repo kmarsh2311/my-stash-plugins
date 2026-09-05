@@ -13,8 +13,7 @@
     function cleanTitleForScraping(rawStr) {
         if (!rawStr) return '';
         let clean = String(rawStr).replace(/\.[a-zA-Z0-9]{2,5}$/, '');
-        clean = clean.replace(/[\b\._-](2160p|1080p|720p|480p|4k|uhd|hd|sd|fhd|hevc|x264|x265|h264|h265|aac|dvdrip|webrip|bluray|mp4|mkv|avi|wmv)[\b\._-]/gi, ' ');
-        clean = clean.replace(/[\b\._-](2160p|1080p|720p|480p|4k|uhd|hd|sd|fhd|hevc|x264|x265|h264|h265|aac|dvdrip|webrip|bluray|mp4|mkv|avi|wmv)$/gi, '');
+        clean = clean.replace(/(^|[\s._-])(2160p|1080p|720p|480p|4k|uhd|hd|sd|fhd|hevc|x264|x265|h264|h265|aac|dvdrip|webrip|bluray|mp4|mkv|avi|wmv)(?=$|[\s._-])/gi, '$1');
         clean = clean.replace(/[\._\-+]/g, ' ');
         clean = clean.replace(/\s+/g, ' ').trim();
         return clean;
@@ -159,6 +158,69 @@
         return false;
     }
 
+    function rankSuggestionItems(items, primaryText, detailsText, existingIds = null, limit = 20) {
+        const normalizeSource = (value) => {
+            const normalized = normalizeTextForSuggestions(value || '');
+            const tokens = normalized.split(/\s+/).filter(Boolean);
+            return { spaced: normalized ? ` ${normalized} ` : '', tokens, tokenSet: new Set(tokens) };
+        };
+        const primary = normalizeSource(primaryText);
+        const details = normalizeSource(detailsText);
+        const selected = existingIds ? new Set(Array.from(existingIds, String)) : new Set();
+
+        const exactDetailsMatch = (item) => {
+            if (!details.spaced) return false;
+            const names = [];
+            if (item?.name) names.push({ value: item.name, primary: true });
+            if (item?.title && item.title !== item.name) names.push({ value: item.title, primary: true });
+            if (item?.sort_name && item.sort_name !== item.name) names.push({ value: item.sort_name, primary: false });
+            const appendAliases = (aliases) => {
+                if (Array.isArray(aliases)) aliases.forEach(value => names.push({ value, primary: false }));
+                else if (typeof aliases === 'string') aliases.split(',').forEach(value => names.push({ value: value.trim(), primary: false }));
+            };
+            appendAliases(item?.alias_list);
+            appendAliases(item?.aliases);
+
+            return names.some(({ value, primary: isPrimary }) => {
+                const clean = normalizeTextForSuggestions(value);
+                if (!clean) return false;
+                if (!isPrimary && clean.split(/\s+/).length === 1) return false;
+                return details.spaced.includes(` ${clean} `);
+            });
+        };
+
+        return (Array.isArray(items) ? items : [])
+            .map((item, originalIndex) => {
+                if (!item?.id || selected.has(String(item.id))) return null;
+                const primaryName = normalizeTextForSuggestions(item.name || item.title || '');
+                const exactPrimary = primaryName && primary.spaced.includes(` ${primaryName} `);
+                const primaryMatch = primary.tokens.length > 0
+                    && isSuggestionMatch(item, primary.spaced, primary.tokenSet, primary.tokens);
+                const detailsMatch = exactDetailsMatch(item);
+                const score = exactPrimary ? 3 : primaryMatch ? 2 : detailsMatch ? 1 : 0;
+                const specificity = primaryName ? primaryName.split(/\s+/).length * 1000 + primaryName.length : 0;
+                return score ? { item, originalIndex, score, specificity } : null;
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.score - a.score || b.specificity - a.specificity || a.originalIndex - b.originalIndex)
+            .slice(0, Math.max(0, Number(limit) || 0))
+            .map(entry => entry.item);
+    }
+
+    function findUniqueSelectedPerformerComponentMatch(performers, selectedIds, aiName) {
+        const normalizedAiName = normalizeTextForSuggestions(aiName || '');
+        const aiWords = normalizedAiName.split(/\s+/).filter(Boolean);
+        if (aiWords.length !== 1 || normalizedAiName.length < 4) return null;
+
+        const selected = selectedIds ? new Set(Array.from(selectedIds, String)) : new Set();
+        const candidates = (Array.isArray(performers) ? performers : []).filter(performer => {
+            if (!performer?.id || !selected.has(String(performer.id))) return false;
+            const nameWords = normalizeTextForSuggestions(performer.name || '').split(/\s+/).filter(Boolean);
+            return nameWords.length > 1 && nameWords.includes(normalizedAiName);
+        });
+        return candidates.length === 1 ? candidates[0] : null;
+    }
+
     function extractSceneId(cardElement) {
         if (!cardElement) return null;
         const link = cardElement.querySelector('a[href*="/scenes/"]');
@@ -214,6 +276,8 @@
         cleanFilenameForSuggestions,
         normalizeTextForSuggestions,
         isSuggestionMatch,
+        rankSuggestionItems,
+        findUniqueSelectedPerformerComponentMatch,
         extractSceneId,
         findSceneCardForContextTarget,
         isScenePreviewContextTarget

@@ -4,6 +4,24 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.2.10] - 2026-09-05
+
+### Added
+- **Verified StashDB ID Saving**: Accepting a StashDB result now preserves existing external IDs, saves the matched scene ID through a dedicated mutation, and verifies that Stash returned the exact endpoint and ID before reporting full success.
+- **Manual Search After No Match**: The scraper remains open with an editable search box when automatic searches return no results.
+- **Random Scene History**: Random tagging mode now supports back and forward navigation through previously visited random scenes.
+
+### Changed
+- **Stronger Local Suggestions**: Exact names and more specific matches are prioritised, while AI Parse remains separate from deterministic tag and performer suggestions.
+- **Better Scraper Fallbacks**: Automatic searches can use performers already linked to the scene when title and filename searches fail.
+- **Cleaner Compact Controls**: Suggestion rows retain horizontal scrolling without a prominent scrollbar, with larger touch targets on coarse-pointer devices.
+
+### Fixed
+- **Scraper Search Input**: Text fields now accept spaces and shortcut letters without global FastTag hotkeys intercepting them.
+- **Cleaner Search Terms**: Resolution markers such as `1080p` are removed whether separated by spaces, dots, underscores, or hyphens.
+- **Conservative AI Performer Resolution**: Short AI names only resolve to an existing selected multi-word performer when the match is unique.
+- **Honest Partial-Save Reporting**: A missing, conflicting, rejected, or unverified StashDB ID is reported as a warning rather than being hidden behind a successful save message.
+
 ## [4.2.9] - 2026-09-05
 
 ### Added

@@ -215,6 +215,12 @@
 ### Install / Update
 - Repository index: `https://kmarsh2311.github.io/my-stash-plugins/index.yml`
 - Full changelog: See [CHANGELOG.md](CHANGELOG.md)
+## FastTag 4.2.10 - Verified Scraping and Workflow Polish
+
+FastTag 4.2.10 makes scraper acceptance safer and easier to diagnose. Accepted StashDB scene IDs are now saved independently, existing external IDs are preserved, and FastTag verifies the exact returned endpoint and ID before showing a complete success state.
+
+Scraper searches now keep an editable manual-search panel open after automatic failure, remove common resolution noise more reliably, and fall back to performers already linked to the scene. This release also improves deterministic suggestions, isolates AI Parse from local suggestions, adds history navigation to Random Scene mode, prevents popup hotkeys from consuming scraper-search keystrokes, and refines suggestion controls for mouse and touch use.
+
 ## FastTag 4.2.9 - Modular Reliability and Safer Matching
 
 FastTag 4.2.9 introduces a tested modular foundation while preserving the established editing workflow and performance. Core matching, caching, integrations, Gemini communication, scraper analysis, and workflow helpers are now separated into dedicated modules with automated coverage.

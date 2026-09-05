@@ -21,6 +21,21 @@ const target = [{ id: 'old' }];
 assert.strictEqual(workflows.replaceResults(target, [{ id: 'new' }]), target);
 assert.deepEqual(target, [{ id: 'new' }]);
 
+const randomHistory = workflows.createRandomSceneHistory('10', 25);
+workflows.appendRandomSceneHistory(randomHistory, '11', 24);
+workflows.appendRandomSceneHistory(randomHistory, '12', 23);
+assert.deepEqual(randomHistory, {
+    entries: [{ id: '10', count: 25 }, { id: '11', count: 24 }, { id: '12', count: 23 }],
+    index: 2
+});
+assert.equal(workflows.moveRandomSceneHistory(randomHistory, -1)?.id, '11');
+assert.equal(workflows.moveRandomSceneHistory(randomHistory, -1)?.id, '10');
+assert.equal(workflows.moveRandomSceneHistory(randomHistory, -1), null);
+assert.equal(workflows.moveRandomSceneHistory(randomHistory, 1)?.id, '11');
+workflows.appendRandomSceneHistory(randomHistory, '13', 22);
+assert.deepEqual(randomHistory.entries.map(entry => entry.id), ['10', '11', '13'], 'new rolls should discard forward history');
+assert.equal(workflows.moveRandomSceneHistory(randomHistory, 1), null);
+
 async function testSerialTaskQueue() {
     const enqueue = workflows.createSerialTaskQueue();
     const events = [];

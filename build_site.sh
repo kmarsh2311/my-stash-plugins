@@ -31,7 +31,7 @@ buildPlugin()
     
     # create the zip file
     # copy other files
-    zipfile=$(realpath "$outdir/$plugin_id.zip")
+    zipfile="$(cd "$outdir" && pwd)/$plugin_id.zip"
     
     pushd "$dir" > /dev/null
     zip -r "$zipfile" . > /dev/null
@@ -61,9 +61,8 @@ buildPlugin()
         done
     fi
 
-    echo "" >> "$outdir"/index.yml
 }
 
-find ./plugins -mindepth 1 -name *.yml | while read file; do
+find ./plugins -mindepth 1 -name '*.yml' | while read file; do
     buildPlugin "$file"
 done

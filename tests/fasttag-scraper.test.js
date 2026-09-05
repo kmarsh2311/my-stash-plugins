@@ -124,6 +124,32 @@ assert.deepEqual(selection, {
 });
 assert.deepEqual(scraper.mergeUniqueIds([1, '2'], ['2', 3]), ['1', '2', '3']);
 
+const stashIdResult = scraper.buildAcceptedSceneStashIds(
+    [{ endpoint: 'https://fansdb.cc/graphql', stash_id: 'fans-1' }],
+    { _sourceName: 'StashDB', remote_site_id: 'stash-scene-1' },
+    [{ name: 'StashDB', endpoint: 'https://stashdb.org/graphql' }]
+);
+assert.equal(stashIdResult.added, true);
+assert.deepEqual(stashIdResult.stashIds, [
+    { endpoint: 'https://fansdb.cc/graphql', stash_id: 'fans-1' },
+    { endpoint: 'https://stashdb.org/graphql', stash_id: 'stash-scene-1' }
+]);
+assert.equal(scraper.buildAcceptedSceneStashIds(
+    stashIdResult.stashIds,
+    { _sourceName: 'StashDB', remote_site_id: 'https://stashdb.org/scenes/stash-scene-1' },
+    [{ name: 'StashDB', endpoint: 'https://stashdb.org/graphql/' }]
+).added, false, 'the same StashDB ID should not be duplicated');
+assert.match(scraper.buildAcceptedSceneStashIds(
+    stashIdResult.stashIds,
+    { _sourceName: 'StashDB', remote_site_id: 'different-scene' },
+    [{ name: 'StashDB', endpoint: 'https://stashdb.org/graphql' }]
+).reason, /different StashDB ID/);
+assert.equal(scraper.buildAcceptedSceneStashIds(
+    [],
+    { _sourceName: 'Custom Scraper', remote_site_id: 'custom-1' },
+    [{ name: 'StashDB', endpoint: 'https://stashdb.org/graphql' }]
+).added, false, 'non-StashDB scraper identifiers must not be saved as StashDB IDs');
+
 const payloadOptions = {
     sceneId: 'scene-9',
     match: { title: 'New title', date: '2026-09-04', details: 'Details', image: 'cover-data' },
@@ -235,6 +261,35 @@ async function testManualSearchSkipsHashLookup() {
     assert.equal(calls.some(call => call.variables?.input?.query === 'correct search words'), true);
 }
 
+async function testLinkedPerformerFallbackRunsAfterFilenameQueries() {
+    const calls = [];
+    scraper.configure({
+        cleanTitleForScraping,
+        parseDurationSec,
+        fetchGQL: async (query, variables) => {
+            calls.push({ query, variables });
+            if (query.includes('findScene')) {
+                return { data: { findScene: {
+                    title: 'f997610384 ftyp',
+                    performers: [{ id: '734', name: 'Johannes Lars', alias_list: [] }],
+                    files: [{ path: '/media/f997610384 ftyp.mp4' }]
+                } } };
+            }
+            if (query.includes('listScrapers')) return { data: { listScrapers: [] } };
+            if (variables?.input?.query === 'johannes lars') {
+                return { data: { scrapeSingleScene: [{ title: 'Performer fallback result', performers: [{ stored_id: '734', name: 'Johannes Lars' }] }] } };
+            }
+            return { data: { scrapeSingleScene: [] } };
+        }
+    });
+    const results = await scraper.fetchScraperMatchesForScene('fallback-scene', null);
+    const searchedQueries = calls.map(call => call.variables?.input?.query).filter(Boolean);
+    assert.ok(searchedQueries.indexOf('f997610384 ftyp') < searchedQueries.indexOf('johannes lars'));
+    assert.equal(results[0].title, 'Performer fallback result');
+    assert.equal(results[0]._searchQuery, 'johannes lars');
+    assert.deepEqual(results[0]._performerOverlapNames, ['Johannes Lars']);
+}
+
 async function testEntityResolution() {
     const cache = new Map([
         ['studios', [{ id: 10, name: 'Known Studio' }]],
@@ -317,6 +372,7 @@ Promise.resolve()
     .then(testHashMatch)
     .then(testTitleThenInstalledScraperFallback)
     .then(testManualSearchSkipsHashLookup)
+    .then(testLinkedPerformerFallbackRunsAfterFilenameQueries)
     .then(testEntityResolution)
     .then(() => console.log('fasttag-scraper tests passed'))
     .catch(error => {

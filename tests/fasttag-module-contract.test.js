@@ -58,6 +58,19 @@ assert.equal(
 );
 assert.ok(mainSource.includes('createSerialTaskQueue()'), 'Edit Everything saves should use the serial workflow queue');
 assert.ok(mainSource.includes('resolutionFailures'), 'scraper saves should report unresolved selected entities');
+assert.ok(mainSource.includes('stash_ids { endpoint stash_id }'), 'scraper acceptance should preserve existing scene Stash IDs');
+assert.ok(mainSource.includes('mutation FastTagAcceptStashId'), 'accepted StashDB matches should save their remote ID independently');
+assert.ok(mainSource.includes('stash_ids: stashIdResolution.stashIds'), 'the Stash ID mutation should preserve existing IDs and add the accepted remote ID');
+assert.ok(mainSource.includes('!idWasSaved'), 'scraper acceptance should verify that Stash returned the accepted remote ID');
+assert.ok(
+    mainSource.includes('!form.contains(e.target) && !isTextEntryTarget'),
+    'background hotkey blocking must not consume typing in detached FastTag inputs'
+);
+assert.ok(mainSource.includes('fasttag-scrape-empty-query'), 'zero-result scraper state should provide an editable manual-search field');
+assert.ok(
+    mainSource.includes('renderScraperMatchCard(\n                            popup.scraperCardContainer,\n                            [],'),
+    'Edit Everything should open the scraper search panel when automatic scraping returns no results'
+);
 const aiApplyMetadataBlock = mainSource.match(/mutation FastTagAIApplyMetadata[\s\S]*?syncSceneToApolloCache\(metadataRes\.data\.sceneUpdate\);/)?.[0] || '';
 assert.ok(aiApplyMetadataBlock.includes('title date'), 'AI Apply All should return updated title and date');
 assert.ok(aiApplyMetadataBlock.includes('syncSceneToApolloCache'), 'AI Apply All should synchronize metadata to live scene cards');

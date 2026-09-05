@@ -39,6 +39,36 @@
         return candidates;
     }
 
+    function buildLinkedPerformerFallbackQueries(linkedPerformers, primaryQueries = []) {
+        const { cleanTitleForScraping } = getDependencies();
+        const fallbacks = [];
+        const primaryKeys = new Set((primaryQueries || []).map(value => normalizePerformerName(value)));
+        const add = (value) => {
+            const cleaned = cleanTitleForScraping(value || '');
+            const key = normalizePerformerName(cleaned);
+            if (cleaned && key.length >= 3 && !primaryKeys.has(key) && !fallbacks.some(item => normalizePerformerName(item) === key)) {
+                fallbacks.push(cleaned);
+            }
+        };
+
+        const performerNames = [];
+        for (const performer of linkedPerformers || []) {
+            if (performer?.name) performerNames.push(performer.name);
+            if (Array.isArray(performer?.alias_list)) performerNames.push(...performer.alias_list);
+            else if (typeof performer?.alias_list === 'string') performerNames.push(...performer.alias_list.split(','));
+        }
+        performerNames.forEach(add);
+
+        const usefulWords = normalizePerformerName((primaryQueries || []).join(' '))
+            .split(/\s+/)
+            .filter(word => word.length >= 3 && !SCRAPE_TITLE_STOP_WORDS.has(word) && !/\d/.test(word))
+            .slice(0, 5);
+        if (usefulWords.length > 0) {
+            performerNames.forEach(name => add(`${name} ${usefulWords.join(' ')}`));
+        }
+        return fallbacks;
+    }
+
     function normalizePerformerName(value) {
         if (!value) return '';
         let normalized = String(value);
@@ -290,6 +320,34 @@
         return Array.from(new Set([...(existingIds || []).map(String), ...(addedIds || []).map(String)]));
     }
 
+    function buildAcceptedSceneStashIds(existingStashIds, match, stashBoxes) {
+        const existing = (Array.isArray(existingStashIds) ? existingStashIds : [])
+            .filter(item => item?.endpoint && item?.stash_id)
+            .map(item => ({ endpoint: String(item.endpoint), stash_id: String(item.stash_id) }));
+        const urls = Array.isArray(match?.urls) ? match.urls.filter(value => typeof value === 'string') : [];
+        const stashDbSceneUrl = urls.find(value => /stashdb\.org\/scenes\//i.test(value)) || '';
+        const rawRemoteId = String(match?.remote_site_id || '').trim();
+        const remoteUrl = /^https?:\/\//i.test(rawRemoteId) ? rawRemoteId : stashDbSceneUrl;
+        const urlIdMatch = remoteUrl.match(/\/scenes\/([^/?#]+)/i);
+        const stashId = urlIdMatch ? decodeURIComponent(urlIdMatch[1]) : (/^[a-z0-9-]+$/i.test(rawRemoteId) ? rawRemoteId : '');
+        const isStashDbResult = /stashdb/i.test(String(match?._sourceName || '')) || /stashdb\.org/i.test(remoteUrl);
+        if (!isStashDbResult || !stashId) return { stashIds: existing, added: false, reason: null };
+
+        const boxes = Array.isArray(stashBoxes) ? stashBoxes : [];
+        const endpoint = boxes.find(box => /stashdb\.org/i.test(String(box?.endpoint || '')))?.endpoint
+            || boxes.find(box => /stashdb/i.test(String(box?.name || '')))?.endpoint
+            || '';
+        if (!endpoint) return { stashIds: existing, added: false, reason: 'the configured StashDB endpoint could not be resolved' };
+
+        const endpointKey = String(endpoint).replace(/\/+$/, '').toLowerCase();
+        const sameEndpoint = existing.find(item => item.endpoint.replace(/\/+$/, '').toLowerCase() === endpointKey);
+        if (sameEndpoint) {
+            if (sameEndpoint.stash_id === stashId) return { stashIds: existing, added: false, reason: null };
+            return { stashIds: existing, added: false, reason: 'the scene already has a different StashDB ID' };
+        }
+        return { stashIds: [...existing, { endpoint: String(endpoint), stash_id: stashId }], added: true, reason: null };
+    }
+
     function buildScrapeUpdateInput(options) {
         const {
             sceneId,
@@ -433,9 +491,12 @@
         const cardText = cardElement
             ? (cardElement.querySelector('.title, .card-title, .scene-card__title')?.textContent || '').trim()
             : '';
-        const candidateQueries = cleanedManualQuery
+        const primaryQueries = cleanedManualQuery
             ? [cleanedManualQuery]
             : buildScrapeCandidateQueries(sceneTitle, sceneFileName, cardText);
+        const candidateQueries = cleanedManualQuery
+            ? primaryQueries
+            : primaryQueries.concat(buildLinkedPerformerFallbackQueries(linkedPerformers, primaryQueries));
 
         for (const queryTerm of candidateQueries) {
             if (!queryTerm || queryTerm.length < 2) continue;
@@ -484,6 +545,7 @@
     root.FastTag.scraper = Object.freeze({
         configure,
         buildScrapeCandidateQueries,
+        buildLinkedPerformerFallbackQueries,
         rankMatchesByLinkedPerformers,
         calculateTitleSimilarity,
         rankScraperMatchesByEvidence,
@@ -491,6 +553,7 @@
         analyzeScraperMatch,
         readScrapeFieldSelection,
         mergeUniqueIds,
+        buildAcceptedSceneStashIds,
         buildScrapeUpdateInput,
         resolveScrapedStudioResult,
         resolveScrapedStudio,

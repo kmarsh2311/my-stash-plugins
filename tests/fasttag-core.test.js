@@ -27,6 +27,9 @@ assert.equal(core.cleanFilenameForSuggestions('MyScene_1080p_x264.mkv'), 'MyScen
 assert.equal(core.normalizeTextForSuggestions('CaféScene4K'), 'cafe scene 4 k');
 assert.equal(core.normalizeTextForSuggestions('CafeScene4K'), 'cafe scene 4 k');
 assert.equal(core.cleanTitleForScraping('Example.Scene_1080p.mp4'), 'Example Scene');
+assert.equal(core.cleanTitleForScraping('Botp0047 Alexsilver Reecebentley Deaconhunter 1080p'), 'Botp0047 Alexsilver Reecebentley Deaconhunter');
+assert.equal(core.cleanTitleForScraping('Example-2160p-x265.mkv'), 'Example');
+assert.equal(core.cleanTitleForScraping('720p Example Scene WEBRIP'), 'Example Scene');
 
 function matches(item, text) {
     const normalized = core.normalizeTextForSuggestions(text);
@@ -47,6 +50,40 @@ assert.equal(matches({ name: 'Clayton', alias_list: ['Danny Clayton'] }, 'Danny 
 assert.equal(matches({ name: 'Café Scene' }, 'CafeScene'), true);
 // Existing behaviour: primary tag names can exact-match even when listed as stop words.
 assert.equal(matches({ name: 'Man' }, 'A man arrives'), true);
+
+const rankedSuggestions = core.rankSuggestionItems([
+    { id: '2', name: 'Fox' },
+    { id: '1', name: 'Benny Fox' },
+    { id: '3', name: 'Outdoor Scene' },
+    { id: '4', name: 'Benny', alias_list: ['Benny Fox'] }
+], 'Papi Kocic and Benny Fox', 'An outdoor description mentions Scene much later.', new Set(), 20);
+assert.deepEqual(rankedSuggestions.map(item => item.id), ['1', '4', '2']);
+
+const limitedSuggestions = core.rankSuggestionItems([
+    { id: '1', name: 'Fox' },
+    { id: '2', name: 'Benny Fox' }
+], 'Benny Fox', '', new Set(), 1);
+assert.deepEqual(limitedSuggestions.map(item => item.id), ['2'], 'exact primary names should win before the result limit');
+
+assert.deepEqual(
+    core.rankSuggestionItems([{ id: '1', name: 'Outdoor Scene' }], '', 'Outdoor words occur in a different scene.', null, 20),
+    [],
+    'details-only multiword matches should require the complete phrase'
+);
+assert.deepEqual(
+    core.rankSuggestionItems([{ id: '1', name: 'Outdoor Scene' }], '', 'This is an Outdoor Scene.', null, 20).map(item => item.id),
+    ['1']
+);
+
+const selectedPerformers = [
+    { id: '1', name: 'Skyler Dallon' },
+    { id: '2', name: 'Dominic Couture' },
+    { id: '3', name: 'Skyler Blue' }
+];
+assert.equal(core.findUniqueSelectedPerformerComponentMatch(selectedPerformers, new Set(['1', '2']), 'Skyler')?.id, '1');
+assert.equal(core.findUniqueSelectedPerformerComponentMatch(selectedPerformers, new Set(['1', '3']), 'Skyler'), null);
+assert.equal(core.findUniqueSelectedPerformerComponentMatch(selectedPerformers, new Set(['1']), 'Sky'), null);
+assert.equal(core.findUniqueSelectedPerformerComponentMatch(selectedPerformers, new Set(['1']), 'Skyler Dallon'), null);
 
 const sceneLink = { href: 'http://localhost:9999/scenes/abc-123?continue=true' };
 const sceneCard = {

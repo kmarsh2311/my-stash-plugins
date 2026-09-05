@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash FastTag
 // @namespace    http://tampermonkey.net/
-// @version      4.2.9
+// @version      4.2.10
 // @description  Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
@@ -50,7 +50,8 @@
         parseDurationSec,
         cleanFilenameForSuggestions,
         normalizeTextForSuggestions,
-        isSuggestionMatch,
+        rankSuggestionItems,
+        findUniqueSelectedPerformerComponentMatch,
         extractSceneId,
         findSceneCardForContextTarget,
         isScenePreviewContextTarget
@@ -79,8 +80,6 @@
         setGeminiModel,
         getGeminiAutoParse,
         setGeminiAutoParse,
-        getGeminiSuggestions,
-        setGeminiSuggestions,
         getAutoMarkOrganized,
         setAutoMarkOrganized,
         DEFAULT_SCRUB_SPEEDS,
@@ -117,6 +116,7 @@
         analyzeScraperMatch,
         readScrapeFieldSelection,
         buildScrapeUpdateInput,
+        buildAcceptedSceneStashIds,
         resolveScrapedStudioResult,
         resolveScrapedEntityIdsResult,
         fetchScraperMatchesForScene
@@ -138,7 +138,14 @@
         fetchSceneMediaUrls: fetchSceneMediaUrlsFromModule
     } = FastTagPreview;
     const { getOptimalPopupSize, getDefaultEverythingPosition } = FastTagUi;
-    const { dismissIndexedResult, replaceResults, createSerialTaskQueue } = FastTagWorkflows;
+    const {
+        dismissIndexedResult,
+        replaceResults,
+        createSerialTaskQueue,
+        createRandomSceneHistory,
+        appendRandomSceneHistory,
+        moveRandomSceneHistory
+    } = FastTagWorkflows;
     const {
         hasSelectionSetChanged,
         calculateBulkSelectionDelta,
@@ -166,7 +173,7 @@
         log: (...args) => ftLog(...args)
     });
 
-    console.log('[FastTag v4.2.9] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
+    console.log('[FastTag v4.2.10] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
 
     let fastTagHelpLoadPromise = null;
     function loadFastTagHelpModule() {
@@ -1263,6 +1270,14 @@
             filter: brightness(1.25) !important;
             transform: scale(1.04) !important;
         }
+        @media (pointer: coarse) {
+            .fasttag-suggestion-chip,
+            .fasttag-smart-suggestion-chip {
+                min-height: 36px !important;
+                padding: 7px 11px !important;
+                font-size: 12px !important;
+            }
+        }
         .fasttag-quick-chip.fasttag-keyboard-meta-focus {
             outline: none !important;
             border-color: #818cf8 !important;
@@ -1294,6 +1309,18 @@
         #scenes-popup .tabulator-tableholder {
             scrollbar-width: thin !important;
             scrollbar-color: rgba(129, 140, 248, 0.35) transparent !important;
+        }
+        #scenes-popup #everything-sugg-tags-chips,
+        #scenes-popup #everything-sugg-performers-chips {
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
+            overscroll-behavior-inline: contain;
+        }
+        #scenes-popup #everything-sugg-tags-chips::-webkit-scrollbar,
+        #scenes-popup #everything-sugg-performers-chips::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
         }
         `;
         document.head.appendChild(style);
@@ -2331,16 +2358,6 @@
                             <input type="checkbox" id="fasttag-setting-gemini-auto-parse" ${getGeminiAutoParse() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
                         </div>
 
-                        <div style="height: 1px; background: ${border};"></div>
-
-                        <!-- Include AI in Smart Suggestions -->
-                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
-                            <div style="flex: 1;">
-                                <div style="font-weight: 600; font-size: 13px;">Include AI Results in Smart Suggestions</div>
-                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Show sparkling AI suggestions (✨) directly in the quick-suggestion chip list.</div>
-                            </div>
-                            <input type="checkbox" id="fasttag-setting-gemini-suggestions" ${getGeminiSuggestions() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
-                        </div>
                     </div>
 
                     <!-- TAB 5: SYSTEM -->
@@ -2574,7 +2591,6 @@
         const geminiTestStatus = modal.querySelector('#fasttag-gemini-test-status');
         const geminiModelSelect = modal.querySelector('#fasttag-setting-gemini-model');
         const geminiAutoParseToggle = modal.querySelector('#fasttag-setting-gemini-auto-parse');
-        const geminiSuggestionsToggle = modal.querySelector('#fasttag-setting-gemini-suggestions');
 
         if (geminiKeyInput) {
             geminiKeyInput.addEventListener('input', (e) => {
@@ -2639,13 +2655,6 @@
             geminiAutoParseToggle.addEventListener('change', (e) => {
                 setGeminiAutoParse(e.target.checked);
                 showToast(`Auto-Parse on Scene Open ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
-            });
-        }
-
-        if (geminiSuggestionsToggle) {
-            geminiSuggestionsToggle.addEventListener('change', (e) => {
-                setGeminiSuggestions(e.target.checked);
-                showToast(`AI Smart Suggestions ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
             });
         }
 
@@ -2754,7 +2763,7 @@
             helpBtn.textContent = '⏳ Loading Guide…';
             try {
                 const help = await loadFastTagHelpModule();
-                help.openGuide({ theme: getEffectiveTheme(), version: '4.2.9' });
+                help.openGuide({ theme: getEffectiveTheme(), version: '4.2.10' });
             } catch (error) {
                 toastError(`Unable to open help: ${error.message}`);
             } finally {
@@ -4584,6 +4593,7 @@
         unselectedSuggestions.forEach(item => {
             const btn = document.createElement('button');
             btn.type = 'button';
+            btn.className = 'fasttag-smart-suggestion-chip';
             btn.textContent = `+ ${item.name || item.title}`;
             btn.title = `Click to add ${item.name || item.title}`;
             
@@ -4615,6 +4625,7 @@
         if (unselectedSuggestions.length > 1) {
             const acceptAllBtn = document.createElement('button');
             acceptAllBtn.type = 'button';
+            acceptAllBtn.className = 'fasttag-smart-suggestion-chip';
             acceptAllBtn.textContent = '✓ Accept All';
             acceptAllBtn.title = 'Add all suggested items';
             acceptAllBtn.style.cssText = 'padding: 3px 10px; border: 1px solid #10b981; border-radius: 999px; background: #059669; color: #ffffff; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.15s ease; margin-left: 4px; line-height: 1.3;';
@@ -5532,16 +5543,8 @@
         });
     }
 
-    async function renderScraperMatchCard(container, results, sceneId, ctx, popup, onDismiss) {
-        if (!results || results.length === 0) {
-            if (container) {
-                container.innerHTML = '';
-                container.style.display = 'none';
-            }
-            closeFloatingScraperHud();
-            return;
-        }
-
+    async function renderScraperMatchCard(container, results, sceneId, ctx, popup, onDismiss, emptySearchQuery = '') {
+        const hasResults = Array.isArray(results) && results.length > 0;
         const isDetached = getDetachScraper();
         let targetContainer = container;
 
@@ -5640,6 +5643,87 @@
 
         let currentIndex = 0;
         const isDark = getEffectiveTheme() === 'dark';
+
+        if (!hasResults) {
+            const initialQuery = cleanTitleForScraping(emptySearchQuery || '');
+            targetContainer.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 10px; padding: 12px; box-sizing: border-box; height: 100%; min-height: 150px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                        <strong style="font-size: 12px; color: ${isDark ? '#e2e8f0' : '#1e293b'};">⚡ Scraper Search</strong>
+                        <button type="button" id="fasttag-scrape-empty-close" style="border: none; background: transparent; color: ${isDark ? '#94a3b8' : '#64748b'}; font-size: 15px; cursor: pointer;">✕</button>
+                    </div>
+                    <div style="padding: 8px; border-radius: 6px; background: ${isDark ? 'rgba(245,158,11,0.1)' : '#fffbeb'}; border: 1px solid ${isDark ? 'rgba(245,158,11,0.35)' : '#fcd34d'}; color: ${isDark ? '#fde68a' : '#92400e'}; font-size: 11px;">
+                        No automatic matches were found. Edit the search words below and try again.
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <input id="fasttag-scrape-empty-query" type="text" value="${escapeHtml(initialQuery)}" placeholder="Enter title, studio or performer names" style="flex: 1; min-width: 0; height: 30px; box-sizing: border-box; padding: 4px 8px; border-radius: 6px; border: 1px solid ${isDark ? 'rgba(129,140,248,0.55)' : '#a5b4fc'}; background: ${isDark ? '#0f172a' : '#ffffff'}; color: ${isDark ? '#e2e8f0' : '#1e293b'}; font-size: 11px; outline: none;">
+                        <button id="fasttag-scrape-empty-search" type="button" style="height: 30px; padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(129,140,248,0.6); background: rgba(99,102,241,0.22); color: ${isDark ? '#c7d2fe' : '#4338ca'}; font-size: 10.5px; font-weight: 700; cursor: pointer;">Search</button>
+                    </div>
+                </div>
+            `;
+
+            const closeEmpty = () => {
+                window._fastTagEverythingScraperOpen = false;
+                setScraperHudPersistedOpen(false);
+                closeFloatingScraperHud();
+                if (container) {
+                    container.innerHTML = '';
+                    container.style.display = 'none';
+                }
+                if (popup?.scrapeBtn) {
+                    popup.scrapeBtn.disabled = false;
+                    popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
+                    popup.scrapeBtn.innerHTML = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
+                }
+                if (typeof onDismiss === 'function') onDismiss();
+            };
+            const runEmptySearch = async () => {
+                const input = targetContainer.querySelector('#fasttag-scrape-empty-query');
+                const button = targetContainer.querySelector('#fasttag-scrape-empty-search');
+                const query = (input?.value || '').trim();
+                if (!query) {
+                    toastError('Enter the words you want to search for.');
+                    input?.focus();
+                    return;
+                }
+                button.disabled = true;
+                button.textContent = 'Searching…';
+                try {
+                    const manualResults = await fetchScraperMatchesForScene(sceneId, null, query);
+                    if (!manualResults?.length) {
+                        toastError(`No scraper matches found for “${query}”`);
+                        button.disabled = false;
+                        button.textContent = 'Search';
+                        input?.focus();
+                        return;
+                    }
+                    sessionScrapeCache.set(sceneId, manualResults);
+                    await renderScraperMatchCard(container, manualResults, sceneId, ctx, popup, onDismiss);
+                } catch (error) {
+                    button.disabled = false;
+                    button.textContent = 'Search';
+                    toastError('Scrape search failed: ' + (error?.message || error));
+                }
+            };
+
+            targetContainer.querySelector('#fasttag-scrape-empty-close')?.addEventListener('click', closeEmpty);
+            const emptySearchInput = targetContainer.querySelector('#fasttag-scrape-empty-query');
+            emptySearchInput?.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+                event.stopPropagation();
+                runEmptySearch();
+            });
+            targetContainer.querySelector('#fasttag-scrape-empty-search')?.addEventListener('click', runEmptySearch);
+            if (popup?.scrapeBtn) {
+                popup.scrapeBtn.disabled = false;
+                popup.scrapeBtn.innerHTML = isEasterEggActive() ? '<span>▲ Hide 🍫</span>' : '<span>▲ Hide</span>';
+                if (isDetached) popup.scrapeBtn.classList.add('fasttag-dock-pulse');
+            }
+            if (isDetached && floatingScraperHudElement) attachScraperHudResizeHandles(floatingScraperHudElement);
+            setTimeout(() => emptySearchInput?.focus({ preventScroll: true }), 0);
+            return;
+        }
 
         const updateCardView = () => {
             const match = results[currentIndex];
@@ -6440,6 +6524,7 @@
                             performers { id }
                             tags { id }
                             studio { id }
+                            stash_ids { endpoint stash_id }
                         }
                     }
                 `, { id: sceneId });
@@ -6450,6 +6535,20 @@
 
                 const existingPerformerIds = (sceneRes?.data?.findScene?.performers || []).map(p => String(p.id));
                 const existingTagIds = (sceneRes?.data?.findScene?.tags || []).map(t => String(t.id));
+                let stashIdResolution = { stashIds: sceneRes?.data?.findScene?.stash_ids || [], added: false, reason: null };
+                try {
+                    const configRes = await fetchGQL(`query FastTagStashBoxes { configuration { general { stashBoxes { endpoint name } } } }`);
+                    stashIdResolution = buildAcceptedSceneStashIds(
+                        sceneRes?.data?.findScene?.stash_ids,
+                        match,
+                        configRes?.data?.configuration?.general?.stashBoxes
+                    );
+                } catch (error) {
+                    if (match?.remote_site_id || match?.urls?.some?.(url => /stashdb\.org/i.test(url))) {
+                        stashIdResolution.reason = 'the configured StashDB endpoint could not be loaded';
+                    }
+                }
+                if (stashIdResolution.reason) resolutionFailures.push(`StashDB ID (${stashIdResolution.reason})`);
                 const { updateInput, mergedPerformerIds, mergedTagIds } = buildScrapeUpdateInput({
                     sceneId,
                     match,
@@ -6477,6 +6576,32 @@
                 }
 
                 syncSceneToApolloCache(saveRes.data.sceneUpdate);
+
+                // Save and verify the StashDB ID independently. Keeping this separate from the
+                // metadata mutation makes any endpoint/ID problem visible without rolling back
+                // title, studio, performer, tag, date or details changes that already succeeded.
+                if (stashIdResolution.added) {
+                    const expectedStashId = stashIdResolution.stashIds[stashIdResolution.stashIds.length - 1];
+                    const stashIdSaveRes = await fetchGQL(`
+                        mutation FastTagAcceptStashId($input: SceneUpdateInput!) {
+                            sceneUpdate(input: $input) {
+                                id
+                                stash_ids { endpoint stash_id }
+                            }
+                        }
+                    `, { input: { id: sceneId, stash_ids: stashIdResolution.stashIds } });
+                    const returnedStashIds = stashIdSaveRes?.data?.sceneUpdate?.stash_ids || [];
+                    const expectedEndpoint = String(expectedStashId.endpoint).replace(/\/+$/, '').toLowerCase();
+                    const idWasSaved = returnedStashIds.some(item =>
+                        String(item?.endpoint || '').replace(/\/+$/, '').toLowerCase() === expectedEndpoint
+                        && String(item?.stash_id || '') === String(expectedStashId.stash_id)
+                    );
+                    if (stashIdSaveRes?.errors?.length || !idWasSaved) {
+                        const reason = stashIdSaveRes?.errors?.map(error => error.message).join('; ')
+                            || 'Stash did not return the accepted ID after saving';
+                        resolutionFailures.push(`StashDB ID (${reason})`);
+                    }
+                }
 
                 // Save cover separately. If Stash rejects the image value, all other metadata is
                 // already safely committed and the user gets a warning rather than losing everything.
@@ -6538,7 +6663,7 @@
 
                 if (resolutionFailures.length > 0) {
                     const coverNote = coverSaved ? '' : ' The cover also failed to save.';
-                    toastError(`Metadata saved, but FastTag could not create: ${resolutionFailures.join(', ')}.${coverNote}`);
+                    toastError(`Metadata saved, but FastTag could not apply: ${resolutionFailures.join(', ')}.${coverNote}`);
                 } else if (coverSaved) {
                     toastSuccess('Matched & Saved from StashDB!');
                 } else {
@@ -6578,27 +6703,13 @@
                 }
             } catch (e) {}
 
-            const rawCombined = `${title} ${fileName} ${details}`.trim();
-            if (!rawCombined) return [];
-
-            const normalizedSpaced = ' ' + normalizeTextForSuggestions(rawCombined) + ' ';
-            const tokens = normalizedSpaced.trim().split(/\s+/).filter(Boolean);
-            const tokenSet = new Set(tokens);
-            if (!tokens.length) return [];
-
-            const existingSet = existingIds ? new Set(Array.from(existingIds).map(String)) : new Set();
-            const suggestions = [];
-
-            for (const item of allAvailableItems) {
-                if (!item || !item.id) continue;
-                if (existingSet.has(String(item.id))) continue;
-
-                if (isSuggestionMatch(item, normalizedSpaced, tokenSet, tokens)) {
-                    suggestions.push(item);
-                    if (suggestions.length >= 20) break;
-                }
-            }
-            return suggestions;
+            return rankSuggestionItems(
+                allAvailableItems,
+                `${title} ${fileName}`.trim(),
+                details,
+                existingIds,
+                20
+            );
         } catch (e) {
             console.error('[FastTag] Suggestions error:', e);
             return [];
@@ -7020,7 +7131,7 @@
             }
 
             // Alt+Left / Alt+Right for Sequential
-            if (sequentialEditState.enabled && e.altKey) {
+            if ((sequentialEditState.enabled || activePopup?._isRandomMode) && e.altKey) {
                 if (e.key === 'ArrowRight') {
                     e.preventDefault();
                     e.stopPropagation();
@@ -7036,8 +7147,16 @@
                 }
             }
 
-            // If key event originated OUTSIDE form, block Stash hotkeys from running in background
-            if (!form.contains(e.target)) {
+            // If key event originated OUTSIDE form, block Stash hotkeys from running in the
+            // background, but never consume typing inside detached FastTag inputs (such as
+            // the floating scraper's manual-search field).
+            const isTextEntryTarget = Boolean(e.target && (
+                e.target.isContentEditable
+                || e.target.tagName === 'INPUT'
+                || e.target.tagName === 'TEXTAREA'
+                || e.target.tagName === 'SELECT'
+            ));
+            if (!form.contains(e.target) && !isTextEntryTarget) {
                 const pageNavKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ', 'Spacebar', 'n', 'N', 'p', 'P', 'j', 'J', 'k', 'K', 'l', 'L'];
                 if (pageNavKeys.includes(e.key) && !e.altKey && !e.ctrlKey && !e.metaKey) {
                     e.preventDefault();
@@ -8783,16 +8902,8 @@
             }
         } catch (e) {}
 
-        const rawCombined = `${title} ${fileName} ${details}`.trim();
-        if (!rawCombined) {
-            if (container) container.style.display = 'none';
-            return;
-        }
-
-        const normalizedSpaced = ' ' + normalizeTextForSuggestions(rawCombined) + ' ';
-        const tokens = normalizedSpaced.trim().split(/\s+/).filter(Boolean);
-        const tokenSet = new Set(tokens);
-        if (!tokens.length) {
+        const primaryText = `${title} ${fileName}`.trim();
+        if (!primaryText && !details.trim()) {
             if (container) container.style.display = 'none';
             return;
         }
@@ -8846,21 +8957,8 @@
                 }
             }
 
-            const matchingItems = [];
-            for (const [originalIndex, item] of cached.entries()) {
-                if (!item || !item.id) continue;
-                if (existingSet && (existingSet.has(String(item.id)) || existingSet.has(Number(item.id)))) continue;
-
-                if (isSuggestionMatch(item, normalizedSpaced, tokenSet, tokens)) {
-                    const primaryName = normalizeTextForSuggestions(item.name || item.title || '');
-                    const exactPrimaryMatch = primaryName && normalizedSpaced.includes(` ${primaryName} `);
-                    matchingItems.push({ item, originalIndex, exactPrimaryMatch });
-                }
-            }
-            matchingItems
-                .sort((a, b) => Number(b.exactPrimaryMatch) - Number(a.exactPrimaryMatch) || a.originalIndex - b.originalIndex)
-                .slice(0, 20)
-                .forEach(entry => allSuggestions.push({ type, icon, item: entry.item }));
+            rankSuggestionItems(cached, primaryText, details, existingSet, 20)
+                .forEach(item => allSuggestions.push({ type, icon, item }));
         }
 
         const tagsBox = container.querySelector('#everything-sugg-tags-box');
@@ -9051,6 +9149,10 @@
             if (popup && popup.element && popup.element.isConnected) {
                 popup._isRandomMode = true;
                 popup._randomUntaggedCount = count;
+                if (!popup._randomHistoryState) {
+                    popup._randomHistoryState = createRandomSceneHistory(popup.currentSceneId, popup._randomUntaggedCount);
+                }
+                appendRandomSceneHistory(popup._randomHistoryState, targetScene.id, count);
                 sequentialEditState.enabled = false;
                 await loadEditEverythingDataIntoPopup(targetScene.id, null, popup);
                 popup._context?.refreshAllUI?.();
@@ -9061,6 +9163,28 @@
             }
         } catch (e) {
             toastError('Failed to find random untagged scene', e);
+        }
+    }
+
+    async function navigateRandomSceneHistory(popup, direction, doSaveFn) {
+        const history = popup?._randomHistoryState;
+        if (!popup?._isRandomMode || !history) return;
+
+        const previousIndex = history.index;
+        const target = moveRandomSceneHistory(history, direction);
+        if (!target) return;
+
+        const ctx = popup._context;
+        try {
+            if (ctx && typeof doSaveFn === 'function' && typeof ctx.isDirty === 'function' && ctx.isDirty()) {
+                await doSaveFn();
+            }
+            popup._randomUntaggedCount = target.count;
+            await loadEditEverythingDataIntoPopup(target.id, null, popup);
+            popup._context?.refreshAllUI?.();
+        } catch (error) {
+            history.index = previousIndex;
+            toastError(`Unable to open random-scene history: ${error?.message || error}`);
         }
     }
 
@@ -9158,14 +9282,21 @@
             const sceneTitle = getSceneTitle(popup.sceneData, sceneId, cardElement);
 
             if (isRandom) {
+                const history = popup._randomHistoryState || createRandomSceneHistory(sceneId, popup._randomUntaggedCount);
+                popup._randomHistoryState = history;
+                const historyPosition = history.index >= 0 ? `${history.index + 1}/${history.entries.length}` : '1/1';
                 const untaggedCount = popup._randomUntaggedCount !== undefined ? popup._randomUntaggedCount : '?';
-                titleSpan.innerHTML = `<span style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; font-size: 13px; line-height: 1; flex-shrink: 0; margin-right: 4px; user-select: none; transform: translateY(1.5px);">⚡</span><span style="opacity: 0.95; font-size: 11px; background: rgba(99,102,241,0.25); border: 1px solid rgba(99,102,241,0.45); padding: 1px 6px; border-radius: 4px; margin-right: 7px; font-weight: 700; color: #a5b4fc; white-space: nowrap; flex-shrink: 0; line-height: 1.3;">🎲 [${untaggedCount} untagged]</span><span class="fasttag-marquee-box" style="flex: 1; min-width: 0; overflow: hidden; display: inline-flex; align-items: center;"><span class="fasttag-marquee-track"><span class="fasttag-marquee-item" data-raw-title="${escapeHtml(sceneTitle)}" title="${escapeHtml(sceneTitle)}">${escapeHtml(sceneTitle)}</span></span></span>`;
+                titleSpan.innerHTML = `<span style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; font-size: 13px; line-height: 1; flex-shrink: 0; margin-right: 4px; user-select: none; transform: translateY(1.5px);">⚡</span><span style="opacity: 0.95; font-size: 11px; background: rgba(99,102,241,0.25); border: 1px solid rgba(99,102,241,0.45); padding: 1px 6px; border-radius: 4px; margin-right: 7px; font-weight: 700; color: #a5b4fc; white-space: nowrap; flex-shrink: 0; line-height: 1.3;">🎲 [${historyPosition}] [${untaggedCount} untagged]</span><span class="fasttag-marquee-box" style="flex: 1; min-width: 0; overflow: hidden; display: inline-flex; align-items: center;"><span class="fasttag-marquee-track"><span class="fasttag-marquee-item" data-raw-title="${escapeHtml(sceneTitle)}" title="${escapeHtml(sceneTitle)}">${escapeHtml(sceneTitle)}</span></span></span>`;
                 titleSpan.title = `🎲 ${sceneTitle} [${untaggedCount} untagged]`;
                 applyMarqueeAnimation(titleSpan);
 
-                if (popup.seqContainer) popup.seqContainer.style.display = 'none';
-                if (popup.navGroup) popup.navGroup.style.display = 'none';
+                if (popup.seqContainer) popup.seqContainer.style.display = 'inline-flex';
+                const seqLabel = seqCheckbox?.closest('label');
+                if (seqLabel) seqLabel.style.display = 'none';
+                if (popup.navGroup) popup.navGroup.style.display = 'inline-flex';
             } else if (isSeq) {
+                const seqLabel = seqCheckbox?.closest('label');
+                if (seqLabel) seqLabel.style.display = 'inline-flex';
                 if (popup.seqContainer) popup.seqContainer.style.display = 'inline-flex';
                 if (popup.navGroup) popup.navGroup.style.display = 'inline-flex';
 
@@ -9181,6 +9312,8 @@
                     applyMarqueeAnimation(titleSpan);
                 }
             } else {
+                const seqLabel = seqCheckbox?.closest('label');
+                if (seqLabel) seqLabel.style.display = 'inline-flex';
                 if (popup.seqContainer) popup.seqContainer.style.display = 'inline-flex';
                 if (popup.navGroup) popup.navGroup.style.display = 'inline-flex';
 
@@ -9189,16 +9322,21 @@
                 applyMarqueeAnimation(titleSpan);
             }
 
-            prevBtn.disabled = !isSeq;
-            nextBtn.disabled = !isSeq;
-            prevBtn.style.opacity = isSeq ? '1' : '0.4';
-            nextBtn.style.opacity = isSeq ? '1' : '0.4';
-            prevBtn.style.cursor = isSeq ? 'pointer' : 'not-allowed';
-            nextBtn.style.cursor = isSeq ? 'pointer' : 'not-allowed';
+            const randomHistory = popup._randomHistoryState;
+            const canRandomBack = isRandom && randomHistory && randomHistory.index > 0;
+            const canRandomForward = isRandom && randomHistory && randomHistory.index < randomHistory.entries.length - 1;
+            prevBtn.disabled = isRandom ? !canRandomBack : !isSeq;
+            nextBtn.disabled = isRandom ? !canRandomForward : !isSeq;
+            prevBtn.style.opacity = prevBtn.disabled ? '0.4' : '1';
+            nextBtn.style.opacity = nextBtn.disabled ? '0.4' : '1';
+            prevBtn.style.cursor = prevBtn.disabled ? 'not-allowed' : 'pointer';
+            nextBtn.style.cursor = nextBtn.disabled ? 'not-allowed' : 'pointer';
+            prevBtn.title = isRandom ? 'Previous random scene (Alt+Left)' : 'Previous scene (Alt+Left)';
+            nextBtn.title = isRandom ? 'Next scene in random history (Alt+Right)' : 'Next scene (Alt+Right)';
 
             if (popup.navGroup) {
-                popup.navGroup.style.maxWidth = isSeq ? '60px' : '0';
-                popup.navGroup.style.opacity = isSeq ? '1' : '0';
+                popup.navGroup.style.maxWidth = (isSeq || isRandom) ? '60px' : '0';
+                popup.navGroup.style.opacity = (isSeq || isRandom) ? '1' : '0';
             }
         };
 
@@ -9242,18 +9380,26 @@
             popup._context?.refreshAllUI?.();
         };
 
-        prevBtn.onclick = (e) => {
+        prevBtn.onclick = async (e) => {
             e.preventDefault();
             e.stopPropagation();
             hideScrapeCoverTooltip();
-            navigateSequentialEditEverything(popup, sceneId, -1, doSaveFn);
+            if (popup._isRandomMode) {
+                await navigateRandomSceneHistory(popup, -1, doSaveFn);
+            } else {
+                await navigateSequentialEditEverything(popup, sceneId, -1, doSaveFn);
+            }
         };
 
-        nextBtn.onclick = (e) => {
+        nextBtn.onclick = async (e) => {
             e.preventDefault();
             e.stopPropagation();
             hideScrapeCoverTooltip();
-            navigateSequentialEditEverything(popup, sceneId, 1, doSaveFn);
+            if (popup._isRandomMode) {
+                await navigateRandomSceneHistory(popup, 1, doSaveFn);
+            } else {
+                await navigateSequentialEditEverything(popup, sceneId, 1, doSaveFn);
+            }
         };
 
         if (popup.randomBtn) {
@@ -9437,6 +9583,9 @@
         const allTags = getCachedOrNull('tags') || [];
         const allPerformers = getCachedOrNull('performers') || [];
         const allStudios = getCachedOrNull('studios') || [];
+        const selTagIds = ctx?.getSelectedTags ? ctx.getSelectedTags() : (ctx?.selectedTagIds || new Set());
+        const selPerfIds = ctx?.getSelectedPerformers ? ctx.getSelectedPerformers() : (ctx?.selectedPerformerIds || new Set());
+        const selStudioId = ctx?.getSelectedStudio ? ctx.getSelectedStudio() : null;
 
         const matchesEntityName = (candidateName, searchName) => {
             if (!candidateName || !searchName) return false;
@@ -9455,7 +9604,8 @@
                 if (p.alias_list && p.alias_list.some(a => matchesEntityName(a, pName))) return true;
                 return false;
             });
-            return { rawName: pName, item: found, matched: !!found };
+            const possibleItem = found ? null : findUniqueSelectedPerformerComponentMatch(allPerformers, selPerfIds, pName);
+            return { rawName: pName, item: found, matched: !!found, possibleItem };
         });
 
         // Match studio by name/alias
@@ -9477,10 +9627,6 @@
             });
             return { rawName: tName, item: found, matched: !!found };
         });
-
-        const selTagIds = ctx?.getSelectedTags ? ctx.getSelectedTags() : (ctx?.selectedTagIds || new Set());
-        const selPerfIds = ctx?.getSelectedPerformers ? ctx.getSelectedPerformers() : (ctx?.selectedPerformerIds || new Set());
-        const selStudioId = ctx?.getSelectedStudio ? ctx.getSelectedStudio() : null;
 
         container.style.display = 'flex';
         container.style.flexDirection = 'column';
@@ -9555,6 +9701,8 @@
                                     const pillColor = isAdded ? '#ffffff' : (isDark ? '#bae6fd' : '#0369a1');
                                     const pillText = isAdded ? `✓ ${escapeHtml(p.item.name)}` : `+ ${escapeHtml(p.item.name)}`;
                                     return `<button type="button" class="fasttag-ai-chip-perf" data-id="${p.item.id}" style="background: ${pillBg}; border: ${pillBorder}; color: ${pillColor}; font-size: 10px; font-weight: 600; padding: 1.5px 6px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 2px;" title="${isAdded ? 'Already added to scene' : 'Add to scene'}">${pillText}</button>`;
+                                } else if (p.possibleItem) {
+                                    return `<span style="display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap;"><span style="background: rgba(245, 158, 11, 0.16); border: 1px solid rgba(245, 158, 11, 0.7); color: ${isDark ? '#fde68a' : '#92400e'}; font-size: 10px; font-weight: 650; padding: 1.5px 7px; border-radius: 999px;" title="Gemini returned '${escapeHtml(p.rawName)}'; this may refer to the performer already linked to the scene.">⚠ ${escapeHtml(p.rawName)} → ${escapeHtml(p.possibleItem.name)}?</span><button type="button" class="fasttag-ai-chip-create-perf" data-name="${escapeHtml(p.rawName)}" style="background: rgba(168, 85, 247, 0.15); border: 1px dashed rgba(168, 85, 247, 0.6); color: ${isDark ? '#e9d5ff' : '#7e22ce'}; font-size: 10px; font-weight: 600; padding: 1.5px 7px; border-radius: 999px; cursor: pointer;" title="Create '${escapeHtml(p.rawName)}' only if this is a different performer">+ Create separately</button></span>`;
                                 } else {
                                     return `<button type="button" class="fasttag-ai-chip-create-perf" data-name="${escapeHtml(p.rawName)}" style="background: rgba(168, 85, 247, 0.15); border: 1px dashed rgba(168, 85, 247, 0.6); color: ${isDark ? '#e9d5ff' : '#7e22ce'}; font-size: 10px; font-weight: 600; padding: 1.5px 7px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 3px;" title="Create '${escapeHtml(p.rawName)}' in Stash & add to scene">+ Create "${escapeHtml(p.rawName)}"</button>`;
                                 }
@@ -9869,7 +10017,7 @@
                         if (p.matched && perfSet) {
                             perfSet.add(String(p.item.id));
                             addRecentEntry('performers', p.item);
-                        } else if (!p.matched && p.rawName && perfSet) {
+                        } else if (!p.matched && !p.possibleItem && p.rawName && perfSet) {
                             try {
                                 const res = await fetchGQL(ENTITY_CONFIG.performers.createQuery, ENTITY_CONFIG.performers.createVariables(p.rawName));
                                 const newId = ENTITY_CONFIG.performers.createExtract(res.data);
@@ -9962,6 +10110,9 @@
                 activePopup._randomUntaggedCount = randomCount;
                 if (isRandomMode) {
                     sequentialEditState.enabled = false;
+                    activePopup._randomHistoryState = createRandomSceneHistory(sceneId, randomCount);
+                } else {
+                    activePopup._randomHistoryState = null;
                 }
                 await loadEditEverythingDataIntoPopup(sceneId, cardElement, activePopup);
                 return;
@@ -9977,6 +10128,7 @@
             popup.type = 'everything';
             popup._isRandomMode = isRandomMode;
             popup._randomUntaggedCount = randomCount;
+            popup._randomHistoryState = isRandomMode ? createRandomSceneHistory(sceneId, randomCount) : null;
             if (isRandomMode) {
                 sequentialEditState.enabled = false;
             }
@@ -11837,12 +11989,19 @@
                 try {
                     const matches = await fetchScraperMatchesForScene(activeSceneId, activeCardElement);
                     if (!matches || matches.length === 0) {
-                        popup.scrapeBtn.innerHTML = `<span>✕ No Matches</span>`;
                         toastError('No scraper matches found on configured scrapers');
-                        setTimeout(() => {
-                            popup.scrapeBtn.disabled = false;
-                            popup.scrapeBtn.innerHTML = origHtml;
-                        }, 2500);
+                        const firstPath = popup.sceneData?.files?.[0]?.path || '';
+                        const pathParts = firstPath.split(/[/\\]/);
+                        const initialSearch = pathParts[pathParts.length - 1] || popup.sceneData?.title || '';
+                        await renderScraperMatchCard(
+                            popup.scraperCardContainer,
+                            [],
+                            activeSceneId,
+                            popup._context,
+                            popup,
+                            () => popup.globalSearch?.focus({ preventScroll: true }),
+                            initialSearch
+                        );
                     } else {
                         sessionScrapeCache.set(activeSceneId, matches);
                         popup.scrapeBtn.disabled = false;
