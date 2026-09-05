@@ -29,8 +29,6 @@
     if (!FastTagScraper) throw new Error('[FastTag] fasttag-scraper.js must load before fasttag.js');
     const FastTagScraperUi = window.FastTag?.scraperUi;
     if (!FastTagScraperUi) throw new Error('[FastTag] fasttag-scraper-ui.js must load before fasttag.js');
-    const FastTagHelp = window.FastTag?.help;
-    if (!FastTagHelp) throw new Error('[FastTag] fasttag-help.js must load before fasttag.js');
     const FastTagPreview = window.FastTag?.preview;
     if (!FastTagPreview) throw new Error('[FastTag] fasttag-preview.js must load before fasttag.js');
     const FastTagUi = window.FastTag?.ui;
@@ -130,7 +128,6 @@
         getSourcePresentation,
         getUnavailableContextPresentation
     } = FastTagScraperUi;
-    const { openGuide: openFastTagGuide } = FastTagHelp;
     const {
         getDominantWheelDelta,
         getWheelNotches,
@@ -170,6 +167,36 @@
     });
 
     console.log('[FastTag v4.2.9] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
+
+    let fastTagHelpLoadPromise = null;
+    function loadFastTagHelpModule() {
+        if (window.FastTag?.help?.openGuide) return Promise.resolve(window.FastTag.help);
+        if (fastTagHelpLoadPromise) return fastTagHelpLoadPromise;
+
+        fastTagHelpLoadPromise = new Promise((resolve, reject) => {
+            const mainScript = Array.from(document.scripts).find(script => /\/fasttag\.js(?:[?#]|$)/.test(script.src || ''));
+            if (!mainScript?.src) {
+                reject(new Error('Could not determine the FastTag plugin file location.'));
+                return;
+            }
+            const existingScript = document.getElementById('fasttag-help-script');
+            if (existingScript) existingScript.remove();
+            const script = document.createElement('script');
+            script.id = 'fasttag-help-script';
+            script.src = new URL('fasttag-help.js', mainScript.src).href;
+            script.async = true;
+            script.onload = () => {
+                if (window.FastTag?.help?.openGuide) resolve(window.FastTag.help);
+                else reject(new Error('The help module loaded but did not initialise.'));
+            };
+            script.onerror = () => reject(new Error('The offline help module could not be loaded.'));
+            document.head.appendChild(script);
+        }).catch(error => {
+            fastTagHelpLoadPromise = null;
+            throw error;
+        });
+        return fastTagHelpLoadPromise;
+    }
 
     // --- State & Controllers ---
     let currentMenu = null;
@@ -2714,10 +2741,21 @@
         if (doneBtn) doneBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); closeModal(); };
 
         const helpBtn = modal.querySelector('#fasttag-settings-help');
-        if (helpBtn) helpBtn.onclick = (e) => {
+        if (helpBtn) helpBtn.onclick = async (e) => {
             e.preventDefault();
             e.stopPropagation();
-            openFastTagGuide({ theme: getEffectiveTheme(), version: '4.2.9' });
+            helpBtn.disabled = true;
+            const originalText = helpBtn.innerHTML;
+            helpBtn.textContent = '⏳ Loading Guide…';
+            try {
+                const help = await loadFastTagHelpModule();
+                help.openGuide({ theme: getEffectiveTheme(), version: '4.2.9' });
+            } catch (error) {
+                toastError(`Unable to open help: ${error.message}`);
+            } finally {
+                helpBtn.disabled = false;
+                helpBtn.innerHTML = originalText;
+            }
         };
 
         modal.onclick = (e) => {
