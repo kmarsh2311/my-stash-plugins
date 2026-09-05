@@ -40,7 +40,8 @@ assert.ok(mainSource.includes('__fastTagRuntimeInitialized'), 'FastTag should gu
 assert.ok(mainSource.includes('loadFastTagHelpModule'), 'Settings should lazy-load the standalone FastTag help module');
 assert.equal(javascriptSection.includes('fasttag-help.js'), false, 'optional help must not participate in critical plugin startup');
 assert.ok(yaml.includes('assets:\n    /: .'), 'FastTag should expose optional offline help through the Stash plugin asset route');
-assert.ok(mainSource.includes('/plugin/mypluginrc/assets/fasttag-help.js'), 'help loader should use the documented Stash plugin asset URL');
+assert.ok(mainSource.includes('/plugin/fasttag/assets/fasttag-help.js'), 'help loader should try the configuration-derived Stash plugin asset URL');
+assert.ok(mainSource.includes('/plugin/mypluginrc/assets/fasttag-help.js'), 'help loader should support the installed package ID asset URL');
 assert.ok(fs.existsSync(path.join(pluginDirectory, 'USER_GUIDE.md')), 'offline Markdown user guide should ship with FastTag');
 
 const scraperSaveMutation = mainSource.match(/mutation FastTagAcceptSave[\s\S]*?`, \{ input: updateInput \}\);/)?.[0] || '';

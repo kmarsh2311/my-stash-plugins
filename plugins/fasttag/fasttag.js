@@ -174,18 +174,28 @@
         if (fastTagHelpLoadPromise) return fastTagHelpLoadPromise;
 
         fastTagHelpLoadPromise = new Promise((resolve, reject) => {
-            const existingScript = document.getElementById('fasttag-help-script');
-            if (existingScript) existingScript.remove();
-            const script = document.createElement('script');
-            script.id = 'fasttag-help-script';
-            script.src = new URL('/plugin/mypluginrc/assets/fasttag-help.js', window.location.origin).href;
-            script.async = true;
-            script.onload = () => {
-                if (window.FastTag?.help?.openGuide) resolve(window.FastTag.help);
-                else reject(new Error('The help module loaded but did not initialise.'));
+            const assetPaths = [
+                '/plugin/fasttag/assets/fasttag-help.js',
+                '/plugin/mypluginrc/assets/fasttag-help.js'
+            ];
+            const attemptLoad = (index) => {
+                document.getElementById('fasttag-help-script')?.remove();
+                if (index >= assetPaths.length) {
+                    reject(new Error(`The offline help module could not be loaded (${assetPaths.join(' or ')}).`));
+                    return;
+                }
+                const script = document.createElement('script');
+                script.id = 'fasttag-help-script';
+                script.src = new URL(assetPaths[index], window.location.origin).href;
+                script.async = true;
+                script.onload = () => {
+                    if (window.FastTag?.help?.openGuide) resolve(window.FastTag.help);
+                    else attemptLoad(index + 1);
+                };
+                script.onerror = () => attemptLoad(index + 1);
+                document.head.appendChild(script);
             };
-            script.onerror = () => reject(new Error('The offline help module could not be loaded.'));
-            document.head.appendChild(script);
+            attemptLoad(0);
         }).catch(error => {
             fastTagHelpLoadPromise = null;
             throw error;
