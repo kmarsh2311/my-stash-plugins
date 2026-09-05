@@ -15,148 +15,158 @@
 
 (async function() {
     'use strict';
+    const FastTagCore = window.FastTag?.core;
+    if (!FastTagCore) throw new Error('[FastTag] fasttag-core.js must load before fasttag.js');
+    const FastTagEntities = window.FastTag?.entities;
+    if (!FastTagEntities) throw new Error('[FastTag] fasttag-entities.js must load before fasttag.js');
+    const FastTagStorage = window.FastTag?.storage;
+    if (!FastTagStorage) throw new Error('[FastTag] fasttag-storage.js must load before fasttag.js');
+    const FastTagIntegrations = window.FastTag?.integrations;
+    if (!FastTagIntegrations) throw new Error('[FastTag] fasttag-integrations.js must load before fasttag.js');
+    const FastTagGemini = window.FastTag?.gemini;
+    if (!FastTagGemini) throw new Error('[FastTag] fasttag-gemini.js must load before fasttag.js');
+    const FastTagScraper = window.FastTag?.scraper;
+    if (!FastTagScraper) throw new Error('[FastTag] fasttag-scraper.js must load before fasttag.js');
+    const FastTagScraperUi = window.FastTag?.scraperUi;
+    if (!FastTagScraperUi) throw new Error('[FastTag] fasttag-scraper-ui.js must load before fasttag.js');
+    const FastTagPreview = window.FastTag?.preview;
+    if (!FastTagPreview) throw new Error('[FastTag] fasttag-preview.js must load before fasttag.js');
+    const FastTagUi = window.FastTag?.ui;
+    if (!FastTagUi) throw new Error('[FastTag] fasttag-ui.js must load before fasttag.js');
+    const FastTagEditors = window.FastTag?.editors;
+    if (!FastTagEditors) throw new Error('[FastTag] fasttag-editors.js must load before fasttag.js');
+    const FastTagWorkflows = window.FastTag?.workflows;
+    if (!FastTagWorkflows) throw new Error('[FastTag] fasttag-workflows.js must load before fasttag.js');
+    if (window.__fastTagRuntimeInitialized) {
+        console.warn('[FastTag] Runtime is already initialized; skipped duplicate event-handler registration.');
+        return;
+    }
+    window.__fastTagRuntimeInitialized = true;
+    const {
+        escapeHtml,
+        cleanTitleForScraping,
+        formatTime,
+        formatDurationSec,
+        parseDurationSec,
+        cleanFilenameForSuggestions,
+        normalizeTextForSuggestions,
+        isSuggestionMatch,
+        extractSceneId,
+        findSceneCardForContextTarget,
+        isScenePreviewContextTarget
+    } = FastTagCore;
+    const { SCENE_CARD_UPDATE_FIELDS, ENTITY_CONFIG } = FastTagEntities;
+    const {
+        getAutoScrapeSequential,
+        setAutoScrapeSequential,
+        getThemePreference,
+        setThemePreference,
+        getShowIdColumns,
+        setShowIdColumns,
+        getEnableSuggestions,
+        setEnableSuggestions,
+        getEnableCardIconClicks,
+        setEnableCardIconClicks,
+        getAlwaysPlayFullVideo,
+        setAlwaysPlayFullVideo,
+        getShowRecentChips,
+        setShowRecentChips,
+        getShowPinnedChips,
+        setShowPinnedChips,
+        getGeminiApiKey,
+        setGeminiApiKey,
+        getGeminiModel,
+        setGeminiModel,
+        getGeminiAutoParse,
+        setGeminiAutoParse,
+        getGeminiSuggestions,
+        setGeminiSuggestions,
+        getAutoMarkOrganized,
+        setAutoMarkOrganized,
+        DEFAULT_SCRUB_SPEEDS,
+        MAX_SCRUB_CUE_DISPLAYS,
+        getScrubSpeeds,
+        setScrubSpeeds,
+        getScrubCueCount,
+        incrementScrubCueCount,
+        resetScrubCueCount,
+        isVideoHudPersistedOpen,
+        setVideoHudPersistedOpen,
+        isScraperHudPersistedOpen,
+        setScraperHudPersistedOpen,
+        getDetachScraper,
+        setDetachScraper,
+        idbGet,
+        idbSet,
+        idbDelete,
+        readPinnedEntries,
+        writePinnedEntries,
+        readRecentEntries,
+        writeRecentEntries,
+        addRecentEntry,
+        addRecentEntriesFromSelection
+    } = FastTagStorage;
+    const {
+        resetRefractSceneCards,
+        syncSceneToApolloCache,
+        refreshSceneCards,
+        refreshSceneCardsDebounced
+    } = FastTagIntegrations;
+    const { callGeminiAPI, parseSceneWithGemini } = FastTagGemini;
+    const {
+        analyzeScraperMatch,
+        readScrapeFieldSelection,
+        buildScrapeUpdateInput,
+        resolveScrapedStudioResult,
+        resolveScrapedEntityIdsResult,
+        fetchScraperMatchesForScene
+    } = FastTagScraper;
+    const {
+        getAssessmentPresentation,
+        getAcceptPresentation,
+        getPerformerPresentation,
+        getSourcePresentation,
+        getUnavailableContextPresentation
+    } = FastTagScraperUi;
+    const {
+        getDominantWheelDelta,
+        getWheelNotches,
+        selectScrubStep,
+        calculateScrubTarget,
+        getDefaultPopoutSize,
+        calculateVideoPopoutPosition,
+        fetchSceneMediaUrls: fetchSceneMediaUrlsFromModule
+    } = FastTagPreview;
+    const { getOptimalPopupSize, getDefaultEverythingPosition } = FastTagUi;
+    const { dismissIndexedResult, replaceResults, createSerialTaskQueue } = FastTagWorkflows;
+    const {
+        hasSelectionSetChanged,
+        calculateBulkSelectionDelta,
+        applyBulkSelectionDelta
+    } = FastTagEditors;
+
+    FastTagGemini.configure({
+        fetchGQL: (...args) => fetchGQL(...args),
+        getGeminiApiKey,
+        getGeminiModel,
+        getCachedOrNull: type => getCachedOrNull(type),
+        log: (...args) => ftLog(...args)
+    });
+    FastTagScraper.configure({
+        fetchGQL: (...args) => fetchGQL(...args),
+        cleanTitleForScraping,
+        parseDurationSec,
+        getEntityConfig: type => ENTITY_CONFIG[type],
+        getCachedOrNull: type => getCachedOrNull(type),
+        setCache: (type, data) => setCache(type, data)
+    });
+    FastTagPreview.configure({ fetchGQL: (...args) => fetchGQL(...args) });
+    FastTagUi.configure({
+        getDefaultPopoutSize,
+        log: (...args) => ftLog(...args)
+    });
+
     console.log('[FastTag v4.2.8] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
-
-    // Selection set of fields to update Apollo's in-memory SceneCard directly (0ms latency, eliminates 40-scene FindScenes refetch)
-    const SCENE_CARD_UPDATE_FIELDS = `
-        id
-        organized
-        tags { id name }
-        performers { id name disambiguation gender image_path }
-        studio { id name image_path }
-    `;
-
-    // --- Entity Configuration & Schema Registry ---
-    const ENTITY_CONFIG = {
-        tags: {
-            icon: '🏷️',
-            title: 'Tag',
-            pluralTitle: 'Tags',
-            labelKey: 'name',
-            searchFields: ['name', 'id'],
-            columns: [
-                { title: "ID", field: "id", width: 55, hozAlign: "center", headerHozAlign: "center", resizable: false, headerSort: false },
-                { title: "Name", field: "name", resizable: false, headerSort: false },
-            ],
-            fetchQuery: `query { findTags(filter: { per_page: -1 }) { tags { id name sort_name scene_count created_at updated_at } } }`,
-            extractList: data => data?.findTags?.tags || [],
-            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title organized files { path } tags { id } } }`,
-            extractExisting: data => data?.findScene?.tags?.map(t => t.id) || [],
-            createQuery: `mutation ($name: String!) { tagCreate(input: { name: $name }) { id name } }`,
-            createExtract: data => data?.tagCreate?.id,
-            createVariables: val => ({ name: val }),
-            updateQuery: `mutation ($scene_id: ID!, $tag_ids: [ID!]!) { sceneUpdate(input: { id: $scene_id, tag_ids: $tag_ids }) { ${SCENE_CARD_UPDATE_FIELDS} } }`,
-            updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), tag_ids: ids.map(String) })
-        },
-        performers: {
-            icon: '⭐',
-            title: 'Performer',
-            pluralTitle: 'Performers',
-            labelKey: 'name',
-            searchFields: ['name', 'disambiguation', 'id'],
-            columns: [
-                { title: "ID", field: "id", width: 55, hozAlign: "center", headerHozAlign: "center", resizable: false, headerSort: false },
-                { title: "Name", field: "name", widthGrow: 2, resizable: true, headerSort: false },
-                { title: "Details", field: "disambiguation", widthGrow: 1, resizable: false, headerSort: false },
-            ],
-            fetchQuery: `query { findPerformers(filter: { per_page: -1 }) { performers { id name disambiguation scene_count birthdate rating100 created_at updated_at image_path country gender alias_list } } }`,
-            extractList: data => data?.findPerformers?.performers || [],
-            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title organized files { path } performers { id } } }`,
-            extractExisting: data => data?.findScene?.performers?.map(p => p.id) || [],
-            createQuery: `mutation ($name: String!) { performerCreate(input: { name: $name }) { id name } }`,
-            createExtract: data => data?.performerCreate?.id,
-            createVariables: val => ({ name: val }),
-            updateQuery: `mutation ($scene_id: ID!, $performer_ids: [ID!]!) { sceneUpdate(input: { id: $scene_id, performer_ids: $performer_ids }) { ${SCENE_CARD_UPDATE_FIELDS} } }`,
-            updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), performer_ids: ids.map(String) })
-        },
-        galleries: {
-            icon: '🖼️',
-            title: 'Gallery',
-            pluralTitle: 'Galleries',
-            labelKey: 'title',
-            searchFields: ['title', 'id'],
-            columns: [
-                { title: "ID", field: "id", width: 55, hozAlign: "center", headerHozAlign: "center", resizable: false, headerSort: false },
-                { title: "Title", field: "title", resizable: false, headerSort: false },
-            ],
-            fetchQuery: `query { findGalleries(filter: { per_page: -1 }) { galleries { id title folder { path } files { path } created_at updated_at } } }`,
-            extractList: data => (data?.findGalleries?.galleries || []).map(g => {
-                let displayTitle = (g.title && g.title.trim()) ? g.title.trim() : '';
-                if (!displayTitle) {
-                    const folderPath = g.folder?.path || g.files?.[0]?.path || '';
-                    if (folderPath) {
-                        const parts = folderPath.replace(/\\/g, '/').split('/').filter(Boolean);
-                        displayTitle = parts.length > 0 ? parts[parts.length - 1] : `Gallery #${g.id}`;
-                    } else {
-                        displayTitle = `Gallery #${g.id}`;
-                    }
-                }
-                return {
-                    id: g.id,
-                    title: displayTitle,
-                    rawTitle: g.title || '',
-                    created_at: g.created_at || '',
-                    updated_at: g.updated_at || ''
-                };
-            }),
-            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title organized files { path } galleries { id } } }`,
-            extractExisting: data => data?.findScene?.galleries?.map(g => g.id) || [],
-            createQuery: `mutation ($title: String!) { galleryCreate(input: { title: $title }) { id title } }`,
-            createExtract: data => data?.galleryCreate?.id,
-            createVariables: val => ({ title: val }),
-            updateQuery: `mutation ($scene_id: ID!, $gallery_ids: [ID!]!) { sceneUpdate(input: { id: $scene_id, gallery_ids: $gallery_ids }) { ${SCENE_CARD_UPDATE_FIELDS} } }`,
-            updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), gallery_ids: ids.map(String) })
-        },
-        studios: {
-            icon: '🏢',
-            title: 'Studio',
-            pluralTitle: 'Studios',
-            labelKey: 'name',
-            searchFields: ['name', 'parent_name', 'id'],
-            isSingleSelect: true,
-            columns: [
-                { title: "ID", field: "id", width: 55, hozAlign: "center", headerHozAlign: "center", resizable: false, headerSort: false },
-                { title: "Name", field: "name", widthGrow: 2, resizable: true, headerSort: false },
-                { title: "Parent Studio", field: "parent_name", widthGrow: 1, resizable: false, headerSort: false },
-            ],
-            fetchQuery: `query { findStudios(filter: { per_page: -1 }) { studios { id name parent_studio { id name } scene_count image_path created_at updated_at } } }`,
-            extractList: data => (data?.findStudios?.studios || []).map(s => ({
-                id: s.id,
-                name: s.name,
-                parent_name: s.parent_studio ? s.parent_studio.name : '',
-                scene_count: s.scene_count || 0,
-                created_at: s.created_at || '',
-                updated_at: s.updated_at || ''
-            })),
-            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title organized files { path } studio { id name } } }`,
-            extractExisting: data => data?.findScene?.studio?.id ? [data.findScene.studio.id] : [],
-            createQuery: `mutation ($name: String!) { studioCreate(input: { name: $name }) { id name } }`,
-            createExtract: data => data?.studioCreate?.id,
-            createVariables: val => ({ name: val }),
-            updateQuery: `mutation ($scene_id: ID!, $studio_id: ID) { sceneUpdate(input: { id: $scene_id, studio_id: $studio_id }) { ${SCENE_CARD_UPDATE_FIELDS} } }`,
-            updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), studio_id: ids.length > 0 ? String(ids[0]) : null })
-        },
-        groups: {
-            icon: '🎬',
-            title: 'Group',
-            pluralTitle: 'Groups',
-            labelKey: 'name',
-            searchFields: ['name', 'id'],
-            columns: [
-                { title: "ID", field: "id", width: 55, hozAlign: "center", headerHozAlign: "center", resizable: false, headerSort: false },
-                { title: "Name", field: "name", resizable: false, headerSort: false },
-            ],
-            fetchQuery: `query { findGroups(filter: { per_page: -1 }) { groups { id name scene_count created_at updated_at } } }`,
-            extractList: data => data?.findGroups?.groups || [],
-            fetchExistingQuery: `query ($id: ID!) { findScene(id: $id) { id title organized files { path } groups { group { id name } scene_index } } }`,
-            extractExisting: data => (data?.findScene?.groups || []).map(g => g.group?.id).filter(Boolean),
-            createQuery: `mutation ($name: String!) { groupCreate(input: { name: $name }) { id name } }`,
-            createExtract: data => data?.groupCreate?.id,
-            createVariables: val => ({ name: val }),
-            updateQuery: `mutation ($scene_id: ID!, $groups: [SceneGroupInput!]) { sceneUpdate(input: { id: $scene_id, groups: $groups }) { ${SCENE_CARD_UPDATE_FIELDS} } }`,
-            updateVariables: (sceneId, ids) => ({ scene_id: String(sceneId), groups: ids.map(id => ({ group_id: String(id) })) })
-        }
-    };
 
     // --- State & Controllers ---
     let currentMenu = null;
@@ -178,79 +188,6 @@
     const REVALIDATE_INTERVAL = 2 * 60 * 60 * 1000; // 2 hours background revalidation threshold
 
     // --- IndexedDB Persistent Caching Layer (0ms Remote Access) ---
-    const IDB_NAME = 'stash_fasttag_cache_db';
-    const IDB_VERSION = 1;
-    const IDB_STORE = 'entity_cache';
-    let idbPromise = null;
-
-    function getIDB() {
-        if (typeof indexedDB === 'undefined') return Promise.resolve(null);
-        if (idbPromise) return idbPromise;
-
-        idbPromise = new Promise((resolve) => {
-            try {
-                const req = indexedDB.open(IDB_NAME, IDB_VERSION);
-                req.onupgradeneeded = (e) => {
-                    const db = e.target.result;
-                    if (!db.objectStoreNames.contains(IDB_STORE)) {
-                        db.createObjectStore(IDB_STORE, { keyPath: 'type' });
-                    }
-                };
-                req.onsuccess = (e) => resolve(e.target.result);
-                req.onerror = (err) => {
-                    console.warn('[FastTag] IndexedDB open error, falling back to memory cache:', err);
-                    resolve(null);
-                };
-            } catch (e) {
-                console.warn('[FastTag] IndexedDB initialization failed:', e);
-                resolve(null);
-            }
-        });
-        return idbPromise;
-    }
-
-    async function idbGet(type) {
-        try {
-            const db = await getIDB();
-            if (!db) return null;
-            return new Promise((resolve) => {
-                const tx = db.transaction(IDB_STORE, 'readonly');
-                const store = tx.objectStore(IDB_STORE);
-                const req = store.get(type);
-                req.onsuccess = () => resolve(req.result || null);
-                req.onerror = () => resolve(null);
-            });
-        } catch (e) {
-            return null;
-        }
-    }
-
-    async function idbSet(type, data, timestamp = Date.now()) {
-        try {
-            const db = await getIDB();
-            if (!db) return;
-            const tx = db.transaction(IDB_STORE, 'readwrite');
-            const store = tx.objectStore(IDB_STORE);
-            store.put({ type, data, timestamp });
-        } catch (e) {
-            console.warn('[FastTag] Error writing to IndexedDB:', e);
-        }
-    }
-
-    async function idbDelete(type) {
-        try {
-            const db = await getIDB();
-            if (!db) return;
-            const tx = db.transaction(IDB_STORE, 'readwrite');
-            const store = tx.objectStore(IDB_STORE);
-            if (type) {
-                store.delete(type);
-            } else {
-                store.clear();
-            }
-        } catch (e) {}
-    }
-
     async function prewarmCacheFromIDB() {
         try {
             const types = ['tags', 'performers', 'studios', 'groups', 'galleries'];
@@ -281,34 +218,6 @@
         popupPosition: { left: 0, top: 0 },
         initialSelectedIds: new Set(),
         getSelectedIdsFn: null
-    };
-
-    const THEME_STORAGE_KEY = 'stash_fast_tag_theme';
-    const SHOW_IDS_STORAGE_KEY = 'stash_fast_tag_show_ids';
-    const SUGGESTIONS_STORAGE_KEY = 'stash_fast_tag_enable_suggestions';
-    const AUTO_SCRAPE_STORAGE_KEY = 'stash_fast_tag_auto_scrape_sequential';
-
-    function getAutoScrapeSequential() {
-        try {
-            const val = localStorage.getItem(AUTO_SCRAPE_STORAGE_KEY);
-            return val === null ? true : val === 'true'; // Default true (ON)
-        } catch (e) {
-            return true;
-        }
-    }
-
-    function setAutoScrapeSequential(enabled) {
-        try {
-            localStorage.setItem(AUTO_SCRAPE_STORAGE_KEY, enabled ? 'true' : 'false');
-        } catch (e) {}
-    }
-
-    const recentStorageKeys = {
-        tags: 'stash_fast_tag_recent_tags',
-        performers: 'stash_fast_tag_recent_performers',
-        galleries: 'stash_fast_tag_recent_galleries',
-        studios: 'stash_fast_tag_recent_studios',
-        groups: 'stash_fast_tag_recent_groups'
     };
 
     // --- Scroll Restoration ---
@@ -1730,10 +1639,6 @@
     }
 
     // --- Theme & Storage Helpers ---
-    function getThemePreference() {
-        return localStorage.getItem(THEME_STORAGE_KEY) || 'dark';
-    }
-
     function getEffectiveTheme() {
         const pref = getThemePreference();
         if (pref === 'light' || pref === 'dark') return pref;
@@ -1741,19 +1646,6 @@
         if (htmlTheme === 'light' || htmlTheme === 'dark') return htmlTheme;
         if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
         return 'dark';
-    }
-
-    function setThemePreference(theme) {
-        localStorage.setItem(THEME_STORAGE_KEY, theme);
-    }
-
-    function escapeHtml(str) {
-        if (!str) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
     }
 
     function getSceneTitle(sceneData, sceneId, cardElement) {
@@ -1811,155 +1703,14 @@
         });
     }
 
-    function getShowIdColumns() {
-        const val = localStorage.getItem(SHOW_IDS_STORAGE_KEY);
-        return val === null ? true : val === 'true'; // Default true (ON)
-    }
-
-    function setShowIdColumns(enabled) {
-        localStorage.setItem(SHOW_IDS_STORAGE_KEY, enabled ? 'true' : 'false');
-    }
-
-    function getEnableSuggestions() {
-        const val = localStorage.getItem(SUGGESTIONS_STORAGE_KEY);
-        return val === null ? true : val === 'true'; // Default true (ON)
-    }
-
-    function setEnableSuggestions(enabled) {
-        localStorage.setItem(SUGGESTIONS_STORAGE_KEY, enabled ? 'true' : 'false');
-    }
-
-    const SHOW_RECENT_STORAGE_KEY = 'fasttag_show_recent_chips';
-    const SHOW_PINNED_STORAGE_KEY = 'fasttag_show_pinned_chips';
-    const ALWAYS_PLAY_FULL_VIDEO_KEY = 'fasttag_always_play_full_video';
-    const ENABLE_CARD_ICON_CLICKS_KEY = 'fasttag_enable_card_icon_clicks';
-
-    function getEnableCardIconClicks() {
-        const val = localStorage.getItem(ENABLE_CARD_ICON_CLICKS_KEY);
-        return val === null ? true : val === 'true'; // Default true (ON)
-    }
-
-    function setEnableCardIconClicks(enabled) {
-        localStorage.setItem(ENABLE_CARD_ICON_CLICKS_KEY, enabled ? 'true' : 'false');
-    }
-
-    function getAlwaysPlayFullVideo() {
-        const val = localStorage.getItem(ALWAYS_PLAY_FULL_VIDEO_KEY);
-        return val === 'true'; // Default false (OFF)
-    }
-
-    function setAlwaysPlayFullVideo(enabled) {
-        localStorage.setItem(ALWAYS_PLAY_FULL_VIDEO_KEY, enabled ? 'true' : 'false');
-    }
-
-    function getShowRecentChips() {
-        const val = localStorage.getItem(SHOW_RECENT_STORAGE_KEY);
-        return val === null ? true : val === 'true'; // Default true (ON)
-    }
-
-    function setShowRecentChips(enabled) {
-        localStorage.setItem(SHOW_RECENT_STORAGE_KEY, enabled ? 'true' : 'false');
-    }
-
-    function getShowPinnedChips() {
-        const val = localStorage.getItem(SHOW_PINNED_STORAGE_KEY);
-        return val === null ? true : val === 'true'; // Default true (ON)
-    }
-
-    function setShowPinnedChips(enabled) {
-        localStorage.setItem(SHOW_PINNED_STORAGE_KEY, enabled ? 'true' : 'false');
-    }
-
-    const SCRUB_SPEEDS_STORAGE_KEY = 'fasttag_scrub_speeds';
-
-    const DEFAULT_SCRUB_SPEEDS = {
-        slow: 5.0,
-        normal: 10.0,
-        fast: 20.0,
-        freeze: 1.0
-    };
-
-    function getScrubSpeeds() {
-        try {
-            const raw = localStorage.getItem(SCRUB_SPEEDS_STORAGE_KEY);
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                return {
-                    slow: Math.max(0, Math.min(30, Number(parsed.slow) !== undefined && !isNaN(Number(parsed.slow)) ? Number(parsed.slow) : DEFAULT_SCRUB_SPEEDS.slow)),
-                    normal: Math.max(0, Math.min(60, Number(parsed.normal) !== undefined && !isNaN(Number(parsed.normal)) ? Number(parsed.normal) : DEFAULT_SCRUB_SPEEDS.normal)),
-                    fast: Math.max(0, Math.min(120, Number(parsed.fast) !== undefined && !isNaN(Number(parsed.fast)) ? Number(parsed.fast) : DEFAULT_SCRUB_SPEEDS.fast)),
-                    freeze: Math.max(0.1, Math.min(10, Number(parsed.freeze) || DEFAULT_SCRUB_SPEEDS.freeze))
-                };
-            }
-        } catch (e) {}
-        return { ...DEFAULT_SCRUB_SPEEDS };
-    }
-
     let hasShownScrubCueThisSession = false;
-    const SCRUB_CUE_COUNT_KEY = 'stash_fast_tag_scrub_cue_count_v6';
-    const MAX_SCRUB_CUE_DISPLAYS = 5;
-
-    function getScrubCueCount() {
-        try {
-            return parseInt(localStorage.getItem(SCRUB_CUE_COUNT_KEY) || '0', 10) || 0;
-        } catch (e) {
-            return 0;
-        }
-    }
-
-    function incrementScrubCueCount() {
-        try {
-            const current = getScrubCueCount();
-            localStorage.setItem(SCRUB_CUE_COUNT_KEY, String(current + 1));
-        } catch (e) {}
-    }
 
     let isVideoPoppedOut = false;
     let floatingHudElement = null;
     let floatingHudPosition = null;
     let floatingHudSize = null;
     // --- Google Gemini AI Smart Metadata & Filename Parser ---
-    const GEMINI_API_KEY_KEY = 'fasttag_gemini_api_key';
-    const GEMINI_MODEL_KEY = 'fasttag_gemini_model';
-    const GEMINI_AUTO_PARSE_KEY = 'fasttag_gemini_auto_parse';
-    const GEMINI_SUGGESTIONS_KEY = 'fasttag_gemini_suggestions';
-
-    function getGeminiApiKey() {
-        return localStorage.getItem(GEMINI_API_KEY_KEY) || '';
-    }
-    function setGeminiApiKey(val) {
-        localStorage.setItem(GEMINI_API_KEY_KEY, (val || '').trim());
-    }
-    function getGeminiModel() {
-        return localStorage.getItem(GEMINI_MODEL_KEY) || 'gemini-flash-latest';
-    }
-    function setGeminiModel(val) {
-        localStorage.setItem(GEMINI_MODEL_KEY, val || 'gemini-flash-latest');
-    }
-    function getGeminiAutoParse() {
-        const val = localStorage.getItem(GEMINI_AUTO_PARSE_KEY);
-        return val === null ? true : val === 'true';
-    }
-    function setGeminiAutoParse(enabled) {
-        localStorage.setItem(GEMINI_AUTO_PARSE_KEY, enabled ? 'true' : 'false');
-    }
-    function getGeminiSuggestions() {
-        const val = localStorage.getItem(GEMINI_SUGGESTIONS_KEY);
-        return val === null ? true : val === 'true';
-    }
-    function setGeminiSuggestions(enabled) {
-        localStorage.setItem(GEMINI_SUGGESTIONS_KEY, enabled ? 'true' : 'false');
-    }
-
     // --- Organized Status Workflow Helpers ---
-    const AUTO_MARK_ORGANIZED_KEY = 'stash_fast_tag_auto_mark_organized';
-    function getAutoMarkOrganized() {
-        return localStorage.getItem(AUTO_MARK_ORGANIZED_KEY) === 'true';
-    }
-    function setAutoMarkOrganized(enabled) {
-        localStorage.setItem(AUTO_MARK_ORGANIZED_KEY, enabled ? 'true' : 'false');
-    }
-
     async function updateSceneOrganized(sceneId, isOrganized) {
         if (!sceneId) return false;
         try {
@@ -2082,274 +1833,28 @@
         };
     }
 
-    let geminiSocket = null;
-    let geminiRequestId = 1;
-    const geminiPendingRequests = new Map();
-
-    function getGeminiSocketUrl() {
-        const host = window.location.hostname || '127.0.0.1';
-        return `ws://${host}:9998`;
-    }
-
-    async function ensureGeminiSocket() {
-        if (geminiSocket && geminiSocket.readyState === WebSocket.OPEN) {
-            return geminiSocket;
-        }
-
-        return new Promise(async (resolve, reject) => {
-            let socketUrl = getGeminiSocketUrl();
-            let settled = false;
-
-            const setupSocketHandlers = (ws) => {
-                ws.onmessage = (event) => {
-                    try {
-                        const data = JSON.parse(event.data);
-                        const id = data.id;
-                        if (id && geminiPendingRequests.has(id)) {
-                            const { resFn, rejFn } = geminiPendingRequests.get(id);
-                            geminiPendingRequests.delete(id);
-                            if (data.error) {
-                                rejFn(new Error(data.error));
-                            } else {
-                                resFn(data.result || data);
-                            }
-                        }
-                    } catch (e) {}
-                };
-                ws.onclose = () => {
-                    geminiSocket = null;
-                };
-            };
-
-            let ws;
-            try {
-                ws = new WebSocket(socketUrl);
-            } catch (e) {
-                // Ignore initial constructor error
-            }
-
-            const timeout = setTimeout(async () => {
-                if (!settled && (!ws || ws.readyState !== WebSocket.OPEN)) {
-                    if (ws) try { ws.close(); } catch (e) {}
-                    // Auto-start via Stash plugin task
-                    try {
-                        await fetchGQL(`mutation { runPluginTask(plugin_id: "mypluginrc", task_name: "Start Gemini Bridge") }`);
-                        await new Promise(r => setTimeout(r, 600));
-                        const wsRetry = new WebSocket(socketUrl);
-                        wsRetry.onopen = () => {
-                            if (!settled) {
-                                settled = true;
-                                geminiSocket = wsRetry;
-                                setupSocketHandlers(wsRetry);
-                                resolve(wsRetry);
-                            }
-                        };
-                        wsRetry.onerror = () => {
-                            if (!settled) {
-                                settled = true;
-                                reject(new Error('Cannot connect to FastTag Gemini Bridge. Click "Start Gemini Bridge" in Tasks.'));
-                            }
-                        };
-                    } catch (err) {
-                        if (!settled) {
-                            settled = true;
-                            reject(new Error('FastTag Gemini Bridge offline'));
-                        }
-                    }
-                }
-            }, 800);
-
-            if (ws) {
-                ws.onopen = () => {
-                    if (!settled) {
-                        settled = true;
-                        clearTimeout(timeout);
-                        geminiSocket = ws;
-                        setupSocketHandlers(ws);
-                        resolve(ws);
-                    }
-                };
-                ws.onerror = () => {
-                    // Fallback to timeout auto-starter
-                };
-            }
-        });
-    }
-
-    async function sendGeminiSocketRequest(payload) {
-        const socket = await ensureGeminiSocket();
-        const id = geminiRequestId++;
-        payload.id = id;
-
-        return new Promise((resFn, rejFn) => {
-            geminiPendingRequests.set(id, { resFn, rejFn });
-            socket.send(JSON.stringify(payload));
-            setTimeout(() => {
-                if (geminiPendingRequests.has(id)) {
-                    geminiPendingRequests.delete(id);
-                    rejFn(new Error('AI request took too long (>40s). Google API may be busy or rate-limited.'));
-                }
-            }, 40000);
-        });
-    }
-
-    async function callGeminiAPI(customApiKey = null, customModel = null) {
-        const apiKey = customApiKey || getGeminiApiKey();
-        if (!apiKey) throw new Error('No Gemini API key configured. Enter your key in Settings ➔ 🤖 AI');
-        const model = customModel || getGeminiModel();
-
-        const res = await sendGeminiSocketRequest({
-            type: "test",
-            api_key: apiKey,
-            model: model
-        });
-        return res;
-    }
-
-    const geminiSceneParseCache = new Map();
-
-    async function parseSceneWithGemini(sceneId, rawFilename, rawTitle) {
-        if (geminiSceneParseCache.has(sceneId)) {
-            return geminiSceneParseCache.get(sceneId);
-        }
-
-        const apiKey = getGeminiApiKey();
-        if (!apiKey) throw new Error('No Gemini API key configured. Enter your key in Settings ➔ 🤖 AI');
-
-        ftLog('ACTION', 'GeminiAI', `Running AI smart parser on scene #${sceneId}: "${rawFilename || rawTitle}"...`);
-
-        // Small library samples to guide fuzzy performer/studio matching
-        let performersContext = [];
-        let studiosContext = [];
-        try {
-            const cachedPerformers = getCachedOrNull('performers') || [];
-            if (cachedPerformers.length > 0) {
-                performersContext = cachedPerformers.map(p => p.name).slice(0, 150);
-            }
-            const cachedStudios = getCachedOrNull('studios') || [];
-            if (cachedStudios.length > 0) {
-                studiosContext = cachedStudios.map(s => s.name).slice(0, 60);
-            }
-        } catch (e) {}
-
-        const res = await sendGeminiSocketRequest({
-            type: "parse",
-            api_key: apiKey,
-            model: getGeminiModel(),
-            filename: rawFilename || '',
-            title: rawTitle || '',
-            performers_context: performersContext,
-            studios_context: studiosContext
-        });
-
-        ftLog('ACTION', 'GeminiAI', `Gemini AI parsed scene #${sceneId}: title="${res?.clean_title}", studio="${res?.studio}", performers=${JSON.stringify(res?.performers || [])}`);
-
-        geminiSceneParseCache.set(sceneId, res);
-        return res;
-    }
-
-    function getDefaultPopoutSize(hostContainer) {
-        const screenW = window.innerWidth;
-        const screenH = window.innerHeight;
-        
-        let targetWidth = 600;
-        if (screenW >= 2200) {
-            targetWidth = 760;
-        } else if (screenW >= 1600) { // 1080p standard (1920x1080)
-            targetWidth = 600;
-        } else if (screenW >= 1300) {
-            targetWidth = 520;
-        } else if (screenW >= 1000) {
-            targetWidth = 460;
-        } else {
-            targetWidth = Math.max(300, Math.round(screenW * 0.40));
-        }
-
-        const targetHeight = Math.round(targetWidth * (9 / 16));
-        return { width: `${targetWidth}px`, height: `${targetHeight}px` };
-    }
-
-    function enforceZeroOverlap(left, top, width, height, formRect, otherRect, screenWidth, screenHeight, margin = 14) {
-        let finalLeft = left;
-        let finalTop = top;
-
-        // If placed to the left of formRect, ensure right edge (finalLeft + width) does not collide with formRect.left
-        if (formRect && finalLeft < formRect.left) {
-            if (finalLeft + width > formRect.left - margin) {
-                finalLeft = Math.max(margin, formRect.left - width - margin);
-            }
-        }
-        // If placed to the right of formRect, ensure left edge does not collide with formRect.right
-        if (formRect && finalLeft < formRect.right && finalLeft + width > formRect.right) {
-            finalLeft = Math.min(screenWidth - width - margin, formRect.right + margin);
-        }
-
-        // Keep strictly inside viewport bounds
-        finalLeft = Math.max(margin, Math.min(screenWidth - width - margin, finalLeft));
-        finalTop = Math.max(margin, Math.min(screenHeight - height - margin, finalTop));
-
-        return {
-            left: `${Math.round(finalLeft)}px`,
-            top: `${Math.round(finalTop)}px`,
-            width: `${Math.round(width)}px`,
-            height: `${Math.round(height)}px`
-        };
-    }
-
     function getInitialPopoutPosition(hudWidth = 600, hudHeight = 338) {
         const activeForm = activePopup?.element || document.querySelector('#scenes-popup');
-        const margin = 14;
-        const screenWidth = window.innerWidth;
-        const screenHeight = window.innerHeight;
-
         const isScraperOpen = floatingScraperHudElement && document.body.contains(floatingScraperHudElement);
         const scraperRect = isScraperOpen ? floatingScraperHudElement.getBoundingClientRect() : null;
-
+        let rect = null;
         if (activeForm) {
-            let rect = activeForm.getBoundingClientRect();
+            rect = activeForm.getBoundingClientRect();
             if (!rect || rect.width <= 0 || rect.left <= 0) {
                 const formW = parseInt(activeForm.style.width, 10) || 760;
                 const formH = parseInt(activeForm.style.height, 10) || 760;
                 const defPos = getDefaultEverythingPosition(formW, formH);
                 rect = { left: defPos.x, right: defPos.x + formW, top: defPos.y, bottom: defPos.y + formH, width: formW, height: formH };
             }
-
-            const spaceLeft = Math.max(0, rect.left - margin);
-            const spaceRight = Math.max(0, screenWidth - rect.right - margin);
-
-            // 1. Primary: Place Video on the LEFT flank of the main modal
-            if (spaceLeft >= hudWidth + margin) {
-                const left = Math.round(rect.left - hudWidth - margin);
-                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return { left: `${left}px`, top: `${top}px`, width: `${hudWidth}px`, height: `${hudHeight}px` };
-            }
-
-            // 2. Secondary: If left flank is tight, try the RIGHT flank if not occupied by scraper
-            if (spaceRight >= hudWidth + margin && (!isScraperOpen || (scraperRect && scraperRect.right <= rect.left))) {
-                const left = Math.round(rect.right + margin);
-                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return { left: `${left}px`, top: `${top}px`, width: `${hudWidth}px`, height: `${hudHeight}px` };
-            }
-
-            // 3. Viewport fallback (flush with left screen edge)
-            const left = Math.max(margin, Math.min(screenWidth - hudWidth - margin, Math.round(rect.left - hudWidth - margin)));
-            const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-            return { left: `${left}px`, top: `${top}px`, width: `${hudWidth}px`, height: `${hudHeight}px` };
         }
-
-        return { left: '20px', top: '70px', width: `${hudWidth}px`, height: `${hudHeight}px` };
-    }
-
-    const VIDEO_HUD_OPEN_KEY = 'fasttag_video_hud_open_state';
-    function isVideoHudPersistedOpen() {
-        try {
-            return localStorage.getItem(VIDEO_HUD_OPEN_KEY) === 'true';
-        } catch (e) { return false; }
-    }
-    function setVideoHudPersistedOpen(val) {
-        try {
-            localStorage.setItem(VIDEO_HUD_OPEN_KEY, val ? 'true' : 'false');
-        } catch (e) {}
+        return calculateVideoPopoutPosition({
+            formRect: rect,
+            scraperRect,
+            hudWidth,
+            hudHeight,
+            screenWidth: window.innerWidth,
+            screenHeight: window.innerHeight
+        });
     }
 
     function closeFloatingVideoHud(fullReset = false) {
@@ -2360,36 +1865,9 @@
         isVideoPoppedOut = false;
     }
 
-    const DETACH_SCRAPER_STORAGE_KEY = 'fasttag_detach_scraper_v1';
-    const SCRAPER_HUD_OPEN_KEY = 'fasttag_scraper_hud_open_state';
     let floatingScraperHudElement = null;
     let floatingScraperHudPosition = null;
     let floatingScraperHudSize = null;
-
-    function isScraperHudPersistedOpen() {
-        try {
-            return localStorage.getItem(SCRAPER_HUD_OPEN_KEY) === 'true';
-        } catch (e) { return false; }
-    }
-    function setScraperHudPersistedOpen(val) {
-        try {
-            localStorage.setItem(SCRAPER_HUD_OPEN_KEY, val ? 'true' : 'false');
-        } catch (e) {}
-    }
-
-    function getDetachScraper() {
-        try {
-            const val = localStorage.getItem(DETACH_SCRAPER_STORAGE_KEY);
-            return val === null ? true : val === 'true'; // Default true (ON)
-        } catch (e) {}
-        return true;
-    }
-
-    function setDetachScraper(enabled) {
-        try {
-            localStorage.setItem(DETACH_SCRAPER_STORAGE_KEY, enabled ? 'true' : 'false');
-        } catch (e) {}
-    }
 
     function closeFloatingScraperHud(fullReset = false) {
         if (floatingScraperHudElement) {
@@ -2440,10 +1918,6 @@
         }
 
         return { right: '20px', top: '70px', width: `${hudWidth}px`, height: `${hudHeight}px` };
-    }
-
-    function setScrubSpeeds(speeds) {
-        localStorage.setItem(SCRUB_SPEEDS_STORAGE_KEY, JSON.stringify(speeds));
     }
 
     function promptDebugModeWarningDialog() {
@@ -3048,7 +2522,7 @@
             resetSpeedsBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 setScrubSpeeds(DEFAULT_SCRUB_SPEEDS);
-                localStorage.removeItem(SCRUB_CUE_COUNT_KEY);
+                resetScrubCueCount();
                 if (speedSlowInput) speedSlowInput.value = DEFAULT_SCRUB_SPEEDS.slow;
                 if (speedNormalInput) speedNormalInput.value = DEFAULT_SCRUB_SPEEDS.normal;
                 if (speedFastInput) speedFastInput.value = DEFAULT_SCRUB_SPEEDS.fast;
@@ -3297,23 +2771,6 @@
         }
     }
 
-    const PINNED_STORAGE_PREFIX = 'stash_fast_tag_pinned_';
-    function readPinnedEntries(type) {
-        try {
-            const raw = localStorage.getItem(PINNED_STORAGE_PREFIX + type);
-            const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-            return [];
-        }
-    }
-
-    function writePinnedEntries(type, value) {
-        try {
-            localStorage.setItem(PINNED_STORAGE_PREFIX + type, JSON.stringify(Array.isArray(value) ? value : []));
-        } catch (e) {}
-    }
-
     function togglePinnedEntry(type, item) {
         if (!item || !item.id) return;
         const name = item.name || item.title;
@@ -3327,36 +2784,6 @@
             showToast(`Pinned ${name} 📌`, 'success');
         }
         writePinnedEntries(type, list);
-    }
-
-    function readRecentEntries(type) {
-        try {
-            const raw = localStorage.getItem(recentStorageKeys[type]);
-            const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-            return [];
-        }
-    }
-
-    function writeRecentEntries(type, value) {
-        try {
-            localStorage.setItem(recentStorageKeys[type], JSON.stringify((Array.isArray(value) ? value : []).slice(0, 24)));
-        } catch (e) {}
-    }
-
-    function addRecentEntry(type, item) {
-        if (!item) return;
-        const name = item.name || item.title;
-        if (!name) return;
-        const list = readRecentEntries(type).filter(entry => entry && (entry.name || entry.title) && (entry.name || entry.title) !== name);
-        list.unshift({ id: item.id, name: name });
-        writeRecentEntries(type, list);
-    }
-
-    function addRecentEntriesFromSelection(type, selectedItems) {
-        if (!Array.isArray(selectedItems)) return;
-        selectedItems.filter(Boolean).forEach(item => addRecentEntry(type, item));
     }
 
     // --- Bulk Scene Selection Detection ---
@@ -3377,148 +2804,6 @@
     }
 
     // --- Preview & Scrubbing ---
-    function extractMediaUrlsFromCard(cardElement) {
-        if (!cardElement) return { previewUrl: null, coverUrl: null };
-        let previewUrl = null;
-        let coverUrl = null;
-
-        const videoNode = cardElement.querySelector('video');
-        if (videoNode) {
-            const vSrc = videoNode.currentSrc || videoNode.src || videoNode.getAttribute('src');
-            if (vSrc && /(preview|\.mp4|\.webm|\.m4v|\.mov|\.webp|\.gif)/i.test(vSrc)) {
-                previewUrl = vSrc;
-            }
-            const vPoster = videoNode.getAttribute('poster') || videoNode.poster;
-            if (vPoster) {
-                coverUrl = vPoster;
-            }
-        }
-
-        const sourceNodes = cardElement.querySelectorAll('source[src]');
-        for (const sNode of sourceNodes) {
-            const sSrc = sNode.getAttribute('src') || sNode.src;
-            if (sSrc && !previewUrl && /(preview|\.mp4|\.webm|\.m4v|\.mov|\.webp|\.gif)/i.test(sSrc)) {
-                previewUrl = sSrc;
-            }
-        }
-
-        const imgNodes = cardElement.querySelectorAll('img');
-        for (const imgNode of imgNodes) {
-            const iSrc = imgNode.currentSrc || imgNode.src || imgNode.getAttribute('src');
-            if (iSrc) {
-                if (!previewUrl && /(preview|\.mp4|\.webm|\.webp|\.gif)/i.test(iSrc)) {
-                    previewUrl = iSrc;
-                } else if (!coverUrl && /(screenshot|thumb|image|cover|\.jpe?g|\.png)/i.test(iSrc)) {
-                    coverUrl = iSrc;
-                } else if (!coverUrl) {
-                    coverUrl = iSrc;
-                }
-            }
-        }
-
-        const bgNodes = cardElement.querySelectorAll('[style*="background"]');
-        for (const node of bgNodes) {
-            const bg = node.style.backgroundImage || node.getAttribute('style') || '';
-            const match = bg.match(/url\(['"]?([^'"]+)['"]?\)/i);
-            if (match && match[1]) {
-                const src = match[1];
-                if (!coverUrl && /(screenshot|thumb|image|cover|\/scene\/)/i.test(src)) {
-                    coverUrl = src;
-                }
-            }
-        }
-
-        return { previewUrl, coverUrl };
-    }
-
-    async function fetchSceneMediaUrls(sceneId, cardElement) {
-        const cardMedia = extractMediaUrlsFromCard(cardElement);
-        let previewUrl = cardMedia.previewUrl;
-        let coverUrl = cardMedia.coverUrl;
-        let streamUrl = null;
-        let previewExplicitlyMissing = false;
-
-        if (sceneId) {
-            const queries = [
-                `query ($id: ID!) { findScene(id: $id) { paths { preview screenshot webp stream } } }`,
-                `query ($id: ID!) { findScene(id: $id) { paths { preview screenshot stream } } }`,
-                `query ($id: ID!) { findScene(id: $id) { paths { preview screenshot } } }`,
-                `query ($id: ID!) { findScene(id: $id) { preview screenshot } }`
-            ];
-
-            for (const query of queries) {
-                try {
-                    const res = await fetchGQL(query, { id: sceneId });
-                    if (res.errors) continue;
-                    const scene = res.data?.findScene;
-                    if (!scene) continue;
-
-                    const gqlPreview = scene.paths?.preview || scene.preview || scene.paths?.webp || null;
-                    const gqlScreenshot = scene.paths?.screenshot || scene.screenshot || null;
-                    const gqlStream = scene.paths?.stream || null;
-
-                    if (gqlPreview) {
-                        previewUrl = gqlPreview;
-                    } else if (scene.paths && ('preview' in scene.paths) && !scene.paths.preview && !scene.paths.webp) {
-                        // Stash explicitly reports that no preview was generated
-                        previewUrl = null;
-                        previewExplicitlyMissing = true;
-                    }
-
-                    if (gqlScreenshot) {
-                        coverUrl = gqlScreenshot;
-                    }
-                    if (gqlStream) {
-                        streamUrl = gqlStream;
-                    }
-                    break;
-                } catch (error) {
-                    console.error('FastTag: preview fetch failed', error);
-                }
-            }
-        }
-
-        const baseOrigin = window.location.origin || 'http://localhost:9999';
-        if (!coverUrl && sceneId) {
-            coverUrl = `${baseOrigin}/scene/${encodeURIComponent(sceneId)}/screenshot`;
-        }
-        if (!streamUrl && sceneId) {
-            streamUrl = `${baseOrigin}/scene/${encodeURIComponent(sceneId)}/stream`;
-        }
-        if (!previewUrl && !previewExplicitlyMissing && sceneId) {
-            previewUrl = `${baseOrigin}/scene/${encodeURIComponent(sceneId)}/preview`;
-        }
-
-        const toRelative = (url) => {
-            if (!url) return url;
-            try {
-                const u = new URL(url, window.location.href);
-                return u.pathname + u.search;
-            } catch (e) {
-                return url;
-            }
-        };
-
-        return {
-            previewUrl: toRelative(previewUrl),
-            coverUrl: toRelative(coverUrl),
-            streamUrl: toRelative(streamUrl)
-        };
-    }
-
-    function formatTime(seconds) {
-        if (isNaN(seconds) || seconds < 0) return '0:00';
-        const totalSecs = Math.floor(seconds);
-        const mins = Math.floor(totalSecs / 60);
-        const secs = totalSecs % 60;
-        const hrs = Math.floor(mins / 60);
-        const remMins = mins % 60;
-        if (hrs > 0) {
-            return `${hrs}:${remMins < 10 ? '0' : ''}${remMins}:${secs < 10 ? '0' : ''}${secs}`;
-        }
-        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-    }
-
     async function attachScenePreview(hostContainer, sceneId, cardElement) {
         if (!hostContainer) return;
         if (hostContainer._previewAbortController) {
@@ -3564,7 +2849,7 @@
             }
         };
 
-        const { previewUrl, coverUrl, streamUrl } = await fetchSceneMediaUrls(sceneId, cardElement);
+        const { previewUrl, coverUrl, streamUrl } = await fetchSceneMediaUrlsFromModule(sceneId, cardElement);
         if (signal.aborted) return;
 
         if (!previewUrl && !coverUrl && !streamUrl) {
@@ -4023,8 +3308,8 @@
             if (!currentMedia || currentMedia.tagName !== 'VIDEO' || currentMedia.duration <= 0 || !isFinite(currentMedia.duration)) return;
 
             // Handle both vertical deltaY and horizontal deltaX across all mouse types
-            const rawDelta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-            if (!rawDelta || isNaN(rawDelta)) return;
+            const rawDelta = getDominantWheelDelta(e.deltaX, e.deltaY);
+            if (rawDelta === null) return;
 
             const now = performance.now();
             const timeDelta = lastWheelTimestamp > 0 ? (now - lastWheelTimestamp) : 300;
@@ -4032,26 +3317,9 @@
 
             const scrubSpeeds = getScrubSpeeds();
 
-            // Step size calculation:
-            // When Shift is held -> fixed precision frame step from settings
-            // When Shift is NOT held -> velocity-based dynamic step size with 0-disabled tier fallbacks
-            let step = scrubSpeeds.freeze;
-            if (!shiftHeld) {
-                const s = scrubSpeeds.slow > 0 ? scrubSpeeds.slow : 0;
-                const n = scrubSpeeds.normal > 0 ? scrubSpeeds.normal : 0;
-                const f = scrubSpeeds.fast > 0 ? scrubSpeeds.fast : 0;
-
-                if (timeDelta < 80) {
-                    step = f || n || s || 10.0;
-                } else if (timeDelta < 200) {
-                    step = n || s || f || 10.0;
-                } else {
-                    step = s || n || f || 10.0;
-                }
-            }
-
-            const notches = e.deltaMode === 1 ? rawDelta : (rawDelta / 60);
-            if (Math.abs(notches) < 0.05) return;
+            const step = selectScrubStep(scrubSpeeds, timeDelta, shiftHeld);
+            const notches = getWheelNotches(rawDelta, e.deltaMode);
+            if (notches === null) return;
 
             if (!scrubbing) {
                 scrubbing = true;
@@ -4064,9 +3332,7 @@
                 try { currentMedia.pause(); } catch (err) {}
             }
 
-            const direction = -Math.sign(notches);
-            const scrubSeconds = direction * step;
-            currentMedia.currentTime = Math.min(currentMedia.duration, Math.max(0, currentMedia.currentTime + scrubSeconds));
+            currentMedia.currentTime = calculateScrubTarget(currentMedia.currentTime, currentMedia.duration, notches, step);
             clearTimeout(resumeTimer);
 
             showProgressBar();
@@ -4378,16 +3644,6 @@
         return null;
     }
 
-    function extractSceneId(cardElement) {
-        if (!cardElement) return null;
-        const link = cardElement.querySelector('a[href*="/scenes/"]');
-        if (link) {
-            const match = link.href.match(/scenes\/([a-zA-Z0-9-]+)/);
-            if (match) return match[1];
-        }
-        return null;
-    }
-
     function getAllVisibleSceneCards() {
         const cards = document.querySelectorAll('.scene-card, [class*="scene-card"], [class*="SceneCard"]');
         return Array.from(cards).filter(card => extractSceneId(card) !== null);
@@ -4418,13 +3674,8 @@
                 return false;
             }
         }
-        const currentSet = new Set(Array.from(selectedIds).map(String));
         const initialSet = sequentialEditState.initialSelectedIds || new Set();
-        if (currentSet.size !== initialSet.size) return true;
-        for (let id of currentSet) {
-            if (!initialSet.has(id)) return true;
-        }
-        return false;
+        return hasSelectionSetChanged(selectedIds, initialSet);
     }
 
     function updateSequentialEditUI(form, type, selectedIds) {
@@ -4513,154 +3764,6 @@
         }
     }
 
-    const apolloSceneSyncSuccess = new Set();
-
-    function syncSceneToApolloCache(sceneData) {
-        if (!sceneData || !sceneData.id) return false;
-        const sceneIdStr = String(sceneData.id);
-
-        // Refract Theme compatibility: strip its "already processed" marker on this specific card
-        try {
-            document.querySelectorAll(
-                `.scene-card a[href^="/scenes/${sceneIdStr}?"], ` +
-                `.scene-card a[href="/scenes/${sceneIdStr}"], ` +
-                `.scene-card a[href^="/scenes/${sceneIdStr}/"]`
-            ).forEach(a => {
-                const card = a.closest('.scene-card');
-                if (card) {
-                    card.removeAttribute('data-stash-sc');
-                    card.querySelectorAll('.stash-performer-circles').forEach(el => el.remove());
-                }
-            });
-        } catch (e) {}
-
-        const apollo = window.__APOLLO_CLIENT__;
-        if (!apollo || !apollo.cache) return false;
-
-        try {
-            const cacheId = (typeof apollo.cache.identify === 'function' && apollo.cache.identify({ __typename: 'Scene', id: sceneIdStr })) || `Scene:${sceneIdStr}`;
-
-            const fieldsToUpdate = {};
-
-            if (sceneData.tags !== undefined) {
-                fieldsToUpdate.tags = (existing, { toReference }) => {
-                    return (sceneData.tags || []).map(t => {
-                        const ref = typeof toReference === 'function' ? toReference({ __typename: 'Tag', id: String(t.id), name: t.name }) : null;
-                        return ref || { __typename: 'Tag', id: String(t.id), name: t.name };
-                    });
-                };
-            }
-
-            if (sceneData.performers !== undefined) {
-                fieldsToUpdate.performers = (existing, { toReference }) => {
-                    return (sceneData.performers || []).map(p => {
-                        const perfObj = {
-                            __typename: 'Performer',
-                            id: String(p.id),
-                            name: p.name,
-                            disambiguation: p.disambiguation || null,
-                            gender: p.gender || null,
-                            image_path: p.image_path || null
-                        };
-                        const ref = typeof toReference === 'function' ? toReference(perfObj) : null;
-                        return ref || perfObj;
-                    });
-                };
-            }
-
-            if (sceneData.studio !== undefined) {
-                fieldsToUpdate.studio = (existing, { toReference }) => {
-                    if (!sceneData.studio) return null;
-                    const stObj = {
-                        __typename: 'Studio',
-                        id: String(sceneData.studio.id),
-                        name: sceneData.studio.name,
-                        image_path: sceneData.studio.image_path || null
-                    };
-                    const ref = typeof toReference === 'function' ? toReference(stObj) : null;
-                    return ref || stObj;
-                };
-            }
-
-            if (sceneData.organized !== undefined) {
-                fieldsToUpdate.organized = () => Boolean(sceneData.organized);
-            }
-
-            if (sceneData.title !== undefined) {
-                fieldsToUpdate.title = () => sceneData.title;
-            }
-
-            if (sceneData.date !== undefined) {
-                fieldsToUpdate.date = () => sceneData.date;
-            }
-
-            if (Object.keys(fieldsToUpdate).length > 0) {
-                apollo.cache.modify({
-                    id: cacheId,
-                    fields: fieldsToUpdate
-                });
-                apolloSceneSyncSuccess.add(sceneIdStr);
-                return true;
-            }
-        } catch (err) {
-            console.warn('[FastTag] Error updating Apollo scene cache directly:', err);
-        }
-        return false;
-    }
-
-    async function refreshSceneCards(sceneId = null) {
-        const resetRefractCards = () => {
-            try {
-                if (sceneId) {
-                    const sIdStr = String(sceneId);
-                    document.querySelectorAll(
-                        `.scene-card a[href^="/scenes/${sIdStr}?"], ` +
-                        `.scene-card a[href="/scenes/${sIdStr}"], ` +
-                        `.scene-card a[href^="/scenes/${sIdStr}/"]`
-                    ).forEach(a => {
-                        const card = a.closest('.scene-card');
-                        if (card) {
-                            card.removeAttribute('data-stash-sc');
-                            card.querySelectorAll('.stash-performer-circles').forEach(el => el.remove());
-                        }
-                    });
-                } else {
-                    document.querySelectorAll('.scene-card').forEach(card => {
-                        card.removeAttribute('data-stash-sc');
-                        card.querySelectorAll('.stash-performer-circles').forEach(el => el.remove());
-                    });
-                }
-            } catch (e) {}
-        };
-
-        resetRefractCards();
-
-        const apollo = window.__APOLLO_CLIENT__;
-        if (!apollo || typeof apollo.getObservableQueries !== 'function') return false;
-
-        const sceneQueries = [...apollo.getObservableQueries().values()].filter(query => {
-            const queryName = query.queryName || query.options?.query?.definitions?.[0]?.name?.value || '';
-            const queryText = query.options?.query?.loc?.source?.body || '';
-            return (queryName === 'FindScenes' || queryText.includes('FindScenes') || queryName.includes('Scene')) && typeof query.refetch === 'function';
-        });
-
-        if (!sceneQueries.length) return false;
-        await Promise.all(sceneQueries.map(query => query.refetch()));
-
-        // Also clean after Apollo refetch resolves and React updates the DOM
-        setTimeout(resetRefractCards, 60);
-        setTimeout(resetRefractCards, 300);
-        return true;
-    }
-
-    let refreshSceneCardsTimer = null;
-    function refreshSceneCardsDebounced(sceneId = null, delayMs = 150) {
-        clearTimeout(refreshSceneCardsTimer);
-        refreshSceneCardsTimer = setTimeout(() => {
-            refreshSceneCards(sceneId);
-        }, delayMs);
-    }
-
     async function updateEntityForScene(type, sceneId, selectedIds) {
         const config = ENTITY_CONFIG[type];
         const res = await fetchGQL(config.updateQuery, config.updateVariables(sceneId, selectedIds));
@@ -4671,22 +3774,7 @@
         if (res?.data?.sceneUpdate) {
             syncSceneToApolloCache(res.data.sceneUpdate);
         }
-        // Refract Theme compatibility: strip its "already processed" marker and circles
-        // so it re-queries fresh data for this card on its next MutationObserver pass.
-        try {
-            const sceneIdStr = String(sceneId);
-            document.querySelectorAll(
-                `.scene-card a[href^="/scenes/${sceneIdStr}?"], ` +
-                `.scene-card a[href="/scenes/${sceneIdStr}"], ` +
-                `.scene-card a[href^="/scenes/${sceneIdStr}/"]`
-            ).forEach(a => {
-                const card = a.closest('.scene-card');
-                if (card) {
-                    card.removeAttribute('data-stash-sc');
-                    card.querySelectorAll('.stash-performer-circles').forEach(el => el.remove());
-                }
-            });
-        } catch (e) {}
+        resetRefractSceneCards(sceneId);
         return true;
     }
 
@@ -5697,25 +4785,6 @@
         }
     }
 
-    function getOptimalPopupSize(type = 'single') {
-        const screenW = window.innerWidth || 1920;
-        const screenH = window.innerHeight || 1080;
-
-        if (type === 'everything') {
-            const rawW = Math.round(screenW * 0.40);
-            const rawH = Math.round(screenH * 0.82);
-            const width = Math.max(720, Math.min(Math.min(screenW - 24, rawW), 760));
-            const height = Math.max(620, Math.min(Math.min(screenH - 24, rawH), 760));
-            return { width, height };
-        } else {
-            const rawW = Math.round(screenW * 0.18);
-            const rawH = Math.round(screenH * 0.74);
-            const width = Math.max(320, Math.min(Math.min(screenW - 24, rawW), 345));
-            const height = Math.max(540, Math.min(Math.min(screenH - 24, rawH), 660));
-            return { width, height };
-        }
-    }
-
     function getSavedPopupSize(type = 'single') {
         try {
             const key = type === 'everything' ? 'stash_fast_tag_popup_size_everything' : 'stash_fast_tag_popup_size_single';
@@ -5732,46 +4801,6 @@
             const key = type === 'everything' ? 'stash_fast_tag_popup_size_everything' : 'stash_fast_tag_popup_size_single';
             localStorage.setItem(key, JSON.stringify({ width: Math.round(width), height: Math.round(height) }));
         } catch (e) {}
-    }
-
-    function getDefaultEverythingPosition(formW, formH) {
-        const screenW = window.innerWidth || 1920;
-        const screenH = window.innerHeight || 1080;
-        const minTop = 8;
-        const minLeft = 8;
-
-        const defaultVideoSize = getDefaultPopoutSize();
-        const videoW = parseInt(defaultVideoSize.width, 10) || 600;
-        const scraperW = 390;
-        const margin = 14;
-
-        let posX = null;
-        let posY = null;
-
-        // If screen is wide enough to accommodate Video (Left) + Form (Center) + Scraper (Right)
-        // Balance the flanking spaces so both sidecars have comfortable, equal breathing room without any collision
-        if (screenW >= videoW + formW + scraperW + (margin * 3)) {
-            // Symmetrical balanced flanking: (screenW - formW + videoW - scraperW) / 2
-            posX = Math.round((screenW - formW + videoW - scraperW) / 2);
-        } else if (screenW >= videoW + formW + (margin * 2)) {
-            // Ensure Video HUD on the left has zero overlap
-            posX = Math.round(videoW + (margin * 2));
-        } else {
-            // Fallback for smaller screens: centered
-            posX = Math.round((screenW - formW) / 2);
-        }
-
-        // Keep strictly within screen bounds
-        const maxAllowedLeft = Math.max(minLeft, screenW - formW - 8);
-        const maxAllowedTop = Math.max(minTop, screenH - formH - 8);
-        posX = Math.max(minLeft, Math.min(maxAllowedLeft, posX));
-        posY = Math.max(minTop, Math.min(maxAllowedTop, Math.round((screenH - formH) / 2)));
-
-        ftLog('DEBUG', 'LAYOUT', `Default workstation position calculated: (${posX}, ${posY}) on ${screenW}x${screenH}`, {
-            screenW, screenH, formW, formH, videoW, scraperW, margin, posX, posY
-        });
-
-        return { x: posX, y: posY };
     }
 
     function resetAllLayoutsToDefault() {
@@ -6321,190 +5350,8 @@
         }
     }, true);
 
-    function cleanTitleForScraping(rawStr) {
-        if (!rawStr) return '';
-        let clean = String(rawStr).replace(/\.[a-zA-Z0-9]{2,5}$/, '');
-        clean = clean.replace(/[\b\._-](2160p|1080p|720p|480p|4k|uhd|hd|sd|fhd|hevc|x264|x265|h264|h265|aac|dvdrip|webrip|bluray|mp4|mkv|avi|wmv)[\b\._-]/gi, ' ');
-        clean = clean.replace(/[\b\._-](2160p|1080p|720p|480p|4k|uhd|hd|sd|fhd|hevc|x264|x265|h264|h265|aac|dvdrip|webrip|bluray|mp4|mkv|avi|wmv)$/gi, '');
-        clean = clean.replace(/[\._\-+]/g, ' ');
-        clean = clean.replace(/\s+/g, ' ').trim();
-        return clean;
-    }
-
     // Temporary in-memory session cache for active scrape results (cleared when popup is closed)
     const sessionScrapeCache = new Map();
-
-    async function fetchScraperMatchesForScene(sceneId, cardElement) {
-        let sceneTitle = '';
-        let sceneFileName = '';
-        let sceneFilePath = '';
-        let localDuration = null;
-        let localFingerprints = [];
-
-        try {
-            const query = `query ($id: ID!) { findScene(id: $id) { id title details files { path duration fingerprints { type value } } } }`;
-            const res = await fetchGQL(query, { id: sceneId });
-            const sc = res?.data?.findScene;
-            if (sc) {
-                sceneTitle = sc.title || '';
-                if (sc.files && sc.files.length > 0) {
-                    const f0 = sc.files[0];
-                    if (f0?.path) {
-                        sceneFilePath = f0.path;
-                        const parts = sceneFilePath.split(/[/\\]/);
-                        sceneFileName = parts[parts.length - 1] || '';
-                    }
-                    if (f0?.duration) localDuration = f0.duration;
-                    if (f0?.fingerprints) localFingerprints = f0.fingerprints;
-                }
-            }
-        } catch (e) {}
-
-        const SCRAPE_QUERY = `
-            query FastTagScrapeSingleScene($source: ScraperSourceInput!, $input: ScrapeSingleSceneInput!) {
-                scrapeSingleScene(source: $source, input: $input) {
-                    title
-                    code
-                    details
-                    director
-                    urls
-                    date
-                    image
-                    remote_site_id
-                    duration
-                    fingerprints {
-                        algorithm
-                        hash
-                        duration
-                    }
-                    studio {
-                        stored_id
-                        name
-                        image
-                    }
-                    tags {
-                        stored_id
-                        name
-                    }
-                    performers {
-                        stored_id
-                        name
-                        gender
-                        images
-                    }
-                }
-            }
-        `;
-
-        const enrichMatches = (matches, matchType, sourceName) => {
-            if (!Array.isArray(matches)) return [];
-            matches.forEach(m => {
-                m._matchType = matchType;
-                m._sourceName = sourceName;
-                m._localDuration = localDuration;
-                m._localFingerprints = localFingerprints;
-            });
-            return matches;
-        };
-
-        // 1. First try direct hash scrape on StashBox 0
-        try {
-            const res = await fetchGQL(SCRAPE_QUERY, {
-                source: { stash_box_index: 0 },
-                input: { scene_id: String(sceneId) }
-            });
-            const matches = res?.data?.scrapeSingleScene;
-            if (Array.isArray(matches) && matches.length > 0) {
-                return enrichMatches(matches, 'hash', 'StashDB');
-            }
-        } catch (err) {
-            console.log('[FastTag] Scrape by scene_id error/empty:', err);
-        }
-
-        // 2. Query StashBox by cleaned title/filename
-        const candidateQueries = [];
-        if (sceneTitle && sceneTitle.trim()) {
-            candidateQueries.push(cleanTitleForScraping(sceneTitle));
-        }
-        if (sceneFileName && sceneFileName.trim()) {
-            const cleanedFile = cleanTitleForScraping(sceneFileName);
-            if (cleanedFile && !candidateQueries.includes(cleanedFile)) {
-                candidateQueries.push(cleanedFile);
-            }
-        }
-        if (cardElement) {
-            const cardText = (cardElement.querySelector('.title, .card-title, .scene-card__title')?.textContent || '').trim();
-            if (cardText) {
-                const cleanedCard = cleanTitleForScraping(cardText);
-                if (cleanedCard && !candidateQueries.includes(cleanedCard)) {
-                    candidateQueries.push(cleanedCard);
-                }
-            }
-        }
-
-        for (const queryTerm of candidateQueries) {
-            if (!queryTerm || queryTerm.length < 2) continue;
-            try {
-                const res = await fetchGQL(SCRAPE_QUERY, {
-                    source: { stash_box_index: 0 },
-                    input: { query: queryTerm }
-                });
-                const matches = res?.data?.scrapeSingleScene;
-                if (Array.isArray(matches) && matches.length > 0) {
-                    return enrichMatches(matches, 'title', 'StashDB');
-                }
-            } catch (err) {
-                console.log('[FastTag] Scrape query error:', err);
-            }
-        }
-
-        // 3. Fallback: Query installed scene scrapers
-        try {
-            const listRes = await fetchGQL(`query { listScrapers(types: [SCENE]) { id name } }`);
-            const scrapers = listRes?.data?.listScrapers || [];
-            for (const sc of scrapers) {
-                if (sc.id === 'builtin_autotag') continue;
-                for (const queryTerm of candidateQueries) {
-                    if (!queryTerm || queryTerm.length < 2) continue;
-                    try {
-                        const res = await fetchGQL(SCRAPE_QUERY, {
-                            source: { scraper_id: sc.id },
-                            input: { query: queryTerm }
-                        });
-                        const matches = res?.data?.scrapeSingleScene;
-                        if (Array.isArray(matches) && matches.length > 0) {
-                            return enrichMatches(matches, 'scraper', sc.name || 'Scraper');
-                        }
-                    } catch (e) {}
-                }
-            }
-        } catch (e) {}
-
-        return [];
-    }
-
-    function formatDurationSec(sec) {
-        if (!sec || isNaN(sec)) return '';
-        const s = Math.round(Number(sec));
-        const hrs = Math.floor(s / 3600);
-        const mins = Math.floor((s % 3600) / 60);
-        const secs = s % 60;
-        if (hrs > 0) {
-            return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-        }
-        return `${mins}:${String(secs).padStart(2, '0')}`;
-    }
-
-    function parseDurationSec(val) {
-        if (!val) return null;
-        if (typeof val === 'number') return val;
-        const str = String(val).trim();
-        if (/^\d+(\.\d+)?$/.test(str)) return Math.round(Number(str));
-        const parts = str.split(':').map(Number);
-        if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-        if (parts.length === 2) return parts[0] * 60 + parts[1];
-        return null;
-    }
 
     function attachScraperHudResizeHandles(hudElement) {
         if (!hudElement) return;
@@ -6764,34 +5611,71 @@
             }
 
             // Calculate match likelihood & fingerprint verification (mirroring Stash's native scraper)
-            const localFps = match._localFingerprints || [];
-            const localPhash = (localFps.find(f => f.type?.toLowerCase() === 'phash')?.value || '').toLowerCase();
-            const localOshash = (localFps.find(f => f.type?.toLowerCase() === 'oshash')?.value || '').toLowerCase();
-            const localMd5 = (localFps.find(f => f.type?.toLowerCase() === 'md5')?.value || '').toLowerCase();
+            const {
+                isHashMatch,
+                matchBadges,
+                localDurSec,
+                scrapedDurSec,
+                totalFps,
+                matchingDurFps
+            } = analyzeScraperMatch(match);
 
-            const remoteFps = match.fingerprints || [];
-            const phashMatch = localPhash && remoteFps.some(rf => rf.algorithm?.toLowerCase() === 'phash' && (rf.hash || '').toLowerCase() === localPhash);
-            const oshashMatch = localOshash && remoteFps.some(rf => (rf.algorithm?.toLowerCase() === 'oshash' || rf.algorithm?.toLowerCase() === 'md5') && (rf.hash || '').toLowerCase() === localOshash);
-            const md5Match = localMd5 && remoteFps.some(rf => rf.algorithm?.toLowerCase() === 'md5' && (rf.hash || '').toLowerCase() === localMd5);
-
-            const isHashMatch = match._matchType === 'hash' || phashMatch || oshashMatch || md5Match;
-
-            const matchBadges = [];
-            if (phashMatch) matchBadges.push('PHash is a match');
-            if (oshashMatch || md5Match) matchBadges.push('MD5 Checksum is a match');
-
-            if (matchBadges.length === 0 && isHashMatch) {
-                matchBadges.push('Fingerprint is a match');
+            const performerPresentation = getPerformerPresentation(match);
+            let performerMatchBadge = '';
+            if (performerPresentation) {
+                const overlapNames = performerPresentation.overlapNames;
+                if (overlapNames.length > 0) {
+                    performerMatchBadge = `
+                        <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #34d399; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="Matches performer already linked to this scene: ${escapeHtml(overlapNames.join(', '))}">
+                            <span>★</span><span>Performer Match (${performerPresentation.overlapCount}/${performerPresentation.linkedCount})</span>
+                        </span>
+                    `;
+                } else {
+                    performerMatchBadge = `
+                        <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #fbbf24; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="None of this result's performers match the ${performerPresentation.linkedCount} performer(s) already linked to your scene. Check the result carefully before accepting it.">
+                            <span>⚠</span><span>No Linked Performer Match</span>
+                        </span>
+                    `;
+                }
             }
 
-            const localDurSec = parseDurationSec(match._localDuration);
-            const scrapedDurSec = parseDurationSec(match.duration);
+            const assessment = getAssessmentPresentation(match);
+            const assessmentBadge = assessment ? `
+                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 700; color: ${assessment.color}; background: ${assessment.background}; border: 1px solid ${assessment.border}; padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="${escapeHtml(assessment.tooltip)}">
+                    <span>${assessment.icon}</span><span>${assessment.label}</span>
+                </span>
+            ` : '';
 
-            const totalFps = remoteFps.length;
-            const matchingDurFps = remoteFps.filter(rf => {
-                const fd = parseDurationSec(rf.duration);
-                return fd && localDurSec && Math.abs(fd - localDurSec) <= 15;
-            }).length;
+            const sourcePresentation = getSourcePresentation(match, isHashMatch);
+            const sourceTone = sourcePresentation?.tone === 'success'
+                ? { color: '#34d399', background: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', icon: '✓' }
+                : sourcePresentation?.tone === 'warning'
+                    ? { color: '#fbbf24', background: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.4)', icon: '⌕' }
+                    : { color: isDark ? '#cbd5e1' : '#475569', background: 'rgba(148, 163, 184, 0.12)', border: 'rgba(148, 163, 184, 0.3)', icon: '↗' };
+            const sourceBadge = sourcePresentation ? `
+                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: ${sourceTone.color}; background: ${sourceTone.background}; border: 1px solid ${sourceTone.border}; padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="${escapeHtml(sourcePresentation.tooltip)}">
+                    <span>${sourceTone.icon}</span><span>${escapeHtml(sourcePresentation.label)}</span>
+                </span>
+            ` : '';
+
+            const unavailableContext = getUnavailableContextPresentation(match);
+            const unavailableContextBadge = unavailableContext ? `
+                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 500; color: ${isDark ? '#94a3b8' : '#64748b'}; background: rgba(148, 163, 184, 0.1); border: 1px dashed rgba(148, 163, 184, 0.4); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="${escapeHtml(unavailableContext.tooltip)}">
+                    <span>ⓘ</span><span>${escapeHtml(unavailableContext.label)}</span>
+                </span>
+            ` : '';
+
+            const studioMismatchBadge = match._studioComparison === 'mismatch' ? `
+                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #f87171; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="The scraped studio (${escapeHtml(studioName)}) differs from the studio already linked to this scene.">
+                    <span>⚠</span><span>Studio Mismatch</span>
+                </span>
+            ` : '';
+            const additionalPerformerBadge = performerPresentation?.additionalCount > 0 ? `
+                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #fbbf24; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="The scraped result contains additional performer(s) not currently linked to this scene: ${escapeHtml(performerPresentation.additionalNames.join(', '))}">
+                    <span>＋</span><span>${performerPresentation.additionalCount} Additional Performer${performerPresentation.additionalCount === 1 ? '' : 's'}</span>
+                </span>
+            ` : '';
+            const acceptPresentation = getAcceptPresentation(match);
 
             let durationBadge = '';
             if (scrapedDurSec && localDurSec) {
@@ -6802,10 +5686,16 @@
                             <span>⏱</span><span>${formatDurationSec(scrapedDurSec)} (Exact Match)</span>
                         </span>
                     `;
-                } else {
+                } else if (diff <= 60) {
                     durationBadge = `
                         <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 500; color: ${isDark ? '#cbd5e1' : '#475569'}; background: rgba(148, 163, 184, 0.12); border: 1px solid rgba(148, 163, 184, 0.25); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="Scraped duration is ${formatDurationSec(scrapedDurSec)}, local is ${formatDurationSec(localDurSec)}">
                             <span>⏱</span><span>${formatDurationSec(scrapedDurSec)} (Local: ${formatDurationSec(localDurSec)})</span>
+                        </span>
+                    `;
+                } else {
+                    durationBadge = `
+                        <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #f87171; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="Scraped duration is ${formatDurationSec(scrapedDurSec)}, local is ${formatDurationSec(localDurSec)}; the difference is ${formatDurationSec(diff)}.">
+                            <span>⚠</span><span>Duration Mismatch (${formatDurationSec(diff)})</span>
                         </span>
                     `;
                 }
@@ -6853,6 +5743,7 @@
                                     <span>🔗</span><span>↗</span>
                                 </a>
                             ` : ''}
+                            <button type="button" id="fasttag-scrape-dismiss-match" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(248, 113, 113, 0.35); border-radius: 4px; padding: 2.5px 6px; font-size: 10px; font-weight: 700; color: #f87171; cursor: pointer; line-height: 1;" title="Dismiss this result for the current FastTag session">✕</button>
                             <button type="button" id="fasttag-scrape-popout-toggle" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 4px; padding: 2.5px 6px; font-size: 10px; font-weight: 700; color: #818cf8; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 3px; line-height: 1; transition: all 0.15s ease; white-space: nowrap;" data-micro-tooltip="${isDetached ? 'Dock scraper inside popup' : 'Pop out scraper into floating window'}">
                                 <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: block; pointer-events: none;">
                                     <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" fill="none" stroke-width="2"></rect>
@@ -6860,24 +5751,31 @@
                                 </svg>
                                 <span>${isDetached ? 'Dock' : 'Pop Out'}</span>
                             </button>
-                            <button type="button" id="fasttag-scrape-accept-btn" style="background: #059669; border: 1px solid #10b981; color: #ffffff; padding: 2.5px 7px; border-radius: 4px; font-size: 10px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 2px; box-shadow: 0 1px 4px rgba(5,150,105,0.4); line-height: 1.2; transition: all 0.15s ease; white-space: nowrap; flex-shrink: 0;" title="Accept match and save metadata">
-                                <span>✓ Accept</span>
+                            <button type="button" id="fasttag-scrape-accept-btn" style="background: ${acceptPresentation.background}; border: 1px solid ${acceptPresentation.border}; color: #ffffff; padding: 2.5px 7px; border-radius: 4px; font-size: 10px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 2px; box-shadow: 0 1px 4px ${acceptPresentation.shadow}; line-height: 1.2; transition: all 0.15s ease; white-space: nowrap; flex-shrink: 0;" title="${acceptPresentation.title}">
+                                <span>${acceptPresentation.label}</span>
                             </button>
                         </div>
+                    </div>
+
+                    <div id="fasttag-scrape-manual-search-form" style="display: flex; align-items: center; gap: 5px;">
+                        <input id="fasttag-scrape-manual-query" type="text" value="${escapeHtml(match._searchQuery || '')}" placeholder="Optional: correct the search words" style="flex: 1; min-width: 0; height: 25px; box-sizing: border-box; padding: 3px 7px; border-radius: 5px; border: 1px solid ${isDark ? 'rgba(129,140,248,0.45)' : '#a5b4fc'}; background: ${isDark ? 'rgba(15,23,42,0.8)' : '#ffffff'}; color: ${isDark ? '#e2e8f0' : '#1e293b'}; font-size: 10.5px; outline: none;">
+                        <button id="fasttag-scrape-manual-search-btn" type="button" style="height: 25px; padding: 3px 8px; border-radius: 5px; border: 1px solid rgba(129,140,248,0.55); background: rgba(99,102,241,0.18); color: ${isDark ? '#c7d2fe' : '#4338ca'}; font-size: 10px; font-weight: 700; cursor: pointer; white-space: nowrap;">Search</button>
                     </div>
 
                     <div id="fasttag-scrape-body-wrapper" style="display: flex; flex-direction: column; gap: 7px; ${isDetached ? 'flex: 1 1 auto; min-height: 0; overflow: hidden;' : 'height: auto;'} transition: all 0.15s ease;">
                         <!-- Dedicated Verification Badges Row -->
                         <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap; padding: 3px 6px; background: ${isDark ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.03)'}; border-radius: 5px; border: 1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}; flex-shrink: 0;">
+                            ${assessmentBadge}
+                            ${sourceBadge}
                             ${isHashMatch ? matchBadges.map(b => `
                                 <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #34d399; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="Direct file fingerprint match on StashDB">
                                     <span>✓</span><span>${b}</span>
                                 </span>
-                            `).join('') : `
-                                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #f87171; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); padding: 1px 5px; border-radius: 4px; cursor: help; user-select: none;" data-micro-tooltip="No file hash/fingerprint match found on StashDB. This scene was found by searching words from your filename/title. Please check the preview to confirm it is the correct scene before saving.">
-                                    <span>✕</span><span>No Hash Match (Keyword Search)</span>
-                                </span>
-                            `}
+                            `).join('') : ''}
+                            ${unavailableContextBadge}
+                            ${performerMatchBadge}
+                            ${additionalPerformerBadge}
+                            ${studioMismatchBadge}
                             ${durationBadge}
                         </div>
 
@@ -7087,6 +5985,74 @@
             const previewBox = targetContainer.querySelector('#fasttag-scrape-items-preview');
             const perfPills = targetContainer.querySelector('#fasttag-scrape-perf-pills');
             const tagsPills = targetContainer.querySelector('#fasttag-scrape-tags-pills');
+
+            const runManualSearch = async () => {
+                const input = targetContainer.querySelector('#fasttag-scrape-manual-query');
+                const searchBtn = targetContainer.querySelector('#fasttag-scrape-manual-search-btn');
+                const query = (input?.value || '').trim();
+                if (!query) {
+                    toastError('Enter the words you want to search for.');
+                    input?.focus();
+                    return;
+                }
+                if (searchBtn) {
+                    searchBtn.disabled = true;
+                    searchBtn.textContent = 'Searching…';
+                }
+                try {
+                    const manualResults = await fetchScraperMatchesForScene(sceneId, null, query);
+                    if (!manualResults?.length) {
+                        toastError(`No scraper matches found for “${query}”`);
+                        if (searchBtn) {
+                            searchBtn.disabled = false;
+                            searchBtn.textContent = 'Search';
+                        }
+                        return;
+                    }
+                    replaceResults(results, manualResults);
+                    sessionScrapeCache.set(sceneId, results);
+                    currentIndex = 0;
+                    hideScrapeCoverTooltip();
+                    updateCardView();
+                } catch (error) {
+                    toastError('Scrape search failed: ' + (error?.message || error));
+                    if (searchBtn) {
+                        searchBtn.disabled = false;
+                        searchBtn.textContent = 'Search';
+                    }
+                }
+            };
+
+            const manualSearchBtn = targetContainer.querySelector('#fasttag-scrape-manual-search-btn');
+            if (manualSearchBtn) manualSearchBtn.onclick = runManualSearch;
+            const manualSearchInput = targetContainer.querySelector('#fasttag-scrape-manual-query');
+            if (manualSearchInput) {
+                manualSearchInput.onkeydown = (event) => {
+                    if (event.key !== 'Enter') return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    runManualSearch();
+                };
+            }
+
+            const dismissMatchBtn = targetContainer.querySelector('#fasttag-scrape-dismiss-match');
+            if (dismissMatchBtn) {
+                dismissMatchBtn.onclick = (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    hideScrapeCoverTooltip();
+                    const dismissal = dismissIndexedResult(results, currentIndex);
+                    if (dismissal.results.length === 0) {
+                        sessionScrapeCache.delete(sceneId);
+                        renderScraperMatchCard(container, results, sceneId, ctx, popup, onDismiss);
+                        if (typeof onDismiss === 'function') onDismiss();
+                        return;
+                    }
+                    currentIndex = dismissal.index;
+                    sessionScrapeCache.set(sceneId, results);
+                    updateCardView();
+                };
+            }
 
             // Wire popout / dock button
             const popoutToggleBtn = targetContainer.querySelector('#fasttag-scrape-popout-toggle');
@@ -7387,103 +6353,20 @@
                 date: match.date
             });
 
-            const isStudioChecked = container.querySelector('#fasttag-scrape-chk-studio')?.checked ?? false;
-            const isTitleChecked = container.querySelector('#fasttag-scrape-chk-title')?.checked ?? false;
-            const isDateChecked = container.querySelector('#fasttag-scrape-chk-date')?.checked ?? false;
-            const isCoverChecked = container.querySelector('#fasttag-scrape-chk-cover')?.checked ?? false;
-            const isDetailsChecked = container.querySelector('#fasttag-scrape-chk-details')?.checked ?? false;
+            const scrapeSelection = readScrapeFieldSelection(container);
 
-            // 1. Studio Resolution
-            let studioIdToSet = null;
-            if (isStudioChecked && match.studio?.name) {
-                if (match.studio.stored_id) {
-                    studioIdToSet = String(match.studio.stored_id);
-                } else {
-                    let cachedStudios = getCachedOrNull('studios');
-                    if (!cachedStudios) {
-                        const res = await fetchGQL(ENTITY_CONFIG.studios.fetchQuery);
-                        cachedStudios = ENTITY_CONFIG.studios.extractList(res.data);
-                        setCache('studios', cachedStudios);
-                    }
-                    const found = cachedStudios?.find(s => (s.name || '').trim().toLowerCase() === match.studio.name.trim().toLowerCase());
-                    if (found) {
-                        studioIdToSet = String(found.id);
-                    } else {
-                        const createRes = await fetchGQL(ENTITY_CONFIG.studios.createQuery, { name: match.studio.name.trim() });
-                        const newId = ENTITY_CONFIG.studios.createExtract(createRes.data);
-                        if (newId) {
-                            studioIdToSet = String(newId);
-                            setCache('studios', null);
-                        }
-                    }
-                }
-            }
-
-            // 2. Performers Resolution
-            const checkedPerfIndices = Array.from(container.querySelectorAll('.fasttag-scrape-perf-item:checked')).map(el => parseInt(el.getAttribute('data-idx'), 10));
-            const performerIdsToAdd = [];
-
-            if (checkedPerfIndices.length > 0 && match.performers) {
-                let cachedPerformers = getCachedOrNull('performers');
-                if (!cachedPerformers) {
-                    const res = await fetchGQL(ENTITY_CONFIG.performers.fetchQuery);
-                    cachedPerformers = ENTITY_CONFIG.performers.extractList(res.data);
-                    setCache('performers', cachedPerformers);
-                }
-
-                for (const idx of checkedPerfIndices) {
-                    const p = match.performers[idx];
-                    if (!p || !p.name) continue;
-                    if (p.stored_id) {
-                        performerIdsToAdd.push(String(p.stored_id));
-                    } else {
-                        const found = cachedPerformers?.find(cp => (cp.name || '').trim().toLowerCase() === p.name.trim().toLowerCase());
-                        if (found) {
-                            performerIdsToAdd.push(String(found.id));
-                        } else {
-                            const createRes = await fetchGQL(ENTITY_CONFIG.performers.createQuery, { name: p.name.trim() });
-                            const newId = ENTITY_CONFIG.performers.createExtract(createRes.data);
-                            if (newId) {
-                                performerIdsToAdd.push(String(newId));
-                                setCache('performers', null);
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 3. Tags Resolution
-            const checkedTagIndices = Array.from(container.querySelectorAll('.fasttag-scrape-tag-item:checked')).map(el => parseInt(el.getAttribute('data-idx'), 10));
-            const tagIdsToAdd = [];
-
-            if (checkedTagIndices.length > 0 && match.tags) {
-                let cachedTags = getCachedOrNull('tags');
-                if (!cachedTags) {
-                    const res = await fetchGQL(ENTITY_CONFIG.tags.fetchQuery);
-                    cachedTags = ENTITY_CONFIG.tags.extractList(res.data);
-                    setCache('tags', cachedTags);
-                }
-
-                for (const idx of checkedTagIndices) {
-                    const t = match.tags[idx];
-                    if (!t || !t.name) continue;
-                    if (t.stored_id) {
-                        tagIdsToAdd.push(String(t.stored_id));
-                    } else {
-                        const found = cachedTags?.find(ct => (ct.name || '').trim().toLowerCase() === t.name.trim().toLowerCase());
-                        if (found) {
-                            tagIdsToAdd.push(String(found.id));
-                        } else {
-                            const createRes = await fetchGQL(ENTITY_CONFIG.tags.createQuery, { name: t.name.trim() });
-                            const newId = ENTITY_CONFIG.tags.createExtract(createRes.data);
-                            if (newId) {
-                                tagIdsToAdd.push(String(newId));
-                                setCache('tags', null);
-                            }
-                        }
-                    }
-                }
-            }
+            // 1–3. Resolve studio, performers and tags against stored IDs and the local library.
+            const studioResolution = await resolveScrapedStudioResult(match.studio, scrapeSelection.studio);
+            const performerResolution = await resolveScrapedEntityIdsResult('performers', match.performers, scrapeSelection.performerIndices);
+            const tagResolution = await resolveScrapedEntityIdsResult('tags', match.tags, scrapeSelection.tagIndices);
+            const studioIdToSet = studioResolution.id;
+            const performerIdsToAdd = performerResolution.ids;
+            const tagIdsToAdd = tagResolution.ids;
+            const resolutionFailures = [
+                ...studioResolution.failures.map(name => `studio “${name}”`),
+                ...performerResolution.failures.map(name => `performer “${name}”`),
+                ...tagResolution.failures.map(name => `tag “${name}”`)
+            ];
 
             // 4. Update Scene & Synchronize Context
             const effectiveCtx = ctx || popup?._context || activePopup?._context;
@@ -7513,20 +6396,24 @@
 
                 const existingPerformerIds = (sceneRes?.data?.findScene?.performers || []).map(p => String(p.id));
                 const existingTagIds = (sceneRes?.data?.findScene?.tags || []).map(t => String(t.id));
-                const mergedPerformerIds = Array.from(new Set([...existingPerformerIds, ...performerIdsToAdd]));
-                const mergedTagIds = Array.from(new Set([...existingTagIds, ...tagIdsToAdd]));
-
-                const updateInput = { id: sceneId };
-                if (studioIdToSet) updateInput.studio_id = studioIdToSet;
-                if (performerIdsToAdd.length > 0) updateInput.performer_ids = mergedPerformerIds;
-                if (tagIdsToAdd.length > 0) updateInput.tag_ids = mergedTagIds;
-                if (isDateChecked && match.date) updateInput.date = match.date;
-                if (isDetailsChecked && match.details) updateInput.details = match.details;
-                if (isTitleChecked && match.title) updateInput.title = match.title;
+                const { updateInput, mergedPerformerIds, mergedTagIds } = buildScrapeUpdateInput({
+                    sceneId,
+                    match,
+                    selection: scrapeSelection,
+                    studioIdToSet,
+                    performerIdsToAdd,
+                    tagIdsToAdd,
+                    existingPerformerIds,
+                    existingTagIds
+                });
 
                 const saveRes = await fetchGQL(`
                     mutation FastTagAcceptSave($input: SceneUpdateInput!) {
-                        sceneUpdate(input: $input) { id }
+                        sceneUpdate(input: $input) {
+                            ${SCENE_CARD_UPDATE_FIELDS}
+                            title
+                            date
+                        }
                     }
                 `, { input: updateInput });
 
@@ -7535,10 +6422,12 @@
                     throw new Error(msg);
                 }
 
+                syncSceneToApolloCache(saveRes.data.sceneUpdate);
+
                 // Save cover separately. If Stash rejects the image value, all other metadata is
                 // already safely committed and the user gets a warning rather than losing everything.
                 let coverSaved = true;
-                if (isCoverChecked && match.image) {
+                if (scrapeSelection.cover && match.image) {
                     const coverRes = await fetchGQL(`
                         mutation FastTagAcceptCover($input: SceneUpdateInput!) {
                             sceneUpdate(input: $input) { id }
@@ -7584,84 +6473,27 @@
                 window._fastTagEverythingScraperOpen = true;
                 const acceptBtn = container ? container.querySelector('#fasttag-scrape-accept-btn') : null;
                 if (acceptBtn) {
-                    acceptBtn.innerHTML = coverSaved ? '<span>✓ Saved</span>' : '<span>✓ Saved (cover failed)</span>';
+                    acceptBtn.innerHTML = resolutionFailures.length > 0
+                        ? '<span>⚠ Saved with warnings</span>'
+                        : (coverSaved ? '<span>✓ Saved</span>' : '<span>✓ Saved (cover failed)</span>');
                     acceptBtn.disabled = true;
                     acceptBtn.style.opacity = '0.7';
                     acceptBtn.style.cursor = 'default';
                     acceptBtn.style.background = '#059669';
                 }
 
-                if (coverSaved) {
+                if (resolutionFailures.length > 0) {
+                    const coverNote = coverSaved ? '' : ' The cover also failed to save.';
+                    toastError(`Metadata saved, but FastTag could not create: ${resolutionFailures.join(', ')}.${coverNote}`);
+                } else if (coverSaved) {
                     toastSuccess('Matched & Saved from StashDB!');
                 } else {
                     toastError('Metadata saved, but Stash rejected the cover image.');
                 }
                 return;
             } else {
-                // In Single-Column Popup (Edit Tags, Edit Performers, Edit Studio):
-                // Fetch current scene tags and performers first to safely MERGE without overwriting existing data
-                const sceneRes = await fetchGQL(`query ($id: ID!) { findScene(id: $id) { id performers { id } tags { id } studio { id } } }`, { id: sceneId });
-                const existingPerformerIds = (sceneRes?.data?.findScene?.performers || []).map(p => String(p.id));
-                const existingTagIds = (sceneRes?.data?.findScene?.tags || []).map(t => String(t.id));
-
-                const mergedPerformerIds = Array.from(new Set([...existingPerformerIds, ...performerIdsToAdd]));
-                const mergedTagIds = Array.from(new Set([...existingTagIds, ...tagIdsToAdd]));
-
-                const updateVars = { id: sceneId };
-                if (studioIdToSet) updateVars.studio_id = studioIdToSet;
-                if (mergedPerformerIds.length > 0) updateVars.performer_ids = mergedPerformerIds;
-                if (mergedTagIds.length > 0) updateVars.tag_ids = mergedTagIds;
-                if (isDateChecked && match.date) updateVars.date = match.date;
-                if (isDetailsChecked && match.details) updateVars.details = match.details;
-                if (isCoverChecked && match.image) updateVars.cover_image = match.image;
-                if (isTitleChecked && match.title) updateVars.title = match.title;
-
-                const updateRes = await fetchGQL(`
-                    mutation DirectSceneUpdate($input: SceneUpdateInput!) {
-                        sceneUpdate(input: $input) { ${SCENE_CARD_UPDATE_FIELDS} }
-                    }
-                `, { input: updateVars });
-                if (updateRes?.data?.sceneUpdate) {
-                    syncSceneToApolloCache(updateRes.data.sceneUpdate);
-                }
-                await refreshSceneCards(sceneId);
-                toastSuccess('Matched & Saved from StashDB!');
-
-                sessionScrapeCache.delete(sceneId);
-
-                // If in sequential edit mode, navigate to next scene; otherwise close popup cleanly
-                if (sequentialEditState.enabled && popup && popup.element) {
-                    const formEl = popup.element;
-                    const type = formEl.getAttribute('data-entity-type') || 'tags';
-                    if (sequentialEditState.currentIndex < sequentialEditState.allSceneCards.length - 1) {
-                        let currentSelectedSet = new Set(mergedTagIds);
-                        if (type === 'performers') currentSelectedSet = new Set(mergedPerformerIds);
-                        else if (type === 'studios') currentSelectedSet = new Set(studioIdToSet ? [studioIdToSet] : []);
-                        navigateToNextScene(formEl, type, 1, () => currentSelectedSet);
-                        return;
-                    }
-                }
-                closePopup();
-                return;
+                throw new Error('Scraping is only supported from Edit Everything.');
             }
-
-            const popupEl = popup?.element || (container ? container.closest('#scenes-popup') : null);
-            if (popupEl && popupEl._savedPreScrapeSize) {
-                popupEl.style.transition = 'width 0.22s cubic-bezier(0.4, 0, 0.2, 1), height 0.22s cubic-bezier(0.4, 0, 0.2, 1)';
-                popupEl.style.width = popupEl._savedPreScrapeSize.width;
-                popupEl.style.height = popupEl._savedPreScrapeSize.height;
-                popupEl._savedPreScrapeSize = null;
-            }
-
-            closeFloatingScraperHud();
-            container.innerHTML = '';
-            container.style.display = 'none';
-            if (popup && popup.scrapeBtn) {
-                popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
-                popup.scrapeBtn.innerHTML = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
-                popup.scrapeBtn.title = 'Scrape scene metadata';
-            }
-            sessionScrapeCache.delete(sceneId);
         } catch (err) {
             console.error('[FastTag] Error accepting scrape match:', err);
             toastError('Failed to apply match: ' + (err?.message || err));
@@ -7669,111 +6501,6 @@
     }
 
     // --- Smart Suggestions Engine ---
-    const SUGGESTION_STOP_WORDS = new Set([
-        'a', 'an', 'and', 'the', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
-        'from', 'as', 'is', 'it', 'or', 'be', 'are', 'was', 'were', 'not', 'no',
-        'he', 'she', 'his', 'her', 'my', 'me', 'you', 'your', 'we', 'our', 'they',
-        'them', 'their', 'this', 'that', 'these', 'those', 'all', 'any', 'some',
-        'new', 'top', 'hot', 'big', 'get', 'set', 'out', 'up', 'down', 'man', 'men',
-        'full', 'clip', 'part', 'scene', 'video', 'best', 'good', 'raw', 'free', 'one', 'two'
-    ]);
-
-    function cleanFilenameForSuggestions(rawName) {
-        if (!rawName) return '';
-        let name = rawName.replace(/\.[^/.]+$/, '');
-        name = name.replace(/\b(1080p|720p|2160p|4k|uhd|fhd|hd|sd|x264|x265|h264|h265|hevc|aac|mp4|mkv|avi|wmv|60fps|120fps|fps|xxx|rip|webrip|bluray|dvdrip|sdh)\b/gi, ' ');
-        return name;
-    }
-
-    function normalizeTextForSuggestions(str) {
-        if (!str) return '';
-        let splitStr = String(str)
-            .replace(/([a-z])([A-Z])/g, '$1 $2')
-            .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
-            .replace(/([a-zA-Z])([0-9])/g, '$1 $2')
-            .replace(/([0-9])([a-zA-Z])/g, '$1 $2');
-
-        try {
-            splitStr = splitStr.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        } catch (e) {}
-
-        return splitStr.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-    }
-
-    function isSuggestionMatch(item, normalizedSpaced, tokenSet, tokens = null) {
-        if (!item) return false;
-        if (!tokens) {
-            tokens = normalizedSpaced.trim().split(/\s+/).filter(Boolean);
-        }
-        const namesToCheck = [];
-        if (item.name) namesToCheck.push({ name: item.name, isPrimary: true });
-        if (item.title && item.title !== item.name) namesToCheck.push({ name: item.title, isPrimary: true });
-        if (item.sort_name && item.sort_name !== item.name) namesToCheck.push({ name: item.sort_name, isPrimary: false });
-
-        if (Array.isArray(item.alias_list)) {
-            item.alias_list.forEach(a => { if (a && typeof a === 'string') namesToCheck.push({ name: a, isPrimary: false }); });
-        } else if (typeof item.alias_list === 'string' && item.alias_list.trim()) {
-            item.alias_list.split(',').forEach(a => { if (a.trim()) namesToCheck.push({ name: a.trim(), isPrimary: false }); });
-        }
-
-        if (Array.isArray(item.aliases)) {
-            item.aliases.forEach(a => { if (a && typeof a === 'string') namesToCheck.push({ name: a, isPrimary: false }); });
-        } else if (typeof item.aliases === 'string' && item.aliases.trim()) {
-            item.aliases.split(',').forEach(a => { if (a.trim()) namesToCheck.push({ name: a.trim(), isPrimary: false }); });
-        }
-
-        const primaryWords = normalizeTextForSuggestions(item.name || item.title || '').split(/\s+/).filter(Boolean);
-        const isPrimaryMultiWord = primaryWords.length > 1;
-
-        for (const { name: raw, isPrimary } of namesToCheck) {
-            const clean = normalizeTextForSuggestions(raw);
-            if (!clean || clean.length < 2) continue;
-
-            if (!isPrimary) {
-                const aliasWords = clean.split(/\s+/).filter(Boolean);
-                if (isPrimaryMultiWord && aliasWords.length === 1) {
-                    continue;
-                }
-                if (clean.length <= 3 || SUGGESTION_STOP_WORDS.has(clean)) {
-                    continue;
-                }
-            }
-
-            if (normalizedSpaced.includes(' ' + clean + ' ')) return true;
-
-            const words = clean.split(/\s+/).filter(Boolean);
-            const compact = clean.replace(/\s+/g, '');
-            if (words.length > 1) {
-                if (compact.length >= 4 && tokenSet.has(compact)) return true;
-                if (words.every(w => tokenSet.has(w))) return true;
-            } else if (words.length === 1 && clean.length >= 3 && !SUGGESTION_STOP_WORDS.has(clean)) {
-                if (tokenSet.has(clean)) return true;
-            }
-
-            // Check if adjacent tokens in scene text combine to match compact (e.g. "only" + "fans" matches "onlyfans")
-            if (compact.length >= 4 && tokens && tokens.length > 1) {
-                for (let i = 0; i < tokens.length - 1; i++) {
-                    if (tokens[i] + tokens[i + 1] === compact) return true;
-                    if (i < tokens.length - 2 && tokens[i] + tokens[i + 1] + tokens[i + 2] === compact) return true;
-                }
-            }
-
-            // Plural / singular stemming check (e.g. "Tattoo" matches "tattoos", "Piercings" matches "piercing")
-            if (clean.length >= 4 && !SUGGESTION_STOP_WORDS.has(clean)) {
-                if (clean.endsWith('s')) {
-                    const singular = clean.slice(0, -1);
-                    if (singular.length >= 3 && (tokenSet.has(singular) || normalizedSpaced.includes(' ' + singular + ' '))) return true;
-                } else {
-                    const plural = clean + 's';
-                    if (tokenSet.has(plural) || normalizedSpaced.includes(' ' + plural + ' ')) return true;
-                    const pluralEs = clean + 'es';
-                    if (tokenSet.has(pluralEs) || normalizedSpaced.includes(' ' + pluralEs + ' ')) return true;
-                }
-            }
-        }
-        return false;
-    }
-
     async function fetchSceneSmartSuggestions(type, sceneId, allAvailableItems, existingIds, cardElement) {
         if (!getEnableSuggestions() || !sceneId || !allAvailableItems || !allAvailableItems.length) return [];
         try {
@@ -9350,8 +8077,7 @@
             );
             if (!confirmed) return;
 
-            const removedIds = new Set(Array.from(initialCommonIds).filter(id => !selectedIds.has(id)));
-            const addedIds = Array.from(selectedIds).filter(id => !initialCommonIds.has(id));
+            const { removedIds, addedIds } = calculateBulkSelectionDelta(initialCommonIds, selectedIds);
 
             saveBtn.disabled = true;
             let updatedCount = 0;
@@ -9364,9 +8090,7 @@
                         try {
                             const existRes = await fetchGQL(config.fetchExistingQuery, { id: scene.id });
                             const existIds = (config.extractExisting(existRes?.data) || []).map(String);
-                            const filtered = existIds.filter(id => !removedIds.has(id));
-                            const merged = new Set([...filtered, ...addedIds]);
-                            targetIds = Array.from(merged);
+                            targetIds = applyBulkSelectionDelta(existIds, removedIds, addedIds);
                         } catch (e) {}
                     }
                     const success = await updateEntityForScene(type, scene.id, targetIds);
@@ -10032,6 +8756,11 @@
             const config = ENTITY_CONFIG[type];
             if (!config) continue;
             let cached = getCachedOrNull(type);
+            const loadedTable = type === 'tags' ? ctx?.tagsTable : type === 'performers' ? ctx?.performersTable : null;
+            const loadedTableData = loadedTable && typeof loadedTable.getData === 'function' ? loadedTable.getData() : null;
+            if (Array.isArray(loadedTableData) && loadedTableData.length > 0) {
+                cached = loadedTableData;
+            }
             if (!cached) {
                 try {
                     const res = await fetchGQL(config.fetchQuery);
@@ -10063,15 +8792,21 @@
                 }
             }
 
-            for (const item of cached) {
+            const matchingItems = [];
+            for (const [originalIndex, item] of cached.entries()) {
                 if (!item || !item.id) continue;
                 if (existingSet && (existingSet.has(String(item.id)) || existingSet.has(Number(item.id)))) continue;
 
                 if (isSuggestionMatch(item, normalizedSpaced, tokenSet, tokens)) {
-                    allSuggestions.push({ type, icon, item });
-                    if (allSuggestions.length >= 30) break;
+                    const primaryName = normalizeTextForSuggestions(item.name || item.title || '');
+                    const exactPrimaryMatch = primaryName && normalizedSpaced.includes(` ${primaryName} `);
+                    matchingItems.push({ item, originalIndex, exactPrimaryMatch });
                 }
             }
+            matchingItems
+                .sort((a, b) => Number(b.exactPrimaryMatch) - Number(a.exactPrimaryMatch) || a.originalIndex - b.originalIndex)
+                .slice(0, 20)
+                .forEach(entry => allSuggestions.push({ type, icon, item: entry.item }));
         }
 
         const tagsBox = container.querySelector('#everything-sugg-tags-box');
@@ -10626,7 +9361,14 @@
 
     function renderEverythingAIMatchCard(container, aiResult, sceneId, popup, ctx) {
         if (!container) return;
-        if (!aiResult) {
+        const hasSuggestion = aiResult && (
+            (typeof aiResult.clean_title === 'string' && aiResult.clean_title.trim())
+            || (typeof aiResult.date === 'string' && aiResult.date.trim())
+            || (typeof aiResult.studio === 'string' && aiResult.studio.trim())
+            || (Array.isArray(aiResult.performers) && aiResult.performers.length > 0)
+            || (Array.isArray(aiResult.tags) && aiResult.tags.length > 0)
+        );
+        if (!hasSuggestion) {
             container.style.display = 'none';
             container.innerHTML = '';
             return;
@@ -10808,8 +9550,13 @@
                     const titleRes = await fetchGQL(`mutation DirectSceneUpdate($input: SceneUpdateInput!) { sceneUpdate(input: $input) { ${SCENE_CARD_UPDATE_FIELDS} title } }`, {
                         input: { id: sceneId, title: aiResult.clean_title }
                     });
-                    if (titleRes?.data?.sceneUpdate) {
-                        syncSceneToApolloCache(titleRes.data.sceneUpdate);
+                    if (titleRes?.errors?.length || !titleRes?.data?.sceneUpdate?.id) {
+                        throw new Error(titleRes?.errors?.map(error => error.message).join('; ') || 'Stash did not return the updated scene.');
+                    }
+                    syncSceneToApolloCache(titleRes.data.sceneUpdate);
+                    if (popup?.titleSpan) {
+                        popup.titleSpan.textContent = aiResult.clean_title;
+                        applyMarqueeAnimation(popup.titleSpan);
                     }
                     applyTitleBtn.textContent = '✓ Set';
                     applyTitleBtn.disabled = true;
@@ -11100,9 +9847,17 @@
                     }
 
                     if (updateVars.title || updateVars.date) {
-                        await fetchGQL(`mutation DirectSceneUpdate($input: SceneUpdateInput!) { sceneUpdate(input: $input) { id } }`, {
+                        const metadataRes = await fetchGQL(`mutation FastTagAIApplyMetadata($input: SceneUpdateInput!) { sceneUpdate(input: $input) { ${SCENE_CARD_UPDATE_FIELDS} title date } }`, {
                             input: updateVars
                         });
+                        if (metadataRes?.errors?.length || !metadataRes?.data?.sceneUpdate?.id) {
+                            throw new Error(metadataRes?.errors?.map(error => error.message).join('; ') || 'Stash did not return the updated scene.');
+                        }
+                        syncSceneToApolloCache(metadataRes.data.sceneUpdate);
+                        if (aiResult.clean_title && popup?.titleSpan) {
+                            popup.titleSpan.textContent = aiResult.clean_title;
+                            applyMarqueeAnimation(popup.titleSpan);
+                        }
                     }
 
                     if (typeof ctx.renderStudioBar === 'function') {
@@ -12816,9 +11571,22 @@
                     } catch (e) {}
                 };
 
-                let pendingEverythingSaveSeq = 0;
-            const doSave = async (customSuccessMessage = null, shouldCloseScraper = false) => {
+            let pendingEverythingSaveSeq = 0;
+            const enqueueEverythingSave = createSerialTaskQueue();
+            const doSave = (customSuccessMessage = null, shouldCloseScraper = false) => {
                 const saveSeq = ++pendingEverythingSaveSeq;
+                const targetSceneId = currentSceneId;
+                const autoMarkOrg = getAutoMarkOrganized();
+                const variables = {
+                    id: targetSceneId,
+                    tag_ids: Array.from(selectedTagIds),
+                    performer_ids: Array.from(selectedPerformerIds),
+                    studio_id: selectedStudioId || null,
+                    groups: Array.from(selectedGroupIds).map(gid => ({ group_id: gid }))
+                };
+                if (autoMarkOrg) variables.organized = true;
+
+                const runSave = async () => {
                     if (shouldCloseScraper && !window._fastTagEverythingScraperOpen) {
                         if (popup.scraperCardContainer) {
                             popup.scraperCardContainer.innerHTML = '';
@@ -12827,7 +11595,6 @@
                         hideScrapeCoverTooltip();
                     }
 
-                    const autoMarkOrg = getAutoMarkOrganized();
                     const mutation = `
                         mutation SceneUpdateEverything($id: ID!, $tag_ids: [ID!], $performer_ids: [ID!], $studio_id: ID, $groups: [SceneGroupInput!]${autoMarkOrg ? ', $organized: Boolean' : ''}) {
                             sceneUpdate(input: {
@@ -12842,16 +11609,6 @@
                         }
                     `;
                     try {
-                        const variables = {
-                            id: currentSceneId,
-                            tag_ids: Array.from(selectedTagIds),
-                            performer_ids: Array.from(selectedPerformerIds),
-                            studio_id: selectedStudioId || null,
-                            groups: Array.from(selectedGroupIds).map(gid => ({ group_id: gid }))
-                        };
-                        if (autoMarkOrg) {
-                            variables.organized = true;
-                        }
                         const res = await fetchGQL(mutation, variables);
 
                         if (res?.data?.sceneUpdate?.id) {
@@ -12884,23 +11641,9 @@
                                 if (grp) addRecentEntry('groups', grp);
                             });
 
-                            // Refract Theme compatibility: strip its "already processed" marker and circles
-                            try {
-                                const sIdStr = String(currentSceneId);
-                                document.querySelectorAll(
-                                    `.scene-card a[href^="/scenes/${sIdStr}?"], ` +
-                                    `.scene-card a[href="/scenes/${sIdStr}"], ` +
-                                    `.scene-card a[href^="/scenes/${sIdStr}/"]`
-                                ).forEach(a => {
-                                    const card = a.closest('.scene-card');
-                                    if (card) {
-                                        card.removeAttribute('data-stash-sc');
-                                        card.querySelectorAll('.stash-performer-circles').forEach(el => el.remove());
-                                    }
-                                });
-                            } catch (e) {}
+                            resetRefractSceneCards(targetSceneId);
 
-                            refreshSceneCardsDebounced(currentSceneId);
+                            refreshSceneCardsDebounced(targetSceneId);
                             recordSaveUsage();
                             toastSuccess(customSuccessMessage || 'Scene saved successfully');
                             updateSaveButton();
@@ -12910,6 +11653,9 @@
                         toastError('Failed to save scene', e);
                     }
                     return false;
+                };
+
+                return enqueueEverythingSave(runSave);
                 };
 
                 const onSuggestionActivated = async (sug) => {
@@ -15776,39 +14522,6 @@
     }
 
     // --- Global DOM Triggers ---
-    function findSceneCardForContextTarget(target) {
-        const element = target?.nodeType === Node.ELEMENT_NODE ? target : target?.parentElement;
-        if (!element || typeof element.closest !== 'function') return null;
-
-        const knownCard = element.closest('.scene-card, [class*="scene-card"], [class*="SceneCard"]');
-        if (knownCard && extractSceneId(knownCard)) return knownCard;
-
-        // Theme fallback: accept only a generic card that contains a real scene link.
-        // This avoids capturing right-clicks on unrelated cards elsewhere in Stash.
-        const genericCard = element.closest('.card, [class*="grid-card"]');
-        return genericCard && extractSceneId(genericCard) ? genericCard : null;
-    }
-
-    function isScenePreviewContextTarget(target, sceneCard) {
-        const element = target?.nodeType === Node.ELEMENT_NODE ? target : target?.parentElement;
-        if (!element || !sceneCard || typeof element.closest !== 'function') return false;
-
-        const mediaArea = element.closest([
-            '.thumbnail-section',
-            '.scene-card-preview',
-            '[class*="scene-card-preview"]',
-            '[class*="video-preview"]',
-            '[class*="media-preview"]',
-            '.video-js',
-            '[class*="video-controls"]',
-            '[class*="player-controls"]',
-            'video',
-            'audio'
-        ].join(', '));
-
-        return Boolean(mediaArea && sceneCard.contains(mediaArea));
-    }
-
     document.addEventListener('contextmenu', function(event) {
         if (activePopup) return;
         closeMenu();
