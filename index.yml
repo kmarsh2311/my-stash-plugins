@@ -1,4 +1,4 @@
-- id: fasttag
+- id: mypluginrc
   name: FastTag
   metadata:
     description: "Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation"

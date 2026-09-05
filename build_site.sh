@@ -22,8 +22,15 @@ buildPlugin()
     # get the plugin id from the directory
     dir=$(dirname "$f")
     plugin_id=$(basename "$f" .yml)
+    package_id="$plugin_id"
+    # FastTag was originally published under this package ID. Keep it stable so
+    # existing installations continue to receive updates even though its
+    # manifest filename is fasttag.yml.
+    if [ "$plugin_id" = "fasttag" ]; then
+        package_id="mypluginrc"
+    fi
 
-    echo "Processing $plugin_id"
+    echo "Processing $package_id"
 
     # create a directory for the version
     version=$(git log -n 1 --pretty=format:%h -- "$dir"/*)
@@ -44,10 +51,10 @@ buildPlugin()
     IFS=$'\n' dep=$(grep "^# requires:" "$f" | cut -c 12- | sed -e 's/\r//')
 
     # write to spec index
-    echo "- id: $plugin_id
+    echo "- id: $package_id
   name: $name
   metadata:
-    description: $description
+    description: \"$description\"
   version: $version
   date: $updated
   path: $plugin_id.zip
