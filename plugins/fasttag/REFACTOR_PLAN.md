@@ -1,16 +1,20 @@
 # FastTag modularisation plan
 
-This worktree is an isolated refactoring copy of FastTag v4.2.8. Nothing in
-this branch is copied to the live Stash plugin or published from `main` unless
-the refactored build later passes side-by-side testing.
+Development continues on the isolated `feature/runtime-refactor` branch created
+from released FastTag v4.3.0. Nothing in this branch is copied to the live Stash
+plugin or published from `main` unless the refactored build later passes
+side-by-side testing.
 
 ## Baseline
 
-- Source commit: `f3527f7` (FastTag v4.2.8)
-- `fasttag.js`: 15,895 lines / 831,400 bytes
-- Baseline SHA-256: `48face98c8580135d6a9732032e2134a2d9874e2363829dd3faf22f486e24dbc`
+- Source commit: `4e0e08d` (published FastTag v4.3.0 package)
+- `fasttag.js`: 15,529 lines / 839,005 bytes
+- Baseline SHA-256: `ef8c0f846ed05db4c9c3d723b70950185dea44889c7531f515a90487394b8d97`
 - Runtime format: one browser IIFE with shared closure state
-- Stash currently loads `tabulator.min.js` followed by `fasttag.js`
+- Stash loads the modules in the order recorded in `REFACTOR_BASELINE.md`
+
+See `REFACTOR_BASELINE.md` for the complete frozen load-order, API, size, and
+verification reference.
 
 ## Safety rules
 
@@ -26,7 +30,7 @@ the refactored build later passes side-by-side testing.
 6. After every extraction, run syntax checks, diff checks, and compare the
    public function/constant inventory against the previous step.
 
-## Proposed module boundary
+## Current module boundary
 
 The modules will share one explicit `window.FastTag` namespace. They will use
 classic scripts loaded in dependency order, matching Stash's current plugin
@@ -114,8 +118,9 @@ smaller extraction is safer.
 - Dark and light themes
 - Desktop, tablet-width, and phone-width layouts
 
-## First implementation target
+## Next implementation target
 
-Extract only pure helper functions and scene-card discovery into
-`fasttag-core.js`. This provides a small proof of the namespace/load-order
-approach without touching editor state, GraphQL mutations, or UI templates.
+Add characterization and lifecycle coverage for the coordinator's DOM-heavy
+workflows before moving more implementation. The first subsequent extraction
+will separate diagnostics, GraphQL transport, and notifications without
+changing their user-visible behaviour.

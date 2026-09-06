@@ -1,8 +1,15 @@
 # FastTag refactor status
 
-This branch is an isolated development copy. It must not be published or copied
-over the live plugin until the manual regression checklist in `REFACTOR_PLAN.md`
-has passed.
+`feature/runtime-refactor` is an isolated development branch created from the
+published FastTag 4.3.0 package commit. It must not be published or copied over
+the live plugin until the manual regression checklist in `REFACTOR_PLAN.md` has
+passed.
+
+## Current phase
+
+Step 2 is complete: the 4.3.0 source, load order, namespace surface, file size,
+hash, automated verification, and remaining manual baseline are recorded in
+`REFACTOR_BASELINE.md`.
 
 ## Extracted modules
 
@@ -35,12 +42,18 @@ The runner syntax-checks every FastTag JavaScript source and executes each test
 file in a separate Node process to prevent shared browser mocks leaking between
 suites.
 
+## Next work
+
+Add characterization tests around startup and cleanup, popup ownership,
+navigation, saving, scraper request generations, and preview/Cover Editor
+handoff before beginning another extraction.
+
 ## Still required before a merge or release
 
 1. Create an isolated Stash test-plugin directory with a distinct plugin ID.
 2. Keep it disabled whenever the production FastTag plugin is enabled.
 3. Run the complete manual regression checklist in `REFACTOR_PLAN.md` using both
    standard Stash and Refract.
-4. Compare browser-console errors and update latency with production v4.2.8.
+4. Compare browser-console errors and update latency with released v4.3.0.
 5. Only after successful testing, decide whether to merge, version, package, and
    publish the refactor.
