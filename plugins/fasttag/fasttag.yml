@@ -19,6 +19,7 @@ ui:
     - fasttag-preview.js
     - fasttag-cover-editor.js
     - fasttag-ui.js
+    - fasttag-popup.js
     - fasttag-editors.js
     - fasttag-workflows.js
     - fasttag.js

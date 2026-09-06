@@ -8,6 +8,7 @@ const repositoryRoot = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(repositoryRoot, 'plugins', 'fasttag', 'fasttag.js'), 'utf8');
 const previewSource = fs.readFileSync(path.join(repositoryRoot, 'plugins', 'fasttag', 'fasttag-preview.js'), 'utf8');
 const scraperControllerSource = fs.readFileSync(path.join(repositoryRoot, 'plugins', 'fasttag', 'fasttag-scraper-controller.js'), 'utf8');
+const popupSource = fs.readFileSync(path.join(repositoryRoot, 'plugins', 'fasttag', 'fasttag-popup.js'), 'utf8');
 
 function section(startMarker, endMarker, text = source) {
     const start = text.indexOf(startMarker);
@@ -96,7 +97,7 @@ assert.ok(popupClose.includes('sessionScrapeCache.clear();'), 'full popup closur
 
 // The shared popup shell must retain its stable DOM contract, clamp restored
 // sizes to the viewport, and enter the document before callers bind controls.
-const popupShell = section('function createPopupShell(type)', 'function positionPopupNearCard(');
+const popupShell = section('function createPopupShell(type)', 'function setupPopupListeners(');
 assertBefore(popupShell, "const savedSize = getSavedPopupSize('single');", "const form = document.createElement('form');", 'popup sizing must be resolved before constructing the shell');
 assert.ok(popupShell.includes('Math.min(rawW, maxScreenW)'), 'restored popup width must be clamped to the viewport');
 assert.ok(popupShell.includes('Math.min(rawH, maxScreenH)'), 'restored popup height must be clamped to the viewport');
@@ -108,7 +109,7 @@ assertBefore(popupShell, 'document.body.appendChild(form);', 'return {', 'the po
 
 // Positioning honours persisted positions and sequential continuity before
 // falling back to card anchoring, then exposes and focuses the popup in a frame.
-const popupPositioning = section('function positionPopupNearCard(', 'function setupPopupListeners(');
+const popupPositioning = section('function positionNearCard(', 'root.FastTag = root.FastTag || {};', popupSource);
 assert.ok(popupPositioning.includes("localStorage.getItem('fasttag_everything_pos')"), 'Edit Everything position must be restored');
 assert.ok(popupPositioning.includes("localStorage.getItem('fasttag_single_pos')"), 'single-editor position must be restored');
 assertBefore(popupPositioning, 'if (isEverythingModal)', 'if (sequentialEditState.enabled && sequentialEditState.popupPosition.left !== 0)', 'Edit Everything placement must be decided before single-editor sequential continuity');

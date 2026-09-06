@@ -45,6 +45,8 @@
     if (!FastTagCoverEditor) throw new Error('[FastTag] fasttag-cover-editor.js must load before fasttag.js');
     const FastTagUi = window.FastTag?.ui;
     if (!FastTagUi) throw new Error('[FastTag] fasttag-ui.js must load before fasttag.js');
+    const FastTagPopup = window.FastTag?.popup;
+    if (!FastTagPopup) throw new Error('[FastTag] fasttag-popup.js must load before fasttag.js');
     const FastTagEditors = window.FastTag?.editors;
     if (!FastTagEditors) throw new Error('[FastTag] fasttag-editors.js must load before fasttag.js');
     const FastTagWorkflows = window.FastTag?.workflows;
@@ -176,6 +178,11 @@
     } = FastTagPreview;
     const { getOptimalPopupSize, getDefaultEverythingPosition } = FastTagUi;
     const {
+        getSavedSize: getSavedPopupSize,
+        setSavedSize: setSavedPopupSize,
+        positionNearCard: positionPopupNearCard
+    } = FastTagPopup;
+    const {
         createSerialTaskQueue,
         createRandomSceneHistory,
         appendRandomSceneHistory,
@@ -290,6 +297,12 @@
     FastTagUi.configure({
         getDefaultPopoutSize,
         log: (...args) => ftLog(...args)
+    });
+    FastTagPopup.configure({
+        getOptimalPopupSize: type => getOptimalPopupSize(type),
+        getDefaultEverythingPosition: (...args) => getDefaultEverythingPosition(...args),
+        getSequentialEditState: () => sequentialEditState,
+        getActivePopup: () => activePopup
     });
 
     console.log('[FastTag v4.3.0] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
@@ -3078,24 +3091,6 @@
         }
     }
 
-    function getSavedPopupSize(type = 'single') {
-        try {
-            const key = type === 'everything' ? 'stash_fast_tag_popup_size_everything' : 'stash_fast_tag_popup_size_single';
-            const val = localStorage.getItem(key) || (type !== 'everything' ? localStorage.getItem('stash_fast_tag_popup_size') : null);
-            if (val) {
-                const parsed = JSON.parse(val);
-                if (parsed && parsed.width && parsed.height) return parsed;
-            }
-        } catch (e) {}
-        return getOptimalPopupSize(type);
-    }
-    function setSavedPopupSize(width, height, type = 'single') {
-        try {
-            const key = type === 'everything' ? 'stash_fast_tag_popup_size_everything' : 'stash_fast_tag_popup_size_single';
-            localStorage.setItem(key, JSON.stringify({ width: Math.round(width), height: Math.round(height) }));
-        } catch (e) {}
-    }
-
     function resetAllLayoutsToDefault() {
         try {
             // 1. Remove custom popup sizes and positions
@@ -3869,151 +3864,6 @@
             saveBtn: form.querySelector(`#${type}-save-btn`),
             cancelBtn: form.querySelector(`#${type}-cancel-btn`)
         };
-    }
-
-    function positionPopupNearCard(form, cardElement) {
-        const minTop = 8;
-        const minLeft = 8;
-
-        const clampPos = (x, y) => {
-            const formW = form.offsetWidth || 400;
-            const formH = form.offsetHeight || 500;
-            const maxAllowedTop = Math.max(minTop, window.innerHeight - formH - 8);
-            const maxAllowedLeft = Math.max(minLeft, window.innerWidth - formW - 8);
-            return {
-                x: Math.max(minLeft, Math.min(maxAllowedLeft, x)),
-                y: Math.max(minTop, Math.min(maxAllowedTop, y))
-            };
-        };
-
-        const popupType = form.getAttribute('data-popup-type') || activePopup?.type;
-        const isEverythingModal = popupType === 'everything' || popupType === 'bulk-everything';
-
-        // For Edit Everything / Bulk Edit Everything: Center in viewport by default or use saved drag position
-        if (isEverythingModal) {
-            let savedPos = null;
-            try {
-                savedPos = JSON.parse(localStorage.getItem('fasttag_everything_pos') || 'null');
-            } catch (e) {}
-
-            let posX = null;
-            let posY = null;
-            const formW = parseInt(form.style.width, 10) || form.offsetWidth || 660;
-            const formH = parseInt(form.style.height, 10) || form.offsetHeight || 520;
-
-            if (savedPos && savedPos.left && savedPos.top) {
-                const parsedX = parseInt(savedPos.left, 10);
-                const parsedY = parseInt(savedPos.top, 10);
-                if (!isNaN(parsedX) && !isNaN(parsedY)) {
-                    const pos = clampPos(parsedX, parsedY);
-                    posX = pos.x;
-                    posY = pos.y;
-                }
-            }
-
-            if (posX == null || posY == null) {
-                const defPos = getDefaultEverythingPosition(formW, formH);
-                posX = defPos.x;
-                posY = defPos.y;
-            }
-
-            form.style.left = `${posX}px`;
-            form.style.top = `${posY}px`;
-
-            if (sequentialEditState.enabled) {
-                sequentialEditState.popupPosition = { left: posX, top: posY };
-            }
-
-            requestAnimationFrame(() => {
-                const actualFormRect = form.getBoundingClientRect();
-                const pos = clampPos(actualFormRect.left, actualFormRect.top);
-                form.style.left = `${pos.x}px`;
-                form.style.top = `${pos.y}px`;
-
-                form.classList.add('popup-visible');
-
-                if (typeof form._fastTagOnResize === 'function') {
-                    form._fastTagOnResize();
-                }
-
-                const firstInput = form.querySelector('#everything-global-search, input[type="text"], input[type="search"]');
-                if (firstInput) {
-                    firstInput.focus({ preventScroll: true });
-                }
-            });
-            return;
-        }
-
-        if (sequentialEditState.enabled && sequentialEditState.popupPosition.left !== 0) {
-            const pos = clampPos(sequentialEditState.popupPosition.left, sequentialEditState.popupPosition.top);
-            form.style.left = `${pos.x}px`;
-            form.style.top = `${pos.y}px`;
-
-            requestAnimationFrame(() => form.classList.add('popup-visible'));
-            const firstInput = form.querySelector('#everything-global-search, input[type="text"], input[type="search"]');
-            if (firstInput) firstInput.focus({ preventScroll: true });
-            return;
-        }
-
-        // For single-column modals: Check saved position from dragging first, otherwise anchor near card
-        let savedSinglePos = null;
-        try {
-            savedSinglePos = JSON.parse(localStorage.getItem('fasttag_single_pos') || 'null');
-        } catch (e) {}
-
-        if (savedSinglePos && savedSinglePos.left && savedSinglePos.top) {
-            const parsedX = parseInt(savedSinglePos.left, 10);
-            const parsedY = parseInt(savedSinglePos.top, 10);
-            if (!isNaN(parsedX) && !isNaN(parsedY)) {
-                const pos = clampPos(parsedX, parsedY);
-                form.style.left = `${pos.x}px`;
-                form.style.top = `${pos.y}px`;
-                if (sequentialEditState.enabled) {
-                    sequentialEditState.popupPosition = { left: pos.x, top: pos.y };
-                }
-                requestAnimationFrame(() => {
-                    const actualFormRect = form.getBoundingClientRect();
-                    const p = clampPos(actualFormRect.left, actualFormRect.top);
-                    form.style.left = `${p.x}px`;
-                    form.style.top = `${p.y}px`;
-                    form.classList.add('popup-visible');
-                    if (typeof form._fastTagOnResize === 'function') form._fastTagOnResize();
-                    const firstInput = form.querySelector('input[type="text"], input[type="search"]');
-                    if (firstInput) firstInput.focus({ preventScroll: true });
-                });
-                return;
-            }
-        }
-
-        const cardRect = cardElement ? cardElement.getBoundingClientRect() : { right: 100, top: 100, left: 100 };
-        let popupX = cardRect.right + 10;
-        let popupY = Math.max(minTop, cardRect.top);
-
-        form.style.left = `${popupX}px`;
-        form.style.top = `${popupY}px`;
-
-        requestAnimationFrame(() => {
-            const formRect = form.getBoundingClientRect();
-            if (cardRect.right + 10 + formRect.width > window.innerWidth) {
-                popupX = cardRect.left - formRect.width - 10;
-            }
-            if (cardRect.top + formRect.height > window.innerHeight) {
-                popupY = window.innerHeight - formRect.height - 8;
-            }
-            const pos = clampPos(popupX, popupY);
-
-            form.style.left = `${pos.x}px`;
-            form.style.top = `${pos.y}px`;
-
-            form.classList.add('popup-visible');
-
-            if (typeof form._fastTagOnResize === 'function') {
-                form._fastTagOnResize();
-            }
-
-            const firstInput = form.querySelector('#everything-global-search, input[type="text"], input[type="search"]');
-            if (firstInput) firstInput.focus({ preventScroll: true });
-        });
     }
 
     function setupPopupListeners(form, signal, onSaveCallback) {

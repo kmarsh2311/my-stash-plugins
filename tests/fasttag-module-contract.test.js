@@ -12,6 +12,7 @@ const coverEditorSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-co
 const settingsSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-settings.js'), 'utf8');
 const previewSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-preview.js'), 'utf8');
 const scraperControllerSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-scraper-controller.js'), 'utf8');
+const popupSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-popup.js'), 'utf8');
 const runnerSource = fs.readFileSync(path.join(__dirname, 'run-all.js'), 'utf8');
 const expectedOrder = [
     'tabulator.min.js',
@@ -30,6 +31,7 @@ const expectedOrder = [
     'fasttag-preview.js',
     'fasttag-cover-editor.js',
     'fasttag-ui.js',
+    'fasttag-popup.js',
     'fasttag-editors.js',
     'fasttag-workflows.js',
     'fasttag.js'
@@ -41,7 +43,7 @@ assert.deepEqual(configuredOrder, expectedOrder, 'Stash must load FastTag module
 for (const file of expectedOrder) {
     assert.ok(fs.existsSync(path.join(pluginDirectory, file)), `${file} should exist`);
 }
-for (const namespace of ['Core', 'Entities', 'Storage', 'Diagnostics', 'Api', 'Notifications', 'Settings', 'Integrations', 'Gemini', 'Scraper', 'ScraperUi', 'ScraperController', 'Preview', 'CoverEditor', 'Ui', 'Editors', 'Workflows']) {
+for (const namespace of ['Core', 'Entities', 'Storage', 'Diagnostics', 'Api', 'Notifications', 'Settings', 'Integrations', 'Gemini', 'Scraper', 'ScraperUi', 'ScraperController', 'Preview', 'CoverEditor', 'Ui', 'Popup', 'Editors', 'Workflows']) {
     assert.ok(mainSource.includes(`FastTag${namespace}`), `main entry point should require FastTag${namespace}`);
 }
 assert.equal(mainSource.includes('LEGACY_'), false, 'legacy comparison declarations should be removed');
