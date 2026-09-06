@@ -2,9 +2,89 @@
     'use strict';
 
     let dependencies = null;
+    let popupAbortController = null;
+    let isClosing = false;
 
     function configure(options) {
         dependencies = options;
+    }
+
+    function beginSession() {
+        popupAbortController = new root.AbortController();
+        return popupAbortController.signal;
+    }
+
+    function isPopupClosing() {
+        return isClosing;
+    }
+
+    function closeActive(resetSequential = true) {
+        if (!dependencies) throw new Error('[FastTag] Popup integration is not configured');
+        if (dependencies.coverEditor.closeActiveEditor?.() === false) return false;
+        isClosing = true;
+        try {
+            const activePopup = dependencies.getActivePopup?.();
+            if (activePopup) {
+                activePopup._fastTagClosed = true;
+                dependencies.invalidateScraperRequests(activePopup);
+                if (activePopup.tagsTable) {
+                    try {
+                        activePopup.tagsTable.off('rowSelected');
+                        activePopup.tagsTable.off('rowDeselected');
+                        activePopup.tagsTable.destroy();
+                    } catch (error) {}
+                    activePopup.tagsTable = null;
+                }
+                if (activePopup.performersTable) {
+                    try {
+                        activePopup.performersTable.off('rowSelected');
+                        activePopup.performersTable.off('rowDeselected');
+                        activePopup.performersTable.destroy();
+                    } catch (error) {}
+                    activePopup.performersTable = null;
+                }
+            }
+
+            const activeTableInstance = dependencies.getActiveTableInstance?.();
+            if (activeTableInstance) {
+                try {
+                    activeTableInstance.off('rowSelected');
+                    activeTableInstance.off('rowDeselected');
+                    activeTableInstance.destroy();
+                } catch (error) {}
+                dependencies.setActiveTableInstance(null);
+            }
+            if (popupAbortController) {
+                popupAbortController.abort();
+                popupAbortController = null;
+            }
+            dependencies.abortCurrentPreview();
+            if (activePopup?.element) {
+                activePopup.element.classList.remove('popup-visible');
+                activePopup.element.remove();
+                dependencies.setActivePopup(null);
+            }
+            root.document.querySelectorAll('#scenes-popup').forEach(element => element.remove());
+            dependencies.closeFloatingVideoHud(resetSequential);
+            dependencies.closeFloatingScraperHud(resetSequential);
+            dependencies.hidePerformerHoverCard();
+            dependencies.hideScrapeCoverTooltip();
+            dependencies.hideMicroTooltip();
+            dependencies.resetPreviewSessionCue();
+
+            root.document.body.classList.remove('fasttag-modal-open');
+            if (resetSequential) {
+                dependencies.resetSequentialEditState();
+                dependencies.sessionScrapeCache.clear();
+                root._fastTagEverythingScraperOpen = false;
+            }
+            dependencies.refreshSceneCardsDebounced(null, 50);
+            return true;
+        } finally {
+            root.setTimeout(() => {
+                isClosing = false;
+            }, 100);
+        }
     }
 
     function getSavedSize(type = 'single') {
@@ -286,7 +366,7 @@
                 )) {
                     return;
                 }
-                dependencies.closePopup();
+                closeActive();
             }, { signal });
         }, 0);
 
@@ -400,7 +480,7 @@
 
                 e.preventDefault();
                 e.stopPropagation();
-                dependencies.closePopup();
+                closeActive();
                 return;
             }
 
@@ -743,6 +823,9 @@
     root.FastTag = root.FastTag || {};
     root.FastTag.popup = Object.freeze({
         configure,
+        beginSession,
+        isPopupClosing,
+        closeActive,
         getSavedSize,
         setSavedSize,
         createShell,

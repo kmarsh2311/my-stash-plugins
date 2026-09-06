@@ -77,23 +77,23 @@ assertBefore(sceneReload, 'popup.currentSceneId = sceneId;', 'attachScenePreview
 
 // Popup closure first allows the Cover Editor to veto data loss, then marks the
 // popup closed before destroying tables, aborting listeners, and closing HUDs.
-const popupClose = section('function closePopup(resetSequential = true)', 'function createCustomMenu(');
-assertBefore(popupClose, 'FastTagCoverEditor.closeActiveEditor?.() === false', 'isModalClosing = true;', 'unsaved cover confirmation must run before popup teardown');
+const popupClose = section('function closeActive(resetSequential = true)', 'function getSavedSize(', popupSource);
+assertBefore(popupClose, 'dependencies.coverEditor.closeActiveEditor?.() === false', 'isClosing = true;', 'unsaved cover confirmation must run before popup teardown');
 assertBefore(popupClose, 'activePopup._fastTagClosed = true;', 'invalidateScraperRequests(activePopup);', 'popup closure must be visible before scraper invalidation');
 for (const expected of [
     'activePopup.tagsTable.destroy();',
     'activePopup.performersTable.destroy();',
     'activeTableInstance.destroy();',
     'popupAbortController.abort();',
-    'abortCurrentPreview();',
-    'closeFloatingVideoHud(resetSequential);',
-    'closeFloatingScraperHud(resetSequential);',
+    'dependencies.abortCurrentPreview();',
+    'dependencies.closeFloatingVideoHud(resetSequential);',
+    'dependencies.closeFloatingScraperHud(resetSequential);',
     'document.body.classList.remove(\'fasttag-modal-open\');'
 ]) {
     assert.ok(popupClose.includes(expected), `popup teardown must retain: ${expected}`);
 }
 assert.ok(popupClose.includes('if (resetSequential) {'), 'session state should only be reset when requested');
-assert.ok(popupClose.includes('sessionScrapeCache.clear();'), 'full popup closure must clear session scrape results');
+assert.ok(popupClose.includes('dependencies.sessionScrapeCache.clear();'), 'full popup closure must clear session scrape results');
 
 // The shared popup shell must retain its stable DOM contract, clamp restored
 // sizes to the viewport, and enter the document before callers bind controls.
@@ -126,7 +126,7 @@ assert.ok(popupListeners.includes("root.addEventListener('wheel'"), 'popup wheel
 assert.ok(popupListeners.includes("document.addEventListener('keydown'"), 'popup keyboard containment must remain installed');
 assert.ok(popupListeners.includes("e.target.closest('#fasttag-cover-editor-hud')"), 'Cover Editor interactions must remain within popup ownership');
 const escapeHandling = section("if (e.key === 'Escape')", "if (e.target?.closest?.('#fasttag-cover-editor-hud'))", popupListeners);
-assertBefore(escapeHandling, 'if (searchBox && searchBox.value.trim().length > 0)', 'closePopup();', 'Escape must clear active search text before closing the popup');
+assertBefore(escapeHandling, 'if (searchBox && searchBox.value.trim().length > 0)', 'closeActive();', 'Escape must clear active search text before closing the popup');
 assert.ok(popupListeners.includes("localStorage.setItem('fasttag_everything_pos'"), 'dragging Edit Everything must persist its position');
 assert.ok(popupListeners.includes("localStorage.setItem('fasttag_single_pos'"), 'dragging a single editor must persist its position');
 assert.ok(popupListeners.includes('setSavedSize(form.offsetWidth, form.offsetHeight, popupType);'), 'resize completion must persist popup dimensions');

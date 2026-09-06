@@ -13,7 +13,11 @@ global.innerHeight = 800;
 global.requestAnimationFrame = callback => callback();
 let appendedForm = null;
 global.document = {
-    body: { appendChild: form => { appendedForm = form; } },
+    body: {
+        appendChild: form => { appendedForm = form; },
+        classList: { remove() {} }
+    },
+    querySelectorAll: () => [],
     createElement(tagName) {
         return {
             tagName: tagName.toUpperCase(),
@@ -107,5 +111,62 @@ const restored = createForm('single', 400, 300);
 popup.positionNearCard(restored.form, null);
 assert.equal(restored.form.style.left, '792px');
 assert.equal(restored.form.style.top, '8px');
+
+const closeEvents = [];
+const makeTable = name => ({
+    off: event => closeEvents.push(`${name}:off:${event}`),
+    destroy: () => closeEvents.push(`${name}:destroy`)
+});
+let activePopup = {
+    tagsTable: makeTable('tags'),
+    performersTable: makeTable('performers'),
+    element: {
+        classList: { remove: name => closeEvents.push(`popup:class:${name}`) },
+        remove: () => closeEvents.push('popup:remove')
+    }
+};
+let activeTable = makeTable('active');
+let allowClose = false;
+const sessionCache = new Map([['scene-1', []]]);
+popup.configure({
+    coverEditor: { closeActiveEditor: () => allowClose },
+    getActivePopup: () => activePopup,
+    setActivePopup: value => { activePopup = value; },
+    getActiveTableInstance: () => activeTable,
+    setActiveTableInstance: value => { activeTable = value; },
+    invalidateScraperRequests: () => closeEvents.push('scraper:invalidate'),
+    abortCurrentPreview: () => closeEvents.push('preview:abort'),
+    closeFloatingVideoHud: reset => closeEvents.push(`video:close:${reset}`),
+    closeFloatingScraperHud: reset => closeEvents.push(`scraper:close:${reset}`),
+    hidePerformerHoverCard: () => closeEvents.push('performer:hide'),
+    hideScrapeCoverTooltip: () => closeEvents.push('cover-tooltip:hide'),
+    hideMicroTooltip: () => closeEvents.push('micro-tooltip:hide'),
+    resetPreviewSessionCue: () => closeEvents.push('preview:cue-reset'),
+    resetSequentialEditState: () => closeEvents.push('sequential:reset'),
+    sessionScrapeCache: sessionCache,
+    refreshSceneCardsDebounced: () => closeEvents.push('cards:refresh')
+});
+
+assert.equal(popup.closeActive(), false, 'unsaved Cover Editor work must be able to veto closure');
+assert.deepEqual(closeEvents, []);
+
+allowClose = true;
+const popupSignal = popup.beginSession();
+let sessionAborted = false;
+popupSignal.addEventListener('abort', () => { sessionAborted = true; });
+assert.equal(popup.closeActive(false), true);
+assert.equal(sessionAborted, true, 'closing must abort all shared popup listeners');
+assert.equal(activePopup, null);
+assert.equal(activeTable, null);
+assert.ok(closeEvents.indexOf('scraper:invalidate') < closeEvents.indexOf('popup:remove'));
+assert.ok(closeEvents.includes('video:close:false'));
+assert.ok(closeEvents.includes('scraper:close:false'));
+assert.equal(closeEvents.includes('sequential:reset'), false, 'navigation state must survive a non-reset close');
+assert.equal(sessionCache.has('scene-1'), true, 'session results must survive a non-reset close');
+
+popup.beginSession();
+popup.closeActive(true);
+assert.ok(closeEvents.includes('sequential:reset'));
+assert.equal(sessionCache.size, 0);
 
 console.log('fasttag-popup tests passed');

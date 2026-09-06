@@ -180,6 +180,9 @@
     const {
         getSavedSize: getSavedPopupSize,
         setSavedSize: setSavedPopupSize,
+        beginSession: beginPopupSession,
+        isPopupClosing,
+        closeActive: closePopup,
         createShell: createPopupShell,
         positionNearCard: positionPopupNearCard,
         setupListeners: setupPopupListeners
@@ -307,8 +310,21 @@
         getEffectiveTheme: () => getEffectiveTheme(),
         getSequentialEditState: () => sequentialEditState,
         getActivePopup: () => activePopup,
+        setActivePopup: popup => { activePopup = popup; },
         getActiveTableInstance: () => activeTableInstance,
-        closePopup: () => closePopup()
+        setActiveTableInstance: table => { activeTableInstance = table; },
+        coverEditor: FastTagCoverEditor,
+        invalidateScraperRequests,
+        abortCurrentPreview,
+        closeFloatingVideoHud,
+        closeFloatingScraperHud,
+        hidePerformerHoverCard: () => hidePerformerHoverCard(),
+        hideScrapeCoverTooltip: () => hideScrapeCoverTooltip(),
+        hideMicroTooltip: () => hideMicroTooltip(),
+        resetPreviewSessionCue: () => FastTagPreview.resetSessionCue(),
+        resetSequentialEditState: () => resetSequentialEditState(),
+        sessionScrapeCache,
+        refreshSceneCardsDebounced: (...args) => refreshSceneCardsDebounced(...args)
     });
 
     console.log('[FastTag v4.3.0] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
@@ -353,7 +369,6 @@
     let activePopup = null;
     let activeTableInstance = null;
     let menuAbortController = null;
-    let popupAbortController = null;
     let isTabActive = true;
 
     let cacheStore = {
@@ -2900,8 +2915,6 @@
 
 
     // --- Window and Context Menu Management ---
-    let isModalClosing = false;
-
     function closeMenu() {
         if (menuAbortController) {
             menuAbortController.abort();
@@ -2910,71 +2923,6 @@
         if (currentMenu) {
             currentMenu.remove();
             currentMenu = null;
-        }
-    }
-
-    function closePopup(resetSequential = true) {
-        if (FastTagCoverEditor.closeActiveEditor?.() === false) return false;
-        isModalClosing = true;
-        try {
-            if (activePopup) {
-                activePopup._fastTagClosed = true;
-                invalidateScraperRequests(activePopup);
-                if (activePopup.tagsTable) {
-                    try {
-                        activePopup.tagsTable.off("rowSelected");
-                        activePopup.tagsTable.off("rowDeselected");
-                        activePopup.tagsTable.destroy();
-                    } catch (e) {}
-                    activePopup.tagsTable = null;
-                }
-                if (activePopup.performersTable) {
-                    try {
-                        activePopup.performersTable.off("rowSelected");
-                        activePopup.performersTable.off("rowDeselected");
-                        activePopup.performersTable.destroy();
-                    } catch (e) {}
-                    activePopup.performersTable = null;
-                }
-            }
-            if (activeTableInstance) {
-                try {
-                    activeTableInstance.off("rowSelected");
-                    activeTableInstance.off("rowDeselected");
-                    activeTableInstance.destroy();
-                } catch (e) {}
-                activeTableInstance = null;
-            }
-            if (popupAbortController) {
-                popupAbortController.abort();
-                popupAbortController = null;
-            }
-            abortCurrentPreview();
-            if (activePopup && activePopup.element) {
-                activePopup.element.classList.remove('popup-visible');
-                activePopup.element.remove();
-                activePopup = null;
-            }
-            document.querySelectorAll('#scenes-popup').forEach(el => el.remove());
-            closeFloatingVideoHud(resetSequential);
-            closeFloatingScraperHud(resetSequential);
-            hidePerformerHoverCard();
-            hideScrapeCoverTooltip();
-            hideMicroTooltip();
-            FastTagPreview.resetSessionCue();
-
-            document.body.classList.remove('fasttag-modal-open');
-            if (resetSequential) {
-                resetSequentialEditState();
-                sessionScrapeCache.clear();
-                window._fastTagEverythingScraperOpen = false;
-            }
-            refreshSceneCardsDebounced(null, 50);
-            return true;
-        } finally {
-            setTimeout(() => {
-                isModalClosing = false;
-            }, 100);
         }
     }
 
@@ -3911,8 +3859,7 @@
         closeMenu();
         closePopup(false);
 
-        popupAbortController = new AbortController();
-        const { signal } = popupAbortController;
+        const signal = beginPopupSession();
 
         activePopup = createPopupShell(type);
         const form = activePopup.element;
@@ -4164,7 +4111,7 @@
         });
 
         activeTableInstance.on("rowDeselected", async (row) => {
-            if (!isRestoringSelections && !isModalClosing) {
+            if (!isRestoringSelections && !isPopupClosing()) {
                 const id = row.getData().id;
                 if (id) selectedIds.delete(String(id));
                 currentSingleSection = 'table';
@@ -6444,8 +6391,7 @@
             closePopup(false);
             window._fastTagEverythingScraperOpen = false;
 
-            popupAbortController = new AbortController();
-            const { signal } = popupAbortController;
+            const signal = beginPopupSession();
 
             const popup = createEditEverythingPopupShell();
             popup.type = 'everything';
@@ -8484,8 +8430,7 @@
             closePopup(false);
             window._fastTagEverythingScraperOpen = false;
 
-            popupAbortController = new AbortController();
-            const { signal } = popupAbortController;
+            const signal = beginPopupSession();
 
             const popup = createEditEverythingPopupShell();
             popup.type = 'bulk-everything';
@@ -10180,8 +10125,7 @@
 
         closePopup(false);
 
-        popupAbortController = new AbortController();
-        const { signal } = popupAbortController;
+        const signal = beginPopupSession();
 
         activePopup = createPopupShell(type);
         const form = activePopup.element;
