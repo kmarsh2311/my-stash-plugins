@@ -9,6 +9,7 @@ const pluginDirectory = path.join(repositoryRoot, 'plugins', 'fasttag');
 const yaml = fs.readFileSync(path.join(pluginDirectory, 'fasttag.yml'), 'utf8');
 const mainSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag.js'), 'utf8');
 const coverEditorSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-cover-editor.js'), 'utf8');
+const settingsSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-settings.js'), 'utf8');
 const runnerSource = fs.readFileSync(path.join(__dirname, 'run-all.js'), 'utf8');
 const expectedOrder = [
     'tabulator.min.js',
@@ -18,6 +19,7 @@ const expectedOrder = [
     'fasttag-diagnostics.js',
     'fasttag-api.js',
     'fasttag-notifications.js',
+    'fasttag-settings.js',
     'fasttag-integrations.js',
     'fasttag-gemini.js',
     'fasttag-scraper.js',
@@ -36,7 +38,7 @@ assert.deepEqual(configuredOrder, expectedOrder, 'Stash must load FastTag module
 for (const file of expectedOrder) {
     assert.ok(fs.existsSync(path.join(pluginDirectory, file)), `${file} should exist`);
 }
-for (const namespace of ['Core', 'Entities', 'Storage', 'Diagnostics', 'Api', 'Notifications', 'Integrations', 'Gemini', 'Scraper', 'ScraperUi', 'Preview', 'CoverEditor', 'Ui', 'Editors', 'Workflows']) {
+for (const namespace of ['Core', 'Entities', 'Storage', 'Diagnostics', 'Api', 'Notifications', 'Settings', 'Integrations', 'Gemini', 'Scraper', 'ScraperUi', 'Preview', 'CoverEditor', 'Ui', 'Editors', 'Workflows']) {
     assert.ok(mainSource.includes(`FastTag${namespace}`), `main entry point should require FastTag${namespace}`);
 }
 assert.equal(mainSource.includes('LEGACY_'), false, 'legacy comparison declarations should be removed');
@@ -98,10 +100,10 @@ assert.ok(
     mainSource.includes('sessionScrapeCache.set(activeSceneId, previousResults);'),
     'failed scraper refreshes should restore the previous result set'
 );
-assert.ok(mainSource.includes('fasttag-tab-pane-matching'), 'Settings should provide a dedicated scraper-matching tab');
-assert.ok(mainSource.includes('fasttag-match-restore-defaults'), 'scraper-matching settings should provide a restore-defaults action');
-assert.ok(mainSource.includes("setScraperMatchingPreset(matchingPresetSelect.value)"), 'matching presets should update the persisted analysis criteria');
-assert.ok(mainSource.includes('<option value="custom" disabled'), 'Custom matching should be an automatic status rather than a selectable preset');
+assert.ok(settingsSource.includes('fasttag-tab-pane-matching'), 'Settings should provide a dedicated scraper-matching tab');
+assert.ok(settingsSource.includes('fasttag-match-restore-defaults'), 'scraper-matching settings should provide a restore-defaults action');
+assert.ok(settingsSource.includes("setScraperMatchingPreset(matchingPresetSelect.value)"), 'matching presets should update the persisted analysis criteria');
+assert.ok(settingsSource.includes('<option value="custom" disabled'), 'Custom matching should be an automatic status rather than a selectable preset');
 assert.ok(mainSource.includes('partitionObviousFalsePositiveMatches(allResults)'), 'scraper rendering should preserve and partition the complete result set');
 assert.ok(mainSource.includes('fasttag-scrape-toggle-hidden'), 'filtered scraper results must remain available through a show-hidden control');
 assert.ok(mainSource.includes('fasttag-scrape-toggle-overflow'), 'lower-ranked scraper results must remain available through a show-all control');
@@ -116,7 +118,7 @@ assert.ok(mainSource.includes('function beginScraperRequest(popup, sceneId)'), '
 assert.ok(mainSource.includes('if (!isScraperRequestCurrent(popup, activeSceneId, scrapeRequestId)) return null;'), 'late automatic scrape responses should be discarded');
 assert.ok(mainSource.includes('invalidateScraperRequests(popup);\n            popup.currentSceneId = sceneId;'), 'scene navigation should invalidate requests for the previous scene');
 assert.ok(mainSource.includes('{ endpoint: match._sourceEndpoint, name: match._sourceName }'), 'scraper acceptance should pass source identity into new performer creation');
-assert.ok(mainSource.includes('fasttag-match-fill-performer-images'), 'Match settings should expose missing performer image enrichment');
+assert.ok(settingsSource.includes('fasttag-match-fill-performer-images'), 'Match settings should expose missing performer image enrichment');
 assert.ok(mainSource.includes('buildScrapedPerformerPreviewData(performer, match, cachedPerformers)'), 'scraper performer pills should provide local-or-source hover previews');
 assert.ok(mainSource.includes('data-scrape-performer-index='), 'scraper performer pills should be identifiable hover targets');
 assert.ok(mainSource.includes('schedulePerformerHoverCardHide(delay = 260)'), 'performer previews should remain reachable across the pointer gap');
