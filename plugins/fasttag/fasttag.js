@@ -9746,7 +9746,6 @@
     }
 
     async function rollNextRandomUntaggedScene(popup = null) {
-        if (FastTagCoverEditor.closeActiveEditor?.() === false) return;
         if (popup && popup.saveBtn) {
             const dice = popup.saveBtn.querySelector('.fasttag-dice-icon');
             if (dice) {
@@ -9785,6 +9784,7 @@
 
             const targetScene = scenes[0];
             if (popup && popup.element && popup.element.isConnected) {
+                if (FastTagCoverEditor.prepareForSceneNavigation?.() === false) return;
                 popup._isRandomMode = true;
                 popup._randomUntaggedCount = count;
                 if (!popup._randomHistoryState) {
@@ -9807,7 +9807,7 @@
     async function navigateRandomSceneHistory(popup, direction, doSaveFn) {
         const history = popup?._randomHistoryState;
         if (!popup?._isRandomMode || !history) return;
-        if (FastTagCoverEditor.closeActiveEditor?.() === false) return;
+        if (FastTagCoverEditor.prepareForSceneNavigation?.() === false) return;
 
         const previousIndex = history.index;
         const target = moveRandomSceneHistory(history, direction);
@@ -9829,7 +9829,6 @@
 
     async function navigateSequentialEditEverything(popup, sceneId, direction, doSaveFn) {
         if (!sequentialEditState.enabled) return;
-        if (FastTagCoverEditor.closeActiveEditor?.() === false) return;
 
         if (!window._fastTagEverythingScraperOpen) {
             if (popup.scraperCardContainer) {
@@ -9889,6 +9888,7 @@
             toastError('Error resolving next scene');
             return;
         }
+        if (FastTagCoverEditor.prepareForSceneNavigation?.() === false) return;
 
         sequentialEditState.currentIndex = nextIndex;
         sequentialEditState.currentSceneId = nextSceneId;
@@ -10743,7 +10743,7 @@
 
             // If the Everything popup is already open, reuse it in-place! Zero redraw flash!
             if (activePopup && activePopup.type === 'everything' && activePopup.element && activePopup.element.isConnected) {
-                if (FastTagCoverEditor.closeActiveEditor?.() === false) return;
+                if (FastTagCoverEditor.prepareForSceneNavigation?.() === false) return;
                 activePopup._isRandomMode = isRandomMode;
                 activePopup._randomUntaggedCount = randomCount;
                 if (isRandomMode) {

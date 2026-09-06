@@ -9,6 +9,7 @@
     const EDITOR_SIZE_STORAGE_KEY = 'fasttag_cover_editor_size';
     let dependencies = null;
     let activeEditor = null;
+    let pendingNavigationLayout = null;
 
     function configure(options) {
         dependencies = options || null;
@@ -212,19 +213,37 @@
         signal.addEventListener('abort', up, { once: true });
     }
 
-    function closeActiveEditor(force = false) {
+    function closeActiveEditor(force = false, preserveNavigation = false) {
         if (!activeEditor) return true;
         const editor = activeEditor;
         if (!force && editor.hasUnsavedChanges?.()) {
             const discard = root.confirm?.('Discard the new cover without saving?');
             if (discard === false) return false;
         }
+        if (!preserveNavigation) pendingNavigationLayout = null;
         activeEditor = null;
         saveEditorSize(editor.element);
         editor.mediaController?.releaseFromCoverEditor?.();
         editor.abortController.abort();
         editor.element.remove();
         return true;
+    }
+
+    function prepareForSceneNavigation() {
+        if (!activeEditor) return true;
+        const editor = activeEditor;
+        if (editor.hasUnsavedChanges?.()) {
+            const discard = root.confirm?.('Discard the new cover and continue to the next scene?');
+            if (discard === false) return false;
+        }
+        const rect = editor.element?.getBoundingClientRect?.();
+        pendingNavigationLayout = rect ? {
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height
+        } : {};
+        return closeActiveEditor(true, true);
     }
 
     function closeForHost(hostElement) {
@@ -256,6 +275,14 @@
         panel.setAttribute('aria-label', 'Scene cover editor');
         panel.style.cssText = `position:fixed;z-index:1000007;display:flex;flex-direction:column;overflow:auto;resize:both;box-sizing:border-box;padding:0;background:${isDark ? '#111827' : '#f8fafc'};color:${isDark ? '#f8fafc' : '#0f172a'};border:1px solid ${isDark ? '#475569' : '#94a3b8'};border-radius:11px;box-shadow:0 22px 55px rgba(0,0,0,.7);font-family:system-ui,-apple-system,sans-serif;`;
         positionEditor(panel, options.anchorElement || options.hostElement);
+        if (options.navigationLayout) {
+            const size = resolveEditorSize(options.navigationLayout, root.innerWidth, root.innerHeight);
+            const margin = 8;
+            panel.style.width = `${size.width}px`;
+            panel.style.height = `${size.height}px`;
+            panel.style.left = `${Math.round(Math.max(margin, Math.min(root.innerWidth - size.width - margin, Number(options.navigationLayout.left) || margin)))}px`;
+            panel.style.top = `${Math.round(Math.max(margin, Math.min(root.innerHeight - size.height - margin, Number(options.navigationLayout.top) || margin)))}px`;
+        }
         panel.addEventListener('mousedown', event => event.stopPropagation(), { signal });
 
         const header = document.createElement('header');
@@ -551,6 +578,13 @@
         };
         if (options.beforeElement?.parentNode === options.container) options.container.insertBefore(button, options.beforeElement);
         else options.container.appendChild(button);
+        if (pendingNavigationLayout) {
+            const navigationLayout = pendingNavigationLayout;
+            pendingNavigationLayout = null;
+            root.setTimeout(() => {
+                if (button.isConnected) openEditor({ ...options, navigationLayout });
+            }, 0);
+        }
         return button;
     }
 
@@ -569,6 +603,7 @@
         mountLauncher,
         openEditor,
         closeActiveEditor,
+        prepareForSceneNavigation,
         closeForHost
     });
 }(typeof window !== 'undefined' ? window : globalThis));

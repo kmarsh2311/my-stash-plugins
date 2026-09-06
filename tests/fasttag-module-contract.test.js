@@ -156,7 +156,9 @@ assert.ok(coverEditorSource.includes("closeActiveEditor(true)"), 'a successful c
 assert.ok(mainSource.includes('if (FastTagCoverEditor.closeActiveEditor?.() === false) return false;'), 'outside and parent-popup closure should respect the unsaved-cover warning');
 assert.ok(mainSource.includes("hostContainer.style.height = 'auto';"), 'loading a new scene should restore a preview container collapsed by the cover editor');
 assert.ok(!mainSource.includes('if (signal.aborted || !hostContainer.isConnected) return;'), 'aborted scene previews should still restore their connected host before navigation');
-assert.ok((mainSource.match(/FastTagCoverEditor\.closeActiveEditor\?\.\(\) === false/g) || []).length >= 5, 'all Edit Everything scene-navigation paths should honour the unsaved-cover warning');
+assert.ok((mainSource.match(/FastTagCoverEditor\.prepareForSceneNavigation\?\.\(\) === false/g) || []).length >= 4, 'all Edit Everything scene-navigation paths should hand the open cover editor to the next scene');
+assert.ok(coverEditorSource.includes('pendingNavigationLayout') && coverEditorSource.includes('navigationLayout'), 'scene navigation should preserve and restore the cover-editor layout');
+assert.ok(coverEditorSource.includes('Discard the new cover and continue to the next scene?'), 'cover-editor handoff should protect unsaved proposed covers');
 const aiApplyMetadataBlock = mainSource.match(/mutation FastTagAIApplyMetadata[\s\S]*?syncSceneToApolloCache\(metadataRes\.data\.sceneUpdate\);/)?.[0] || '';
 assert.ok(aiApplyMetadataBlock.includes('title date'), 'AI Apply All should return updated title and date');
 assert.ok(aiApplyMetadataBlock.includes('syncSceneToApolloCache'), 'AI Apply All should synchronize metadata to live scene cards');

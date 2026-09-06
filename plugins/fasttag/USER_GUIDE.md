@@ -42,6 +42,8 @@ Alternatively, select **Upload** for a JPEG, PNG, or WebP image, drag an image f
 
 The Cover Editor opens in a compact layout with playback, capture, upload, paste, and save controls visible together. Resize it from the bottom-right corner; FastTag remembers the resized width and height for its next opening while keeping it inside the available screen. Closing it returns the existing player to its previous location—embedded in Edit Everything or in the floating video HUD—and restores its previous Preview or Full Video mode.
 
+When the Edit Everything next/previous controls move to another scene, an open Cover Editor stays open in the same position and size and loads the incoming scene’s video and covers. If a proposed cover has not been saved, FastTag asks before discarding it; cancelling that warning also cancels navigation.
+
 FastTag prefers the full-video stream for the highest-quality frame capture. If that stream is unavailable or the browser cannot play its format, an MP4 preview becomes the fallback player with Play/Pause, frame stepping, timeline and wheel scrubbing, and **Capture Preview Frame**. If the fallback is an animated WebP image, it cannot be paused or scrubbed, but **Capture Preview Frame** captures the animation frame visible when the button is pressed. Preview captures are identified in the proposed-cover status and can be lower resolution. Upload, Paste and Drop remain available when no preview can be captured.
 
 ## StashDB scraping
