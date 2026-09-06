@@ -134,6 +134,7 @@ assert.ok(mainSource.includes('timelineWasPlaying = !currentMedia.paused;'), 'ti
 assert.ok(mainSource.includes("height: 16px; background: transparent"), 'the interactive timeline should provide an accessible pointer target');
 assert.ok(mainSource.includes("progressBarTrack.style.height = '7px'"), 'the visible timeline should grow while hovered or dragged');
 assert.ok(mainSource.includes('}, 3500);'), 'the interactive timeline should remain visible longer after use');
+assert.ok(mainSource.includes('if (isVideoPoppedOut || coverEditing) return;'), 'clicking video inside the cover editor should not open the scene page');
 assert.ok(coverEditorSource.includes('overflow:auto;resize:both'), 'the cover-editor HUD should be resizable from its browser corner');
 assert.ok(coverEditorSource.includes("EDITOR_SIZE_STORAGE_KEY = 'fasttag_cover_editor_size'"), 'the cover editor should remember its resized dimensions');
 assert.ok(coverEditorSource.includes('grid-template-columns:auto auto minmax(68px,1fr) auto auto'), 'cover playback and capture controls should remain on one line');

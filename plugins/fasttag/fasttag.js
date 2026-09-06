@@ -3132,7 +3132,7 @@
         let startLeft = 0, startTop = 0;
 
         mediaContainer.onclick = (e) => {
-            if (isVideoPoppedOut) return; // Do NOT open scene when video is popped out into floating HUD
+            if (isVideoPoppedOut || coverEditing) return; // Keep floating and cover-editor video clicks inside their HUDs
             if (e.shiftKey || hasDragged || isDragging) return;
             if (e.target && (e.target.closest('#fasttag-stream-toggle-pill') || e.target.closest('#fasttag-stream-popout-btn') || e.target.closest('#fasttag-hud-close-btn') || e.target.closest('#fasttag-inline-dock-btn'))) return;
             const sceneUrl = getSceneUrl(sceneId, cardElement);
