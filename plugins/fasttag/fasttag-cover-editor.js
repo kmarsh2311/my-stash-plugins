@@ -208,18 +208,24 @@
         signal.addEventListener('abort', up, { once: true });
     }
 
-    function closeActiveEditor() {
-        if (!activeEditor) return;
+    function closeActiveEditor(force = false) {
+        if (!activeEditor) return true;
         const editor = activeEditor;
+        if (!force && editor.hasUnsavedChanges?.()) {
+            const discard = root.confirm?.('Discard the new cover without saving?');
+            if (discard === false) return false;
+        }
         activeEditor = null;
         saveEditorSize(editor.element);
         editor.mediaController?.releaseFromCoverEditor?.();
         editor.abortController.abort();
         editor.element.remove();
+        return true;
     }
 
     function closeForHost(hostElement) {
-        if (activeEditor?.hostElement === hostElement) closeActiveEditor();
+        if (activeEditor?.hostElement === hostElement) return closeActiveEditor();
+        return true;
     }
 
     function createActionButton(label, accent = false) {
@@ -234,7 +240,7 @@
         if (!dependencies) throw new Error('[FastTag] Cover editor is not configured');
         const sceneId = String(options?.sceneId || '');
         if (!sceneId) return;
-        closeActiveEditor();
+        if (!closeActiveEditor()) return;
 
         const abortController = new AbortController();
         const { signal } = abortController;
@@ -378,6 +384,27 @@
             if (file) useBlob(file, 'Uploaded image');
             fileInput.value = '';
         };
+        const restoreCandidateDropStyle = () => {
+            candidateBox.style.border = '1px dashed #6366f1';
+            candidateBox.style.background = '#020617';
+        };
+        candidateBox.addEventListener('dragover', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            candidateBox.style.border = '2px solid #818cf8';
+            candidateBox.style.background = 'rgba(79,70,229,.16)';
+        }, { signal });
+        candidateBox.addEventListener('dragleave', event => {
+            if (!candidateBox.contains(event.relatedTarget)) restoreCandidateDropStyle();
+        }, { signal });
+        candidateBox.addEventListener('drop', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            restoreCandidateDropStyle();
+            const file = Array.from(event.dataTransfer?.files || []).find(item => String(item.type || '').startsWith('image/'));
+            if (file) useBlob(file, 'Dropped image');
+            else setStatus('Drop a JPEG, PNG or WebP image here.', true, true);
+        }, { signal });
         pasteButton.onclick = async () => {
             if (!navigator.clipboard?.read) {
                 requestManualPaste();
@@ -437,7 +464,7 @@
                 }
                 dependencies.showToast?.('Scene cover updated', 'success', 3000);
                 await dependencies.refreshSceneCards?.(sceneId);
-                closeActiveEditor();
+                closeActiveEditor(true);
                 await options.onSaved?.();
             } catch (error) {
                 saving = false;
@@ -465,7 +492,13 @@
                 setStatus(state.available ? 'Seek or scrub to the frame you want, then select Capture Frame.' : (state.reason || 'Preparing full video…'));
             }
         };
-        activeEditor = { element: panel, abortController, hostElement: options.hostElement, mediaController: options.mediaController };
+        activeEditor = {
+            element: panel,
+            abortController,
+            hostElement: options.hostElement,
+            mediaController: options.mediaController,
+            hasUnsavedChanges: () => Boolean(candidateDataUrl)
+        };
         options.mediaController?.mountForCoverEditor?.(videoStage);
         options.mediaController?.switchToFullVideo?.();
         panel.focus({ preventScroll: true });

@@ -5090,6 +5090,7 @@
     }
 
     function closePopup(resetSequential = true) {
+        if (FastTagCoverEditor.closeActiveEditor?.() === false) return false;
         isModalClosing = true;
         try {
             if (activePopup) {
@@ -5148,6 +5149,7 @@
                 window._fastTagEverythingScraperOpen = false;
             }
             refreshSceneCardsDebounced(null, 50);
+            return true;
         } finally {
             setTimeout(() => {
                 isModalClosing = false;

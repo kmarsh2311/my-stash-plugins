@@ -145,6 +145,10 @@ assert.ok(coverEditorSource.includes("pasteButton.textContent = '⌨ Press Ctrl+
 assert.ok(coverEditorSource.includes("panel.focus?.({ preventScroll: true })"), 'the manual paste fallback should focus the cover editor');
 assert.ok(coverEditorSource.includes("root.location?.protocol === 'http:' && root.isSecureContext === false"), 'the clipboard explanation should only identify insecure HTTP connections');
 assert.ok(coverEditorSource.includes('This HTTP network address cannot read the clipboard directly'), 'pressing Paste on an insecure HTTP connection should explain the keyboard fallback');
+assert.ok(coverEditorSource.includes("root.confirm?.('Discard the new cover without saving?')"), 'closing an editor with a proposed cover should request confirmation');
+assert.ok(coverEditorSource.includes("candidateBox.addEventListener('drop'"), 'the new-cover target should accept dragged image files');
+assert.ok(coverEditorSource.includes("closeActiveEditor(true)"), 'a successful cover save should close without a discard warning');
+assert.ok(mainSource.includes('if (FastTagCoverEditor.closeActiveEditor?.() === false) return false;'), 'outside and parent-popup closure should respect the unsaved-cover warning');
 const aiApplyMetadataBlock = mainSource.match(/mutation FastTagAIApplyMetadata[\s\S]*?syncSceneToApolloCache\(metadataRes\.data\.sceneUpdate\);/)?.[0] || '';
 assert.ok(aiApplyMetadataBlock.includes('title date'), 'AI Apply All should return updated title and date');
 assert.ok(aiApplyMetadataBlock.includes('syncSceneToApolloCache'), 'AI Apply All should synchronize metadata to live scene cards');

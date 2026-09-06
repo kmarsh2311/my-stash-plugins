@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
-- **Cover Editor (development)**: Edit Everything now provides a compact, resizable cover workspace that remembers its dimensions and temporarily incorporates the existing Full Video player. Persistent Play/Pause, frame-step (or one-second Shift-click), and Capture Frame controls remain together, video clicks stay within the editor, and current/proposed cover previews support upload and clipboard input—including a guided keyboard-paste fallback on insecure LAN connections. Capture pauses automatically and saving remains explicit.
+- **Cover Editor (development)**: Edit Everything now provides a compact, resizable cover workspace that remembers its dimensions and temporarily incorporates the existing Full Video player. Persistent Play/Pause, frame-step (or one-second Shift-click), and Capture Frame controls remain together, video clicks stay within the editor, and current/proposed cover previews support upload, drag-and-drop, and clipboard input—including a guided keyboard-paste fallback on insecure LAN connections. Unsaved proposed covers are protected by a discard warning, capture pauses automatically, and saving remains explicit.
 - **Interactive Video Timeline**: The Full Video progress bar now supports ordinary click-and-drag seeking while preserving whether playback was previously playing or paused. Its larger pointer target expands the visible track on hover/drag and keeps it visible longer after use.
 
 ## [4.2.13] - 2026-09-06
