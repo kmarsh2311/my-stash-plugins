@@ -147,6 +147,7 @@ assert.ok(coverEditorSource.includes("root.location?.protocol === 'http:' && roo
 assert.ok(coverEditorSource.includes('This HTTP network address cannot read the clipboard directly'), 'pressing Paste on an insecure HTTP connection should explain the keyboard fallback');
 assert.ok(coverEditorSource.includes("root.confirm?.('Discard the new cover without saving?')"), 'closing an editor with a proposed cover should request confirmation');
 assert.ok(coverEditorSource.includes("candidateBox.addEventListener('drop'"), 'the new-cover target should accept dragged image files');
+assert.ok(coverEditorSource.includes('Capture, upload, paste or drop an image'), 'the empty new-cover target should advertise drag-and-drop support');
 assert.ok(coverEditorSource.includes("closeActiveEditor(true)"), 'a successful cover save should close without a discard warning');
 assert.ok(mainSource.includes('if (FastTagCoverEditor.closeActiveEditor?.() === false) return false;'), 'outside and parent-popup closure should respect the unsaved-cover warning');
 const aiApplyMetadataBlock = mainSource.match(/mutation FastTagAIApplyMetadata[\s\S]*?syncSceneToApolloCache\(metadataRes\.data\.sceneUpdate\);/)?.[0] || '';
