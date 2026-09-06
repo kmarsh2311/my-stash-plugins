@@ -479,8 +479,64 @@
             if (playback.paused) currentOptions.mediaController?.play?.();
             else currentOptions.mediaController?.pause?.();
         };
-        stepBackButton.onclick = event => currentOptions.mediaController?.stepBy?.(resolveStepSeconds(-1, event.shiftKey));
-        stepForwardButton.onclick = event => currentOptions.mediaController?.stepBy?.(resolveStepSeconds(1, event.shiftKey));
+        const bindStepButton = (button, direction) => {
+            let holdDelayTimer = null;
+            let repeatTimer = null;
+            let activePointerId = null;
+            let repeated = false;
+            let holdUsesShift = false;
+            let suppressClick = false;
+            const performStep = shiftKey => currentOptions.mediaController?.stepBy?.(resolveStepSeconds(direction, shiftKey));
+            const clearTimers = () => {
+                root.clearTimeout(holdDelayTimer);
+                root.clearTimeout(repeatTimer);
+                holdDelayTimer = null;
+                repeatTimer = null;
+            };
+            const stopHolding = () => {
+                clearTimers();
+                activePointerId = null;
+                repeated = false;
+            };
+            const repeatStep = () => {
+                if (activePointerId === null) return;
+                repeated = true;
+                performStep(holdUsesShift);
+                repeatTimer = root.setTimeout(repeatStep, holdUsesShift ? 100 : 150);
+            };
+            button.addEventListener('pointerdown', event => {
+                if (button.disabled || event.button !== 0) return;
+                event.preventDefault();
+                activePointerId = event.pointerId;
+                repeated = false;
+                holdUsesShift = event.shiftKey;
+                try { button.setPointerCapture(event.pointerId); } catch (error) {}
+                holdDelayTimer = root.setTimeout(repeatStep, 400);
+            }, { signal });
+            button.addEventListener('pointerup', event => {
+                if (event.pointerId !== activePointerId) return;
+                event.preventDefault();
+                const shouldSingleStep = !repeated;
+                const shiftKey = event.shiftKey || holdUsesShift;
+                suppressClick = true;
+                stopHolding();
+                try { button.releasePointerCapture(event.pointerId); } catch (error) {}
+                if (shouldSingleStep) performStep(shiftKey);
+                root.setTimeout(() => { suppressClick = false; }, 0);
+            }, { signal });
+            button.addEventListener('pointercancel', stopHolding, { signal });
+            button.addEventListener('pointerleave', event => {
+                if (event.pointerId === activePointerId) stopHolding();
+            }, { signal });
+            button.addEventListener('click', event => {
+                event.preventDefault();
+                if (!suppressClick) performStep(event.shiftKey);
+            }, { signal });
+            root.addEventListener('blur', stopHolding, { signal });
+            signal.addEventListener('abort', clearTimers, { once: true });
+        };
+        bindStepButton(stepBackButton, -1);
+        bindStepButton(stepForwardButton, 1);
 
         document.addEventListener('paste', event => {
             const item = findClipboardImage(event.clipboardData?.items);
