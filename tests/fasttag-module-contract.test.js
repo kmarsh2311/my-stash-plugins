@@ -84,7 +84,7 @@ assert.ok(
     mainSource.includes('!form.contains(e.target) && !isTextEntryTarget'),
     'background hotkey blocking must not consume typing in detached FastTag inputs'
 );
-assert.ok(mainSource.includes('fasttag-scrape-empty-query'), 'zero-result scraper state should provide an editable manual-search field');
+assert.ok(scraperControllerSource.includes('fasttag-scrape-empty-query'), 'zero-result scraper state should provide an editable manual-search field');
 assert.ok(
     mainSource.includes('renderScraperMatchCard(\n                            popup.scraperCardContainer,\n                            [],'),
     'Edit Everything should open the scraper search panel when automatic scraping returns no results'
@@ -107,15 +107,15 @@ assert.ok(settingsSource.includes('fasttag-tab-pane-matching'), 'Settings should
 assert.ok(settingsSource.includes('fasttag-match-restore-defaults'), 'scraper-matching settings should provide a restore-defaults action');
 assert.ok(settingsSource.includes("setScraperMatchingPreset(matchingPresetSelect.value)"), 'matching presets should update the persisted analysis criteria');
 assert.ok(settingsSource.includes('<option value="custom" disabled'), 'Custom matching should be an automatic status rather than a selectable preset');
-assert.ok(mainSource.includes('partitionObviousFalsePositiveMatches(allResults)'), 'scraper rendering should preserve and partition the complete result set');
-assert.ok(mainSource.includes('fasttag-scrape-toggle-hidden'), 'filtered scraper results must remain available through a show-hidden control');
-assert.ok(mainSource.includes('fasttag-scrape-toggle-overflow'), 'lower-ranked scraper results must remain available through a show-all control');
-assert.ok(mainSource.includes('const initialResultLimit = getScraperMatchingSettings().initialResultLimit;'), 'large scraper result limits should use the matching preference');
-assert.ok(mainSource.includes('font-variant-numeric: tabular-nums'), 'scraper navigation counters should use stable-width numerals');
-assert.ok(mainSource.includes('>✕ Dismiss</button>'), 'result dismissal should be clearly labelled away from the navigation arrows');
-assert.ok(mainSource.includes("value=\"${escapeHtml(match._searchQuery || '')}\""), 'manual scraper search should retain the complete contextual query');
+assert.ok(scraperControllerSource.includes('partitionObviousFalsePositiveMatches(allResults)'), 'scraper rendering should preserve and partition the complete result set');
+assert.ok(scraperControllerSource.includes('fasttag-scrape-toggle-hidden'), 'filtered scraper results must remain available through a show-hidden control');
+assert.ok(scraperControllerSource.includes('fasttag-scrape-toggle-overflow'), 'lower-ranked scraper results must remain available through a show-all control');
+assert.ok(scraperControllerSource.includes('const initialResultLimit = getScraperMatchingSettings().initialResultLimit;'), 'large scraper result limits should use the matching preference');
+assert.ok(scraperControllerSource.includes('font-variant-numeric: tabular-nums'), 'scraper navigation counters should use stable-width numerals');
+assert.ok(scraperControllerSource.includes('>✕ Dismiss</button>'), 'result dismissal should be clearly labelled away from the navigation arrows');
+assert.ok(scraperControllerSource.includes("value=\"${escapeHtml(match._searchQuery || '')}\""), 'manual scraper search should retain the complete contextual query');
 assert.ok(scraperControllerSource.includes('function isPopupActive(popup)'), 'scraper rendering should reject stale popup work');
-assert.ok(mainSource.includes('watchFloatingScraperHudOwner(popup);'), 'detached scraper HUD should monitor its owning popup');
+assert.ok(scraperControllerSource.includes('watchHudOwner(popup);'), 'detached scraper HUD should monitor its owning popup');
 assert.ok(mainSource.includes('activePopup._fastTagClosed = true;'), 'popup closure should invalidate pending scraper work');
 assert.ok(scraperControllerSource.includes('function beginRequest(popup, sceneId)'), 'scrapes should receive a per-popup request generation');
 assert.ok(mainSource.includes('if (!isScraperRequestCurrent(popup, activeSceneId, scrapeRequestId)) return null;'), 'late automatic scrape responses should be discarded');
@@ -123,7 +123,7 @@ assert.ok(mainSource.includes('invalidateScraperRequests(popup);\n            po
 assert.ok(scraperControllerSource.includes('{ endpoint: match._sourceEndpoint, name: match._sourceName }'), 'scraper acceptance should pass source identity into new performer creation');
 assert.ok(settingsSource.includes('fasttag-match-fill-performer-images'), 'Match settings should expose missing performer image enrichment');
 assert.ok(mainSource.includes('buildScrapedPerformerPreviewData(performer, match, cachedPerformers)'), 'scraper performer pills should provide local-or-source hover previews');
-assert.ok(mainSource.includes('data-scrape-performer-index='), 'scraper performer pills should be identifiable hover targets');
+assert.ok(scraperControllerSource.includes('data-scrape-performer-index='), 'scraper performer pills should be identifiable hover targets');
 assert.ok(mainSource.includes('schedulePerformerHoverCardHide(delay = 260)'), 'performer previews should remain reachable across the pointer gap');
 assert.ok(mainSource.includes("toastError(`AI Parse Error: ${err.message}`, undefined, 4500)"), 'AI Parse error notifications should use the shorter display duration');
 assert.ok(previewSource.includes('FastTagCoverEditor.mountLauncher({'), 'Edit Everything media controls should mount the cover editor launcher');

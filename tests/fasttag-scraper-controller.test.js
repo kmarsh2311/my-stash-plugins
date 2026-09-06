@@ -117,11 +117,11 @@ async function testAcceptMatchOrdering() {
         setLiveEverythingPopupTitle() { events.push('title'); },
         async refreshSceneCards() { events.push('refresh'); },
         recordSaveUsage() { events.push('usage'); },
-        deleteSessionCache() { events.push('cache-delete'); },
         toastError(message) { throw new Error(message); },
         toastSuccess() { events.push('success'); }
     });
 
+    controller.sessionCache.set('scene-1', [{ title: 'cached' }]);
     await controller.acceptMatch({
         title: 'Matched title',
         image: 'https://example.test/cover.jpg',
@@ -136,7 +136,7 @@ async function testAcceptMatchOrdering() {
     assert.ok(events.indexOf('metadata') < events.indexOf('stash-id'));
     assert.ok(events.indexOf('stash-id') < events.indexOf('cover'));
     assert.ok(events.indexOf('apollo') < events.indexOf('refresh'));
-    assert.ok(events.indexOf('refresh') < events.indexOf('cache-delete'));
+    assert.equal(controller.sessionCache.has('scene-1'), false, 'accepted scene results should leave the session cache after refresh');
     assert.equal(acceptButton.disabled, true);
 }
 

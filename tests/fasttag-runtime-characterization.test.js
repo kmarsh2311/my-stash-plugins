@@ -62,7 +62,7 @@ assertBefore(scraperAcceptance, 'const tagResolution = await resolveScrapedEntit
 assertBefore(scraperAcceptance, 'mutation FastTagAcceptSave', 'mutation FastTagAcceptStashId', 'ordinary metadata must save before the accepted remote ID');
 assertBefore(scraperAcceptance, 'mutation FastTagAcceptStashId', 'mutation FastTagAcceptCover', 'the remote ID must save before the independently protected cover');
 assertBefore(scraperAcceptance, 'syncSceneToApolloCache(saveRes.data.sceneUpdate);', 'await refreshSceneCards(sceneId);', 'the local GraphQL cache must update before scene cards are refreshed');
-assertBefore(scraperAcceptance, 'await refreshSceneCards(sceneId);', 'deleteSessionCache(sceneId);', 'the accepted result cache must only clear after the refreshed scene is available');
+assertBefore(scraperAcceptance, 'await refreshSceneCards(sceneId);', 'sessionCache.delete(sceneId);', 'the accepted result cache must only clear after the refreshed scene is available');
 
 const sceneReload = section('async function loadEditEverythingDataIntoPopup(', 'function renderEverythingAIMatchCard(');
 assertBefore(sceneReload, 'invalidateScraperRequests(popup);', 'popup.currentSceneId = sceneId;', 'scene changes must invalidate old scraper work before changing identity');
