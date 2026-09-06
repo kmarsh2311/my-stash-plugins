@@ -143,7 +143,8 @@ assert.ok(!coverEditorSource.includes('Step backward while paused') && !coverEdi
 assert.ok(coverEditorSource.includes('resolveStepSeconds(-1, event.shiftKey)') && coverEditorSource.includes('resolveStepSeconds(1, event.shiftKey)'), 'Shift-clicking the frame controls should jump one second');
 assert.ok(coverEditorSource.includes("pasteButton.textContent = '⌨ Press Ctrl+V / Cmd+V'"), 'blocked clipboard reads should present an explicit keyboard-paste prompt');
 assert.ok(coverEditorSource.includes("panel.focus?.({ preventScroll: true })"), 'the manual paste fallback should focus the cover editor');
-assert.ok(coverEditorSource.includes('On localhost or HTTPS') && coverEditorSource.includes('On an HTTP network address'), 'the cover editor should explain direct and keyboard-paste behaviour');
+assert.ok(coverEditorSource.includes("root.location?.protocol === 'http:' && root.isSecureContext === false"), 'the clipboard explanation should only identify insecure HTTP connections');
+assert.ok(coverEditorSource.includes('This HTTP network address cannot read the clipboard directly'), 'pressing Paste on an insecure HTTP connection should explain the keyboard fallback');
 const aiApplyMetadataBlock = mainSource.match(/mutation FastTagAIApplyMetadata[\s\S]*?syncSceneToApolloCache\(metadataRes\.data\.sceneUpdate\);/)?.[0] || '';
 assert.ok(aiApplyMetadataBlock.includes('title date'), 'AI Apply All should return updated title and date');
 assert.ok(aiApplyMetadataBlock.includes('syncSceneToApolloCache'), 'AI Apply All should synchronize metadata to live scene cards');
