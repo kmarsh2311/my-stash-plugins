@@ -152,7 +152,8 @@ assert.ok(coverEditorSource.includes('This HTTP network address cannot read the 
 assert.ok(coverEditorSource.includes("root.confirm?.('Discard the new cover without saving?')"), 'closing an editor with a proposed cover should request confirmation');
 assert.ok(coverEditorSource.includes("candidateBox.addEventListener('drop'"), 'the new-cover target should accept dragged image files');
 assert.ok(coverEditorSource.includes('Capture, upload, paste or drop an image'), 'the empty new-cover target should advertise drag-and-drop support');
-assert.ok(coverEditorSource.includes("closeActiveEditor(true)"), 'a successful cover save should close without a discard warning');
+assert.ok(coverEditorSource.includes('Cover saved to Stash. Continue editing or move to another scene.'), 'saving a cover should leave the editor open for continued navigation');
+assert.ok(mainSource.includes("if (!saveOptions?.keepEditorOpen && !signal.aborted)"), 'saving within the persistent editor should not rebuild the underlying scene preview');
 assert.ok(mainSource.includes('if (FastTagCoverEditor.closeActiveEditor?.() === false) return false;'), 'outside and parent-popup closure should respect the unsaved-cover warning');
 assert.ok(mainSource.includes("hostContainer.style.height = 'auto';"), 'loading a new scene should restore a preview container collapsed by the cover editor');
 assert.ok(!mainSource.includes('if (signal.aborted || !hostContainer.isConnected) return;'), 'aborted scene previews should still restore their connected host before navigation');
@@ -160,7 +161,7 @@ assert.ok((mainSource.match(/FastTagCoverEditor\.prepareForSceneNavigation\?\.\(
 assert.ok(coverEditorSource.includes('beginNavigation') && coverEditorSource.includes('rebindScene'), 'scene navigation should rebind the existing cover-editor HUD in place');
 assert.ok(coverEditorSource.includes('releaseFromCoverEditor?.({ forNavigation: true })') && mainSource.includes('if (releaseOptions.forNavigation)'), 'in-place navigation should detach the old player without briefly restoring it behind the HUD');
 assert.ok(coverEditorSource.includes('generation !== sceneGeneration') && coverEditorSource.includes('sceneGeneration += 1'), 'late image processing must not populate the next scene after navigation');
-assert.ok(coverEditorSource.includes("videoStage.innerHTML = '<span style=\"font-size:11px;color:#94a3b8;\">Loading next scene…</span>'"), 'the persistent cover editor should show an in-place loading state');
+assert.ok(coverEditorSource.includes("overlay.className = 'fasttag-cover-navigation-overlay'"), 'the persistent cover editor should overlay loading state without removing the previous frame');
 assert.ok(coverEditorSource.includes('Discard the new cover and continue to the next scene?'), 'cover-editor handoff should protect unsaved proposed covers');
 const aiApplyMetadataBlock = mainSource.match(/mutation FastTagAIApplyMetadata[\s\S]*?syncSceneToApolloCache\(metadataRes\.data\.sceneUpdate\);/)?.[0] || '';
 assert.ok(aiApplyMetadataBlock.includes('title date'), 'AI Apply All should return updated title and date');

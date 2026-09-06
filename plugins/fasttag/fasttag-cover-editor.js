@@ -294,7 +294,7 @@
         body.innerHTML = `
             <div>
                 <div style="font-size:10px;font-weight:700;color:#a5b4fc;margin-bottom:4px;text-transform:uppercase;">Choose a video frame</div>
-                <div class="fasttag-cover-video-stage" style="width:100%;aspect-ratio:16/9;max-height:410px;background:#020617;border:1px solid #334155;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;"></div>
+                <div class="fasttag-cover-video-stage" style="position:relative;width:100%;aspect-ratio:16/9;max-height:410px;background:#020617;border:1px solid #334155;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;"></div>
                 <div class="fasttag-cover-playback-controls" style="display:grid;grid-template-columns:auto auto minmax(68px,1fr) auto auto;align-items:center;gap:4px;margin-top:7px;white-space:nowrap;"></div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;min-height:170px;">
@@ -513,8 +513,12 @@
                 }
                 dependencies.showToast?.('Scene cover updated', 'success', 3000);
                 await dependencies.refreshSceneCards?.(sceneId);
-                closeActiveEditor(true);
-                await currentOptions.onSaved?.();
+                const savedCover = candidateDataUrl;
+                currentOptions.currentCoverUrl = savedCover;
+                renderCurrentCover(savedCover);
+                resetCandidate();
+                setStatus('Cover saved to Stash. Continue editing or move to another scene.', false, true);
+                await currentOptions.onSaved?.({ keepEditorOpen: true, coverUrl: savedCover });
             } catch (error) {
                 saving = false;
                 saveButton.disabled = false;
@@ -547,8 +551,12 @@
         const beginNavigation = () => {
             sceneGeneration += 1;
             currentOptions.mediaController?.releaseFromCoverEditor?.({ forNavigation: true });
-            videoStage.innerHTML = '<span style="font-size:11px;color:#94a3b8;">Loading next scene…</span>';
-            currentBox.innerHTML = '<span style="font-size:11px;color:#94a3b8;">Loading cover…</span>';
+            videoStage.querySelector('.fasttag-cover-navigation-overlay')?.remove();
+            const overlay = document.createElement('div');
+            overlay.className = 'fasttag-cover-navigation-overlay';
+            overlay.textContent = 'Loading next scene…';
+            overlay.style.cssText = 'position:absolute;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(2,6,23,.38);color:#e2e8f0;font-size:11px;font-weight:700;backdrop-filter:blur(1px);pointer-events:none;';
+            videoStage.appendChild(overlay);
             resetCandidate();
             setStatus('Loading the next scene…', false, true);
             for (const button of [playPauseButton, stepBackButton, stepForwardButton, captureButton]) {

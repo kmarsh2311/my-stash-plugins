@@ -4023,7 +4023,9 @@
                 if (currentMode !== 'stream') progressBarBg.style.opacity = '0';
                 detachWheel();
                 if (releaseOptions.forNavigation) {
-                    mediaContainer.remove();
+                    if (currentMedia?.tagName === 'VIDEO') {
+                        try { currentMedia.pause(); } catch (error) {}
+                    }
                     coverEditorPreviousMode = null;
                     coverEditorWasPoppedOut = false;
                     return;
@@ -4121,8 +4123,8 @@
                 sceneId,
                 currentCoverUrl: coverUrl,
                 mediaController,
-                onSaved: async () => {
-                    if (!signal.aborted) await attachScenePreview(hostContainer, sceneId, cardElement);
+                onSaved: async saveOptions => {
+                    if (!saveOptions?.keepEditorOpen && !signal.aborted) await attachScenePreview(hostContainer, sceneId, cardElement);
                 }
             });
         }

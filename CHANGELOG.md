@@ -11,7 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Interactive Video Timeline**: The Full Video progress bar now supports ordinary click-and-drag seeking while preserving whether playback was previously playing or paused. Its larger pointer target expands the visible track on hover/drag and keeps it visible longer after use.
 
 ### Fixed
-- **Cover Editor Scene Navigation**: Moving to another scene keeps the Cover Editor open at the same size and position, reloads it for the incoming scene, and stops navigation when an unsaved-cover discard warning is cancelled. Explicit closure still restores the normal embedded or floating preview.
+- **Cover Editor Scene Navigation**: Saving promotes the proposed image to Current Cover without closing the editor. Moving to another scene keeps the same HUD mounted, holds the previous frame beneath a loading overlay until the incoming player is ready, and stops navigation when an unsaved-cover discard warning is cancelled. Explicit closure still restores the normal embedded or floating preview.
 
 ## [4.2.13] - 2026-09-06
 
