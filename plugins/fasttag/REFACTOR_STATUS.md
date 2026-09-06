@@ -7,11 +7,12 @@ passed.
 
 ## Current phase
 
-Step 4 is complete. GraphQL transport, diagnostics, and native notifications
-now have explicit module APIs, dedicated tests, and separate extraction commits.
-`fasttag.js` has moved from the 839,005-byte baseline to 825,340 bytes without a
-behavioural change. The characterization suite continues to protect coordinator
-startup, cleanup, navigation, scraper, Cover Editor, and save ordering.
+Step 5 is complete. The complete Settings HUD, its tab and control wiring,
+validation, close lifecycle, matching presets, Gemini test controls, and system
+actions now belong to `fasttag-settings.js`. Its dependencies are injected
+explicitly and a smoke test opens the HUD with an isolated browser substitute.
+`fasttag.js` has moved from the 839,005-byte baseline to 764,717 bytes without an
+intentional behavioural change.
 
 ## Extracted modules
 
@@ -46,9 +47,10 @@ suites.
 
 ## Next work
 
-Extract the Settings interface behind an explicit UI/controller boundary while
-leaving preference persistence in `fasttag-storage.js`. Preserve tab selection,
-validation, preset behaviour, cache/debug actions, and all automatic saves.
+Expand `fasttag-preview.js` into the complete preview controller, including
+media selection, scrubbing, floating-HUD lifecycle, restoration, and the Cover
+Editor player handoff. This is a higher-risk extraction and requires additional
+characterization before implementation moves.
 
 ## Still required before a merge or release
 
