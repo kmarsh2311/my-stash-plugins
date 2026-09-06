@@ -141,6 +141,8 @@ assert.ok(coverEditorSource.includes('grid-template-columns:auto auto minmax(68p
 assert.ok(coverEditorSource.includes("padding:7px 12px;min-width:44px"), 'the cover editor frame-step buttons should provide a comfortably wide target');
 assert.ok(!coverEditorSource.includes('Step backward while paused') && !coverEditorSource.includes('Step forward while paused'), 'the frame-step buttons should not display redundant tooltips');
 assert.ok(coverEditorSource.includes('resolveStepSeconds(-1, event.shiftKey)') && coverEditorSource.includes('resolveStepSeconds(1, event.shiftKey)'), 'Shift-clicking the frame controls should jump one second');
+assert.ok(coverEditorSource.includes("pasteButton.textContent = '⌨ Press Ctrl+V / Cmd+V'"), 'blocked clipboard reads should present an explicit keyboard-paste prompt');
+assert.ok(coverEditorSource.includes("panel.focus?.({ preventScroll: true })"), 'the manual paste fallback should focus the cover editor');
 const aiApplyMetadataBlock = mainSource.match(/mutation FastTagAIApplyMetadata[\s\S]*?syncSceneToApolloCache\(metadataRes\.data\.sceneUpdate\);/)?.[0] || '';
 assert.ok(aiApplyMetadataBlock.includes('title date'), 'AI Apply All should return updated title and date');
 assert.ok(aiApplyMetadataBlock.includes('syncSceneToApolloCache'), 'AI Apply All should synchronize metadata to live scene cards');

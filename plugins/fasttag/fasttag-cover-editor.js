@@ -318,12 +318,21 @@
         let saving = false;
         let preparingImage = false;
         let statusLocked = false;
+        let manualPastePending = false;
 
         const setStatus = (message, error = false, lock = false) => {
             if (lock) statusLocked = true;
             status.textContent = message;
             status.style.color = error ? '#fca5a5' : (isDark ? '#cbd5e1' : '#334155');
             status.style.border = error ? '1px solid rgba(239,68,68,.45)' : '1px solid transparent';
+        };
+        const requestManualPaste = () => {
+            manualPastePending = true;
+            pasteButton.textContent = '⌨ Press Ctrl+V / Cmd+V';
+            setStatus('Paste is ready — press Ctrl+V or Cmd+V now.', false, true);
+            status.style.border = '1px solid rgba(99,102,241,.7)';
+            status.style.color = isDark ? '#c7d2fe' : '#3730a3';
+            panel.focus?.({ preventScroll: true });
         };
         const setCandidate = (dataUrl, source) => {
             candidateDataUrl = dataUrl;
@@ -368,8 +377,7 @@
         };
         pasteButton.onclick = async () => {
             if (!navigator.clipboard?.read) {
-                setStatus('Click this panel and press Ctrl+V or Cmd+V to paste an image.', false, true);
-                panel.focus?.();
+                requestManualPaste();
                 return;
             }
             try {
@@ -383,7 +391,7 @@
                 }
                 setStatus('The clipboard does not contain an image.', true, true);
             } catch (error) {
-                setStatus('Clipboard access was unavailable. Click this panel and press Ctrl+V or Cmd+V.', true, true);
+                requestManualPaste();
             }
         };
         playPauseButton.onclick = () => {
@@ -398,8 +406,13 @@
         document.addEventListener('paste', event => {
             const item = findClipboardImage(event.clipboardData?.items);
             const blob = item?.getAsFile?.();
-            if (!blob) return;
+            if (!blob) {
+                if (manualPastePending) setStatus('The pasted clipboard content is not an image.', true, true);
+                return;
+            }
             event.preventDefault();
+            manualPastePending = false;
+            pasteButton.textContent = '📋 Paste';
             useBlob(blob, 'Clipboard image');
         }, { signal });
 
