@@ -50,11 +50,15 @@ assert.equal(coverEditor.findClipboardImage(null), null);
 
 assert.throws(
     () => coverEditor.captureVideoFrame(null),
-    /Full video is not available/
+    /No video or preview frame is available/
 );
 assert.throws(
     () => coverEditor.captureVideoFrame({ tagName: 'VIDEO', readyState: 1, videoWidth: 1920, videoHeight: 1080 }),
     /finish loading/
+);
+assert.throws(
+    () => coverEditor.captureMediaFrame({ tagName: 'IMG', complete: false, naturalWidth: 320, naturalHeight: 180 }),
+    /preview frame to finish loading/
 );
 
 console.log('fasttag-cover-editor tests passed');

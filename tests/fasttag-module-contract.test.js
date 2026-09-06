@@ -124,7 +124,7 @@ assert.ok(mainSource.includes('mountForCoverEditor: target =>'), 'the existing p
 assert.ok(mainSource.includes('releaseFromCoverEditor: () =>'), 'closing the cover editor should return the existing player to Edit Everything');
 assert.ok(mainSource.includes('coverEditorWasPoppedOut = isVideoPoppedOut;'), 'cover editing should remember whether the player started in its floating HUD');
 assert.ok(mainSource.includes('if (restorePopout) togglePopout(true);'), 'closing the cover editor should restore the prior floating-video state');
-assert.ok(coverEditorSource.includes("options.mediaController?.pause?.();\n                setCandidate(captureVideoFrame"), 'capturing a cover should pause the selected video frame first');
+assert.ok(coverEditorSource.includes("options.mediaController?.pause?.();\n                const source = captureState.source"), 'capturing a cover should pause controllable video media first');
 assert.ok(coverEditorSource.includes("const playPauseButton = createActionButton('⏸ Pause')"), 'the cover editor should provide persistent playback controls');
 assert.ok(mainSource.includes("e.target.closest('#fasttag-cover-editor-hud')"), 'cover-editor interactions should remain inside the owning popup boundary');
 assert.ok(mainSource.includes("#fasttag-create-modal, #fasttag-cover-editor-hud"), 'Escape should be delegated to the cover editor before the owning popup');
@@ -135,6 +135,10 @@ assert.ok(mainSource.includes("height: 16px; background: transparent"), 'the int
 assert.ok(mainSource.includes("progressBarTrack.style.height = '7px'"), 'the visible timeline should grow while hovered or dragged');
 assert.ok(mainSource.includes('}, 3500);'), 'the interactive timeline should remain visible longer after use');
 assert.ok(mainSource.includes('if (isVideoPoppedOut || coverEditing) return;'), 'clicking video inside the cover editor should not open the scene page');
+assert.ok(mainSource.includes("currentMediaSource = 'preview-video'"), 'MP4 previews should be recognised as controllable fallback video');
+assert.ok(mainSource.includes("currentMediaSource = 'preview-image'"), 'animated image previews should be recognised as capturable fallback media');
+assert.ok(mainSource.includes("source: 'preview-image'"), 'the cover editor should expose animated preview capture availability');
+assert.ok(coverEditorSource.includes("'Captured preview frame'"), 'fallback captures should be identified as preview frames');
 assert.ok(coverEditorSource.includes('overflow:auto;resize:both'), 'the cover-editor HUD should be resizable from its browser corner');
 assert.ok(coverEditorSource.includes("EDITOR_SIZE_STORAGE_KEY = 'fasttag_cover_editor_size'"), 'the cover editor should remember its resized dimensions');
 assert.ok(coverEditorSource.includes('grid-template-columns:auto auto minmax(68px,1fr) auto auto'), 'cover playback and capture controls should remain on one line');

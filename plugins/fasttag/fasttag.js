@@ -3152,6 +3152,7 @@
 
         let currentMode = 'preview'; // 'preview' or 'stream'
         let currentMedia = null;
+        let currentMediaSource = '';
         let wheelListenerAttached = false;
         let resumeTimer = null;
         let hudTimer = null;
@@ -3164,6 +3165,10 @@
         let coverEditing = false;
         let coverEditorPreviousMode = null;
         let coverEditorWasPoppedOut = false;
+        const hasControllableVideo = () => Boolean(
+            currentMedia?.tagName === 'VIDEO' &&
+            (currentMode === 'stream' || (coverEditing && currentMediaSource === 'preview-video'))
+        );
 
         // Slim Progress Bar at the very bottom edge (no text/numbers)
         const progressBarBg = document.createElement('div');
@@ -3188,7 +3193,7 @@
 
         let progressBarTimer = null;
         const showProgressBar = () => {
-            if (currentMode !== 'stream') return;
+            if (!hasControllableVideo()) return;
             updateProgressBar();
             progressBarBg.style.opacity = '1';
             clearTimeout(progressBarTimer);
@@ -3202,7 +3207,7 @@
         let isTimelineSeeking = false;
         let timelineWasPlaying = false;
         const seekTimelineToPointer = event => {
-            if (currentMode !== 'stream' || !currentMedia || currentMedia.tagName !== 'VIDEO') return;
+            if (!hasControllableVideo()) return;
             const rect = progressBarBg.getBoundingClientRect();
             const target = calculateSeekTarget(event.clientX, rect.left, rect.width, currentMedia.duration);
             if (target === null) return;
@@ -3211,7 +3216,7 @@
             progressBarBg.style.opacity = '1';
         };
         progressBarBg.addEventListener('pointerdown', event => {
-            if (event.button !== 0 || currentMode !== 'stream' || !currentMedia || currentMedia.tagName !== 'VIDEO') return;
+            if (event.button !== 0 || !hasControllableVideo()) return;
             event.preventDefault();
             event.stopPropagation();
             isTimelineSeeking = true;
@@ -3645,7 +3650,7 @@
         };
 
         const attachWheel = () => {
-            if (!wheelListenerAttached && currentMode === 'stream') {
+            if (!wheelListenerAttached && hasControllableVideo()) {
                 mediaContainer.addEventListener('wheel', onWheel, { passive: false, signal });
                 wheelListenerAttached = true;
             }
@@ -3665,7 +3670,7 @@
         let lastWheelTimestamp = 0;
 
         var onWheel = (e) => {
-            if (currentMode !== 'stream') return;
+            if (!hasControllableVideo()) return;
             e.preventDefault();
             hideCueImmediate();
             if (!currentMedia || currentMedia.tagName !== 'VIDEO' || currentMedia.duration <= 0 || !isFinite(currentMedia.duration)) return;
@@ -3709,7 +3714,7 @@
         const renderMedia = (mode) => {
             if (signal.aborted) return;
             currentMode = mode;
-            progressBarBg.style.pointerEvents = mode === 'stream' ? 'auto' : 'none';
+            progressBarBg.style.pointerEvents = 'none';
             updatePill(mode);
 
             // Teardown previous media
@@ -3717,12 +3722,14 @@
                 if (currentMedia.tagName === 'VIDEO') {
                     try {
                         currentMedia.pause();
+                        currentMedia.onerror = null;
                         currentMedia.removeAttribute('src');
                         currentMedia.load();
                     } catch (e) {}
                 }
                 currentMedia.remove();
                 currentMedia = null;
+                currentMediaSource = '';
             }
 
             detachWheel();
@@ -3785,7 +3792,9 @@
                 };
 
                 currentMedia = video;
+                currentMediaSource = 'full-video';
                 mediaContainer.insertBefore(video, mediaContainer.firstChild);
+                progressBarBg.style.pointerEvents = 'auto';
                 video.load();
                 video.play().catch(() => {});
                 if (isHovered) attachWheel();
@@ -3794,9 +3803,11 @@
                 progressBarBg.style.opacity = '0';
                 progressBarFill.style.width = '0%';
 
-                // Preview mode
+                // Preview mode. The /preview endpoint can return MP4 or animated WebP,
+                // so try video first and fall back to an image if decoding fails.
                 if (previewUrl) {
-                    const isVideo = /\/preview(?:[?#]|$)|\.(mp4|webm|mov|m4v|ogg)(\?.*)?$/i.test(previewUrl);
+                    const forceImage = mode === 'preview-image';
+                    const isVideo = !forceImage && /\/preview(?:[?#]|$)|\.(mp4|webm|mov|m4v|ogg)(\?.*)?$/i.test(previewUrl);
                     if (isVideo) {
                         const video = document.createElement('video');
                         video.style.cssText = 'display: block; width: 100%; height: 100%; object-fit: contain; background: #0f172a; pointer-events: none;';
@@ -3813,21 +3824,19 @@
                         video.src = previewUrl;
 
                         video.onerror = () => {
-                            if (streamUrl) {
-                                renderMedia('stream');
-                            } else {
-                                renderCoverOnly();
-                            }
+                            if (currentMedia === video) renderMedia('preview-image');
                         };
-                        video.addEventListener('error', () => {
-                            if (streamUrl) {
-                                renderMedia('stream');
-                            } else {
-                                renderCoverOnly();
+                        video.addEventListener('loadedmetadata', () => {
+                            if (coverEditing && currentMedia === video) {
+                                progressBarBg.style.pointerEvents = 'auto';
+                                showProgressBar();
+                                if (isHovered) attachWheel();
                             }
                         });
+                        video.addEventListener('timeupdate', updateProgressBar);
 
                         currentMedia = video;
+                        currentMediaSource = 'preview-video';
                         mediaContainer.insertBefore(video, mediaContainer.firstChild);
                         video.load();
                         video.play().catch(() => {});
@@ -3839,13 +3848,14 @@
                         img.loading = 'eager';
                         img.src = previewUrl;
                         img.onerror = () => {
-                            if (streamUrl) {
+                            if (streamUrl && !streamCaptureFailure) {
                                 renderMedia('stream');
                             } else {
                                 renderCoverOnly();
                             }
                         };
                         currentMedia = img;
+                        currentMediaSource = 'preview-image';
                         mediaContainer.insertBefore(img, mediaContainer.firstChild);
                     }
                 } else if (streamUrl) {
@@ -3880,6 +3890,7 @@
             };
             img.src = coverUrl;
             currentMedia = img;
+            currentMediaSource = 'cover';
             mediaContainer.insertBefore(img, mediaContainer.firstChild);
         };
 
@@ -3891,7 +3902,7 @@
         // Hover & Key Listeners for Scrubbing & Hold-to-Freeze attached to mediaContainer
         mediaContainer.onmouseenter = () => {
             isHovered = true;
-            if (currentMode === 'stream') {
+            if (hasControllableVideo()) {
                 attachWheel();
             }
         };
@@ -3912,7 +3923,7 @@
         };
 
         const onKeyDown = (e) => {
-            if (currentMode !== 'stream') return;
+            if (!hasControllableVideo()) return;
             if (e.key === 'Shift' && !shiftHeld && isHovered) {
                 shiftHeld = true;
                 hideCueImmediate();
@@ -3930,7 +3941,7 @@
         };
 
         const onKeyUp = (e) => {
-            if (currentMode !== 'stream') return;
+            if (!hasControllableVideo()) return;
             if (e.key === 'Shift' && shiftHeld) {
                 shiftHeld = false;
                 clearTimeout(resumeTimer);
@@ -3980,7 +3991,11 @@
 
         const mediaController = {
             switchToFullVideo: () => renderMedia('stream'),
-            getCurrentVideo: () => currentMode === 'stream' && currentMedia?.tagName === 'VIDEO' ? currentMedia : null,
+            getCurrentCaptureMedia: () => {
+                if (currentMediaSource === 'full-video' && currentMedia?.tagName === 'VIDEO') return currentMedia;
+                if (coverEditing && ['preview-video', 'preview-image'].includes(currentMediaSource)) return currentMedia;
+                return null;
+            },
             getCoverUrl: () => coverUrl,
             mountForCoverEditor: target => {
                 if (!target) return;
@@ -4003,6 +4018,9 @@
             releaseFromCoverEditor: () => {
                 coverEditing = false;
                 if (signal.aborted || !hostContainer.isConnected) return;
+                progressBarBg.style.pointerEvents = currentMode === 'stream' ? 'auto' : 'none';
+                if (currentMode !== 'stream') progressBarBg.style.opacity = '0';
+                detachWheel();
                 hostContainer.innerHTML = '';
                 hostContainer.style.display = 'block';
                 hostContainer.style.position = 'relative';
@@ -4030,7 +4048,7 @@
                 if (restorePopout) togglePopout(true);
             },
             pause: () => {
-                const video = currentMode === 'stream' && currentMedia?.tagName === 'VIDEO' ? currentMedia : null;
+                const video = hasControllableVideo() ? currentMedia : null;
                 if (!video) return false;
                 clearTimeout(resumeTimer);
                 wasPlaying = false;
@@ -4038,14 +4056,14 @@
                 return true;
             },
             play: () => {
-                const video = currentMode === 'stream' && currentMedia?.tagName === 'VIDEO' ? currentMedia : null;
+                const video = hasControllableVideo() ? currentMedia : null;
                 if (!video) return false;
                 clearTimeout(resumeTimer);
                 video.play().catch(() => {});
                 return true;
             },
             stepBy: seconds => {
-                const video = currentMode === 'stream' && currentMedia?.tagName === 'VIDEO' ? currentMedia : null;
+                const video = hasControllableVideo() ? currentMedia : null;
                 if (!video || !isFinite(video.duration)) return false;
                 clearTimeout(resumeTimer);
                 wasPlaying = false;
@@ -4055,7 +4073,7 @@
                 return true;
             },
             getPlaybackState: () => {
-                const video = currentMode === 'stream' && currentMedia?.tagName === 'VIDEO' ? currentMedia : null;
+                const video = hasControllableVideo() ? currentMedia : null;
                 return video ? {
                     available: true,
                     paused: video.paused,
@@ -4064,13 +4082,26 @@
                 } : { available: false, paused: true, currentTime: 0, duration: 0 };
             },
             getCaptureState: () => {
-                if (streamCaptureFailure) return { available: false, reason: streamCaptureFailure };
-                if (!streamUrl) return { available: false, reason: 'This scene has no full-video stream. Upload or paste an image instead.' };
-                const video = currentMode === 'stream' && currentMedia?.tagName === 'VIDEO' ? currentMedia : null;
-                if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
-                    return { available: false, reason: 'Loading the full video for frame capture…' };
+                if (currentMediaSource === 'full-video') {
+                    const video = currentMedia?.tagName === 'VIDEO' ? currentMedia : null;
+                    if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
+                        return { available: false, reason: 'Loading the full video for frame capture…', source: 'full-video' };
+                    }
+                    return { available: true, reason: '', source: 'full-video' };
                 }
-                return { available: true, reason: '' };
+                if (coverEditing && currentMediaSource === 'preview-video') {
+                    const ready = currentMedia?.readyState >= 2 && currentMedia.videoWidth && currentMedia.videoHeight;
+                    return ready
+                        ? { available: true, reason: 'Full video unavailable — using the lower-resolution MP4 preview.', source: 'preview-video' }
+                        : { available: false, reason: 'Loading the MP4 preview…', source: 'preview-video' };
+                }
+                if (coverEditing && currentMediaSource === 'preview-image') {
+                    const ready = currentMedia?.complete && currentMedia.naturalWidth && currentMedia.naturalHeight;
+                    return ready
+                        ? { available: true, reason: 'Full video unavailable — capture the currently visible preview frame.', source: 'preview-image' }
+                        : { available: false, reason: 'Loading the animated preview…', source: 'preview-image' };
+                }
+                return { available: false, reason: streamCaptureFailure || 'No playable video or preview is available. Upload, paste or drop an image instead.', source: '' };
             }
         };
         hostContainer._fastTagMediaController = mediaController;

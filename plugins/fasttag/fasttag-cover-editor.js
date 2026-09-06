@@ -102,24 +102,28 @@
         return canvasToDataUrl(image, image.naturalWidth || image.width, image.naturalHeight || image.height);
     }
 
-    function captureVideoFrame(video) {
-        if (!video || String(video.tagName || '').toUpperCase() !== 'VIDEO') {
-            throw new Error('Full video is not available for frame capture.');
-        }
-        const width = Number(video.videoWidth || 0);
-        const height = Number(video.videoHeight || 0);
-        if (Number(video.readyState || 0) < 2 || !width || !height) {
-            throw new Error('Wait for the full video frame to finish loading.');
+    function captureMediaFrame(media) {
+        const tagName = String(media?.tagName || '').toUpperCase();
+        const isVideo = tagName === 'VIDEO';
+        const isImage = tagName === 'IMG';
+        if (!isVideo && !isImage) throw new Error('No video or preview frame is available for capture.');
+        const width = Number(isVideo ? media.videoWidth : media.naturalWidth) || 0;
+        const height = Number(isVideo ? media.videoHeight : media.naturalHeight) || 0;
+        const ready = isVideo ? Number(media.readyState || 0) >= 2 : Boolean(media.complete);
+        if (!ready || !width || !height) {
+            throw new Error(`Wait for the ${isVideo ? 'video' : 'preview'} frame to finish loading.`);
         }
         try {
-            return canvasToDataUrl(video, width, height);
+            return canvasToDataUrl(media, width, height);
         } catch (error) {
             if (error?.name === 'SecurityError') {
-                throw new Error('This video frame is protected from browser capture. Upload or paste an image instead.');
+                throw new Error('This frame is protected from browser capture. Upload, paste or drop an image instead.');
             }
             throw error;
         }
     }
+
+    const captureVideoFrame = captureMediaFrame;
 
     function resolveEditorSize(savedSize, viewportWidth, viewportHeight) {
         const availableWidth = Math.max(300, Number(viewportWidth || 0) - 24);
@@ -372,8 +376,10 @@
 
         captureButton.onclick = () => {
             try {
+                const captureState = options.mediaController?.getCaptureState?.() || {};
                 options.mediaController?.pause?.();
-                setCandidate(captureVideoFrame(options.mediaController?.getCurrentVideo?.()), 'Captured video frame');
+                const source = captureState.source === 'full-video' ? 'Captured video frame' : 'Captured preview frame';
+                setCandidate(captureMediaFrame(options.mediaController?.getCurrentCaptureMedia?.()), source);
             } catch (error) {
                 setStatus(error?.message || 'The video frame could not be captured.', true, true);
             }
@@ -481,7 +487,10 @@
             const playback = options.mediaController?.getPlaybackState?.() || { available: false, paused: true, currentTime: 0, duration: 0 };
             captureButton.disabled = !state.available;
             captureButton.style.opacity = state.available ? '1' : '0.45';
-            captureButton.title = state.available ? 'Capture the frame currently shown in Full Video' : (state.reason || 'Full video is unavailable');
+            captureButton.textContent = state.source === 'full-video' ? '📷 Capture Frame' : '📷 Capture Preview Frame';
+            captureButton.title = state.available
+                ? (state.source === 'full-video' ? 'Capture the frame currently shown in Full Video' : 'Capture the currently displayed lower-resolution preview frame')
+                : (state.reason || 'Video capture is unavailable');
             for (const button of [playPauseButton, stepBackButton, stepForwardButton]) {
                 button.disabled = !playback.available;
                 button.style.opacity = playback.available ? '1' : '0.45';
@@ -489,7 +498,7 @@
             playPauseButton.textContent = playback.paused ? '▶ Play' : '⏸ Pause';
             timeDisplay.textContent = `${formatTime(playback.currentTime)} / ${formatTime(playback.duration)}`;
             if (!candidateDataUrl && !preparingImage && !statusLocked) {
-                setStatus(state.available ? 'Seek or scrub to the frame you want, then select Capture Frame.' : (state.reason || 'Preparing full video…'));
+                setStatus(state.reason || (state.available ? 'Seek or scrub to the frame you want, then select Capture Frame.' : 'Preparing full video…'));
             }
         };
         activeEditor = {
@@ -556,6 +565,7 @@
         findClipboardImage,
         normalizeImageBlob,
         captureVideoFrame,
+        captureMediaFrame,
         mountLauncher,
         openEditor,
         closeActiveEditor,
