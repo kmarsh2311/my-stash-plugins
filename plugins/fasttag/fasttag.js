@@ -7544,7 +7544,7 @@
             );
 
             // 1. Allow video player & preview containers to handle mouse wheel freely for frame scrubbing
-            if (e.target.closest('[id$="-preview-container"], .fasttag-video-preview, video, #fasttag-floating-video-hud, #fasttag-video-container, #fasttag-video-element')) {
+            if (e.target.closest('[id$="-preview-container"], .fasttag-video-preview, video, #fasttag-floating-video-hud, #fasttag-cover-editor-hud #fasttag-media-container, #fasttag-video-container, #fasttag-video-element')) {
                 return;
             }
 

@@ -125,7 +125,11 @@
         element.style.left = `${Math.round(left)}px`;
         element.style.top = `${Math.round(top)}px`;
         element.style.width = `${Math.round(width)}px`;
-        element.style.maxHeight = `${Math.round(height)}px`;
+        element.style.height = `${Math.round(height)}px`;
+        element.style.minWidth = `${Math.min(360, Math.max(300, root.innerWidth - 24))}px`;
+        element.style.minHeight = `${Math.min(420, Math.max(320, root.innerHeight - 24))}px`;
+        element.style.maxWidth = `${Math.max(300, root.innerWidth - 16)}px`;
+        element.style.maxHeight = `${Math.max(320, root.innerHeight - 16)}px`;
     }
 
     function makeDraggable(element, handle, signal) {
@@ -195,13 +199,13 @@
         panel.tabIndex = -1;
         panel.setAttribute('role', 'dialog');
         panel.setAttribute('aria-label', 'Scene cover editor');
-        panel.style.cssText = `position:fixed;z-index:1000007;display:flex;flex-direction:column;overflow:auto;box-sizing:border-box;padding:0;background:${isDark ? '#111827' : '#f8fafc'};color:${isDark ? '#f8fafc' : '#0f172a'};border:1px solid ${isDark ? '#475569' : '#94a3b8'};border-radius:11px;box-shadow:0 22px 55px rgba(0,0,0,.7);font-family:system-ui,-apple-system,sans-serif;`;
+        panel.style.cssText = `position:fixed;z-index:1000007;display:flex;flex-direction:column;overflow:auto;resize:both;box-sizing:border-box;padding:0;background:${isDark ? '#111827' : '#f8fafc'};color:${isDark ? '#f8fafc' : '#0f172a'};border:1px solid ${isDark ? '#475569' : '#94a3b8'};border-radius:11px;box-shadow:0 22px 55px rgba(0,0,0,.7);font-family:system-ui,-apple-system,sans-serif;`;
         positionEditor(panel, options.anchorElement || options.hostElement);
         panel.addEventListener('mousedown', event => event.stopPropagation(), { signal });
 
         const header = document.createElement('header');
         header.style.cssText = `display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 11px;border-bottom:1px solid ${isDark ? '#334155' : '#cbd5e1'};cursor:grab;user-select:none;position:sticky;top:0;background:${isDark ? '#111827' : '#f8fafc'};z-index:2;`;
-        header.innerHTML = '<strong style="font-size:13px;">🖼️ Cover Editor</strong>';
+        header.innerHTML = '<strong style="font-size:13px;">🖼️ Cover Editor</strong><span style="font-size:9px;color:#94a3b8;margin-left:auto;">Drag header · Resize at bottom-right</span>';
         const closeButton = document.createElement('button');
         closeButton.type = 'button';
         closeButton.textContent = '✕';
