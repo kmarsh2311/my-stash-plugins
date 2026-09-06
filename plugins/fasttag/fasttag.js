@@ -3110,6 +3110,7 @@
         hostContainer.style.display = 'block';
         hostContainer.style.position = 'relative';
         hostContainer.style.width = '100%';
+        hostContainer.style.height = 'auto';
         hostContainer.style.aspectRatio = '16 / 9';
         const isEverythingHost = hostContainer.id === 'everything-preview-container';
         hostContainer.style.maxHeight = isEverythingHost ? '205px' : '280px';
@@ -4017,7 +4018,7 @@
             },
             releaseFromCoverEditor: () => {
                 coverEditing = false;
-                if (signal.aborted || !hostContainer.isConnected) return;
+                if (!hostContainer.isConnected) return;
                 progressBarBg.style.pointerEvents = currentMode === 'stream' ? 'auto' : 'none';
                 if (currentMode !== 'stream') progressBarBg.style.opacity = '0';
                 detachWheel();
@@ -9745,6 +9746,7 @@
     }
 
     async function rollNextRandomUntaggedScene(popup = null) {
+        if (FastTagCoverEditor.closeActiveEditor?.() === false) return;
         if (popup && popup.saveBtn) {
             const dice = popup.saveBtn.querySelector('.fasttag-dice-icon');
             if (dice) {
@@ -9805,6 +9807,7 @@
     async function navigateRandomSceneHistory(popup, direction, doSaveFn) {
         const history = popup?._randomHistoryState;
         if (!popup?._isRandomMode || !history) return;
+        if (FastTagCoverEditor.closeActiveEditor?.() === false) return;
 
         const previousIndex = history.index;
         const target = moveRandomSceneHistory(history, direction);
@@ -9826,6 +9829,7 @@
 
     async function navigateSequentialEditEverything(popup, sceneId, direction, doSaveFn) {
         if (!sequentialEditState.enabled) return;
+        if (FastTagCoverEditor.closeActiveEditor?.() === false) return;
 
         if (!window._fastTagEverythingScraperOpen) {
             if (popup.scraperCardContainer) {
@@ -10739,6 +10743,7 @@
 
             // If the Everything popup is already open, reuse it in-place! Zero redraw flash!
             if (activePopup && activePopup.type === 'everything' && activePopup.element && activePopup.element.isConnected) {
+                if (FastTagCoverEditor.closeActiveEditor?.() === false) return;
                 activePopup._isRandomMode = isRandomMode;
                 activePopup._randomUntaggedCount = randomCount;
                 if (isRandomMode) {

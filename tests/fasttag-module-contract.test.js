@@ -154,6 +154,9 @@ assert.ok(coverEditorSource.includes("candidateBox.addEventListener('drop'"), 't
 assert.ok(coverEditorSource.includes('Capture, upload, paste or drop an image'), 'the empty new-cover target should advertise drag-and-drop support');
 assert.ok(coverEditorSource.includes("closeActiveEditor(true)"), 'a successful cover save should close without a discard warning');
 assert.ok(mainSource.includes('if (FastTagCoverEditor.closeActiveEditor?.() === false) return false;'), 'outside and parent-popup closure should respect the unsaved-cover warning');
+assert.ok(mainSource.includes("hostContainer.style.height = 'auto';"), 'loading a new scene should restore a preview container collapsed by the cover editor');
+assert.ok(!mainSource.includes('if (signal.aborted || !hostContainer.isConnected) return;'), 'aborted scene previews should still restore their connected host before navigation');
+assert.ok((mainSource.match(/FastTagCoverEditor\.closeActiveEditor\?\.\(\) === false/g) || []).length >= 5, 'all Edit Everything scene-navigation paths should honour the unsaved-cover warning');
 const aiApplyMetadataBlock = mainSource.match(/mutation FastTagAIApplyMetadata[\s\S]*?syncSceneToApolloCache\(metadataRes\.data\.sceneUpdate\);/)?.[0] || '';
 assert.ok(aiApplyMetadataBlock.includes('title date'), 'AI Apply All should return updated title and date');
 assert.ok(aiApplyMetadataBlock.includes('syncSceneToApolloCache'), 'AI Apply All should synchronize metadata to live scene cards');
