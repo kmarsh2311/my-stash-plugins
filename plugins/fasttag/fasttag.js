@@ -9048,87 +9048,14 @@
                 } catch (e) {}
             }, signal);
 
-            const triggerScrapeAction = async (forceOpen = false, targetSceneId = null, targetCardElement = null) => {
-                const activeSceneId = targetSceneId || popup.currentSceneId || currentSceneId;
-                const activeCardElement = targetCardElement || popup.currentCardElement || cardElement;
-                const scrapeRequestId = beginScraperRequest(popup, activeSceneId);
-                if (scrapeRequestId == null) return null;
-
-                // If scraper card is currently open and not force-opening, clicking "Hide" closes it and toggles back to "Scrape"
-                const isScraperOpen = (popup.scraperCardContainer && popup.scraperCardContainer.style.display !== 'none' && popup.scraperCardContainer.innerHTML.trim() !== '') || FastTagScraperController.isHudOpen();
-                if (isScraperOpen && !forceOpen) {
-                    window._fastTagEverythingScraperOpen = false;
-                    setScraperHudPersistedOpen(false);
-                    ftLog('ACTION', 'SCRAPER', 'Scraper HUD closed by user');
-                    if (popup.scraperCardContainer) {
-                        popup.scraperCardContainer.style.display = 'none';
-                        popup.scraperCardContainer.innerHTML = '';
-                    }
-                    closeFloatingScraperHud();
-                    popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
-                    popup.scrapeBtn.innerHTML = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
-                    popup.scrapeBtn.title = 'Scrape scene metadata';
-                    popup.refreshBtn.title = 'Refresh all caches';
-                    hideScrapeCoverTooltip();
-                    return;
-                }
-
-                window._fastTagEverythingScraperOpen = true;
-                setScraperHudPersistedOpen(true);
-                popup.refreshBtn.title = 'Search again using current scene metadata';
-                ftLog('ACTION', 'SCRAPER', 'Scraper HUD opened');
-
-                // If already scraped for this scene during this active session, reopen instantly with 0ms lag!
-                if (sessionScrapeCache.has(activeSceneId) && sessionScrapeCache.get(activeSceneId)?.length > 0) {
-                    const cached = sessionScrapeCache.get(activeSceneId);
-                    cached._fromCache = true;
-                    renderScraperMatchCard(
-                        popup.scraperCardContainer, cached, activeSceneId, popup._context, popup,
-                        () => popup.globalSearch?.focus({ preventScroll: true }), '', scrapeRequestId
-                    );
-                    return;
-                }
-
-                const origHtml = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
-                popup.scrapeBtn.disabled = true;
-                popup.scrapeBtn.innerHTML = `<span>⏳ Scraping...</span>`;
-
-                try {
-                    const matches = await fetchScraperMatchesForScene(activeSceneId, activeCardElement);
-                    if (!isScraperRequestCurrent(popup, activeSceneId, scrapeRequestId)) return null;
-                    if (!matches || matches.length === 0) {
-                        toastError('No scraper matches found on configured scrapers');
-                        const firstPath = popup.sceneData?.files?.[0]?.path || '';
-                        const pathParts = firstPath.split(/[/\\]/);
-                        const initialSearch = pathParts[pathParts.length - 1] || popup.sceneData?.title || '';
-                        await renderScraperMatchCard(
-                            popup.scraperCardContainer,
-                            [],
-                            activeSceneId,
-                            popup._context,
-                            popup,
-                            () => popup.globalSearch?.focus({ preventScroll: true }),
-                            initialSearch,
-                            scrapeRequestId
-                        );
-                        return true;
-                    } else {
-                        sessionScrapeCache.set(activeSceneId, matches);
-                        popup.scrapeBtn.disabled = false;
-                        renderScraperMatchCard(
-                            popup.scraperCardContainer, matches, activeSceneId, popup._context, popup,
-                            () => popup.globalSearch?.focus({ preventScroll: true }), '', scrapeRequestId
-                        );
-                        return true;
-                    }
-                } catch (err) {
-                    if (!isScraperRequestCurrent(popup, activeSceneId, scrapeRequestId)) return null;
-                    popup.scrapeBtn.disabled = false;
-                    popup.scrapeBtn.innerHTML = origHtml;
-                    toastError('Scrape error: ' + (err?.message || err));
-                    return false;
-                }
-            };
+            const triggerScrapeAction = FastTagScraperController.createTrigger({
+                popup,
+                mode: 'everything',
+                getSceneId: () => popup.currentSceneId || currentSceneId,
+                getCardElement: () => popup.currentCardElement || cardElement,
+                getContext: () => popup._context,
+                focusAfter: () => popup.globalSearch?.focus({ preventScroll: true })
+            });
 
             popup.triggerScrape = triggerScrapeAction;
 
@@ -11727,67 +11654,19 @@
         };
 
         if (popup.scrapeBtn) {
+            const triggerScrapeAction = FastTagScraperController.createTrigger({
+                popup,
+                mode: 'single',
+                getSceneId: () => sceneId,
+                getCardElement: () => cardElement,
+                getContext: () => null,
+                focusAfter: () => filterInput.focus({ preventScroll: true })
+            });
+            popup.triggerScrape = triggerScrapeAction;
             popup.scrapeBtn.onclick = async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const scrapeRequestId = beginScraperRequest(popup, sceneId);
-                if (scrapeRequestId == null) return;
-
-                // If scraper card is currently open, clicking this button (which says "Hide") closes it and toggles back to "Scrape"
-                const isScraperOpen = (popup.scraperCardContainer && popup.scraperCardContainer.style.display !== 'none' && popup.scraperCardContainer.innerHTML.trim() !== '') || FastTagScraperController.isHudOpen();
-                if (isScraperOpen) {
-                    if (popup.scraperCardContainer) {
-                        popup.scraperCardContainer.style.display = 'none';
-                        popup.scraperCardContainer.innerHTML = '';
-                    }
-                    closeFloatingScraperHud();
-                    popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
-                    popup.scrapeBtn.innerHTML = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
-                    popup.scrapeBtn.title = 'Scrape scene metadata';
-                    hideScrapeCoverTooltip();
-                    return;
-                }
-
-                // If already scraped for this scene during this active session, reopen instantly with 0ms lag!
-                if (sessionScrapeCache.has(sceneId) && sessionScrapeCache.get(sceneId)?.length > 0) {
-                    const cached = sessionScrapeCache.get(sceneId);
-                    cached._fromCache = true;
-                    renderScraperMatchCard(
-                        popup.scraperCardContainer, cached, sceneId, null, popup,
-                        () => filterInput.focus({ preventScroll: true }), '', scrapeRequestId
-                    );
-                    return;
-                }
-
-                const origHtml = isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
-                popup.scrapeBtn.disabled = true;
-                popup.scrapeBtn.innerHTML = `<span>⏳ Scraping...</span>`;
-
-                try {
-                    const matches = await fetchScraperMatchesForScene(sceneId, cardElement);
-                    if (!isScraperRequestCurrent(popup, sceneId, scrapeRequestId)) return;
-                    if (!matches || matches.length === 0) {
-                        popup.scrapeBtn.innerHTML = `<span>✕ No Matches</span>`;
-                        toastError('No scraper matches found on configured scrapers');
-                        setTimeout(() => {
-                            if (!isScraperRequestCurrent(popup, sceneId, scrapeRequestId)) return;
-                            popup.scrapeBtn.disabled = false;
-                            popup.scrapeBtn.innerHTML = origHtml;
-                        }, 2500);
-                    } else {
-                        sessionScrapeCache.set(sceneId, matches);
-                        popup.scrapeBtn.disabled = false;
-                        renderScraperMatchCard(
-                            popup.scraperCardContainer, matches, sceneId, null, popup,
-                            () => filterInput.focus({ preventScroll: true }), '', scrapeRequestId
-                        );
-                    }
-                } catch (err) {
-                    if (!isScraperRequestCurrent(popup, sceneId, scrapeRequestId)) return;
-                    popup.scrapeBtn.disabled = false;
-                    popup.scrapeBtn.innerHTML = origHtml;
-                    toastError('Scrape error: ' + (err?.message || err));
-                }
+                await triggerScrapeAction(false, sceneId, cardElement);
             };
         }
 

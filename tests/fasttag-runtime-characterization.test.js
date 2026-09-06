@@ -53,6 +53,12 @@ assert.ok(scraperHudOwnership.includes('closeHud();'), 'detaching the owner popu
 assertBefore(scraperHudOwnership, 'floatingHudOwnerObserver = null;', 'floatingHudElement.remove();', 'HUD closure must release its observer before removing the element');
 assert.ok(scraperHudOwnership.includes('floatingHudElement = null;'), 'HUD closure must release its element reference');
 
+const scraperTrigger = section('function createTrigger(options)', 'async function renderMatches(', scraperControllerSource);
+assertBefore(scraperTrigger, 'const scrapeRequestId = beginRequest(popup, activeSceneId);', 'await dependencies.fetchScraperMatchesForScene(activeSceneId, activeCardElement);', 'a scraper action must claim request ownership before starting network work');
+assertBefore(scraperTrigger, 'await dependencies.fetchScraperMatchesForScene(activeSceneId, activeCardElement);', 'if (!isRequestCurrent(popup, activeSceneId, scrapeRequestId)) return null;', 'a completed scrape must be revalidated before its result is rendered');
+assert.ok(scraperTrigger.includes('sessionCache.has(activeSceneId)'), 'repeat scraper opens should reuse the active session cache');
+assert.ok(scraperTrigger.includes("mode === 'everything' ? false : undefined"), 'Edit Everything refreshes must be able to detect a failed scrape');
+
 // Accept reads the visible field choices once, resolves all selected entities,
 // commits ordinary metadata first, then stores the remote ID and cover in
 // independent mutations so either optional save cannot roll back metadata.

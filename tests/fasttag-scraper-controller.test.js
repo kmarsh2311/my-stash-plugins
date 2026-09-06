@@ -54,6 +54,38 @@ controller.resetLayoutState();
 assert.equal(controller.getHudPosition(), null);
 assert.equal(controller.getHudSize(), null);
 
+async function testTriggerRejectsLateResults() {
+    let resolveFetch;
+    const lateResult = new Promise(resolve => { resolveFetch = resolve; });
+    const triggerPopup = {
+        currentSceneId: 'scene-1',
+        element: { isConnected: true },
+        scraperCardContainer: { style: { display: 'none' }, innerHTML: '' },
+        scrapeBtn: { classList: { remove() {} }, innerHTML: '', disabled: false }
+    };
+    activePopup = triggerPopup;
+    controller.configure({
+        getActivePopup: () => activePopup,
+        isEasterEggActive: () => false,
+        setScraperHudPersistedOpen() {},
+        log() {},
+        hideScrapeCoverTooltip() {},
+        toastError() {},
+        fetchScraperMatchesForScene: () => lateResult
+    });
+    const trigger = controller.createTrigger({
+        popup: triggerPopup,
+        mode: 'single',
+        getSceneId: () => triggerPopup.currentSceneId
+    });
+    const pending = trigger();
+    triggerPopup.currentSceneId = 'scene-2';
+    controller.invalidateRequests(triggerPopup);
+    resolveFetch([{ title: 'Result for the old scene' }]);
+    assert.equal(await pending, null);
+    assert.equal(controller.sessionCache.has('scene-1'), false, 'late results must never enter the session cache');
+}
+
 async function testAcceptMatchOrdering() {
     const events = [];
     const acceptedStashIds = [{ endpoint: 'https://stashdb.org/graphql', stash_id: 'remote-1' }];
@@ -140,7 +172,8 @@ async function testAcceptMatchOrdering() {
     assert.equal(acceptButton.disabled, true);
 }
 
-testAcceptMatchOrdering()
+testTriggerRejectsLateResults()
+    .then(() => testAcceptMatchOrdering())
     .then(() => console.log('fasttag-scraper-controller tests passed'))
     .catch(error => {
         console.error(error);

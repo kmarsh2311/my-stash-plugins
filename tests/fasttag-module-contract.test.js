@@ -86,7 +86,7 @@ assert.ok(
 );
 assert.ok(scraperControllerSource.includes('fasttag-scrape-empty-query'), 'zero-result scraper state should provide an editable manual-search field');
 assert.ok(
-    mainSource.includes('renderScraperMatchCard(\n                            popup.scraperCardContainer,\n                            [],'),
+    scraperControllerSource.includes('await renderMatches(\n                            popup.scraperCardContainer,\n                            [],'),
     'Edit Everything should open the scraper search panel when automatic scraping returns no results'
 );
 assert.ok(
@@ -118,7 +118,7 @@ assert.ok(scraperControllerSource.includes('function isPopupActive(popup)'), 'sc
 assert.ok(scraperControllerSource.includes('watchHudOwner(popup);'), 'detached scraper HUD should monitor its owning popup');
 assert.ok(mainSource.includes('activePopup._fastTagClosed = true;'), 'popup closure should invalidate pending scraper work');
 assert.ok(scraperControllerSource.includes('function beginRequest(popup, sceneId)'), 'scrapes should receive a per-popup request generation');
-assert.ok(mainSource.includes('if (!isScraperRequestCurrent(popup, activeSceneId, scrapeRequestId)) return null;'), 'late automatic scrape responses should be discarded');
+assert.ok(scraperControllerSource.includes('if (!isRequestCurrent(popup, activeSceneId, scrapeRequestId)) return null;'), 'late automatic scrape responses should be discarded');
 assert.ok(mainSource.includes('invalidateScraperRequests(popup);\n            popup.currentSceneId = sceneId;'), 'scene navigation should invalidate requests for the previous scene');
 assert.ok(scraperControllerSource.includes('{ endpoint: match._sourceEndpoint, name: match._sourceName }'), 'scraper acceptance should pass source identity into new performer creation');
 assert.ok(settingsSource.includes('fasttag-match-fill-performer-images'), 'Match settings should expose missing performer image enrichment');

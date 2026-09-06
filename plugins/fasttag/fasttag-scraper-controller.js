@@ -213,6 +213,130 @@
     function isHudOpen() { return Boolean(floatingHudElement && root.document?.body?.contains(floatingHudElement)); }
     function resetLayoutState() { floatingHudPosition = null; floatingHudSize = null; }
 
+    function createTrigger(options) {
+        if (!dependencies) throw new Error('[FastTag] Scraper controller is not configured');
+        const {
+            popup,
+            mode = 'everything',
+            getSceneId,
+            getCardElement,
+            getContext = () => null,
+            focusAfter = () => {}
+        } = options || {};
+        if (!popup || typeof getSceneId !== 'function') {
+            throw new Error('[FastTag] Scraper trigger requires a popup and scene resolver');
+        }
+
+        return async (forceOpen = false, targetSceneId = null, targetCardElement = null) => {
+            const activeSceneId = targetSceneId || getSceneId();
+            const activeCardElement = targetCardElement || getCardElement?.() || null;
+            const scrapeRequestId = beginRequest(popup, activeSceneId);
+            if (scrapeRequestId == null) return null;
+
+            const isScraperOpen = Boolean(
+                popup.scraperCardContainer
+                && popup.scraperCardContainer.style.display !== 'none'
+                && popup.scraperCardContainer.innerHTML.trim() !== ''
+            ) || isHudOpen();
+            if (isScraperOpen && !forceOpen) {
+                if (mode === 'everything') {
+                    root._fastTagEverythingScraperOpen = false;
+                    dependencies.setScraperHudPersistedOpen(false);
+                    dependencies.log('ACTION', 'SCRAPER', 'Scraper HUD closed by user');
+                }
+                if (popup.scraperCardContainer) {
+                    popup.scraperCardContainer.style.display = 'none';
+                    popup.scraperCardContainer.innerHTML = '';
+                }
+                closeHud();
+                popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
+                popup.scrapeBtn.innerHTML = dependencies.isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
+                popup.scrapeBtn.title = 'Scrape scene metadata';
+                if (mode === 'everything' && popup.refreshBtn) popup.refreshBtn.title = 'Refresh all caches';
+                dependencies.hideScrapeCoverTooltip();
+                return;
+            }
+
+            if (mode === 'everything') {
+                root._fastTagEverythingScraperOpen = true;
+                dependencies.setScraperHudPersistedOpen(true);
+                if (popup.refreshBtn) popup.refreshBtn.title = 'Search again using current scene metadata';
+                dependencies.log('ACTION', 'SCRAPER', 'Scraper HUD opened');
+            }
+
+            if (sessionCache.has(activeSceneId) && sessionCache.get(activeSceneId)?.length > 0) {
+                const cached = sessionCache.get(activeSceneId);
+                cached._fromCache = true;
+                renderMatches(
+                    popup.scraperCardContainer,
+                    cached,
+                    activeSceneId,
+                    getContext(),
+                    popup,
+                    focusAfter,
+                    '',
+                    scrapeRequestId
+                );
+                return;
+            }
+
+            const originalHtml = dependencies.isEasterEggActive() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
+            popup.scrapeBtn.disabled = true;
+            popup.scrapeBtn.innerHTML = '<span>⏳ Scraping...</span>';
+
+            try {
+                const matches = await dependencies.fetchScraperMatchesForScene(activeSceneId, activeCardElement);
+                if (!isRequestCurrent(popup, activeSceneId, scrapeRequestId)) return null;
+                if (!matches || matches.length === 0) {
+                    if (mode !== 'everything') popup.scrapeBtn.innerHTML = '<span>✕ No Matches</span>';
+                    dependencies.toastError('No scraper matches found on configured scrapers');
+                    if (mode === 'everything') {
+                        const firstPath = popup.sceneData?.files?.[0]?.path || '';
+                        const pathParts = firstPath.split(/[/\\]/);
+                        const initialSearch = pathParts[pathParts.length - 1] || popup.sceneData?.title || '';
+                        await renderMatches(
+                            popup.scraperCardContainer,
+                            [],
+                            activeSceneId,
+                            getContext(),
+                            popup,
+                            focusAfter,
+                            initialSearch,
+                            scrapeRequestId
+                        );
+                        return true;
+                    }
+                    root.setTimeout(() => {
+                        if (!isRequestCurrent(popup, activeSceneId, scrapeRequestId)) return;
+                        popup.scrapeBtn.disabled = false;
+                        popup.scrapeBtn.innerHTML = originalHtml;
+                    }, 2500);
+                    return;
+                }
+
+                sessionCache.set(activeSceneId, matches);
+                popup.scrapeBtn.disabled = false;
+                renderMatches(
+                    popup.scraperCardContainer,
+                    matches,
+                    activeSceneId,
+                    getContext(),
+                    popup,
+                    focusAfter,
+                    '',
+                    scrapeRequestId
+                );
+                return mode === 'everything' ? true : undefined;
+            } catch (error) {
+                if (!isRequestCurrent(popup, activeSceneId, scrapeRequestId)) return null;
+                popup.scrapeBtn.disabled = false;
+                popup.scrapeBtn.innerHTML = originalHtml;
+                dependencies.toastError('Scrape error: ' + (error?.message || error));
+                return mode === 'everything' ? false : undefined;
+            }
+        };
+    }
+
     async function renderMatches(container, incomingResults, sceneId, ctx, popup, onDismiss, emptySearchQuery = '', scrapeRequestId = null) {
         if (!dependencies) throw new Error('[FastTag] Scraper controller is not configured');
         const document = root.document;
@@ -1526,6 +1650,7 @@
         isHudOpen,
         resetLayoutState,
         sessionCache,
+        createTrigger,
         renderMatches,
         acceptMatch
     });
