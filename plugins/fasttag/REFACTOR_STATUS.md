@@ -7,14 +7,16 @@ passed.
 
 ## Current phase
 
-Step 6 is complete. `fasttag-preview.js` now owns media discovery and rendering,
-timeline and wheel scrubbing, floating-HUD state and geometry, abort cleanup,
-session cues, persisted layout state, and the Cover Editor player handoff. The
-coordinator supplies its external services through explicit callbacks. Source
-comparison confirms the moved implementation differs only at those dependency
-and state boundaries, and an isolated smoke test covers preview creation and
-abort teardown. `fasttag.js` has moved from the 839,005-byte baseline to 709,747
-bytes without an intentional behavioural change.
+Step 7 is complete. `fasttag-scraper-controller.js` now owns request generations,
+active popup and scene validation, session result caching, result filtering and
+presentation, manual re-search, detached-HUD ownership and geometry, standard
+scrape triggers, and acceptance save ordering. Edit Everything still owns the
+refresh button's dirty-editor save gate; after that gate it delegates the forced
+search to the controller. The controller is supplied external services through
+explicit callbacks, and automated tests cover stale responses, cache rejection,
+HUD cleanup, and metadata/remote-ID/cover save ordering. `fasttag.js` has moved
+from the 839,005-byte baseline to 598,564 bytes without an intentional
+behavioural change.
 
 ## Extracted modules
 
@@ -25,13 +27,14 @@ bytes without an intentional behavioural change.
 - `fasttag-gemini.js`: Gemini bridge transport and scene parsing
 - `fasttag-scraper.js`: discovery, match analysis, entity resolution, and save payloads
 - `fasttag-scraper-ui.js`: scraper assessment and review presentation models
+- `fasttag-scraper-controller.js`: request/HUD lifecycle, result presentation, session caching, and acceptance coordination
 - `fasttag-preview.js`: media discovery, scrubbing calculations, and HUD layout
 - `fasttag-ui.js`: shared popup sizing and workstation positioning
 - `fasttag-editors.js`: selection normalization and bulk-selection deltas
 - `fasttag-workflows.js`: tested result-list and navigation state transitions
 
-`fasttag.js` remains the runtime coordinator and owns DOM-heavy popup rendering,
-event wiring, navigation, and save orchestration.
+`fasttag.js` remains the runtime coordinator and owns editor popup rendering,
+global event wiring, navigation, and editor save orchestration.
 
 See `ARCHITECTURE.md` for the permanent ownership rules used for future work.
 
@@ -49,10 +52,9 @@ suites.
 
 ## Next work
 
-Separate scraper request and HUD lifecycle coordination from the main runtime.
-Preserve request-generation checks, active scene ownership, hidden-result state,
-docking, search refresh, and acceptance ordering before considering shared popup
-infrastructure.
+Characterize and extract the shared popup shell and lifecycle in small slices.
+Keep editor-specific tables, selection state, navigation, and automatic saving
+in the coordinator until each workflow has its own coverage.
 
 ## Still required before a merge or release
 

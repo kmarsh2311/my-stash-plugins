@@ -51,14 +51,16 @@ loader rather than introducing a bundler.
 4. `fasttag-gemini.js`
    - Gemini bridge connection and parsing
 5. `fasttag-scraper.js`
-   - Scraper queries, result rendering, and acceptance
-6. `fasttag-preview.js`
+   - Scraper queries, evidence analysis, entity resolution, and save payloads
+6. `fasttag-scraper-controller.js`
+   - Scraper request/HUD lifecycle, result rendering, session caching, and acceptance coordination
+7. `fasttag-preview.js`
    - Preview media, scrubbing, and floating video HUD
-7. `fasttag-ui.js`
+8. `fasttag-ui.js`
    - Toasts, dialogs, tooltips, shared popup shell, and layout helpers
-8. `fasttag-editors.js`
+9. `fasttag-editors.js`
    - Single-entity, bulk, and Edit Everything workflows
-9. `fasttag.js`
+10. `fasttag.js`
    - Shared runtime state, startup, and global event wiring
 
 These are target ownership boundaries, not an instruction to move everything

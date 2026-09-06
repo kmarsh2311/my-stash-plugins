@@ -163,17 +163,10 @@
         getUnavailableContextPresentation
     } = FastTagScraperUi;
     const {
-        isPopupActive: isScraperPopupActive,
-        beginRequest: beginScraperRequest,
         invalidateRequests: invalidateScraperRequests,
-        isRequestCurrent: isScraperRequestCurrent,
-        watchHudOwner: watchFloatingScraperHudOwner,
         closeHud: closeFloatingScraperHud,
-        getInitialPopoutPosition: getInitialScraperPopoutPosition,
-        attachResizeHandles: attachScraperHudResizeHandles,
         sessionCache: sessionScrapeCache,
-        renderMatches: renderScraperMatchCard,
-        acceptMatch: handleAcceptScrapeMatch
+        renderMatches: renderScraperMatchCard
     } = FastTagScraperController;
     const {
         getDefaultPopoutSize,
