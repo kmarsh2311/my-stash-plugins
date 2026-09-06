@@ -36,11 +36,11 @@ The scrubbing instruction overlay appears once per browser session and no more t
 
 ### Editing a scene cover
 
-In Edit Everything, select the picture button in the video controls to open the separate Cover Editor HUD. It shows the cover currently stored by Stash and a preview of any proposed replacement. Opening it switches the player to Full Video when possible so **Capture Frame** can use the exact frame currently displayed.
+In Edit Everything, select the picture button in the video controls to open the Cover Editor HUD. The existing player temporarily moves into the cover workspace and switches to Full Video when possible. Use the persistent **Play/Pause** and step controls to select a frame; moving the pointer away does not resume a deliberately paused video. **Capture Frame** pauses automatically before capturing the displayed frame. The current Stash cover and proposed replacement remain visible below the player.
 
 Alternatively, select **Upload** for a JPEG, PNG, or WebP image, or **Paste** to read an image from the clipboard. Where direct clipboard access is unavailable, click the Cover Editor and press `Ctrl+V` or `Cmd+V`. Large images are scaled to a maximum dimension of 1920 pixels and prepared as JPEG covers. Review the proposed image and select **Set Cover** to save it through Stash; closing or cancelling the HUD makes no change.
 
-If the browser cannot play the full-video format, frame capture is disabled with an explanation. Upload and clipboard options remain available. A playable preview animation is not treated as the full source video for frame capture.
+Closing the Cover Editor returns the existing player to Edit Everything and restores its previous Preview or Full Video mode. If the browser cannot play the full-video format, frame capture and playback controls are disabled with an explanation. Upload and clipboard options remain available. A playable preview animation is not treated as the full source video for frame capture.
 
 ## StashDB scraping
 

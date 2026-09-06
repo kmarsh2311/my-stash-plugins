@@ -42,6 +42,18 @@
             .replace(/>/g, '&gt;');
     }
 
+    function formatTime(seconds) {
+        const value = Number(seconds);
+        if (!isFinite(value) || value < 0) return '0:00';
+        const total = Math.floor(value);
+        const hours = Math.floor(total / 3600);
+        const minutes = Math.floor((total % 3600) / 60);
+        const secs = String(total % 60).padStart(2, '0');
+        return hours > 0
+            ? `${hours}:${String(minutes).padStart(2, '0')}:${secs}`
+            : `${minutes}:${secs}`;
+    }
+
     function readBlobAsDataUrl(blob) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -102,8 +114,8 @@
     }
 
     function positionEditor(element, anchorElement) {
-        const width = Math.min(470, Math.max(330, root.innerWidth - 24));
-        const height = Math.min(590, Math.max(420, root.innerHeight - 24));
+        const width = Math.min(860, Math.max(330, root.innerWidth - 24));
+        const height = Math.min(780, Math.max(420, root.innerHeight - 24));
         const margin = 12;
         const anchor = anchorElement?.getBoundingClientRect?.();
         let left = anchor ? anchor.left - width - margin : margin;
@@ -152,6 +164,7 @@
         if (!activeEditor) return;
         const editor = activeEditor;
         activeEditor = null;
+        editor.mediaController?.releaseFromCoverEditor?.();
         editor.abortController.abort();
         editor.element.remove();
     }
@@ -200,12 +213,17 @@
         const body = document.createElement('div');
         body.style.cssText = 'display:flex;flex-direction:column;gap:10px;padding:11px;';
         body.innerHTML = `
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;min-height:150px;">
-                <div><div style="font-size:10px;font-weight:700;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;">Current cover</div><div class="fasttag-cover-current" style="height:145px;background:#020617;border:1px solid #334155;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;"></div></div>
-                <div><div style="font-size:10px;font-weight:700;color:#a5b4fc;margin-bottom:4px;text-transform:uppercase;">New cover</div><div class="fasttag-cover-candidate" style="height:145px;background:#020617;border:1px dashed #6366f1;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#64748b;font-size:11px;text-align:center;padding:8px;box-sizing:border-box;">Capture, upload or paste an image</div></div>
+            <div>
+                <div style="font-size:10px;font-weight:700;color:#a5b4fc;margin-bottom:4px;text-transform:uppercase;">Choose a video frame</div>
+                <div class="fasttag-cover-video-stage" style="width:100%;aspect-ratio:16/9;max-height:410px;background:#020617;border:1px solid #334155;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;"></div>
+                <div class="fasttag-cover-playback-controls" style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:7px;"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;min-height:170px;">
+                <div><div style="font-size:10px;font-weight:700;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;">Current cover</div><div class="fasttag-cover-current" style="height:165px;background:#020617;border:1px solid #334155;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;"></div></div>
+                <div><div style="font-size:10px;font-weight:700;color:#a5b4fc;margin-bottom:4px;text-transform:uppercase;">New cover</div><div class="fasttag-cover-candidate" style="height:165px;background:#020617;border:1px dashed #6366f1;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#64748b;font-size:11px;text-align:center;padding:8px;box-sizing:border-box;">Capture, upload or paste an image</div></div>
             </div>
             <div class="fasttag-cover-status" role="status" style="font-size:10.5px;line-height:1.35;padding:7px 8px;border-radius:6px;background:${isDark ? 'rgba(30,41,59,.8)' : '#e2e8f0'};color:${isDark ? '#cbd5e1' : '#334155'};">Opening the full video for frame capture…</div>
-            <div class="fasttag-cover-actions" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;"></div>
+            <div class="fasttag-cover-actions" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;"></div>
             <input class="fasttag-cover-file" type="file" accept="image/jpeg,image/png,image/webp" style="display:none;">
             <div style="font-size:9.5px;color:#94a3b8;line-height:1.35;">Nothing is changed until you select <strong>Set Cover</strong>. Upload and clipboard remain available when the full video cannot be played.</div>
             <div class="fasttag-cover-footer" style="display:flex;gap:7px;border-top:1px solid ${isDark ? '#334155' : '#cbd5e1'};padding-top:9px;"></div>
@@ -215,6 +233,8 @@
 
         const currentBox = body.querySelector('.fasttag-cover-current');
         const candidateBox = body.querySelector('.fasttag-cover-candidate');
+        const videoStage = body.querySelector('.fasttag-cover-video-stage');
+        const playbackControls = body.querySelector('.fasttag-cover-playback-controls');
         const status = body.querySelector('.fasttag-cover-status');
         const actions = body.querySelector('.fasttag-cover-actions');
         const fileInput = body.querySelector('.fasttag-cover-file');
@@ -227,7 +247,14 @@
         const captureButton = createActionButton('📷 Capture Frame');
         const uploadButton = createActionButton('⬆ Upload');
         const pasteButton = createActionButton('📋 Paste');
-        actions.append(captureButton, uploadButton, pasteButton);
+        actions.append(uploadButton, pasteButton);
+        const playPauseButton = createActionButton('⏸ Pause');
+        const stepBackButton = createActionButton('◀ Step');
+        const stepForwardButton = createActionButton('Step ▶');
+        const timeDisplay = document.createElement('span');
+        timeDisplay.style.cssText = `font:600 10.5px ui-monospace,SFMono-Regular,Menlo,monospace;color:${isDark ? '#cbd5e1' : '#334155'};min-width:92px;text-align:center;`;
+        captureButton.style.marginLeft = 'auto';
+        playbackControls.append(playPauseButton, stepBackButton, timeDisplay, stepForwardButton, captureButton);
         const cancelButton = createActionButton('Cancel');
         const saveButton = createActionButton('Set Cover', true);
         saveButton.disabled = true;
@@ -276,6 +303,7 @@
 
         captureButton.onclick = () => {
             try {
+                options.mediaController?.pause?.();
                 setCandidate(captureVideoFrame(options.mediaController?.getCurrentVideo?.()), 'Captured video frame');
             } catch (error) {
                 setStatus(error?.message || 'The video frame could not be captured.', true, true);
@@ -307,6 +335,14 @@
                 setStatus('Clipboard access was unavailable. Click this panel and press Ctrl+V or Cmd+V.', true, true);
             }
         };
+        playPauseButton.onclick = () => {
+            const playback = options.mediaController?.getPlaybackState?.();
+            if (!playback?.available) return;
+            if (playback.paused) options.mediaController?.play?.();
+            else options.mediaController?.pause?.();
+        };
+        stepBackButton.onclick = () => options.mediaController?.stepBy?.(-1 / 30);
+        stepForwardButton.onclick = () => options.mediaController?.stepBy?.(1 / 30);
 
         document.addEventListener('paste', event => {
             const item = findClipboardImage(event.clipboardData?.items);
@@ -348,14 +384,24 @@
 
         const refreshCaptureState = () => {
             const state = options.mediaController?.getCaptureState?.() || { available: false, reason: 'Full video is unavailable.' };
+            const playback = options.mediaController?.getPlaybackState?.() || { available: false, paused: true, currentTime: 0, duration: 0 };
             captureButton.disabled = !state.available;
             captureButton.style.opacity = state.available ? '1' : '0.45';
             captureButton.title = state.available ? 'Capture the frame currently shown in Full Video' : (state.reason || 'Full video is unavailable');
+            for (const button of [playPauseButton, stepBackButton, stepForwardButton]) {
+                button.disabled = !playback.available;
+                button.style.opacity = playback.available ? '1' : '0.45';
+            }
+            playPauseButton.textContent = playback.paused ? '▶ Play' : '⏸ Pause';
+            timeDisplay.textContent = `${formatTime(playback.currentTime)} / ${formatTime(playback.duration)}`;
             if (!candidateDataUrl && !preparingImage && !statusLocked) {
                 setStatus(state.available ? 'Seek or scrub to the frame you want, then select Capture Frame.' : (state.reason || 'Preparing full video…'));
             }
         };
+        activeEditor = { element: panel, abortController, hostElement: options.hostElement, mediaController: options.mediaController };
+        options.mediaController?.mountForCoverEditor?.(videoStage);
         options.mediaController?.switchToFullVideo?.();
+        panel.focus({ preventScroll: true });
         refreshCaptureState();
         const capturePoll = root.setInterval(refreshCaptureState, 300);
         signal.addEventListener('abort', () => root.clearInterval(capturePoll), { once: true });
@@ -366,7 +412,6 @@
             if (event.key === 'Escape') closeActiveEditor();
         }, { signal });
         makeDraggable(panel, header, signal);
-        activeEditor = { element: panel, abortController, hostElement: options.hostElement };
     }
 
     function mountLauncher(options) {
@@ -391,6 +436,7 @@
     root.FastTag.coverEditor = Object.freeze({
         configure,
         calculateImageSize,
+        formatTime,
         validateImageBlob,
         findClipboardImage,
         normalizeImageBlob,

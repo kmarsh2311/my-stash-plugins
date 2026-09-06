@@ -13,6 +13,9 @@ assert.deepEqual(coverEditor.calculateImageSize(1080, 1920), { width: 1080, heig
 assert.deepEqual(coverEditor.calculateImageSize(1280, 720), { width: 1280, height: 720 });
 assert.deepEqual(coverEditor.calculateImageSize(0, 720), { width: 0, height: 0 });
 assert.deepEqual(coverEditor.calculateImageSize(4000, 2000, 1000), { width: 1000, height: 500 });
+assert.equal(coverEditor.formatTime(0), '0:00');
+assert.equal(coverEditor.formatTime(65.9), '1:05');
+assert.equal(coverEditor.formatTime(3661), '1:01:01');
 
 assert.equal(coverEditor.validateImageBlob(null), 'No image was provided.');
 assert.equal(coverEditor.validateImageBlob({ type: 'text/plain', size: 20 }), 'Choose an image file.');

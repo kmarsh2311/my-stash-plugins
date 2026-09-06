@@ -3160,6 +3160,8 @@
         let shiftHeld = false;
         let isHovered = false;
         let streamCaptureFailure = '';
+        let coverEditing = false;
+        let coverEditorPreviousMode = null;
 
         // Slim Progress Bar at the very bottom edge (no text/numbers)
         const progressBarBg = document.createElement('div');
@@ -3834,7 +3836,7 @@
                 clearTimeout(progressBarTimer);
                 progressBarBg.style.opacity = '0';
                 if (currentMedia && currentMedia.tagName === 'VIDEO') {
-                    currentMedia.play().catch(() => {});
+                    if (!coverEditing || wasPlaying) currentMedia.play().catch(() => {});
                 }
             }
             endScrubbing();
@@ -3869,7 +3871,7 @@
                 }, 1500);
                 if (currentMedia && currentMedia.tagName === 'VIDEO') {
                     try { currentMedia.loop = !!originalLoop; } catch (err) {}
-                    currentMedia.play().catch(() => {});
+                    if (!coverEditing || wasPlaying) currentMedia.play().catch(() => {});
                     wasPlaying = false;
                 }
             }
@@ -3882,7 +3884,7 @@
                 clearTimeout(progressBarTimer);
                 progressBarBg.style.opacity = '0';
                 if (currentMedia && currentMedia.tagName === 'VIDEO') {
-                    currentMedia.play().catch(() => {});
+                    if (!coverEditing || wasPlaying) currentMedia.play().catch(() => {});
                 }
             }
         };
@@ -3911,6 +3913,83 @@
             switchToFullVideo: () => renderMedia('stream'),
             getCurrentVideo: () => currentMode === 'stream' && currentMedia?.tagName === 'VIDEO' ? currentMedia : null,
             getCoverUrl: () => coverUrl,
+            mountForCoverEditor: target => {
+                if (!target) return;
+                if (isVideoPoppedOut) togglePopout(false);
+                coverEditorPreviousMode = currentMode;
+                coverEditing = true;
+                hostContainer.style.display = 'none';
+                hostContainer.style.height = '0';
+                hostContainer.style.maxHeight = '0';
+                hostContainer.style.margin = '0';
+                mediaContainer.style.cursor = 'default';
+                mediaContainer.title = '';
+                const launcher = mediaContainer.querySelector('#fasttag-cover-editor-btn');
+                if (launcher) launcher.style.display = 'none';
+                popoutBtn.style.display = 'none';
+                target.innerHTML = '';
+                target.appendChild(mediaContainer);
+            },
+            releaseFromCoverEditor: () => {
+                coverEditing = false;
+                if (signal.aborted || !hostContainer.isConnected) return;
+                hostContainer.innerHTML = '';
+                hostContainer.style.display = 'block';
+                hostContainer.style.position = 'relative';
+                hostContainer.style.width = '100%';
+                hostContainer.style.height = 'auto';
+                hostContainer.style.aspectRatio = '16 / 9';
+                hostContainer.style.maxHeight = '205px';
+                hostContainer.style.margin = '0 0 8px 0';
+                hostContainer.style.borderRadius = '8px';
+                hostContainer.style.overflow = 'hidden';
+                hostContainer.style.background = '#0f172a';
+                hostContainer.style.padding = '0';
+                hostContainer.style.cursor = 'pointer';
+                mediaContainer.style.cursor = 'pointer';
+                mediaContainer.title = 'Click to open scene in new tab';
+                hostContainer.appendChild(mediaContainer);
+                const launcher = mediaContainer.querySelector('#fasttag-cover-editor-btn');
+                if (launcher) launcher.style.display = 'flex';
+                popoutBtn.style.display = 'flex';
+                const restoreMode = coverEditorPreviousMode;
+                coverEditorPreviousMode = null;
+                if (restoreMode && restoreMode !== currentMode) renderMedia(restoreMode);
+            },
+            pause: () => {
+                const video = currentMode === 'stream' && currentMedia?.tagName === 'VIDEO' ? currentMedia : null;
+                if (!video) return false;
+                clearTimeout(resumeTimer);
+                wasPlaying = false;
+                try { video.pause(); } catch (error) {}
+                return true;
+            },
+            play: () => {
+                const video = currentMode === 'stream' && currentMedia?.tagName === 'VIDEO' ? currentMedia : null;
+                if (!video) return false;
+                clearTimeout(resumeTimer);
+                video.play().catch(() => {});
+                return true;
+            },
+            stepBy: seconds => {
+                const video = currentMode === 'stream' && currentMedia?.tagName === 'VIDEO' ? currentMedia : null;
+                if (!video || !isFinite(video.duration)) return false;
+                clearTimeout(resumeTimer);
+                wasPlaying = false;
+                try { video.pause(); } catch (error) {}
+                video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + Number(seconds || 0)));
+                showProgressBar();
+                return true;
+            },
+            getPlaybackState: () => {
+                const video = currentMode === 'stream' && currentMedia?.tagName === 'VIDEO' ? currentMedia : null;
+                return video ? {
+                    available: true,
+                    paused: video.paused,
+                    currentTime: Number(video.currentTime || 0),
+                    duration: Number(video.duration || 0)
+                } : { available: false, paused: true, currentTime: 0, duration: 0 };
+            },
             getCaptureState: () => {
                 if (streamCaptureFailure) return { available: false, reason: streamCaptureFailure };
                 if (!streamUrl) return { available: false, reason: 'This scene has no full-video stream. Upload or paste an image instead.' };
@@ -7557,6 +7636,8 @@
                 closePopup();
                 return;
             }
+
+            if (e.target?.closest?.('#fasttag-cover-editor-hud')) return;
 
             // Alt+S for Scrape
             if (e.altKey && (e.key === 's' || e.key === 'S')) {

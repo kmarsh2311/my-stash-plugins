@@ -8,6 +8,7 @@ const repositoryRoot = path.resolve(__dirname, '..');
 const pluginDirectory = path.join(repositoryRoot, 'plugins', 'fasttag');
 const yaml = fs.readFileSync(path.join(pluginDirectory, 'fasttag.yml'), 'utf8');
 const mainSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag.js'), 'utf8');
+const coverEditorSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-cover-editor.js'), 'utf8');
 const runnerSource = fs.readFileSync(path.join(__dirname, 'run-all.js'), 'utf8');
 const expectedOrder = [
     'tabulator.min.js',
@@ -119,6 +120,10 @@ assert.ok(mainSource.includes('schedulePerformerHoverCardHide(delay = 260)'), 'p
 assert.ok(mainSource.includes("toastError(`AI Parse Error: ${err.message}`, undefined, 4500)"), 'AI Parse error notifications should use the shorter display duration');
 assert.ok(mainSource.includes('FastTagCoverEditor.mountLauncher({'), 'Edit Everything media controls should mount the cover editor launcher');
 assert.ok(mainSource.includes('getCaptureState: () =>'), 'the active media preview should expose safe frame-capture availability');
+assert.ok(mainSource.includes('mountForCoverEditor: target =>'), 'the existing player should move into the cover editor rather than opening a second stream');
+assert.ok(mainSource.includes('releaseFromCoverEditor: () =>'), 'closing the cover editor should return the existing player to Edit Everything');
+assert.ok(coverEditorSource.includes("options.mediaController?.pause?.();\n                setCandidate(captureVideoFrame"), 'capturing a cover should pause the selected video frame first');
+assert.ok(coverEditorSource.includes("const playPauseButton = createActionButton('⏸ Pause')"), 'the cover editor should provide persistent playback controls');
 assert.ok(mainSource.includes("e.target.closest('#fasttag-cover-editor-hud')"), 'cover-editor interactions should remain inside the owning popup boundary');
 assert.ok(mainSource.includes("#fasttag-create-modal, #fasttag-cover-editor-hud"), 'Escape should be delegated to the cover editor before the owning popup');
 const aiApplyMetadataBlock = mainSource.match(/mutation FastTagAIApplyMetadata[\s\S]*?syncSceneToApolloCache\(metadataRes\.data\.sceneUpdate\);/)?.[0] || '';
