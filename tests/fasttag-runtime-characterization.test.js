@@ -1,0 +1,86 @@
+'use strict';
+
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const repositoryRoot = path.resolve(__dirname, '..');
+const source = fs.readFileSync(path.join(repositoryRoot, 'plugins', 'fasttag', 'fasttag.js'), 'utf8');
+
+function section(startMarker, endMarker) {
+    const start = source.indexOf(startMarker);
+    assert.notEqual(start, -1, `missing characterization start marker: ${startMarker}`);
+    const end = source.indexOf(endMarker, start + startMarker.length);
+    assert.notEqual(end, -1, `missing characterization end marker: ${endMarker}`);
+    return source.slice(start, end);
+}
+
+function assertBefore(text, first, second, message) {
+    const firstIndex = text.indexOf(first);
+    const secondIndex = text.indexOf(second);
+    assert.notEqual(firstIndex, -1, `missing first ordering marker: ${first}`);
+    assert.notEqual(secondIndex, -1, `missing second ordering marker: ${second}`);
+    assert.ok(firstIndex < secondIndex, message);
+}
+
+// Startup is deliberately guarded before any module configuration or global
+// listener registration, so loading the plugin twice cannot duplicate runtime
+// ownership.
+const startup = section('(async function() {', '// --- State & Controllers ---');
+assertBefore(startup, 'if (window.__fastTagRuntimeInitialized)', 'window.__fastTagRuntimeInitialized = true;', 'duplicate startup must be rejected before claiming the runtime');
+assertBefore(startup, 'window.__fastTagRuntimeInitialized = true;', 'FastTagGemini.configure({', 'runtime ownership must be claimed before services are configured');
+assert.equal((source.match(/window\.__fastTagRuntimeInitialized = true;/g) || []).length, 1, 'runtime ownership should have one assignment');
+
+// Scraper responses belong to a live popup, scene and monotonically increasing
+// request generation. Navigation invalidates the previous generation first.
+const scraperLifecycle = section('function isScraperPopupActive(popup)', 'function watchFloatingScraperHudOwner(popup)');
+assert.ok(scraperLifecycle.includes('popup === activePopup'), 'scraper work must belong to the active popup');
+assert.ok(scraperLifecycle.includes("popup._fastTagClosed !== true"), 'closed popups must reject scraper work');
+assert.ok(scraperLifecycle.includes('Boolean(popup.element?.isConnected)'), 'detached popups must reject scraper work');
+assert.ok(scraperLifecycle.includes('Number(popup?._scrapeRequestGeneration || 0) + 1'), 'scraper request generations must increase');
+assert.ok(scraperLifecycle.includes('popup._activeScrapeRequest = null;'), 'invalidation must clear the active request');
+assert.ok(scraperLifecycle.includes('popup._activeScrapeRequest?.sceneId === normalizedSceneId'), 'current-result checks must include scene identity');
+
+const sceneReload = section('async function loadEditEverythingDataIntoPopup(', 'function renderEverythingAIMatchCard(');
+assertBefore(sceneReload, 'invalidateScraperRequests(popup);', 'popup.currentSceneId = sceneId;', 'scene changes must invalidate old scraper work before changing identity');
+assertBefore(sceneReload, 'popup.currentSceneId = sceneId;', 'attachScenePreview(', 'the popup scene identity must change before its preview is rebound');
+
+// Popup closure first allows the Cover Editor to veto data loss, then marks the
+// popup closed before destroying tables, aborting listeners, and closing HUDs.
+const popupClose = section('function closePopup(resetSequential = true)', 'function createCustomMenu(');
+assertBefore(popupClose, 'FastTagCoverEditor.closeActiveEditor?.() === false', 'isModalClosing = true;', 'unsaved cover confirmation must run before popup teardown');
+assertBefore(popupClose, 'activePopup._fastTagClosed = true;', 'invalidateScraperRequests(activePopup);', 'popup closure must be visible before scraper invalidation');
+for (const expected of [
+    'activePopup.tagsTable.destroy();',
+    'activePopup.performersTable.destroy();',
+    'activeTableInstance.destroy();',
+    'popupAbortController.abort();',
+    'previewAbortController.abort();',
+    'closeFloatingVideoHud(resetSequential);',
+    'closeFloatingScraperHud(resetSequential);',
+    'document.body.classList.remove(\'fasttag-modal-open\');'
+]) {
+    assert.ok(popupClose.includes(expected), `popup teardown must retain: ${expected}`);
+}
+assert.ok(popupClose.includes('if (resetSequential) {'), 'session state should only be reset when requested');
+assert.ok(popupClose.includes('sessionScrapeCache.clear();'), 'full popup closure must clear session scrape results');
+
+// Sequential navigation saves dirty metadata before changing scene, checks
+// bounds, protects unsaved cover work, and always releases its busy flag.
+const sequentialNavigation = section('async function navigateSequentialEditEverything(', 'function setupSequentialEditEverythingHandlers(');
+assertBefore(sequentialNavigation, 'if (ctx.isDirty())', 'const nextIndex = currIdx + direction;', 'dirty scene data must save before choosing the next scene');
+assertBefore(sequentialNavigation, 'if (nextIndex < 0 || nextIndex >= cards.length)', 'sequentialEditState.currentIndex = nextIndex;', 'navigation bounds must be checked before state changes');
+assertBefore(sequentialNavigation, 'FastTagCoverEditor.prepareForSceneNavigation?.() === false', 'sequentialEditState.currentIndex = nextIndex;', 'cover changes must be protected before advancing state');
+assert.ok(sequentialNavigation.includes('popup._isNavigatingSequential = true;'), 'navigation must expose its busy state');
+assert.ok(sequentialNavigation.includes('finally {\n            popup._isNavigatingSequential = false;'), 'navigation must clear its busy state after success or failure');
+
+// Edit Everything snapshots each save and serializes mutations. Only the newest
+// completed save may become the editor's clean baseline.
+const saveWorkflow = section('let pendingEverythingSaveSeq = 0;', 'const onSuggestionActivated = async (sug) =>');
+assertBefore(saveWorkflow, 'const saveSeq = ++pendingEverythingSaveSeq;', 'const variables = {', 'each save must obtain a sequence before snapshotting selections');
+assert.ok(saveWorkflow.includes('const targetSceneId = currentSceneId;'), 'a queued save must retain its original scene ID');
+assert.ok(saveWorkflow.includes('if (saveSeq !== pendingEverythingSaveSeq) return true;'), 'an older save must not replace the newest clean baseline');
+assert.ok(saveWorkflow.includes('latestEverythingSavePromise = enqueueEverythingSave(runSave);'), 'scene mutations must use the serial queue');
+assert.ok(saveWorkflow.includes('return latestEverythingSavePromise;'), 'callers must be able to await the queued mutation');
+
+console.log('fasttag-runtime-characterization tests passed');

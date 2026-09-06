@@ -7,9 +7,11 @@ passed.
 
 ## Current phase
 
-Step 2 is complete: the 4.3.0 source, load order, namespace surface, file size,
-hash, automated verification, and remaining manual baseline are recorded in
-`REFACTOR_BASELINE.md`.
+Step 3 is complete. In addition to the 4.3.0 baseline in
+`REFACTOR_BASELINE.md`, `fasttag-runtime-characterization.test.js` now protects
+the coordinator's startup ownership, popup and HUD cleanup, scraper request
+generations, scene rebinding, sequential navigation, Cover Editor handoff, and
+serialized Edit Everything saves.
 
 ## Extracted modules
 
@@ -44,9 +46,10 @@ suites.
 
 ## Next work
 
-Add characterization tests around startup and cleanup, popup ownership,
-navigation, saving, scraper request generations, and preview/Cover Editor
-handoff before beginning another extraction.
+Begin the first low-risk extraction by separating GraphQL transport,
+notifications, and diagnostics behind explicit module APIs. Preserve the
+characterized ordering and behaviour and move only one responsibility per
+commit.
 
 ## Still required before a merge or release
 
