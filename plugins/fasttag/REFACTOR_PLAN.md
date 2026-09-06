@@ -57,10 +57,12 @@ loader rather than introducing a bundler.
 7. `fasttag-preview.js`
    - Preview media, scrubbing, and floating video HUD
 8. `fasttag-ui.js`
-   - Toasts, dialogs, tooltips, shared popup shell, and layout helpers
-9. `fasttag-editors.js`
+   - Shared layout calculations and reusable presentation helpers
+9. `fasttag-popup.js`
+   - Shared popup shell, positioning, event containment, and close/abort lifecycle
+10. `fasttag-editors.js`
    - Single-entity, bulk, and Edit Everything workflows
-10. `fasttag.js`
+11. `fasttag.js`
    - Shared runtime state, startup, and global event wiring
 
 These are target ownership boundaries, not an instruction to move everything

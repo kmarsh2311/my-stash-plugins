@@ -7,15 +7,15 @@ passed.
 
 ## Current phase
 
-Step 7 is complete. `fasttag-scraper-controller.js` now owns request generations,
-active popup and scene validation, session result caching, result filtering and
-presentation, manual re-search, detached-HUD ownership and geometry, standard
-scrape triggers, and acceptance save ordering. Edit Everything still owns the
-refresh button's dirty-editor save gate; after that gate it delegates the forced
-search to the controller. The controller is supplied external services through
-explicit callbacks, and automated tests cover stale responses, cache rejection,
-HUD cleanup, and metadata/remote-ID/cover save ordering. `fasttag.js` has moved
-from the 839,005-byte baseline to 598,564 bytes without an intentional
+Step 8 is complete. `fasttag-popup.js` now owns saved popup dimensions,
+single/Edit Everything positioning, shared single-editor shell construction,
+outside-click and keyboard containment, wheel handling, dragging, eight-way
+resizing, abort-controller lifetime, and ordered popup teardown. Editor tables,
+selection state, navigation, and automatic saving remain in the coordinator.
+The extracted positioning and lifecycle have focused unit coverage, and source
+comparison confirmed the shell and listener implementations retained their
+previous behaviour at the new dependency boundaries. `fasttag.js` has moved
+from the 839,005-byte baseline to 556,208 bytes without an intentional
 behavioural change.
 
 ## Extracted modules
@@ -30,6 +30,7 @@ behavioural change.
 - `fasttag-scraper-controller.js`: request/HUD lifecycle, result presentation, session caching, and acceptance coordination
 - `fasttag-preview.js`: media discovery, scrubbing calculations, and HUD layout
 - `fasttag-ui.js`: shared popup sizing and workstation positioning
+- `fasttag-popup.js`: shared shell, positioning, event containment, resizing, and close/abort lifecycle
 - `fasttag-editors.js`: selection normalization and bulk-selection deltas
 - `fasttag-workflows.js`: tested result-list and navigation state transitions
 
@@ -52,9 +53,9 @@ suites.
 
 ## Next work
 
-Characterize and extract the shared popup shell and lifecycle in small slices.
-Keep editor-specific tables, selection state, navigation, and automatic saving
-in the coordinator until each workflow has its own coverage.
+Characterize editor-specific workflow ownership before moving editor rendering
+or state. Keep single, bulk, and Edit Everything behaviour separate until their
+selection, navigation, and automatic-save contracts are independently covered.
 
 ## Still required before a merge or release
 
