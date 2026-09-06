@@ -42,6 +42,27 @@ assert.ok(scraperLifecycle.includes('Number(popup?._scrapeRequestGeneration || 0
 assert.ok(scraperLifecycle.includes('popup._activeScrapeRequest = null;'), 'invalidation must clear the active request');
 assert.ok(scraperLifecycle.includes('popup._activeScrapeRequest?.sceneId === normalizedSceneId'), 'current-result checks must include scene identity');
 
+// A detached scraper belongs to its originating popup. Rebinding replaces the
+// old observer, detachment closes the HUD, and explicit closure relinquishes
+// both DOM and observer ownership.
+const scraperHudOwnership = section('function watchFloatingScraperHudOwner(popup)', 'function getInitialScraperPopoutPosition(');
+assertBefore(scraperHudOwnership, 'floatingScraperHudOwnerObserver.disconnect();', 'floatingScraperHudOwnerPopup = popup || null;', 'HUD ownership must disconnect an old observer before rebinding');
+assert.ok(scraperHudOwnership.includes('if (!isScraperPopupActive(popup) && floatingScraperHudOwnerPopup === popup)'), 'only the current detached-HUD owner may trigger automatic closure');
+assert.ok(scraperHudOwnership.includes('closeFloatingScraperHud();'), 'detaching the owner popup must close its scraper HUD');
+assertBefore(scraperHudOwnership, 'floatingScraperHudOwnerObserver = null;', 'floatingScraperHudElement.remove();', 'HUD closure must release its observer before removing the element');
+assert.ok(scraperHudOwnership.includes('floatingScraperHudElement = null;'), 'HUD closure must release its element reference');
+
+// Accept reads the visible field choices once, resolves all selected entities,
+// commits ordinary metadata first, then stores the remote ID and cover in
+// independent mutations so either optional save cannot roll back metadata.
+const scraperAcceptance = section('async function handleAcceptScrapeMatch(', '// --- Smart Suggestions Engine ---');
+assertBefore(scraperAcceptance, 'const scrapeSelection = readScrapeFieldSelection(container);', 'const studioResolution = await resolveScrapedStudioResult(', 'acceptance must snapshot field choices before asynchronous resolution');
+assertBefore(scraperAcceptance, 'const tagResolution = await resolveScrapedEntityIdsResult(', 'const sceneRes = await fetchGQL(`', 'all selected entities must resolve before scene mutation preparation');
+assertBefore(scraperAcceptance, 'mutation FastTagAcceptSave', 'mutation FastTagAcceptStashId', 'ordinary metadata must save before the accepted remote ID');
+assertBefore(scraperAcceptance, 'mutation FastTagAcceptStashId', 'mutation FastTagAcceptCover', 'the remote ID must save before the independently protected cover');
+assertBefore(scraperAcceptance, 'syncSceneToApolloCache(saveRes.data.sceneUpdate);', 'await refreshSceneCards(sceneId);', 'the local GraphQL cache must update before scene cards are refreshed');
+assertBefore(scraperAcceptance, 'await refreshSceneCards(sceneId);', 'sessionScrapeCache.delete(sceneId);', 'the accepted result cache must only clear after the refreshed scene is available');
+
 const sceneReload = section('async function loadEditEverythingDataIntoPopup(', 'function renderEverythingAIMatchCard(');
 assertBefore(sceneReload, 'invalidateScraperRequests(popup);', 'popup.currentSceneId = sceneId;', 'scene changes must invalidate old scraper work before changing identity');
 assertBefore(sceneReload, 'popup.currentSceneId = sceneId;', 'attachScenePreview(', 'the popup scene identity must change before its preview is rebound');
