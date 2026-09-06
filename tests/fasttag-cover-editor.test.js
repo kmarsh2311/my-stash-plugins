@@ -16,6 +16,10 @@ assert.deepEqual(coverEditor.calculateImageSize(4000, 2000, 1000), { width: 1000
 assert.equal(coverEditor.formatTime(0), '0:00');
 assert.equal(coverEditor.formatTime(65.9), '1:05');
 assert.equal(coverEditor.formatTime(3661), '1:01:01');
+assert.equal(coverEditor.resolveStepSeconds(-1), -1 / 30);
+assert.equal(coverEditor.resolveStepSeconds(1), 1 / 30);
+assert.equal(coverEditor.resolveStepSeconds(-1, true), -1);
+assert.equal(coverEditor.resolveStepSeconds(1, true), 1);
 assert.deepEqual(coverEditor.resolveEditorSize(null, 1920, 1080), {
     width: 450,
     height: 740,

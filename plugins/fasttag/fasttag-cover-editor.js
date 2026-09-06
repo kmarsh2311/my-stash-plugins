@@ -57,6 +57,11 @@
             : `${minutes}:${secs}`;
     }
 
+    function resolveStepSeconds(direction, shiftKey = false, frameDuration = 1 / 30) {
+        const sign = Number(direction) < 0 ? -1 : 1;
+        return sign * (shiftKey ? 1 : Math.max(0, Number(frameDuration) || (1 / 30)));
+    }
+
     function readBlobAsDataUrl(blob) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -387,8 +392,8 @@
             if (playback.paused) options.mediaController?.play?.();
             else options.mediaController?.pause?.();
         };
-        stepBackButton.onclick = () => options.mediaController?.stepBy?.(-1 / 30);
-        stepForwardButton.onclick = () => options.mediaController?.stepBy?.(1 / 30);
+        stepBackButton.onclick = event => options.mediaController?.stepBy?.(resolveStepSeconds(-1, event.shiftKey));
+        stepForwardButton.onclick = event => options.mediaController?.stepBy?.(resolveStepSeconds(1, event.shiftKey));
 
         document.addEventListener('paste', event => {
             const item = findClipboardImage(event.clipboardData?.items);
@@ -496,6 +501,7 @@
         configure,
         calculateImageSize,
         formatTime,
+        resolveStepSeconds,
         resolveEditorSize,
         validateImageBlob,
         findClipboardImage,
