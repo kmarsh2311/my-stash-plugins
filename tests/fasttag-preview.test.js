@@ -6,6 +6,11 @@ global.FastTag = {};
 require('../plugins/fasttag/fasttag-preview.js');
 const preview = global.FastTag.preview;
 assert.ok(preview, 'FastTag preview namespace should be installed');
+assert.equal(preview.isPoppedOut(), false);
+assert.equal(preview.getFloatingHudElement(), null);
+assert.doesNotThrow(() => preview.abortCurrentPreview());
+assert.doesNotThrow(() => preview.resetSessionCue());
+assert.doesNotThrow(() => preview.resetLayoutState());
 
 global.location = { origin: 'http://stash.local:9999', href: 'http://stash.local:9999/scenes' };
 
@@ -117,6 +122,37 @@ async function testMediaLookup() {
         coverUrl: '/scene/13/screenshot',
         streamUrl: '/scene/13/stream'
     }, 'an explicitly missing preview should not be replaced by a guessed URL');
+
+    global.document = {
+        createElement: () => ({ style: {}, closest: () => null }),
+        querySelector: () => null,
+        body: { contains: () => false }
+    };
+    global.localStorage = { getItem: () => null, setItem() {} };
+    global.ResizeObserver = class { observe() {} disconnect() {} };
+    preview.configure({
+        fetchGQL: async () => ({}),
+        coverEditor: { closeForHost() {}, mountLauncher() {} },
+        getSceneUrl: () => null,
+        getScrubSpeeds: () => ({ slow: 5, normal: 10, fast: 20, freeze: 1 }),
+        getScrubCueCount: () => 0,
+        incrementScrubCueCount() {},
+        MAX_SCRUB_CUE_DISPLAYS: 5,
+        isVideoHudPersistedOpen: () => false,
+        setVideoHudPersistedOpen() {},
+        getAlwaysPlayFullVideo: () => false,
+        showToast() {},
+        log() {},
+        getActivePopup: () => null,
+        getFloatingScraperHudElement: () => null,
+        getDefaultEverythingPosition: () => ({ x: 20, y: 70 })
+    });
+    const emptyHost = { style: {}, id: 'everything-preview-container' };
+    await preview.attachScenePreview(emptyHost, null, null);
+    assert.equal(emptyHost.style.display, 'none', 'a scene with no media should hide the empty preview host');
+    assert.ok(emptyHost._previewAbortController instanceof AbortController, 'the preview host should own its abort controller');
+    preview.abortCurrentPreview();
+    assert.equal(emptyHost._previewAbortController.signal.aborted, true, 'controller teardown should abort the active preview');
 }
 
 testMediaLookup()

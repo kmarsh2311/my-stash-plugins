@@ -6,13 +6,14 @@ const path = require('node:path');
 
 const repositoryRoot = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(repositoryRoot, 'plugins', 'fasttag', 'fasttag.js'), 'utf8');
+const previewSource = fs.readFileSync(path.join(repositoryRoot, 'plugins', 'fasttag', 'fasttag-preview.js'), 'utf8');
 
-function section(startMarker, endMarker) {
-    const start = source.indexOf(startMarker);
+function section(startMarker, endMarker, text = source) {
+    const start = text.indexOf(startMarker);
     assert.notEqual(start, -1, `missing characterization start marker: ${startMarker}`);
-    const end = source.indexOf(endMarker, start + startMarker.length);
+    const end = text.indexOf(endMarker, start + startMarker.length);
     assert.notEqual(end, -1, `missing characterization end marker: ${endMarker}`);
-    return source.slice(start, end);
+    return text.slice(start, end);
 }
 
 function assertBefore(text, first, second, message) {
@@ -55,7 +56,7 @@ for (const expected of [
     'activePopup.performersTable.destroy();',
     'activeTableInstance.destroy();',
     'popupAbortController.abort();',
-    'previewAbortController.abort();',
+    'abortCurrentPreview();',
     'closeFloatingVideoHud(resetSequential);',
     'closeFloatingScraperHud(resetSequential);',
     'document.body.classList.remove(\'fasttag-modal-open\');'
@@ -87,7 +88,7 @@ assert.ok(saveWorkflow.includes('return latestEverythingSavePromise;'), 'callers
 // aborts its previous player before claiming a replacement, global input
 // listeners belong to that abort signal, and teardown relinquishes Cover Editor
 // and media-controller ownership.
-const previewLifecycle = section('async function attachScenePreview(', '// --- State & Sequential Utilities ---');
+const previewLifecycle = section('async function attachScenePreview(', 'root.FastTag = root.FastTag || {};', previewSource);
 assertBefore(previewLifecycle, 'hostContainer._previewAbortController.abort();', 'const previewAbort = new AbortController();', 'a host must stop its old preview before creating another');
 assertBefore(previewLifecycle, 'hostContainer._previewAbortController = previewAbort;', 'const { signal } = previewAbort;', 'the host must own the new abort controller');
 assert.ok(previewLifecycle.includes("document.addEventListener('keydown', onKeyDown, { signal });"), 'preview keyboard listeners must follow preview lifetime');

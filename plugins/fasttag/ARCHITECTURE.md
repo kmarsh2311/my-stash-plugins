@@ -17,7 +17,7 @@ final `fasttag.js` file coordinates those APIs and owns browser lifecycle.
 - `fasttag-gemini.js`: Gemini bridge transport, timeouts, and parsed results.
 - `fasttag-scraper.js`: scraper requests, evidence scoring, ranking, and save payloads.
 - `fasttag-scraper-ui.js`: scraper presentation decisions and review-state labels.
-- `fasttag-preview.js`: media discovery, scrubbing calculations, and video HUD geometry.
+- `fasttag-preview.js`: media discovery and rendering, scrubbing, floating video HUD lifecycle, and Cover Editor player handoff.
 - `fasttag-cover-editor.js`: cover image validation, resizing, frame capture, clipboard/upload handling, and the cover-editor HUD.
 - `fasttag-ui.js`: shared popup sizing and placement calculations.
 - `fasttag-editors.js`: reusable selection and bulk-edit calculations.
