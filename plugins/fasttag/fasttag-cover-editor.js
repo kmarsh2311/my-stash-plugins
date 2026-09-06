@@ -274,7 +274,7 @@
             <div class="fasttag-cover-status" role="status" style="font-size:10.5px;line-height:1.35;padding:7px 8px;border-radius:6px;background:${isDark ? 'rgba(30,41,59,.8)' : '#e2e8f0'};color:${isDark ? '#cbd5e1' : '#334155'};">Opening the full video for frame capture…</div>
             <div class="fasttag-cover-actions" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;"></div>
             <input class="fasttag-cover-file" type="file" accept="image/jpeg,image/png,image/webp" style="display:none;">
-            <div style="font-size:9.5px;color:#94a3b8;line-height:1.35;">Nothing is changed until you select <strong>Set Cover</strong>. Upload and clipboard remain available when the full video cannot be played.</div>
+            <div style="font-size:9.5px;color:#94a3b8;line-height:1.35;">On localhost or HTTPS, <strong>Paste</strong> reads the clipboard directly. On an HTTP network address, select <strong>Paste</strong> and then press Ctrl+V or Cmd+V when prompted.<br>Nothing is changed until you select <strong>Set Cover</strong>.</div>
             <div class="fasttag-cover-footer" style="display:flex;gap:7px;border-top:1px solid ${isDark ? '#334155' : '#cbd5e1'};padding-top:9px;"></div>
         `;
         panel.appendChild(body);

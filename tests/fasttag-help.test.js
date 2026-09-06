@@ -12,6 +12,7 @@ assert.equal(new Set(help.GUIDE_SECTIONS.map(section => section.id)).size, help.
 assert.ok(help.searchGuide('fingerprint').some(section => section.id === 'scraping'));
 assert.ok(help.searchGuide('Gemini bridge').some(section => section.id === 'ai'));
 assert.ok(help.searchGuide('cache refresh').some(section => section.id === 'cache'));
+assert.ok(help.searchGuide('HTTP LAN address').some(section => section.id === 'video'));
 assert.equal(help.searchGuide('words-that-do-not-exist').length, 0);
 assert.equal(help.stripHtml('<p>Hello <strong>world</strong></p>'), 'Hello world');
 
