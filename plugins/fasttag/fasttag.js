@@ -3168,10 +3168,10 @@
         // Slim Progress Bar at the very bottom edge (no text/numbers)
         const progressBarBg = document.createElement('div');
         progressBarBg.id = 'fasttag-progress-bar-bg';
-        progressBarBg.style.cssText = 'position: absolute; bottom: 0; left: 0; right: 0; height: 12px; background: transparent; z-index: 30; pointer-events: none; cursor: pointer; opacity: 0; transition: opacity 0.2s ease;';
+        progressBarBg.style.cssText = 'position: absolute; bottom: 0; left: 0; right: 0; height: 16px; background: transparent; z-index: 30; pointer-events: none; cursor: pointer; opacity: 0; transition: opacity 0.2s ease;';
 
         const progressBarTrack = document.createElement('div');
-        progressBarTrack.style.cssText = 'position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(0,0,0,0.55);pointer-events:none;';
+        progressBarTrack.style.cssText = 'position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(0,0,0,0.62);pointer-events:none;transition:height .14s ease,background .14s ease;';
 
         const progressBarFill = document.createElement('div');
         progressBarFill.id = 'fasttag-progress-bar-fill';
@@ -3194,8 +3194,8 @@
             clearTimeout(progressBarTimer);
             if (!shiftHeld) {
                 progressBarTimer = setTimeout(() => {
-                    progressBarBg.style.opacity = '0';
-                }, 1500);
+                    if (!isTimelineSeeking && !progressBarBg.matches(':hover')) progressBarBg.style.opacity = '0';
+                }, 3500);
             }
         };
 
@@ -3217,6 +3217,8 @@
             isTimelineSeeking = true;
             timelineWasPlaying = !currentMedia.paused;
             clearTimeout(progressBarTimer);
+            progressBarTrack.style.height = '7px';
+            progressBarTrack.style.background = 'rgba(0,0,0,0.72)';
             try { currentMedia.pause(); } catch (error) {}
             try { progressBarBg.setPointerCapture(event.pointerId); } catch (error) {}
             seekTimelineToPointer(event);
@@ -3236,6 +3238,8 @@
             try { progressBarBg.releasePointerCapture(event.pointerId); } catch (error) {}
             if (timelineWasPlaying && currentMedia?.tagName === 'VIDEO') currentMedia.play().catch(() => {});
             timelineWasPlaying = false;
+            progressBarTrack.style.height = progressBarBg.matches(':hover') ? '7px' : '4px';
+            progressBarTrack.style.background = progressBarBg.matches(':hover') ? 'rgba(0,0,0,0.72)' : 'rgba(0,0,0,0.62)';
             showProgressBar();
         };
         progressBarBg.addEventListener('pointerup', finishTimelineSeek, { signal });
@@ -3244,7 +3248,18 @@
             event.preventDefault();
             event.stopPropagation();
         }, { signal });
-        progressBarBg.addEventListener('mouseenter', showProgressBar, { signal });
+        progressBarBg.addEventListener('mouseenter', () => {
+            progressBarTrack.style.height = '7px';
+            progressBarTrack.style.background = 'rgba(0,0,0,0.72)';
+            showProgressBar();
+        }, { signal });
+        progressBarBg.addEventListener('mouseleave', () => {
+            if (!isTimelineSeeking) {
+                progressBarTrack.style.height = '4px';
+                progressBarTrack.style.background = 'rgba(0,0,0,0.62)';
+            }
+            showProgressBar();
+        }, { signal });
 
         // Floating Stream Cue Hint (appears once per session on switching to Full Video)
         const cueBadge = document.createElement('div');
@@ -3921,8 +3936,8 @@
                 clearTimeout(resumeTimer);
                 clearTimeout(progressBarTimer);
                 progressBarTimer = setTimeout(() => {
-                    progressBarBg.style.opacity = '0';
-                }, 1500);
+                    if (!isTimelineSeeking && !progressBarBg.matches(':hover')) progressBarBg.style.opacity = '0';
+                }, 3500);
                 if (currentMedia && currentMedia.tagName === 'VIDEO') {
                     try { currentMedia.loop = !!originalLoop; } catch (err) {}
                     if (!coverEditing || wasPlaying) currentMedia.play().catch(() => {});

@@ -131,6 +131,9 @@ assert.ok(mainSource.includes("#fasttag-create-modal, #fasttag-cover-editor-hud"
 assert.ok(mainSource.includes('#fasttag-cover-editor-hud #fasttag-media-container'), 'the relocated cover-editor player should bypass the modal wheel trap for two-way scrubbing');
 assert.ok(mainSource.includes("progressBarBg.addEventListener('pointerdown'"), 'the full-video progress bar should support drag seeking');
 assert.ok(mainSource.includes('timelineWasPlaying = !currentMedia.paused;'), 'timeline seeking should preserve the prior playback state');
+assert.ok(mainSource.includes("height: 16px; background: transparent"), 'the interactive timeline should provide an accessible pointer target');
+assert.ok(mainSource.includes("progressBarTrack.style.height = '7px'"), 'the visible timeline should grow while hovered or dragged');
+assert.ok(mainSource.includes('}, 3500);'), 'the interactive timeline should remain visible longer after use');
 assert.ok(coverEditorSource.includes('overflow:auto;resize:both'), 'the cover-editor HUD should be resizable from its browser corner');
 assert.ok(coverEditorSource.includes("EDITOR_SIZE_STORAGE_KEY = 'fasttag_cover_editor_size'"), 'the cover editor should remember its resized dimensions');
 assert.ok(coverEditorSource.includes('grid-template-columns:auto auto minmax(68px,1fr) auto auto'), 'cover playback and capture controls should remain on one line');
