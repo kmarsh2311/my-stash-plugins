@@ -107,6 +107,15 @@ assert.ok(mainSource.includes("value=\"${escapeHtml(match._searchQuery || '')}\"
 assert.ok(mainSource.includes('function isScraperPopupActive(popup)'), 'scraper rendering should reject stale popup work');
 assert.ok(mainSource.includes('watchFloatingScraperHudOwner(popup);'), 'detached scraper HUD should monitor its owning popup');
 assert.ok(mainSource.includes('activePopup._fastTagClosed = true;'), 'popup closure should invalidate pending scraper work');
+assert.ok(mainSource.includes('function beginScraperRequest(popup, sceneId)'), 'scrapes should receive a per-popup request generation');
+assert.ok(mainSource.includes('if (!isScraperRequestCurrent(popup, activeSceneId, scrapeRequestId)) return null;'), 'late automatic scrape responses should be discarded');
+assert.ok(mainSource.includes('invalidateScraperRequests(popup);\n            popup.currentSceneId = sceneId;'), 'scene navigation should invalidate requests for the previous scene');
+assert.ok(mainSource.includes('{ endpoint: match._sourceEndpoint, name: match._sourceName }'), 'scraper acceptance should pass source identity into new performer creation');
+assert.ok(mainSource.includes('fasttag-match-fill-performer-images'), 'Match settings should expose missing performer image enrichment');
+assert.ok(mainSource.includes('buildScrapedPerformerPreviewData(performer, match, cachedPerformers)'), 'scraper performer pills should provide local-or-source hover previews');
+assert.ok(mainSource.includes('data-scrape-performer-index='), 'scraper performer pills should be identifiable hover targets');
+assert.ok(mainSource.includes('schedulePerformerHoverCardHide(delay = 260)'), 'performer previews should remain reachable across the pointer gap');
+assert.ok(mainSource.includes("toastError(`AI Parse Error: ${err.message}`, undefined, 4500)"), 'AI Parse error notifications should use the shorter display duration');
 const aiApplyMetadataBlock = mainSource.match(/mutation FastTagAIApplyMetadata[\s\S]*?syncSceneToApolloCache\(metadataRes\.data\.sceneUpdate\);/)?.[0] || '';
 assert.ok(aiApplyMetadataBlock.includes('title date'), 'AI Apply All should return updated title and date');
 assert.ok(aiApplyMetadataBlock.includes('syncSceneToApolloCache'), 'AI Apply All should synchronize metadata to live scene cards');

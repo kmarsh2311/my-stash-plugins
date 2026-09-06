@@ -27,7 +27,7 @@
         performers: {
             icon: '⭐', title: 'Performer', pluralTitle: 'Performers', labelKey: 'name', searchFields: ['name', 'disambiguation', 'id'],
             columns: [{ ...commonIdColumn }, { title: 'Name', field: 'name', widthGrow: 2, resizable: true, headerSort: false }, { title: 'Details', field: 'disambiguation', widthGrow: 1, resizable: false, headerSort: false }],
-            fetchQuery: 'query { findPerformers(filter: { per_page: -1 }) { performers { id name disambiguation scene_count birthdate rating100 created_at updated_at image_path country gender alias_list } } }',
+            fetchQuery: 'query { findPerformers(filter: { per_page: -1 }) { performers { id name disambiguation scene_count birthdate rating100 created_at updated_at image_path country gender alias_list stash_ids { endpoint stash_id } } } }',
             extractList: data => data?.findPerformers?.performers || [],
             fetchExistingQuery: 'query ($id: ID!) { findScene(id: $id) { id title organized files { path } performers { id } } }',
             extractExisting: data => data?.findScene?.performers?.map(performer => performer.id) || [],

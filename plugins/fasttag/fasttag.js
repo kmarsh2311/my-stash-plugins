@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash FastTag
 // @namespace    http://tampermonkey.net/
-// @version      4.2.12
+// @version      4.2.13
 // @description  Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
@@ -96,6 +96,8 @@
         getDetachScraper,
         setDetachScraper,
         getHideObviousFalsePositives,
+        getFillMissingPerformerImages,
+        setFillMissingPerformerImages,
         getScraperMatchingSettings,
         setScraperMatchingSettings,
         setScraperMatchingPreset,
@@ -169,6 +171,7 @@
         cleanTitleForScraping,
         parseDurationSec,
         getScraperMatchingSettings,
+        getFillMissingPerformerImages,
         getEntityConfig: type => ENTITY_CONFIG[type],
         getCachedOrNull: type => getCachedOrNull(type),
         setCache: (type, data) => setCache(type, data)
@@ -179,7 +182,7 @@
         log: (...args) => ftLog(...args)
     });
 
-    console.log('[FastTag v4.2.12] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
+    console.log('[FastTag v4.2.13] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
 
     let fastTagHelpLoadPromise = null;
     function loadFastTagHelpModule() {
@@ -1673,8 +1676,8 @@
         if (debug) console.log(debug);
     };
 
-    const toastError = (message, debug) => {
-        showToast(message, 'error', 8000, debug);
+    const toastError = (message, debug, duration = 8000) => {
+        showToast(message, 'error', duration, debug);
         if (debug) {
             console.error(debug);
         } else {
@@ -1957,6 +1960,31 @@
         return popup === activePopup
             && popup._fastTagClosed !== true
             && Boolean(popup.element?.isConnected);
+    }
+
+    function beginScraperRequest(popup, sceneId) {
+        if (!isScraperPopupActive(popup)) return null;
+        const normalizedSceneId = String(sceneId || '');
+        if (popup?.currentSceneId != null && String(popup.currentSceneId) !== normalizedSceneId) return null;
+        const requestId = Number(popup?._scrapeRequestGeneration || 0) + 1;
+        popup._scrapeRequestGeneration = requestId;
+        popup._activeScrapeRequest = { requestId, sceneId: normalizedSceneId };
+        return requestId;
+    }
+
+    function invalidateScraperRequests(popup) {
+        if (!popup) return;
+        popup._scrapeRequestGeneration = Number(popup._scrapeRequestGeneration || 0) + 1;
+        popup._activeScrapeRequest = null;
+    }
+
+    function isScraperRequestCurrent(popup, sceneId, requestId = null) {
+        if (!isScraperPopupActive(popup)) return false;
+        const normalizedSceneId = String(sceneId || '');
+        if (popup?.currentSceneId != null && String(popup.currentSceneId) !== normalizedSceneId) return false;
+        if (requestId == null) return true;
+        return popup?._activeScrapeRequest?.requestId === requestId
+            && popup._activeScrapeRequest?.sceneId === normalizedSceneId;
     }
 
     function watchFloatingScraperHudOwner(popup) {
@@ -2384,6 +2412,11 @@
                             </label>
                         </div>
 
+                        <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; background:${cardBg}; border:1px solid ${border}; border-radius:7px; padding:9px; font-size:11px;">
+                            <span><strong>Fill missing performer images</strong><br><span style="color:${textMuted};">Add scraper images and missing source IDs to selected performers with no local image. Existing images are never replaced.</span></span>
+                            <input type="checkbox" id="fasttag-match-fill-performer-images" ${getFillMissingPerformerImages() ? 'checked' : ''} style="accent-color:#6366f1; flex-shrink:0;">
+                        </label>
+
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; background:${cardBg}; border:1px solid ${border}; border-radius:8px; padding:10px;">
                             <label style="font-size:10.5px; color:${textMuted};">Single-word aliases
                                 <select id="fasttag-match-alias-mode" style="display:block; width:100%; margin-top:4px; padding:5px; border-radius:5px; border:1px solid ${border}; background:${bg}; color:${text};">
@@ -2646,6 +2679,14 @@
             detachScraperToggle.addEventListener('change', (e) => {
                 setDetachScraper(e.target.checked);
                 showToast(`Scraper sidecar ${e.target.checked ? 'detached' : 'embedded'}`, 'info');
+            });
+        }
+
+        const fillMissingPerformerImagesToggle = modal.querySelector('#fasttag-match-fill-performer-images');
+        if (fillMissingPerformerImagesToggle) {
+            fillMissingPerformerImagesToggle.addEventListener('change', (event) => {
+                setFillMissingPerformerImages(event.target.checked);
+                showToast(`Missing performer image import ${event.target.checked ? 'enabled' : 'disabled'}`, 'info');
             });
         }
 
@@ -2941,7 +2982,7 @@
             helpBtn.textContent = '⏳ Loading Guide…';
             try {
                 const help = await loadFastTagHelpModule();
-                help.openGuide({ theme: getEffectiveTheme(), version: '4.2.12' });
+                help.openGuide({ theme: getEffectiveTheme(), version: '4.2.13' });
             } catch (error) {
                 toastError(`Unable to open help: ${error.message}`);
             } finally {
@@ -4850,6 +4891,7 @@
         try {
             if (activePopup) {
                 activePopup._fastTagClosed = true;
+                invalidateScraperRequests(activePopup);
                 if (activePopup.tagsTable) {
                     try {
                         activePopup.tagsTable.off("rowSelected");
@@ -5158,6 +5200,7 @@
     // --- Performer Hover ID Card ---
     let performerHoverCardElement = null;
     let performerHoverTimeout = null;
+    let performerHoverHideTimeout = null;
 
     function getAgeFromBirthdate(birthdate) {
         if (!birthdate) return '';
@@ -5197,8 +5240,24 @@
 
     let isHoveringCard = false;
 
+    function cancelPerformerHoverCardHide() {
+        if (performerHoverHideTimeout) {
+            clearTimeout(performerHoverHideTimeout);
+            performerHoverHideTimeout = null;
+        }
+    }
+
+    function schedulePerformerHoverCardHide(delay = 260) {
+        cancelPerformerHoverCardHide();
+        performerHoverHideTimeout = setTimeout(() => {
+            performerHoverHideTimeout = null;
+            if (!isHoveringCard) hidePerformerHoverCard();
+        }, delay);
+    }
+
     function hidePerformerHoverCard() {
         if (isHoveringCard) return;
+        cancelPerformerHoverCardHide();
         if (performerHoverTimeout) {
             clearTimeout(performerHoverTimeout);
             performerHoverTimeout = null;
@@ -5217,13 +5276,17 @@
 
     function showPerformerHoverCard(data, rowElement) {
         if (!data || !rowElement || !document.body.contains(rowElement)) return;
+        cancelPerformerHoverCardHide();
         if (!performerHoverCardElement) {
             performerHoverCardElement = document.createElement('div');
             performerHoverCardElement.id = 'fasttag-performer-hover-card';
             document.body.appendChild(performerHoverCardElement);
         }
 
-        const imgUrl = data.image_path || `/performer/${data.id}/image`;
+        const imgUrl = data.image_path || data.images?.[0] || (data.id ? `/performer/${data.id}/image` : '');
+        const safeImgUrl = escapeHtml(imgUrl);
+        const profileUrl = data._profileUrl || (data.id ? `/performers/${data.id}` : '');
+        const profileSource = escapeHtml(data._profileSource || (data.id ? 'Local library' : 'Scraper result'));
         const name = escapeHtml(data.name || `Performer #${data.id}`);
         const age = getAgeFromBirthdate(data.birthdate);
         const country = getCountryBadge(data.country);
@@ -5245,12 +5308,12 @@
         if (gender) pills.push(`<span style="background: rgba(244, 114, 182, 0.15); color: #f472b6; border: 1px solid rgba(244, 114, 182, 0.35); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 600;">${gender}</span>`);
         if (data.ethnicity) pills.push(`<span style="background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 4px; padding: 1px 5px; font-size: 10px;">${escapeHtml(data.ethnicity)}</span>`);
 
-        performerHoverCardElement.style.cssText = `position: fixed; z-index: 1000005; pointer-events: auto; cursor: pointer; width: 315px; background: rgba(15, 23, 42, 0.96); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(148, 163, 184, 0.35); border-radius: 12px; box-shadow: 0 20px 45px rgba(0,0,0,0.85), inset 0 0 0 1px rgba(255,255,255,0.08); padding: 10px 11px; box-sizing: border-box; display: flex; gap: 11px; font-family: system-ui, -apple-system, sans-serif; transition: opacity 0.15s ease, transform 0.15s ease, border-color 0.15s ease; opacity: 0; transform: scale(0.96);`;
+        performerHoverCardElement.style.cssText = `position: fixed; z-index: 1000005; pointer-events: auto; cursor: ${profileUrl ? 'pointer' : 'default'}; width: 315px; background: rgba(15, 23, 42, 0.96); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(148, 163, 184, 0.35); border-radius: 12px; box-shadow: 0 20px 45px rgba(0,0,0,0.85), inset 0 0 0 1px rgba(255,255,255,0.08); padding: 10px 11px; box-sizing: border-box; display: flex; gap: 11px; font-family: system-ui, -apple-system, sans-serif; transition: opacity 0.15s ease, transform 0.15s ease, border-color 0.15s ease; opacity: 0; transform: scale(0.96);`;
 
         performerHoverCardElement.innerHTML = `
             <div style="width: 110px; height: 146px; border-radius: 8px; overflow: hidden; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); flex-shrink: 0; display: flex; align-items: center; justify-content: center; position: relative; box-shadow: 0 4px 14px rgba(0,0,0,0.5);">
-                <img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" />
-                <div style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center; font-size: 42px; color: #64748b;">⭐</div>
+                ${imgUrl ? `<img src="${safeImgUrl}" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" />` : ''}
+                <div style="display: ${imgUrl ? 'none' : 'flex'}; width: 100%; height: 100%; align-items: center; justify-content: center; font-size: 42px; color: #64748b;">⭐</div>
             </div>
             <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
@@ -5258,14 +5321,13 @@
                         <span style="font-size: 14.5px; font-weight: 700; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${name}</span>
                         ${ratingStars}
                     </div>
+                    <div style="font-size: 9.5px; color: #818cf8; margin-bottom: 3px;">${profileSource}</div>
                     ${disambiguation ? `<div style="font-size: 11px; color: #94a3b8; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px;">${disambiguation}</div>` : ''}
                     ${pills.length > 0 ? `<div style="display: flex; flex-wrap: wrap; gap: 3.5px; margin-top: 3px;">${pills.join('')}</div>` : ''}
                 </div>
                 <div>
                     ${aliases ? `<div style="font-size: 9.5px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px;"><strong style="color: #94a3b8;">aka:</strong> ${aliases}</div>` : ''}
-                    <div style="display: flex; align-items: center; justify-content: flex-end; gap: 3px; font-size: 10px; font-weight: 600; color: #818cf8; opacity: 0.95; margin-top: 4px;">
-                        <span>View Profile</span><span style="font-size: 10.5px;">↗</span>
-                    </div>
+                    ${profileUrl ? `<div style="display: flex; align-items: center; justify-content: flex-end; gap: 3px; font-size: 10px; font-weight: 600; color: #818cf8; opacity: 0.95; margin-top: 4px;"><span>View Profile</span><span style="font-size: 10.5px;">↗</span></div>` : ''}
                 </div>
             </div>
         `;
@@ -5273,20 +5335,23 @@
         performerHoverCardElement.onclick = (e) => {
             e.stopPropagation();
             e.preventDefault();
-            window.open(`/performers/${data.id}`, '_blank');
+            if (profileUrl) window.open(profileUrl, '_blank');
         };
 
         performerHoverCardElement.onmouseenter = () => {
             isHoveringCard = true;
+            cancelPerformerHoverCardHide();
             if (performerHoverTimeout) clearTimeout(performerHoverTimeout);
             performerHoverCardElement.style.borderColor = 'rgba(99, 102, 241, 0.8)';
+            performerHoverCardElement.style.opacity = '1';
+            performerHoverCardElement.style.transform = 'scale(1)';
         };
 
         performerHoverCardElement.onmouseleave = (e) => {
             isHoveringCard = false;
             performerHoverCardElement.style.borderColor = 'rgba(148, 163, 184, 0.35)';
-            if (!e.relatedTarget || !e.relatedTarget.closest('.tabulator-row')) {
-                hidePerformerHoverCard();
+            if (!e.relatedTarget || !e.relatedTarget.closest('.tabulator-row, .fasttag-performer-hover-trigger')) {
+                schedulePerformerHoverCardHide(120);
             }
         };
 
@@ -5351,6 +5416,46 @@
                 performerHoverCardElement.style.transform = 'scale(1)';
             }
         });
+    }
+
+    function getScrapedPerformerProfileUrl(performer, match) {
+        const urls = Array.isArray(performer?.urls) ? performer.urls : [];
+        const directUrl = urls.find(value => /^https?:\/\//i.test(String(value || '')));
+        if (directUrl) return directUrl;
+        const remoteId = String(performer?.remote_site_id || '').trim();
+        if (/^https?:\/\//i.test(remoteId)) return remoteId;
+        const sourceEndpoint = String(match?._sourceEndpoint || '').trim();
+        if (!remoteId || !/^https?:\/\//i.test(sourceEndpoint)) return '';
+        const sourceRoot = sourceEndpoint.replace(/\/graphql\/?$/i, '').replace(/\/+$/, '');
+        return `${sourceRoot}/performers/${encodeURIComponent(remoteId)}`;
+    }
+
+    function buildScrapedPerformerPreviewData(performer, match, cachedPerformers) {
+        const normalizedName = String(performer?.name || '').trim().toLowerCase();
+        const local = (cachedPerformers || []).find(item =>
+            (performer?.stored_id && String(item.id) === String(performer.stored_id))
+            || (normalizedName && String(item?.name || '').trim().toLowerCase() === normalizedName)
+        );
+        const scrapedImage = (Array.isArray(performer?.images) ? performer.images : [])
+            .map(value => String(value || '').trim())
+            .find(Boolean) || '';
+        if (local) {
+            const localImage = String(local.image_path || '');
+            const localImageMissing = !localImage || /[?&]default=true(?:&|$)/i.test(localImage);
+            return {
+                ...performer,
+                ...local,
+                image_path: localImageMissing && scrapedImage ? scrapedImage : localImage,
+                _profileUrl: `/performers/${local.id}`,
+                _profileSource: localImageMissing && scrapedImage ? `${match?._sourceName || 'Scraper'} image · Local profile` : 'Local library'
+            };
+        }
+        return {
+            ...performer,
+            image_path: scrapedImage,
+            _profileUrl: getScrapedPerformerProfileUrl(performer, match),
+            _profileSource: match?._sourceName || 'Scraper result'
+        };
     }
 
     function attachPerformerHoverCard(table, tableContainer) {
@@ -5722,9 +5827,9 @@
         });
     }
 
-    async function renderScraperMatchCard(container, incomingResults, sceneId, ctx, popup, onDismiss, emptySearchQuery = '') {
-        if (!isScraperPopupActive(popup)) {
-            if (floatingScraperHudOwnerPopup === popup) closeFloatingScraperHud();
+    async function renderScraperMatchCard(container, incomingResults, sceneId, ctx, popup, onDismiss, emptySearchQuery = '', scrapeRequestId = null) {
+        if (!isScraperRequestCurrent(popup, sceneId, scrapeRequestId)) {
+            if (!isScraperPopupActive(popup) && floatingScraperHudOwnerPopup === popup) closeFloatingScraperHud();
             return;
         }
         const initialResultLimit = getScraperMatchingSettings().initialResultLimit;
@@ -5839,8 +5944,8 @@
 
         // Cache loading and scraper requests can finish after the owning popup closes.
         // Do not let a stale continuation recreate or update a detached HUD.
-        if (!isScraperPopupActive(popup)) {
-            if (floatingScraperHudOwnerPopup === popup) closeFloatingScraperHud();
+        if (!isScraperRequestCurrent(popup, sceneId, scrapeRequestId)) {
+            if (!isScraperPopupActive(popup) && floatingScraperHudOwnerPopup === popup) closeFloatingScraperHud();
             return;
         }
 
@@ -5866,6 +5971,7 @@
             `;
 
             const closeEmpty = () => {
+                invalidateScraperRequests(popup);
                 window._fastTagEverythingScraperOpen = false;
                 setScraperHudPersistedOpen(false);
                 closeFloatingScraperHud();
@@ -5889,10 +5995,13 @@
                     input?.focus();
                     return;
                 }
+                const manualRequestId = beginScraperRequest(popup, sceneId);
+                if (manualRequestId == null) return;
                 button.disabled = true;
                 button.textContent = 'Searching…';
                 try {
                     const manualResults = await fetchScraperMatchesForScene(sceneId, null, query);
+                    if (!isScraperRequestCurrent(popup, sceneId, manualRequestId)) return;
                     if (!manualResults?.length) {
                         toastError(`No scraper matches found for “${query}”`);
                         button.disabled = false;
@@ -5901,8 +6010,9 @@
                         return;
                     }
                     sessionScrapeCache.set(sceneId, manualResults);
-                    await renderScraperMatchCard(container, manualResults, sceneId, ctx, popup, onDismiss);
+                    await renderScraperMatchCard(container, manualResults, sceneId, ctx, popup, onDismiss, '', manualRequestId);
                 } catch (error) {
+                    if (!isScraperRequestCurrent(popup, sceneId, manualRequestId)) return;
                     button.disabled = false;
                     button.textContent = 'Search';
                     toastError('Scrape search failed: ' + (error?.message || error));
@@ -6257,7 +6367,7 @@
                                                 const isNew = !(p.stored_id || cachedPerformers.some(cp => (cp.name || '').trim().toLowerCase() === (p.name || '').trim().toLowerCase()));
                                                 if (isNew) {
                                                     return `
-                                                        <label style="display: inline-flex; align-items: baseline; gap: 4px; background: ${isDark ? 'rgba(245, 158, 11, 0.12)' : '#fef3c7'}; color: ${isDark ? '#fde68a' : '#92400e'}; border: 1px dashed ${isDark ? 'rgba(245, 158, 11, 0.55)' : '#f59e0b'}; padding: 2px 6px; border-radius: 4px; font-size: 10px; cursor: pointer; user-select: none;" title="Not in your local library — will create new performer upon saving">
+                                                        <label class="fasttag-performer-hover-trigger" data-scrape-performer-index="${pIdx}" style="display: inline-flex; align-items: baseline; gap: 4px; background: ${isDark ? 'rgba(245, 158, 11, 0.12)' : '#fef3c7'}; color: ${isDark ? '#fde68a' : '#92400e'}; border: 1px dashed ${isDark ? 'rgba(245, 158, 11, 0.55)' : '#f59e0b'}; padding: 2px 6px; border-radius: 4px; font-size: 10px; cursor: pointer; user-select: none;">
                                                             <input type="checkbox" class="fasttag-scrape-perf-item" data-idx="${pIdx}" checked style="cursor: pointer; width: 11px; height: 11px; accent-color: #f59e0b; margin: 0; position: relative; top: 1.5px;">
                                                             <span>${escapeHtml(p.name)}</span>
                                                             <span style="font-size: 8.5px; font-weight: 700; background: ${isDark ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.25)'}; padding: 0.5px 3.5px; border-radius: 3px; color: ${isDark ? '#fef08a' : '#78350f'};">+ New</span>
@@ -6265,7 +6375,7 @@
                                                     `;
                                                 }
                                                 return `
-                                                    <label style="display: inline-flex; align-items: baseline; gap: 4px; background: ${isDark ? 'rgba(14, 165, 233, 0.15)' : '#e0f2fe'}; color: ${isDark ? '#bae6fd' : '#0369a1'}; border: 1px solid ${isDark ? 'rgba(56, 189, 248, 0.35)' : '#7dd3fc'}; padding: 2px 6px; border-radius: 4px; font-size: 10px; cursor: pointer; user-select: none;" title="Exists in your local library">
+                                                    <label class="fasttag-performer-hover-trigger" data-scrape-performer-index="${pIdx}" style="display: inline-flex; align-items: baseline; gap: 4px; background: ${isDark ? 'rgba(14, 165, 233, 0.15)' : '#e0f2fe'}; color: ${isDark ? '#bae6fd' : '#0369a1'}; border: 1px solid ${isDark ? 'rgba(56, 189, 248, 0.35)' : '#7dd3fc'}; padding: 2px 6px; border-radius: 4px; font-size: 10px; cursor: pointer; user-select: none;">
                                                         <input type="checkbox" class="fasttag-scrape-perf-item" data-idx="${pIdx}" checked style="cursor: pointer; width: 11px; height: 11px; accent-color: #0ea5e9; margin: 0; position: relative; top: 1.5px;">
                                                         <span>${escapeHtml(p.name)}</span>
                                                     </label>
@@ -6356,12 +6466,15 @@
                     input?.focus();
                     return;
                 }
+                const manualRequestId = beginScraperRequest(popup, sceneId);
+                if (manualRequestId == null) return;
                 if (searchBtn) {
                     searchBtn.disabled = true;
                     searchBtn.textContent = 'Searching…';
                 }
                 try {
                     const manualResults = await fetchScraperMatchesForScene(sceneId, null, query);
+                    if (!isScraperRequestCurrent(popup, sceneId, manualRequestId)) return;
                     if (!manualResults?.length) {
                         toastError(`No scraper matches found for “${query}”`);
                         if (searchBtn) {
@@ -6372,8 +6485,9 @@
                     }
                     sessionScrapeCache.set(sceneId, manualResults);
                     hideScrapeCoverTooltip();
-                    await renderScraperMatchCard(container, manualResults, sceneId, ctx, popup, onDismiss);
+                    await renderScraperMatchCard(container, manualResults, sceneId, ctx, popup, onDismiss, '', manualRequestId);
                 } catch (error) {
+                    if (!isScraperRequestCurrent(popup, sceneId, manualRequestId)) return;
                     toastError('Scrape search failed: ' + (error?.message || error));
                     if (searchBtn) {
                         searchBtn.disabled = false;
@@ -6402,7 +6516,7 @@
                     allResults._fastTagShowHidden = !showingHiddenResults;
                     allResults._fastTagShowAllResults = !showingHiddenResults;
                     hideScrapeCoverTooltip();
-                    renderScraperMatchCard(container, allResults, sceneId, ctx, popup, onDismiss);
+                    renderScraperMatchCard(container, allResults, sceneId, ctx, popup, onDismiss, '', scrapeRequestId);
                 };
             }
 
@@ -6413,7 +6527,7 @@
                     event.stopPropagation();
                     allResults._fastTagShowAllResults = !showingAllResults;
                     hideScrapeCoverTooltip();
-                    renderScraperMatchCard(container, allResults, sceneId, ctx, popup, onDismiss);
+                    renderScraperMatchCard(container, allResults, sceneId, ctx, popup, onDismiss, '', scrapeRequestId);
                 };
             }
 
@@ -6428,12 +6542,12 @@
                     if (sourceIndex >= 0) allResults.splice(sourceIndex, 1);
                     if (allResults.length === 0) {
                         sessionScrapeCache.delete(sceneId);
-                        renderScraperMatchCard(container, allResults, sceneId, ctx, popup, onDismiss);
+                        renderScraperMatchCard(container, allResults, sceneId, ctx, popup, onDismiss, '', scrapeRequestId);
                         if (typeof onDismiss === 'function') onDismiss();
                         return;
                     }
                     sessionScrapeCache.set(sceneId, allResults);
-                    renderScraperMatchCard(container, allResults, sceneId, ctx, popup, onDismiss);
+                    renderScraperMatchCard(container, allResults, sceneId, ctx, popup, onDismiss, '', scrapeRequestId);
                 };
             }
 
@@ -6454,7 +6568,7 @@
                     } else {
                         closeFloatingScraperHud();
                     }
-                    renderScraperMatchCard(popup?.scraperCardContainer || container, allResults, sceneId, ctx, popup, onDismiss);
+                    renderScraperMatchCard(popup?.scraperCardContainer || container, allResults, sceneId, ctx, popup, onDismiss, '', scrapeRequestId);
                 };
             }
 
@@ -6628,6 +6742,31 @@
                 thumbEl.onmouseleave = () => hideScrapeCoverTooltip();
             }
 
+            targetContainer.querySelectorAll('.fasttag-performer-hover-trigger').forEach(trigger => {
+                const performerIndex = Number(trigger.getAttribute('data-scrape-performer-index'));
+                const performer = performers[performerIndex];
+                if (!performer) return;
+                trigger.onmouseenter = () => {
+                    isHoveringCard = false;
+                    cancelPerformerHoverCardHide();
+                    if (performerHoverTimeout) clearTimeout(performerHoverTimeout);
+                    performerHoverTimeout = setTimeout(() => {
+                        showPerformerHoverCard(
+                            buildScrapedPerformerPreviewData(performer, match, cachedPerformers),
+                            trigger
+                        );
+                    }, 100);
+                };
+                trigger.onmouseleave = (event) => {
+                    if (event.relatedTarget?.closest?.('#fasttag-performer-hover-card')) return;
+                    if (performerHoverTimeout) {
+                        clearTimeout(performerHoverTimeout);
+                        performerHoverTimeout = null;
+                    }
+                    if (!isHoveringCard) schedulePerformerHoverCardHide();
+                };
+            });
+
             // Bind interactions
             const prevBtn = targetContainer.querySelector('#fasttag-scrape-prev');
             if (prevBtn) {
@@ -6675,6 +6814,7 @@
             if (cancelBtn) {
                 cancelBtn.onclick = (e) => {
                     e.preventDefault();
+                    invalidateScraperRequests(popup);
                     hideScrapeCoverTooltip();
                     restoreSingleWidth();
                     closeFloatingScraperHud();
@@ -6740,7 +6880,12 @@
 
             // 1–3. Resolve studio, performers and tags against stored IDs and the local library.
             const studioResolution = await resolveScrapedStudioResult(match.studio, scrapeSelection.studio);
-            const performerResolution = await resolveScrapedEntityIdsResult('performers', match.performers, scrapeSelection.performerIndices);
+            const performerResolution = await resolveScrapedEntityIdsResult(
+                'performers',
+                match.performers,
+                scrapeSelection.performerIndices,
+                { endpoint: match._sourceEndpoint, name: match._sourceName }
+            );
             const tagResolution = await resolveScrapedEntityIdsResult('tags', match.tags, scrapeSelection.tagIndices);
             const studioIdToSet = studioResolution.id;
             const performerIdsToAdd = performerResolution.ids;
@@ -9670,6 +9815,7 @@
             const ctx = popup._context;
             if (!ctx) return;
 
+            invalidateScraperRequests(popup);
             popup.currentSceneId = sceneId;
             popup.currentCardElement = cardElement;
 
@@ -12238,6 +12384,8 @@
             const triggerScrapeAction = async (forceOpen = false, targetSceneId = null, targetCardElement = null) => {
                 const activeSceneId = targetSceneId || popup.currentSceneId || currentSceneId;
                 const activeCardElement = targetCardElement || popup.currentCardElement || cardElement;
+                const scrapeRequestId = beginScraperRequest(popup, activeSceneId);
+                if (scrapeRequestId == null) return null;
 
                 // If scraper card is currently open and not force-opening, clicking "Hide" closes it and toggles back to "Scrape"
                 const isScraperOpen = (popup.scraperCardContainer && popup.scraperCardContainer.style.display !== 'none' && popup.scraperCardContainer.innerHTML.trim() !== '') || (floatingScraperHudElement && document.body.contains(floatingScraperHudElement));
@@ -12267,9 +12415,10 @@
                 if (sessionScrapeCache.has(activeSceneId) && sessionScrapeCache.get(activeSceneId)?.length > 0) {
                     const cached = sessionScrapeCache.get(activeSceneId);
                     cached._fromCache = true;
-                    renderScraperMatchCard(popup.scraperCardContainer, cached, activeSceneId, popup._context, popup, () => {
-                        popup.globalSearch?.focus({ preventScroll: true });
-                    });
+                    renderScraperMatchCard(
+                        popup.scraperCardContainer, cached, activeSceneId, popup._context, popup,
+                        () => popup.globalSearch?.focus({ preventScroll: true }), '', scrapeRequestId
+                    );
                     return;
                 }
 
@@ -12279,6 +12428,7 @@
 
                 try {
                     const matches = await fetchScraperMatchesForScene(activeSceneId, activeCardElement);
+                    if (!isScraperRequestCurrent(popup, activeSceneId, scrapeRequestId)) return null;
                     if (!matches || matches.length === 0) {
                         toastError('No scraper matches found on configured scrapers');
                         const firstPath = popup.sceneData?.files?.[0]?.path || '';
@@ -12291,18 +12441,21 @@
                             popup._context,
                             popup,
                             () => popup.globalSearch?.focus({ preventScroll: true }),
-                            initialSearch
+                            initialSearch,
+                            scrapeRequestId
                         );
                         return true;
                     } else {
                         sessionScrapeCache.set(activeSceneId, matches);
                         popup.scrapeBtn.disabled = false;
-                        renderScraperMatchCard(popup.scraperCardContainer, matches, activeSceneId, popup._context, popup, () => {
-                            popup.globalSearch?.focus({ preventScroll: true });
-                        });
+                        renderScraperMatchCard(
+                            popup.scraperCardContainer, matches, activeSceneId, popup._context, popup,
+                            () => popup.globalSearch?.focus({ preventScroll: true }), '', scrapeRequestId
+                        );
                         return true;
                     }
                 } catch (err) {
+                    if (!isScraperRequestCurrent(popup, activeSceneId, scrapeRequestId)) return null;
                     popup.scrapeBtn.disabled = false;
                     popup.scrapeBtn.innerHTML = origHtml;
                     toastError('Scrape error: ' + (err?.message || err));
@@ -12380,7 +12533,7 @@
                         popup.aiBtn.disabled = false;
                         popup.aiBtn.innerHTML = '<span>✨ AI Parse</span>';
                     }
-                    toastError(`AI Parse Error: ${err.message}`);
+                    toastError(`AI Parse Error: ${err.message}`, undefined, 4500);
                 }
             };
 
@@ -14910,6 +15063,8 @@
             popup.scrapeBtn.onclick = async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                const scrapeRequestId = beginScraperRequest(popup, sceneId);
+                if (scrapeRequestId == null) return;
 
                 // If scraper card is currently open, clicking this button (which says "Hide") closes it and toggles back to "Scrape"
                 const isScraperOpen = (popup.scraperCardContainer && popup.scraperCardContainer.style.display !== 'none' && popup.scraperCardContainer.innerHTML.trim() !== '') || (floatingScraperHudElement && document.body.contains(floatingScraperHudElement));
@@ -14930,9 +15085,10 @@
                 if (sessionScrapeCache.has(sceneId) && sessionScrapeCache.get(sceneId)?.length > 0) {
                     const cached = sessionScrapeCache.get(sceneId);
                     cached._fromCache = true;
-                    renderScraperMatchCard(popup.scraperCardContainer, cached, sceneId, null, popup, () => {
-                        filterInput.focus({ preventScroll: true });
-                    });
+                    renderScraperMatchCard(
+                        popup.scraperCardContainer, cached, sceneId, null, popup,
+                        () => filterInput.focus({ preventScroll: true }), '', scrapeRequestId
+                    );
                     return;
                 }
 
@@ -14942,21 +15098,25 @@
 
                 try {
                     const matches = await fetchScraperMatchesForScene(sceneId, cardElement);
+                    if (!isScraperRequestCurrent(popup, sceneId, scrapeRequestId)) return;
                     if (!matches || matches.length === 0) {
                         popup.scrapeBtn.innerHTML = `<span>✕ No Matches</span>`;
                         toastError('No scraper matches found on configured scrapers');
                         setTimeout(() => {
+                            if (!isScraperRequestCurrent(popup, sceneId, scrapeRequestId)) return;
                             popup.scrapeBtn.disabled = false;
                             popup.scrapeBtn.innerHTML = origHtml;
                         }, 2500);
                     } else {
                         sessionScrapeCache.set(sceneId, matches);
                         popup.scrapeBtn.disabled = false;
-                        renderScraperMatchCard(popup.scraperCardContainer, matches, sceneId, null, popup, () => {
-                            filterInput.focus({ preventScroll: true });
-                        });
+                        renderScraperMatchCard(
+                            popup.scraperCardContainer, matches, sceneId, null, popup,
+                            () => filterInput.focus({ preventScroll: true }), '', scrapeRequestId
+                        );
                     }
                 } catch (err) {
+                    if (!isScraperRequestCurrent(popup, sceneId, scrapeRequestId)) return;
                     popup.scrapeBtn.disabled = false;
                     popup.scrapeBtn.innerHTML = origHtml;
                     toastError('Scrape error: ' + (err?.message || err));

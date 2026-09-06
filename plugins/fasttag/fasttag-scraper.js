@@ -16,7 +16,7 @@
                 fingerprints { algorithm hash duration }
                 studio { stored_id name image }
                 tags { stored_id name }
-                performers { stored_id name gender images }
+                performers { stored_id name gender images remote_site_id urls }
             }
         }
     `;
@@ -628,7 +628,126 @@
         return (await resolveScrapedStudioResult(studio, selected)).id;
     }
 
-    async function resolveScrapedEntityIdsResult(type, items, selectedIndices) {
+    function buildScrapedPerformerCreateInput(item, sourceInfo = {}) {
+        const input = { name: String(item?.name || '').trim() };
+        const image = (Array.isArray(item?.images) ? item.images : [])
+            .map(value => String(value || '').trim())
+            .find(Boolean);
+        if (image) input.image = image;
+
+        const endpoint = String(sourceInfo?.endpoint || '').trim();
+        const rawRemoteId = String(item?.remote_site_id || '').trim();
+        const urlIdMatch = rawRemoteId.match(/\/performers\/([^/?#]+)/i);
+        const remoteId = urlIdMatch
+            ? decodeURIComponent(urlIdMatch[1])
+            : (/^[a-z0-9-]+$/i.test(rawRemoteId) ? rawRemoteId : '');
+        if (/^https?:\/\//i.test(endpoint) && remoteId) {
+            input.stash_ids = [{ endpoint, stash_id: remoteId }];
+        }
+        return input;
+    }
+
+    async function createScrapedPerformer(config, item, sourceInfo) {
+        const fullInput = buildScrapedPerformerCreateInput(item, sourceInfo);
+        const attempts = [];
+        if (fullInput.image || fullInput.stash_ids) attempts.push(fullInput);
+        if (fullInput.image && fullInput.stash_ids) attempts.push({ name: fullInput.name, image: fullInput.image });
+        if (fullInput.image && fullInput.stash_ids) attempts.push({ name: fullInput.name, stash_ids: fullInput.stash_ids });
+
+        for (const input of attempts) {
+            try {
+                const response = await getDependencies().fetchGQL(`
+                    mutation FastTagCreateScrapedPerformer($input: PerformerCreateInput!) {
+                        performerCreate(input: $input) { id name }
+                    }
+                `, { input });
+                const newId = response?.data?.performerCreate?.id || config.createExtract(response?.data);
+                if (newId) return String(newId);
+            } catch (error) {
+                console.warn('[FastTag] Performer profile import failed; retrying with fewer fields.', error);
+            }
+        }
+
+        try {
+            const response = await getDependencies().fetchGQL(config.createQuery, { name: fullInput.name });
+            const newId = config.createExtract(response?.data);
+            return newId ? String(newId) : null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function isMissingPerformerImage(imagePath) {
+        const value = String(imagePath || '').trim();
+        return !value || /[?&]default=true(?:&|$)/i.test(value);
+    }
+
+    function mergePerformerStashIds(existingStashIds, incomingStashIds) {
+        const existing = (Array.isArray(existingStashIds) ? existingStashIds : [])
+            .filter(item => item?.endpoint && item?.stash_id)
+            .map(item => ({ endpoint: String(item.endpoint), stash_id: String(item.stash_id) }));
+        const incoming = (Array.isArray(incomingStashIds) ? incomingStashIds : [])
+            .filter(item => item?.endpoint && item?.stash_id);
+        for (const item of incoming) {
+            const endpointKey = String(item.endpoint).replace(/\/+$/, '').toLowerCase();
+            const endpointAlreadyPresent = existing.some(current =>
+                current.endpoint.replace(/\/+$/, '').toLowerCase() === endpointKey
+            );
+            if (!endpointAlreadyPresent) {
+                existing.push({ endpoint: String(item.endpoint), stash_id: String(item.stash_id) });
+            }
+        }
+        return existing;
+    }
+
+    async function enrichExistingScrapedPerformer(localPerformer, item, sourceInfo) {
+        const deps = getDependencies();
+        if (deps.getFillMissingPerformerImages?.() === false || !localPerformer?.id) return;
+        const scrapedInput = buildScrapedPerformerCreateInput(item, sourceInfo);
+        if (!scrapedInput.image) return;
+
+        let current = localPerformer;
+        if (typeof current.image_path === 'undefined' || typeof current.stash_ids === 'undefined') {
+            try {
+                const response = await deps.fetchGQL(`
+                    query FastTagExistingPerformerProfile($id: ID!) {
+                        findPerformer(id: $id) { id image_path stash_ids { endpoint stash_id } }
+                    }
+                `, { id: String(localPerformer.id) });
+                current = response?.data?.findPerformer || current;
+            } catch (error) {
+                return;
+            }
+        }
+
+        if (!isMissingPerformerImage(current.image_path)) return;
+        const updateInput = { id: String(localPerformer.id), image: scrapedInput.image };
+        const mergedStashIds = mergePerformerStashIds(current.stash_ids, scrapedInput.stash_ids);
+        if (mergedStashIds.length > (Array.isArray(current.stash_ids) ? current.stash_ids.length : 0)) {
+            updateInput.stash_ids = mergedStashIds;
+        }
+        if (!updateInput.image && !updateInput.stash_ids) return;
+
+        const attempts = [updateInput];
+        if (updateInput.image && updateInput.stash_ids) attempts.push({ id: updateInput.id, image: updateInput.image });
+        for (const input of attempts) {
+            try {
+                const response = await deps.fetchGQL(`
+                    mutation FastTagEnrichExistingPerformer($input: PerformerUpdateInput!) {
+                        performerUpdate(input: $input) { id image_path stash_ids { endpoint stash_id } }
+                    }
+                `, { input });
+                if (response?.data?.performerUpdate?.id) {
+                    deps.setCache('performers', null);
+                    return;
+                }
+            } catch (error) {
+                console.warn('[FastTag] Existing performer profile enrichment failed.', error);
+            }
+        }
+    }
+
+    async function resolveScrapedEntityIdsResult(type, items, selectedIndices, sourceInfo = null) {
         if (!selectedIndices?.length || !items) return { ids: [], failures: [] };
         const deps = getDependencies();
         const { cachedEntities, config } = await loadCachedEntities(type);
@@ -639,16 +758,29 @@
             if (!item || !item.name) continue;
             if (item.stored_id) {
                 resolvedIds.push(String(item.stored_id));
+                if (type === 'performers') {
+                    const localPerformer = cachedEntities?.find(cached => String(cached.id) === String(item.stored_id))
+                        || { id: String(item.stored_id) };
+                    await enrichExistingScrapedPerformer(localPerformer, item, sourceInfo || {});
+                }
                 continue;
             }
             const normalizedName = item.name.trim().toLowerCase();
             const found = cachedEntities?.find(cached => (cached.name || '').trim().toLowerCase() === normalizedName);
             if (found) {
                 resolvedIds.push(String(found.id));
+                if (type === 'performers') {
+                    await enrichExistingScrapedPerformer(found, item, sourceInfo || {});
+                }
                 continue;
             }
-            const response = await deps.fetchGQL(config.createQuery, { name: item.name.trim() });
-            const newId = config.createExtract(response?.data);
+            let newId = null;
+            if (type === 'performers') {
+                newId = await createScrapedPerformer(config, item, sourceInfo || {});
+            } else {
+                const response = await deps.fetchGQL(config.createQuery, { name: item.name.trim() });
+                newId = config.createExtract(response?.data);
+            }
             if (newId) {
                 resolvedIds.push(String(newId));
                 deps.setCache(type, null);
@@ -817,6 +949,9 @@
         mergeUniqueIds,
         buildAcceptedSceneStashIds,
         buildScrapeUpdateInput,
+        buildScrapedPerformerCreateInput,
+        isMissingPerformerImage,
+        mergePerformerStashIds,
         resolveScrapedStudioResult,
         resolveScrapedStudio,
         resolveScrapedEntityIdsResult,

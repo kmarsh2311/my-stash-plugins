@@ -21,6 +21,7 @@
         detachScraper: 'fasttag_detach_scraper_v1',
         hideObviousFalsePositives: 'fasttag_hide_obvious_false_positives_v1',
         scraperMatching: 'fasttag_scraper_matching_settings_v1',
+        fillMissingPerformerImages: 'fasttag_fill_missing_performer_images_v1',
         scraperHudOpen: 'fasttag_scraper_hud_open_state'
     });
     const RECENT_KEYS = Object.freeze({
@@ -153,6 +154,12 @@
     }
     function setHideObviousFalsePositives(enabled) {
         setScraperMatchingSettings({ hideObviousFalsePositives: Boolean(enabled), preset: 'custom' });
+    }
+    function getFillMissingPerformerImages() {
+        try { return readBoolean(KEYS.fillMissingPerformerImages, true); } catch (e) { return true; }
+    }
+    function setFillMissingPerformerImages(enabled) {
+        try { writeBoolean(KEYS.fillMissingPerformerImages, enabled); } catch (e) {}
     }
     function normalizeScraperMatchingSettings(settings = {}) {
         const merged = { ...DEFAULT_SCRAPER_MATCHING_SETTINGS, ...settings };
@@ -359,6 +366,8 @@
         setDetachScraper,
         getHideObviousFalsePositives,
         setHideObviousFalsePositives,
+        getFillMissingPerformerImages,
+        setFillMissingPerformerImages,
         SCRAPER_MATCHING_PRESETS,
         DEFAULT_SCRAPER_MATCHING_SETTINGS,
         getScraperMatchingSettings,

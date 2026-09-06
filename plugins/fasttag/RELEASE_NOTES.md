@@ -215,6 +215,14 @@
 ### Install / Update
 - Repository index: `https://kmarsh2311.github.io/my-stash-plugins/index.yml`
 - Full changelog: See [CHANGELOG.md](CHANGELOG.md)
+## FastTag 4.2.13 - Performer Enrichment and Scraper Reliability
+
+FastTag 4.2.13 can import the first available source image and source-specific ID when a scraped performer is created. An enabled-by-default Match option can also fill a missing image and source ID for a confidently resolved existing performer without replacing an image already in the local library; enrichment failure never blocks accepting the scene.
+
+Hovering performer pills in the scraper HUD now previews the matched local performer or the available source profile and image. The preview remains reachable while moving the pointer onto it and links to the appropriate performer profile.
+
+Scraper request generation and scene checks prevent a slower automatic, manual, refresh, or previous-scene response from unexpectedly replacing the newest result. AI Parse error notifications also dismiss sooner while retaining their copy and manual-dismiss controls.
+
 ## FastTag 4.2.12 - Configurable Scraper Matching
 
 FastTag 4.2.12 adds a dedicated Match settings tab with Conservative, Balanced, Strict, and automatically detected Custom behaviour. Users can tune alias handling, cast conflicts, studio requirements, title and duration tolerances, and the initial result count; Restore Defaults returns only these controls to Balanced behaviour.

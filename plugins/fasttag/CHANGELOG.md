@@ -4,6 +4,16 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.2.13] - 2026-09-06
+
+### Added
+- **Performer Profile Images**: Performers created while accepting scraper results import the first available source image and source-specific performer ID. An enabled-by-default Match setting also fills blank images on confidently resolved existing performers without replacing curated images; enrichment failure never blocks scene acceptance.
+- **Scraper Performer Previews**: Hovering a performer pill in scraper results shows the local performer profile when matched, otherwise the source image and profile link; blank local images can preview the available scraped image, and a short grace period keeps the card reachable and clickable.
+
+### Fixed
+- **Stale Scraper Results**: Per-popup request generations and scene checks prevent slower automatic, manual, refresh, or previous-scene scrape responses from replacing the newest results.
+- **AI Parse Notifications**: AI Parse errors now dismiss sooner while retaining hover-to-pause, copy, and manual-dismiss controls.
+
 ## [4.2.12] - 2026-09-05
 
 ### Added

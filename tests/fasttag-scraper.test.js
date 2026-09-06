@@ -318,6 +318,27 @@ assert.deepEqual(selection, {
     tagIndices: [1]
 });
 assert.deepEqual(scraper.mergeUniqueIds([1, '2'], ['2', 3]), ['1', '2', '3']);
+assert.deepEqual(scraper.buildScrapedPerformerCreateInput({
+    name: 'New Performer',
+    images: ['https://images.example/performer.jpg'],
+    remote_site_id: 'performer-uuid'
+}, { endpoint: 'https://stashdb.org/graphql' }), {
+    name: 'New Performer',
+    image: 'https://images.example/performer.jpg',
+    stash_ids: [{ endpoint: 'https://stashdb.org/graphql', stash_id: 'performer-uuid' }]
+});
+assert.equal(scraper.isMissingPerformerImage('http://stash/performer/1/image?t=1&default=true'), true);
+assert.equal(scraper.isMissingPerformerImage('http://stash/performer/1/image?t=1'), false);
+assert.deepEqual(scraper.mergePerformerStashIds(
+    [{ endpoint: 'https://stashdb.org/graphql/', stash_id: 'existing-id' }],
+    [
+        { endpoint: 'https://stashdb.org/graphql', stash_id: 'different-id' },
+        { endpoint: 'https://fansdb.cc/graphql', stash_id: 'fans-id' }
+    ]
+), [
+    { endpoint: 'https://stashdb.org/graphql/', stash_id: 'existing-id' },
+    { endpoint: 'https://fansdb.cc/graphql', stash_id: 'fans-id' }
+], 'existing source IDs must be preserved rather than replaced');
 
 const stashIdResult = scraper.buildAcceptedSceneStashIds(
     [{ endpoint: 'https://fansdb.cc/graphql', stash_id: 'fans-1' }],
@@ -612,6 +633,96 @@ async function testEntityResolution() {
         { name: '' }
     ], [0, 1, 2, 3, 99]), ['19', '20', '21']);
     assert.deepEqual(await scraper.resolveScrapedEntityIds('tags', [{ name: 'KNOWN TAG' }], [0]), ['30']);
+
+    const richCreateCalls = [];
+    cache.set('performers', []);
+    scraper.configure({
+        cleanTitleForScraping,
+        parseDurationSec,
+        getEntityConfig: type => configs[type],
+        getCachedOrNull: type => cache.get(type) || null,
+        setCache: () => {},
+        fetchGQL: async (query, variables) => {
+            richCreateCalls.push([query, variables]);
+            if (query.includes('FastTagCreateScrapedPerformer')) {
+                return { data: { performerCreate: { id: '22', name: variables.input.name } } };
+            }
+            throw new Error(`Unexpected query: ${query}`);
+        }
+    });
+    assert.deepEqual(await scraper.resolveScrapedEntityIdsResult('performers', [{
+        name: 'Profile Person',
+        images: ['https://images.example/profile.jpg'],
+        remote_site_id: 'profile-id'
+    }], [0], { endpoint: 'https://stashdb.org/graphql' }), { ids: ['22'], failures: [] });
+    assert.deepEqual(richCreateCalls[0][1], { input: {
+        name: 'Profile Person',
+        image: 'https://images.example/profile.jpg',
+        stash_ids: [{ endpoint: 'https://stashdb.org/graphql', stash_id: 'profile-id' }]
+    } });
+
+    const retryCalls = [];
+    scraper.configure({
+        cleanTitleForScraping,
+        parseDurationSec,
+        getEntityConfig: type => configs[type],
+        getCachedOrNull: type => cache.get(type) || null,
+        setCache: () => {},
+        fetchGQL: async (query, variables) => {
+            retryCalls.push([query, variables]);
+            if (query.includes('FastTagCreateScrapedPerformer') && variables.input.stash_ids) {
+                return { errors: [{ message: 'external ID rejected' }] };
+            }
+            if (query.includes('FastTagCreateScrapedPerformer') && variables.input.image) {
+                return { data: { performerCreate: { id: '23' } } };
+            }
+            return { data: {} };
+        }
+    });
+    assert.deepEqual(await scraper.resolveScrapedEntityIdsResult('performers', [{
+        name: 'Image Retry Person',
+        images: ['https://images.example/retry.jpg'],
+        remote_site_id: 'rejected-id'
+    }], [0], { endpoint: 'https://stashdb.org/graphql' }), { ids: ['23'], failures: [] });
+    assert.equal(retryCalls.length, 2, 'a rejected source ID should retry performer creation with the image');
+    assert.deepEqual(retryCalls[1][1], { input: {
+        name: 'Image Retry Person',
+        image: 'https://images.example/retry.jpg'
+    } });
+
+    const enrichmentCalls = [];
+    cache.set('performers', [
+        { id: '40', name: 'Existing Blank', image_path: 'http://stash/performer/40/image?t=1&default=true', stash_ids: [] },
+        { id: '41', name: 'Existing Image', image_path: 'http://stash/performer/41/image?t=1', stash_ids: [] }
+    ]);
+    scraper.configure({
+        cleanTitleForScraping,
+        parseDurationSec,
+        getFillMissingPerformerImages: () => true,
+        getEntityConfig: type => configs[type],
+        getCachedOrNull: type => cache.get(type) || null,
+        setCache: () => {},
+        fetchGQL: async (query, variables) => {
+            enrichmentCalls.push([query, variables]);
+            if (query.includes('FastTagEnrichExistingPerformer')) {
+                return { data: { performerUpdate: { id: variables.input.id } } };
+            }
+            throw new Error(`Unexpected query: ${query}`);
+        }
+    });
+    assert.deepEqual(await scraper.resolveScrapedEntityIdsResult('performers', [{
+        stored_id: '40', name: 'Existing Blank', images: ['https://images.example/existing.jpg'], remote_site_id: 'existing-remote-id'
+    }], [0], { endpoint: 'https://stashdb.org/graphql' }), { ids: ['40'], failures: [] });
+    assert.deepEqual(enrichmentCalls[0][1], { input: {
+        id: '40',
+        image: 'https://images.example/existing.jpg',
+        stash_ids: [{ endpoint: 'https://stashdb.org/graphql', stash_id: 'existing-remote-id' }]
+    } });
+    const callCountAfterBlankImage = enrichmentCalls.length;
+    await scraper.resolveScrapedEntityIdsResult('performers', [{
+        stored_id: '41', name: 'Existing Image', images: ['https://images.example/replacement.jpg'], remote_site_id: 'replacement-id'
+    }], [0], { endpoint: 'https://stashdb.org/graphql' });
+    assert.equal(enrichmentCalls.length, callCountAfterBlankImage, 'an existing performer image must never be replaced');
 
     scraper.configure({
         cleanTitleForScraping,

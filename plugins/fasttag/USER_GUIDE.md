@@ -1,6 +1,6 @@
 # FastTag User Guide
 
-FastTag adds rapid scene-card metadata editing to Stash. This guide covers version 4.2.12 and is also available as a searchable offline guide from FastTag Settings.
+FastTag adds rapid scene-card metadata editing to Stash. This guide covers version 4.2.13 and is also available as a searchable offline guide from FastTag Settings.
 
 ## Opening FastTag
 
@@ -56,6 +56,10 @@ Exact stored performer IDs, full names, and multi-word aliases count as confirme
 Title-confidence scoring ignores linked performer names, the known local studio name, connecting words, technical filename markers, and this deliberately short generic descriptor list: `sex`, `porn`, `fuck`, `fucks`, `fucked`, `fucking`, `raw`, `twink`, and `xxx`. These words are removed only from confidence analysis and remain in the actual scraper search.
 
 Field checkboxes determine what is saved. Existing tags and performers are merged with selected scraped values. Covers save separately so a rejected image cannot prevent other metadata from saving.
+
+When a selected scraped performer does not yet exist locally, FastTag creates the performer with the first available source image and source-specific performer ID when provided. With **Fill missing performer images** enabled in Match settings, a confidently resolved existing performer also receives the scraped image and missing source ID when their local image is blank. Existing images are never replaced. If enrichment is rejected, scene acceptance continues and new-performer creation ultimately falls back to the name alone.
+
+Hover over any performer pill in the scraper HUD to preview the performer. FastTag prioritises the matched local profile and link; if the local profile has no image, the available scraped image is shown instead. Performers not yet in the local library use the scraper image and source profile link when provided. A short grace period lets you move the pointer from the performer pill onto the preview and click its profile link.
 
 ## Gemini AI Parse
 
