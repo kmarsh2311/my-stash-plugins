@@ -30,7 +30,7 @@ Sequential mode works through the scenes represented by the active Stash page or
 
 ## Video and mouse-wheel scrubbing
 
-Preview mode uses Stash preview media. Full Video uses the scene stream. With the pointer over Full Video, scroll to scrub. Slow, normal, and fast wheel movement use configurable skip distances; hold Shift for the fine freeze step. The pop-out control creates a draggable, resizable video HUD.
+Preview mode uses Stash preview media. Full Video uses the scene stream. With the pointer over Full Video, scroll to scrub. Slow, normal, and fast wheel movement use configurable skip distances; hold Shift for the fine freeze step. The progress bar along the bottom also works as a normal timeline: click a position or drag along it to seek. Dragging pauses temporarily and resumes only when the video was playing beforehand. The pop-out control creates a draggable, resizable video HUD.
 
 The scrubbing instruction overlay appears once per browser session and no more than five times until **Reset Defaults** is used in Video Settings.
 

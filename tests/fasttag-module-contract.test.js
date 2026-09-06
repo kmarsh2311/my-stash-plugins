@@ -129,6 +129,8 @@ assert.ok(coverEditorSource.includes("const playPauseButton = createActionButton
 assert.ok(mainSource.includes("e.target.closest('#fasttag-cover-editor-hud')"), 'cover-editor interactions should remain inside the owning popup boundary');
 assert.ok(mainSource.includes("#fasttag-create-modal, #fasttag-cover-editor-hud"), 'Escape should be delegated to the cover editor before the owning popup');
 assert.ok(mainSource.includes('#fasttag-cover-editor-hud #fasttag-media-container'), 'the relocated cover-editor player should bypass the modal wheel trap for two-way scrubbing');
+assert.ok(mainSource.includes("progressBarBg.addEventListener('pointerdown'"), 'the full-video progress bar should support drag seeking');
+assert.ok(mainSource.includes('timelineWasPlaying = !currentMedia.paused;'), 'timeline seeking should preserve the prior playback state');
 assert.ok(coverEditorSource.includes('overflow:auto;resize:both'), 'the cover-editor HUD should be resizable from its browser corner');
 assert.ok(coverEditorSource.includes("EDITOR_SIZE_STORAGE_KEY = 'fasttag_cover_editor_size'"), 'the cover editor should remember its resized dimensions');
 assert.ok(coverEditorSource.includes('grid-template-columns:auto auto minmax(68px,1fr) auto auto'), 'cover playback and capture controls should remain on one line');

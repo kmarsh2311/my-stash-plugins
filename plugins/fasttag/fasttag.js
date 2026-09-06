@@ -144,6 +144,7 @@
         getWheelNotches,
         selectScrubStep,
         calculateScrubTarget,
+        calculateSeekTarget,
         getDefaultPopoutSize,
         calculateVideoPopoutPosition,
         fetchSceneMediaUrls: fetchSceneMediaUrlsFromModule
@@ -3167,12 +3168,16 @@
         // Slim Progress Bar at the very bottom edge (no text/numbers)
         const progressBarBg = document.createElement('div');
         progressBarBg.id = 'fasttag-progress-bar-bg';
-        progressBarBg.style.cssText = 'position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: rgba(0, 0, 0, 0.45); z-index: 15; pointer-events: none; opacity: 0; transition: opacity 0.2s ease;';
+        progressBarBg.style.cssText = 'position: absolute; bottom: 0; left: 0; right: 0; height: 12px; background: transparent; z-index: 30; pointer-events: none; cursor: pointer; opacity: 0; transition: opacity 0.2s ease;';
+
+        const progressBarTrack = document.createElement('div');
+        progressBarTrack.style.cssText = 'position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(0,0,0,0.55);pointer-events:none;';
 
         const progressBarFill = document.createElement('div');
         progressBarFill.id = 'fasttag-progress-bar-fill';
         progressBarFill.style.cssText = 'height: 100%; width: 0%; background: #6366f1; border-radius: 0 2px 2px 0; transition: width 0.08s linear;';
-        progressBarBg.appendChild(progressBarFill);
+        progressBarTrack.appendChild(progressBarFill);
+        progressBarBg.appendChild(progressBarTrack);
 
         const updateProgressBar = () => {
             if (currentMedia && currentMedia.tagName === 'VIDEO' && currentMedia.duration > 0 && isFinite(currentMedia.duration)) {
@@ -3193,6 +3198,53 @@
                 }, 1500);
             }
         };
+
+        let isTimelineSeeking = false;
+        let timelineWasPlaying = false;
+        const seekTimelineToPointer = event => {
+            if (currentMode !== 'stream' || !currentMedia || currentMedia.tagName !== 'VIDEO') return;
+            const rect = progressBarBg.getBoundingClientRect();
+            const target = calculateSeekTarget(event.clientX, rect.left, rect.width, currentMedia.duration);
+            if (target === null) return;
+            currentMedia.currentTime = target;
+            updateProgressBar();
+            progressBarBg.style.opacity = '1';
+        };
+        progressBarBg.addEventListener('pointerdown', event => {
+            if (event.button !== 0 || currentMode !== 'stream' || !currentMedia || currentMedia.tagName !== 'VIDEO') return;
+            event.preventDefault();
+            event.stopPropagation();
+            isTimelineSeeking = true;
+            timelineWasPlaying = !currentMedia.paused;
+            clearTimeout(progressBarTimer);
+            try { currentMedia.pause(); } catch (error) {}
+            try { progressBarBg.setPointerCapture(event.pointerId); } catch (error) {}
+            seekTimelineToPointer(event);
+        }, { signal });
+        progressBarBg.addEventListener('pointermove', event => {
+            if (!isTimelineSeeking) return;
+            event.preventDefault();
+            event.stopPropagation();
+            seekTimelineToPointer(event);
+        }, { signal });
+        const finishTimelineSeek = (event, applyFinalPosition = true) => {
+            if (!isTimelineSeeking) return;
+            event.preventDefault();
+            event.stopPropagation();
+            if (applyFinalPosition) seekTimelineToPointer(event);
+            isTimelineSeeking = false;
+            try { progressBarBg.releasePointerCapture(event.pointerId); } catch (error) {}
+            if (timelineWasPlaying && currentMedia?.tagName === 'VIDEO') currentMedia.play().catch(() => {});
+            timelineWasPlaying = false;
+            showProgressBar();
+        };
+        progressBarBg.addEventListener('pointerup', finishTimelineSeek, { signal });
+        progressBarBg.addEventListener('pointercancel', event => finishTimelineSeek(event, false), { signal });
+        progressBarBg.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+        }, { signal });
+        progressBarBg.addEventListener('mouseenter', showProgressBar, { signal });
 
         // Floating Stream Cue Hint (appears once per session on switching to Full Video)
         const cueBadge = document.createElement('div');
@@ -3642,6 +3694,7 @@
         const renderMedia = (mode) => {
             if (signal.aborted) return;
             currentMode = mode;
+            progressBarBg.style.pointerEvents = mode === 'stream' ? 'auto' : 'none';
             updatePill(mode);
 
             // Teardown previous media

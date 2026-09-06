@@ -33,6 +33,10 @@ assert.equal(preview.calculateScrubTarget(50, 100, 1, 10), 40);
 assert.equal(preview.calculateScrubTarget(50, 100, -1, 10), 60);
 assert.equal(preview.calculateScrubTarget(5, 100, 1, 10), 0);
 assert.equal(preview.calculateScrubTarget(95, 100, -1, 10), 100);
+assert.equal(preview.calculateSeekTarget(150, 100, 200, 120), 30);
+assert.equal(preview.calculateSeekTarget(50, 100, 200, 120), 0);
+assert.equal(preview.calculateSeekTarget(400, 100, 200, 120), 120);
+assert.equal(preview.calculateSeekTarget(150, 100, 0, 120), null);
 
 for (const [screenWidth, expected] of [
     [2400, { width: '760px', height: '428px' }],
