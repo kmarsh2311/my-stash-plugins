@@ -295,10 +295,8 @@
         const playPauseButton = createActionButton('⏸ Pause');
         const stepBackButton = createActionButton('◀');
         const stepForwardButton = createActionButton('▶');
-        stepBackButton.title = 'Step backward while paused';
-        stepForwardButton.title = 'Step forward while paused';
-        stepBackButton.style.padding = '7px 9px';
-        stepForwardButton.style.padding = '7px 9px';
+        stepBackButton.style.cssText += 'padding:7px 12px;min-width:44px;';
+        stepForwardButton.style.cssText += 'padding:7px 12px;min-width:44px;';
         const timeDisplay = document.createElement('span');
         timeDisplay.style.cssText = `font:600 9.5px ui-monospace,SFMono-Regular,Menlo,monospace;color:${isDark ? '#cbd5e1' : '#334155'};min-width:68px;text-align:center;`;
         captureButton.style.padding = '7px 9px';
