@@ -83,4 +83,23 @@ assert.ok(saveWorkflow.includes('if (saveSeq !== pendingEverythingSaveSeq) retur
 assert.ok(saveWorkflow.includes('latestEverythingSavePromise = enqueueEverythingSave(runSave);'), 'scene mutations must use the serial queue');
 assert.ok(saveWorkflow.includes('return latestEverythingSavePromise;'), 'callers must be able to await the queued mutation');
 
+// Preview ownership is characterized before its controller extraction. A host
+// aborts its previous player before claiming a replacement, global input
+// listeners belong to that abort signal, and teardown relinquishes Cover Editor
+// and media-controller ownership.
+const previewLifecycle = section('async function attachScenePreview(', '// --- State & Sequential Utilities ---');
+assertBefore(previewLifecycle, 'hostContainer._previewAbortController.abort();', 'const previewAbort = new AbortController();', 'a host must stop its old preview before creating another');
+assertBefore(previewLifecycle, 'hostContainer._previewAbortController = previewAbort;', 'const { signal } = previewAbort;', 'the host must own the new abort controller');
+assert.ok(previewLifecycle.includes("document.addEventListener('keydown', onKeyDown, { signal });"), 'preview keyboard listeners must follow preview lifetime');
+assert.ok(previewLifecycle.includes("document.addEventListener('keyup', onKeyUp, { signal });"), 'preview key-release listeners must follow preview lifetime');
+assert.ok(previewLifecycle.includes("window.addEventListener('blur', onWindowBlur, { signal });"), 'preview blur cleanup must follow preview lifetime');
+assert.ok(previewLifecycle.includes('FastTagCoverEditor.closeForHost(hostContainer);'), 'aborting a preview must close its Cover Editor ownership');
+assert.ok(previewLifecycle.includes('delete hostContainer._fastTagMediaController;'), 'aborting a preview must release its media controller');
+assert.ok(previewLifecycle.includes('setVideoHudPersistedOpen(true);'), 'popping video out must preserve that preference');
+assert.ok(previewLifecycle.includes('setVideoHudPersistedOpen(false);'), 'docking video must clear the persisted popout state');
+assert.ok(previewLifecycle.includes('coverEditorWasPoppedOut = isVideoPoppedOut;'), 'Cover Editor must remember floating-player ownership');
+assert.ok(previewLifecycle.includes('if (restorePopout) togglePopout(true);'), 'Cover Editor release must restore prior floating state');
+assert.ok(previewLifecycle.includes("renderMedia(getAlwaysPlayFullVideo() ? 'stream' : 'preview');"), 'initial media mode must retain the user preference');
+assert.ok(previewLifecycle.includes('if (isVideoPoppedOut || isVideoHudPersistedOpen())'), 'new scenes must retain floating-video continuity');
+
 console.log('fasttag-runtime-characterization tests passed');
