@@ -97,8 +97,8 @@ assert.ok(popupClose.includes('sessionScrapeCache.clear();'), 'full popup closur
 
 // The shared popup shell must retain its stable DOM contract, clamp restored
 // sizes to the viewport, and enter the document before callers bind controls.
-const popupShell = section('function createPopupShell(type)', 'function setupPopupListeners(');
-assertBefore(popupShell, "const savedSize = getSavedPopupSize('single');", "const form = document.createElement('form');", 'popup sizing must be resolved before constructing the shell');
+const popupShell = section('function createShell(type)', 'function positionNearCard(', popupSource);
+assertBefore(popupShell, "const savedSize = getSavedSize('single');", "const form = root.document.createElement('form');", 'popup sizing must be resolved before constructing the shell');
 assert.ok(popupShell.includes('Math.min(rawW, maxScreenW)'), 'restored popup width must be clamped to the viewport');
 assert.ok(popupShell.includes('Math.min(rawH, maxScreenH)'), 'restored popup height must be clamped to the viewport');
 for (const selector of ['preview-container', 'tabulator-table', 'search-input', 'refresh-btn', 'save-btn', 'cancel-btn']) {

@@ -11,6 +11,19 @@ global.localStorage = {
 global.innerWidth = 1200;
 global.innerHeight = 800;
 global.requestAnimationFrame = callback => callback();
+let appendedForm = null;
+global.document = {
+    body: { appendChild: form => { appendedForm = form; } },
+    createElement(tagName) {
+        return {
+            tagName: tagName.toUpperCase(),
+            style: {},
+            attributes: {},
+            setAttribute(name, value) { this.attributes[name] = String(value); },
+            querySelector(selector) { return { selector }; }
+        };
+    }
+};
 global.FastTag = global.FastTag || {};
 
 require('../plugins/fasttag/fasttag-popup.js');
@@ -26,7 +39,9 @@ popup.configure({
     },
     getDefaultEverythingPosition: () => ({ x: 240, y: 120 }),
     getSequentialEditState: () => sequentialState,
-    getActivePopup: () => null
+    getActivePopup: () => null,
+    entityConfig: { tags: { pluralTitle: 'Tags' } },
+    getEffectiveTheme: () => 'dark'
 });
 
 assert.deepEqual(popup.getSavedSize('single'), { width: 640, height: 520 });
@@ -37,6 +52,16 @@ popup.setSavedSize(501.4, 452.7, 'single');
 assert.deepEqual(JSON.parse(values.get('stash_fast_tag_popup_size_single')), { width: 501, height: 453 });
 popup.setSavedSize(701.6, 602.2, 'everything');
 assert.deepEqual(JSON.parse(values.get('stash_fast_tag_popup_size_everything')), { width: 702, height: 602 });
+
+const shell = popup.createShell('tags');
+assert.equal(shell.element, appendedForm, 'the shell should be appended before it is returned');
+assert.equal(shell.element.id, 'scenes-popup');
+assert.equal(shell.element.attributes['data-popup-type'], 'single');
+assert.equal(shell.element.className, 'theme-dark');
+assert.equal(shell.element.style.width, '501px');
+assert.match(shell.element.innerHTML, /class="popup-resize-handle"/);
+assert.equal(shell.searchInput.selector, '#tags-search-input');
+assert.equal(shell.cancelBtn.selector, '#tags-cancel-btn');
 
 function createForm(type, width = 500, height = 400) {
     const visibleClasses = [];
