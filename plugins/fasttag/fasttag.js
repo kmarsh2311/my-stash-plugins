@@ -21,6 +21,8 @@
     if (!FastTagEntities) throw new Error('[FastTag] fasttag-entities.js must load before fasttag.js');
     const FastTagStorage = window.FastTag?.storage;
     if (!FastTagStorage) throw new Error('[FastTag] fasttag-storage.js must load before fasttag.js');
+    const FastTagDiagnostics = window.FastTag?.diagnostics;
+    if (!FastTagDiagnostics) throw new Error('[FastTag] fasttag-diagnostics.js must load before fasttag.js');
     const FastTagApi = window.FastTag?.api;
     if (!FastTagApi) throw new Error('[FastTag] fasttag-api.js must load before fasttag.js');
     const FastTagIntegrations = window.FastTag?.integrations;
@@ -116,6 +118,17 @@
         addRecentEntry,
         addRecentEntriesFromSelection
     } = FastTagStorage;
+    const {
+        getDebugMode,
+        setDebugMode,
+        ftLog,
+        getLogBufferSize,
+        clearDebugLogs,
+        exportDebugLogsAsText,
+        downloadDebugLogFile,
+        copyDebugLogsToClipboard,
+        attachGlobalErrorListeners
+    } = FastTagDiagnostics;
     const { fetchGQL } = FastTagApi;
     const {
         resetRefractSceneCards,
@@ -165,6 +178,8 @@
         applyBulkSelectionDelta
     } = FastTagEditors;
 
+    FastTagDiagnostics.configure({ getUsageCount: () => getUsageCount() });
+    FastTagDiagnostics.attachGlobalErrorListeners();
     FastTagApi.configure({
         fetchImpl: (...args) => window.fetch(...args),
         log: (...args) => ftLog(...args),
@@ -1352,162 +1367,6 @@
         }
         `;
         document.head.appendChild(style);
-    }
-
-    // --- FastTag Comprehensive Diagnostics & Logging Engine ---
-    const DEBUG_STORAGE_KEY = 'fasttag_debug_mode';
-    const DEBUG_LOGS_STORAGE_KEY = 'fasttag_debug_logs_buffer';
-    const MAX_DEBUG_LOGS = 600;
-    let inMemoryDebugLogs = [];
-
-    function getDebugMode() {
-        return localStorage.getItem(DEBUG_STORAGE_KEY) === 'true';
-    }
-    function setDebugMode(enabled) {
-        localStorage.setItem(DEBUG_STORAGE_KEY, enabled ? 'true' : 'false');
-        ftLog('INFO', 'CONFIG', `Debug Mode turned ${enabled ? 'ON' : 'OFF'}`);
-    }
-
-    try {
-        const savedLogs = localStorage.getItem(DEBUG_LOGS_STORAGE_KEY);
-        if (savedLogs) inMemoryDebugLogs = JSON.parse(savedLogs) || [];
-    } catch (e) {
-        inMemoryDebugLogs = [];
-    }
-
-    function getCircularReplacer() {
-        const seen = new WeakSet();
-        return (key, value) => {
-            if (typeof value === "object" && value !== null) {
-                if (seen.has(value) || value instanceof HTMLElement || value instanceof Node) {
-                    return '[DOM/Circular]';
-                }
-                seen.add(value);
-            }
-            return value;
-        };
-    }
-
-    let saveLogsTimeout = null;
-    function scheduleSaveLogsBuffer() {
-        if (saveLogsTimeout) return;
-        saveLogsTimeout = setTimeout(() => {
-            saveLogsTimeout = null;
-            try {
-                localStorage.setItem(DEBUG_LOGS_STORAGE_KEY, JSON.stringify(inMemoryDebugLogs.slice(-250)));
-            } catch (e) {}
-        }, 1000);
-    }
-
-    function ftLog(level, category, message, data = null) {
-        const now = new Date();
-        const timeStr = now.toISOString().replace('T', ' ').replace('Z', '');
-        const entry = {
-            time: timeStr,
-            level: String(level).toUpperCase(),
-            category: String(category).toUpperCase(),
-            message: String(message),
-            data: data ? (typeof data === 'object' ? JSON.parse(JSON.stringify(data, getCircularReplacer())) : data) : null
-        };
-
-        inMemoryDebugLogs.push(entry);
-        if (inMemoryDebugLogs.length > MAX_DEBUG_LOGS) {
-            inMemoryDebugLogs.shift();
-        }
-
-        scheduleSaveLogsBuffer();
-
-        if (getDebugMode() || level === 'ERROR' || level === 'WARN') {
-            const prefix = `[FastTag][${entry.category}]`;
-            if (level === 'ERROR') {
-                console.error(prefix, message, data || '');
-            } else if (level === 'WARN') {
-                console.warn(prefix, message, data || '');
-            } else {
-                console.log(prefix, message, data || '');
-            }
-        }
-    }
-
-    function getLogBufferSize() {
-        return inMemoryDebugLogs.length;
-    }
-
-    function clearDebugLogs() {
-        inMemoryDebugLogs = [];
-        try { localStorage.removeItem(DEBUG_LOGS_STORAGE_KEY); } catch (e) {}
-        ftLog('INFO', 'LOG', 'Debug logs cleared by user');
-    }
-
-    function exportDebugLogsAsText() {
-        const screenInfo = `Screen: ${window.innerWidth}x${window.innerHeight}, DPR: ${window.devicePixelRatio || 1}, UserAgent: ${navigator.userAgent}`;
-        const header = `=== FastTag Diagnostics Log ===\nExported: ${new Date().toISOString()}\n${screenInfo}\nUsage Count: ${getUsageCount()}\n===============================\n\n`;
-        const body = inMemoryDebugLogs.map(e => {
-            let dataStr = '';
-            if (e.data !== null && e.data !== undefined) {
-                try {
-                    dataStr = '\n  ' + JSON.stringify(e.data, null, 2).replace(/\n/g, '\n  ');
-                } catch (err) {
-                    dataStr = '\n  [Non-serializable data]';
-                }
-            }
-            return `[${e.time}] [${e.level}] [${e.category}] ${e.message}${dataStr}`;
-        }).join('\n');
-        return header + body;
-    }
-
-    function downloadDebugLogFile() {
-        const text = exportDebugLogsAsText();
-        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        const d = new Date().toISOString().slice(0, 10);
-        a.href = url;
-        a.download = `fasttag-debug-${d}.log`;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 500);
-    }
-
-    function copyDebugLogsToClipboard() {
-        const text = exportDebugLogsAsText();
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            return navigator.clipboard.writeText(text);
-        } else {
-            const ta = document.createElement('textarea');
-            ta.value = text;
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand('copy');
-            ta.remove();
-            return Promise.resolve();
-        }
-    }
-
-    // Global Error & Promise Rejection Interceptor for FastTag Diagnostics
-    if (!window._fastTagErrorListenersAttached) {
-        window._fastTagErrorListenersAttached = true;
-        window.addEventListener('error', (event) => {
-            if (event?.filename && event.filename.includes('fasttag')) {
-                ftLog('ERROR', 'RUNTIME', `Uncaught error in ${event.filename}:${event.lineno}:${event.colno} - ${event.message}`, {
-                    message: event.message,
-                    filename: event.filename,
-                    lineno: event.lineno,
-                    colno: event.colno,
-                    stack: event.error?.stack || null
-                });
-            }
-        });
-        window.addEventListener('unhandledrejection', (event) => {
-            const reason = event.reason;
-            const str = String(reason?.message || reason);
-            if (str.includes('fasttag') || (reason?.stack && reason.stack.includes('fasttag'))) {
-                ftLog('ERROR', 'PROMISE', `Unhandled Promise Rejection: ${str}`, {
-                    message: str,
-                    stack: reason?.stack || null
-                });
-            }
-        });
     }
 
     function showToast(message, type = "success", duration = 3000, debugPayload = null) {

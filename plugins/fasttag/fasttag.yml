@@ -7,6 +7,7 @@ ui:
     - fasttag-core.js
     - fasttag-entities.js
     - fasttag-storage.js
+    - fasttag-diagnostics.js
     - fasttag-api.js
     - fasttag-integrations.js
     - fasttag-gemini.js
