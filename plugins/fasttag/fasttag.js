@@ -37,6 +37,8 @@
     if (!FastTagScraper) throw new Error('[FastTag] fasttag-scraper.js must load before fasttag.js');
     const FastTagScraperUi = window.FastTag?.scraperUi;
     if (!FastTagScraperUi) throw new Error('[FastTag] fasttag-scraper-ui.js must load before fasttag.js');
+    const FastTagScraperController = window.FastTag?.scraperController;
+    if (!FastTagScraperController) throw new Error('[FastTag] fasttag-scraper-controller.js must load before fasttag.js');
     const FastTagPreview = window.FastTag?.preview;
     if (!FastTagPreview) throw new Error('[FastTag] fasttag-preview.js must load before fasttag.js');
     const FastTagCoverEditor = window.FastTag?.coverEditor;
@@ -161,6 +163,16 @@
         getUnavailableContextPresentation
     } = FastTagScraperUi;
     const {
+        isPopupActive: isScraperPopupActive,
+        beginRequest: beginScraperRequest,
+        invalidateRequests: invalidateScraperRequests,
+        isRequestCurrent: isScraperRequestCurrent,
+        watchHudOwner: watchFloatingScraperHudOwner,
+        closeHud: closeFloatingScraperHud,
+        getInitialPopoutPosition: getInitialScraperPopoutPosition,
+        attachResizeHandles: attachScraperHudResizeHandles
+    } = FastTagScraperController;
+    const {
         getDefaultPopoutSize,
         attachScenePreview,
         closeFloatingVideoHud,
@@ -209,6 +221,12 @@
         getCachedOrNull: type => getCachedOrNull(type),
         setCache: (type, data) => setCache(type, data)
     });
+    FastTagScraperController.configure({
+        getActivePopup: () => activePopup,
+        getFloatingVideoHudElement: () => FastTagPreview.getFloatingHudElement(),
+        isVideoPoppedOut: () => FastTagPreview.isPoppedOut(),
+        getDefaultEverythingPosition: (...args) => getDefaultEverythingPosition(...args)
+    });
     FastTagPreview.configure({
         fetchGQL: (...args) => fetchGQL(...args),
         coverEditor: FastTagCoverEditor,
@@ -223,7 +241,7 @@
         showToast: (...args) => showToast(...args),
         log: (...args) => ftLog(...args),
         getActivePopup: () => activePopup,
-        getFloatingScraperHudElement: () => floatingScraperHudElement,
+        getFloatingScraperHudElement: () => FastTagScraperController.getHudElement(),
         getDefaultEverythingPosition: (...args) => getDefaultEverythingPosition(...args)
     });
     FastTagCoverEditor.configure({
@@ -1616,118 +1634,6 @@
         };
     }
 
-
-    let floatingScraperHudElement = null;
-    let floatingScraperHudPosition = null;
-    let floatingScraperHudSize = null;
-    let floatingScraperHudOwnerPopup = null;
-    let floatingScraperHudOwnerObserver = null;
-
-    function isScraperPopupActive(popup) {
-        if (!popup) return true;
-        return popup === activePopup
-            && popup._fastTagClosed !== true
-            && Boolean(popup.element?.isConnected);
-    }
-
-    function beginScraperRequest(popup, sceneId) {
-        if (!isScraperPopupActive(popup)) return null;
-        const normalizedSceneId = String(sceneId || '');
-        if (popup?.currentSceneId != null && String(popup.currentSceneId) !== normalizedSceneId) return null;
-        const requestId = Number(popup?._scrapeRequestGeneration || 0) + 1;
-        popup._scrapeRequestGeneration = requestId;
-        popup._activeScrapeRequest = { requestId, sceneId: normalizedSceneId };
-        return requestId;
-    }
-
-    function invalidateScraperRequests(popup) {
-        if (!popup) return;
-        popup._scrapeRequestGeneration = Number(popup._scrapeRequestGeneration || 0) + 1;
-        popup._activeScrapeRequest = null;
-    }
-
-    function isScraperRequestCurrent(popup, sceneId, requestId = null) {
-        if (!isScraperPopupActive(popup)) return false;
-        const normalizedSceneId = String(sceneId || '');
-        if (popup?.currentSceneId != null && String(popup.currentSceneId) !== normalizedSceneId) return false;
-        if (requestId == null) return true;
-        return popup?._activeScrapeRequest?.requestId === requestId
-            && popup._activeScrapeRequest?.sceneId === normalizedSceneId;
-    }
-
-    function watchFloatingScraperHudOwner(popup) {
-        if (floatingScraperHudOwnerObserver) {
-            floatingScraperHudOwnerObserver.disconnect();
-            floatingScraperHudOwnerObserver = null;
-        }
-        floatingScraperHudOwnerPopup = popup || null;
-        const ownerParent = popup?.element?.parentNode;
-        if (!popup || !ownerParent || typeof MutationObserver === 'undefined') return;
-
-        floatingScraperHudOwnerObserver = new MutationObserver(() => {
-            if (!isScraperPopupActive(popup) && floatingScraperHudOwnerPopup === popup) {
-                closeFloatingScraperHud();
-            }
-        });
-        floatingScraperHudOwnerObserver.observe(ownerParent, { childList: true });
-    }
-
-    function closeFloatingScraperHud(fullReset = false) {
-        if (floatingScraperHudOwnerObserver) {
-            floatingScraperHudOwnerObserver.disconnect();
-            floatingScraperHudOwnerObserver = null;
-        }
-        floatingScraperHudOwnerPopup = null;
-        if (floatingScraperHudElement) {
-            floatingScraperHudElement.remove();
-            floatingScraperHudElement = null;
-        }
-    }
-
-    function getInitialScraperPopoutPosition(hudWidth = 390, hudHeight = 480) {
-        const activeForm = activePopup?.element || document.querySelector('#scenes-popup');
-        const margin = 12;
-        const screenWidth = window.innerWidth;
-        const screenHeight = window.innerHeight;
-
-        const videoHudElement = FastTagPreview.getFloatingHudElement();
-        const isVideoOpen = FastTagPreview.isPoppedOut() && videoHudElement && document.body.contains(videoHudElement);
-        const videoRect = isVideoOpen ? videoHudElement.getBoundingClientRect() : null;
-
-        if (activeForm) {
-            let rect = activeForm.getBoundingClientRect();
-            if (!rect || rect.width <= 0 || rect.left <= 0) {
-                const formW = parseInt(activeForm.style.width, 10) || 760;
-                const formH = parseInt(activeForm.style.height, 10) || 760;
-                const defPos = getDefaultEverythingPosition(formW, formH);
-                rect = { left: defPos.x, right: defPos.x + formW, top: defPos.y, bottom: defPos.y + formH, width: formW, height: formH };
-            }
-
-            const spaceRight = Math.max(0, screenWidth - rect.right - margin);
-            const spaceLeft = Math.max(0, rect.left - margin);
-
-            // 1. Primary: Place Scraper on the RIGHT flank of the main modal
-            if (spaceRight >= hudWidth + margin) {
-                const left = Math.round(rect.right + margin);
-                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return { left: `${left}px`, top: `${top}px`, width: `${hudWidth}px`, height: `${hudHeight}px` };
-            }
-
-            // 2. Secondary: If right flank is tight, try the LEFT flank if not occupied by video
-            if (spaceLeft >= hudWidth + margin && (!isVideoOpen || (videoRect && videoRect.left >= rect.right))) {
-                const left = Math.round(rect.left - hudWidth - margin);
-                const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-                return { left: `${left}px`, top: `${top}px`, width: `${hudWidth}px`, height: `${hudHeight}px` };
-            }
-
-            // 3. Viewport fallback (flush with right screen edge)
-            const left = Math.max(margin, Math.min(screenWidth - hudWidth - margin, Math.round(rect.right + margin)));
-            const top = Math.max(margin, Math.min(screenHeight - hudHeight - margin, Math.round(rect.top)));
-            return { left: `${left}px`, top: `${top}px`, width: `${hudWidth}px`, height: `${hudHeight}px` };
-        }
-
-        return { right: '20px', top: '70px', width: `${hudWidth}px`, height: `${hudHeight}px` };
-    }
 
     function promptDebugModeWarningDialog() {
         return new Promise((resolve) => {
@@ -3181,8 +3087,7 @@
 
             // 3. Reset floating HUD positions and sizes
             FastTagPreview.resetLayoutState();
-            floatingScraperHudPosition = null;
-            floatingScraperHudSize = null;
+            FastTagScraperController.resetLayoutState();
 
             // 4. If a popup is currently open, smoothly snap it to optimal size and balanced position
             if (activePopup?.element) {
@@ -3767,134 +3672,9 @@
     // Temporary in-memory session cache for active scrape results (cleared when popup is closed)
     const sessionScrapeCache = new Map();
 
-    function attachScraperHudResizeHandles(hudElement) {
-        if (!hudElement) return;
-        hudElement.querySelectorAll('.fasttag-scraper-resize-handle').forEach(el => el.remove());
-
-        const minW = 300;
-        const minH = 220;
-        const maxW = Math.max(minW, window.innerWidth - 16);
-        const maxH = Math.max(minH, window.innerHeight - 16);
-
-        const handles = [
-            { dir: 'n', style: 'top: -5px; left: 12px; right: 12px; height: 10px; cursor: ns-resize; z-index: 100;' },
-            { dir: 's', style: 'bottom: -5px; left: 12px; right: 12px; height: 10px; cursor: ns-resize; z-index: 100;' },
-            { dir: 'e', style: 'right: -5px; top: 12px; bottom: 12px; width: 10px; cursor: ew-resize; z-index: 100;' },
-            { dir: 'w', style: 'left: -5px; top: 12px; bottom: 12px; width: 10px; cursor: ew-resize; z-index: 100;' },
-            { dir: 'ne', style: 'top: -5px; right: -5px; width: 16px; height: 16px; cursor: nesw-resize; z-index: 101;' },
-            { dir: 'nw', style: 'top: -5px; left: -5px; width: 16px; height: 16px; cursor: nwse-resize; z-index: 101;' },
-            { dir: 'se', style: 'bottom: -5px; right: -5px; width: 16px; height: 16px; cursor: nwse-resize; z-index: 101;' },
-            { dir: 'sw', style: 'bottom: -5px; left: -5px; width: 16px; height: 16px; cursor: nesw-resize; z-index: 101;' }
-        ];
-
-        handles.forEach(({ dir, style }) => {
-            const handle = document.createElement('div');
-            handle.className = 'fasttag-scraper-resize-handle';
-            handle.setAttribute('data-dir', dir);
-            handle.style.cssText = `position: absolute; ${style} user-select: none; touch-action: none;`;
-
-            handle.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-
-                hudElement._isDragging = true;
-                const startX = e.clientX;
-                const startY = e.clientY;
-                const rect = hudElement.getBoundingClientRect();
-                const startL = rect.left;
-                const startT = rect.top;
-                const startW = hudElement.offsetWidth;
-                const startH = hudElement.offsetHeight;
-
-                document.body.style.cursor = handle.style.cursor;
-                document.body.style.userSelect = 'none';
-
-                const onMouseMove = (ev) => {
-                    const dx = ev.clientX - startX;
-                    const dy = ev.clientY - startY;
-
-                    let newW = startW;
-                    let newH = startH;
-                    let newL = startL;
-                    let newT = startT;
-
-                    if (dir.includes('e')) newW = startW + dx;
-                    if (dir.includes('w')) {
-                        newW = startW - dx;
-                        newL = startL + dx;
-                    }
-                    if (dir.includes('s')) newH = startH + dy;
-                    if (dir.includes('n')) {
-                        newH = startH - dy;
-                        newT = startT + dy;
-                    }
-
-                    // Bounds Clamping
-                    if (newW < minW) {
-                        if (dir.includes('w')) newL = startL + (startW - minW);
-                        newW = minW;
-                    }
-                    if (newW > maxW) {
-                        if (dir.includes('w')) newL = startL + (startW - maxW);
-                        newW = maxW;
-                    }
-                    if (newL < 8) {
-                        if (dir.includes('w')) newW = startW + (startL - 8);
-                        newL = 8;
-                    }
-
-                    if (newH < minH) {
-                        if (dir.includes('n')) newT = startT + (startH - minH);
-                        newH = minH;
-                    }
-                    if (newH > maxH) {
-                        if (dir.includes('n')) newT = startT + (startH - maxH);
-                        newH = maxH;
-                    }
-                    if (newT < 8) {
-                        if (dir.includes('n')) newH = startH + (startT - 8);
-                        newT = 8;
-                    }
-                    if (newT + newH > window.innerHeight - 8) {
-                        if (dir.includes('s')) newH = window.innerHeight - 8 - newT;
-                    }
-                    if (newL + newW > window.innerWidth - 8) {
-                        if (dir.includes('e')) newW = window.innerWidth - 8 - newL;
-                    }
-
-                    hudElement.style.width = `${Math.round(newW)}px`;
-                    hudElement.style.height = `${Math.round(newH)}px`;
-                    hudElement.style.left = `${Math.round(newL)}px`;
-                    hudElement.style.top = `${Math.round(newT)}px`;
-                    hudElement.style.right = 'auto';
-
-                    floatingScraperHudSize = { width: `${Math.round(newW)}px`, height: `${Math.round(newH)}px` };
-                    floatingScraperHudPosition = { top: `${Math.round(newT)}px`, left: `${Math.round(newL)}px` };
-                };
-
-                const onMouseUp = () => {
-                    hudElement._isDragging = false;
-                    document.removeEventListener('mousemove', onMouseMove);
-                    document.removeEventListener('mouseup', onMouseUp);
-                    document.body.style.cursor = '';
-                    document.body.style.userSelect = '';
-                    try {
-                        localStorage.setItem('fasttag_scraper_hud_pos', JSON.stringify(floatingScraperHudPosition));
-                        localStorage.setItem('fasttag_scraper_hud_size', JSON.stringify(floatingScraperHudSize));
-                    } catch (e) {}
-                };
-
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
-            });
-
-            hudElement.appendChild(handle);
-        });
-    }
-
     async function renderScraperMatchCard(container, incomingResults, sceneId, ctx, popup, onDismiss, emptySearchQuery = '', scrapeRequestId = null) {
         if (!isScraperRequestCurrent(popup, sceneId, scrapeRequestId)) {
-            if (!isScraperPopupActive(popup) && floatingScraperHudOwnerPopup === popup) closeFloatingScraperHud();
+            if (!isScraperPopupActive(popup) && FastTagScraperController.getHudOwnerPopup() === popup) closeFloatingScraperHud();
             return;
         }
         const initialResultLimit = getScraperMatchingSettings().initialResultLimit;
@@ -3912,6 +3692,9 @@
         const hasResults = results.length > 0;
         const isDetached = getDetachScraper();
         let targetContainer = container;
+        let floatingScraperHudElement = FastTagScraperController.getHudElement();
+        let floatingScraperHudPosition = FastTagScraperController.getHudPosition();
+        let floatingScraperHudSize = FastTagScraperController.getHudSize();
 
         if (isDetached) {
             if (popup?.scraperCardContainer) {
@@ -3920,6 +3703,7 @@
             }
             if (!floatingScraperHudElement || !document.body.contains(floatingScraperHudElement)) {
                 floatingScraperHudElement = document.createElement('div');
+                FastTagScraperController.setHudElement(floatingScraperHudElement);
                 floatingScraperHudElement.id = 'fasttag-floating-scraper-hud';
                 const defaultPos = getInitialScraperPopoutPosition(390, 480);
                 let finalWidth = defaultPos.width || '390px';
@@ -3953,7 +3737,9 @@
                         finalWidth = `${pW}px`;
                         finalHeight = `${pH}px`;
                         floatingScraperHudPosition = { left: finalLeft, top: finalTop };
+                        FastTagScraperController.setHudPosition(floatingScraperHudPosition);
                         if (savedSize) floatingScraperHudSize = savedSize;
+                        if (savedSize) FastTagScraperController.setHudSize(savedSize);
                     }
                 }
                 const isDarkTheme = getEffectiveTheme() === 'dark';
@@ -3966,6 +3752,7 @@
                             width: `${floatingScraperHudElement.offsetWidth}px`,
                             height: `${floatingScraperHudElement.offsetHeight}px`
                         };
+                        FastTagScraperController.setHudSize(floatingScraperHudSize);
                         try {
                             localStorage.setItem('fasttag_scraper_hud_size', JSON.stringify(floatingScraperHudSize));
                         } catch (e) {}
@@ -4010,7 +3797,7 @@
         // Cache loading and scraper requests can finish after the owning popup closes.
         // Do not let a stale continuation recreate or update a detached HUD.
         if (!isScraperRequestCurrent(popup, sceneId, scrapeRequestId)) {
-            if (!isScraperPopupActive(popup) && floatingScraperHudOwnerPopup === popup) closeFloatingScraperHud();
+            if (!isScraperPopupActive(popup) && FastTagScraperController.getHudOwnerPopup() === popup) closeFloatingScraperHud();
             return;
         }
 
@@ -4654,6 +4441,7 @@
                         floatingScraperHudElement.style.top = `${newTop}px`;
                         floatingScraperHudElement.style.right = 'auto';
                         floatingScraperHudPosition = { top: `${newTop}px`, left: `${newLeft}px` };
+                        FastTagScraperController.setHudPosition(floatingScraperHudPosition);
                         try {
                             localStorage.setItem('fasttag_scraper_hud_pos', JSON.stringify(floatingScraperHudPosition));
                         } catch (e) {}
@@ -10171,7 +9959,7 @@
                 const scraperIsOpen = (popup.scraperCardContainer
                     && popup.scraperCardContainer.style.display !== 'none'
                     && popup.scraperCardContainer.innerHTML.trim() !== '')
-                    || (floatingScraperHudElement && document.body.contains(floatingScraperHudElement));
+                    || FastTagScraperController.isHudOpen();
                 if (scraperIsOpen) {
                     if (isDirty()) {
                         let saved = await latestEverythingSavePromise;
@@ -10462,7 +10250,7 @@
                 if (scrapeRequestId == null) return null;
 
                 // If scraper card is currently open and not force-opening, clicking "Hide" closes it and toggles back to "Scrape"
-                const isScraperOpen = (popup.scraperCardContainer && popup.scraperCardContainer.style.display !== 'none' && popup.scraperCardContainer.innerHTML.trim() !== '') || (floatingScraperHudElement && document.body.contains(floatingScraperHudElement));
+                const isScraperOpen = (popup.scraperCardContainer && popup.scraperCardContainer.style.display !== 'none' && popup.scraperCardContainer.innerHTML.trim() !== '') || FastTagScraperController.isHudOpen();
                 if (isScraperOpen && !forceOpen) {
                     window._fastTagEverythingScraperOpen = false;
                     setScraperHudPersistedOpen(false);
@@ -13141,7 +12929,7 @@
                 if (scrapeRequestId == null) return;
 
                 // If scraper card is currently open, clicking this button (which says "Hide") closes it and toggles back to "Scrape"
-                const isScraperOpen = (popup.scraperCardContainer && popup.scraperCardContainer.style.display !== 'none' && popup.scraperCardContainer.innerHTML.trim() !== '') || (floatingScraperHudElement && document.body.contains(floatingScraperHudElement));
+                const isScraperOpen = (popup.scraperCardContainer && popup.scraperCardContainer.style.display !== 'none' && popup.scraperCardContainer.innerHTML.trim() !== '') || FastTagScraperController.isHudOpen();
                 if (isScraperOpen) {
                     if (popup.scraperCardContainer) {
                         popup.scraperCardContainer.style.display = 'none';

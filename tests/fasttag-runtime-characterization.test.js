@@ -7,6 +7,7 @@ const path = require('node:path');
 const repositoryRoot = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(repositoryRoot, 'plugins', 'fasttag', 'fasttag.js'), 'utf8');
 const previewSource = fs.readFileSync(path.join(repositoryRoot, 'plugins', 'fasttag', 'fasttag-preview.js'), 'utf8');
+const scraperControllerSource = fs.readFileSync(path.join(repositoryRoot, 'plugins', 'fasttag', 'fasttag-scraper-controller.js'), 'utf8');
 
 function section(startMarker, endMarker, text = source) {
     const start = text.indexOf(startMarker);
@@ -34,8 +35,8 @@ assert.equal((source.match(/window\.__fastTagRuntimeInitialized = true;/g) || []
 
 // Scraper responses belong to a live popup, scene and monotonically increasing
 // request generation. Navigation invalidates the previous generation first.
-const scraperLifecycle = section('function isScraperPopupActive(popup)', 'function watchFloatingScraperHudOwner(popup)');
-assert.ok(scraperLifecycle.includes('popup === activePopup'), 'scraper work must belong to the active popup');
+const scraperLifecycle = section('function isPopupActive(popup)', 'function watchHudOwner(popup)', scraperControllerSource);
+assert.ok(scraperLifecycle.includes('popup === dependencies?.getActivePopup?.()'), 'scraper work must belong to the active popup');
 assert.ok(scraperLifecycle.includes("popup._fastTagClosed !== true"), 'closed popups must reject scraper work');
 assert.ok(scraperLifecycle.includes('Boolean(popup.element?.isConnected)'), 'detached popups must reject scraper work');
 assert.ok(scraperLifecycle.includes('Number(popup?._scrapeRequestGeneration || 0) + 1'), 'scraper request generations must increase');
@@ -45,12 +46,12 @@ assert.ok(scraperLifecycle.includes('popup._activeScrapeRequest?.sceneId === nor
 // A detached scraper belongs to its originating popup. Rebinding replaces the
 // old observer, detachment closes the HUD, and explicit closure relinquishes
 // both DOM and observer ownership.
-const scraperHudOwnership = section('function watchFloatingScraperHudOwner(popup)', 'function getInitialScraperPopoutPosition(');
-assertBefore(scraperHudOwnership, 'floatingScraperHudOwnerObserver.disconnect();', 'floatingScraperHudOwnerPopup = popup || null;', 'HUD ownership must disconnect an old observer before rebinding');
-assert.ok(scraperHudOwnership.includes('if (!isScraperPopupActive(popup) && floatingScraperHudOwnerPopup === popup)'), 'only the current detached-HUD owner may trigger automatic closure');
-assert.ok(scraperHudOwnership.includes('closeFloatingScraperHud();'), 'detaching the owner popup must close its scraper HUD');
-assertBefore(scraperHudOwnership, 'floatingScraperHudOwnerObserver = null;', 'floatingScraperHudElement.remove();', 'HUD closure must release its observer before removing the element');
-assert.ok(scraperHudOwnership.includes('floatingScraperHudElement = null;'), 'HUD closure must release its element reference');
+const scraperHudOwnership = section('function watchHudOwner(popup)', 'function getInitialPopoutPosition(', scraperControllerSource);
+assertBefore(scraperHudOwnership, 'floatingHudOwnerObserver.disconnect();', 'floatingHudOwnerPopup = popup || null;', 'HUD ownership must disconnect an old observer before rebinding');
+assert.ok(scraperHudOwnership.includes('if (!isPopupActive(popup) && floatingHudOwnerPopup === popup)'), 'only the current detached-HUD owner may trigger automatic closure');
+assert.ok(scraperHudOwnership.includes('closeHud();'), 'detaching the owner popup must close its scraper HUD');
+assertBefore(scraperHudOwnership, 'floatingHudOwnerObserver = null;', 'floatingHudElement.remove();', 'HUD closure must release its observer before removing the element');
+assert.ok(scraperHudOwnership.includes('floatingHudElement = null;'), 'HUD closure must release its element reference');
 
 // Accept reads the visible field choices once, resolves all selected entities,
 // commits ordinary metadata first, then stores the remote ID and cover in

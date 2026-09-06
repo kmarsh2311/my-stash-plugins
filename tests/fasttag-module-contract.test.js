@@ -11,6 +11,7 @@ const mainSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag.js'), 'ut
 const coverEditorSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-cover-editor.js'), 'utf8');
 const settingsSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-settings.js'), 'utf8');
 const previewSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-preview.js'), 'utf8');
+const scraperControllerSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-scraper-controller.js'), 'utf8');
 const runnerSource = fs.readFileSync(path.join(__dirname, 'run-all.js'), 'utf8');
 const expectedOrder = [
     'tabulator.min.js',
@@ -25,6 +26,7 @@ const expectedOrder = [
     'fasttag-gemini.js',
     'fasttag-scraper.js',
     'fasttag-scraper-ui.js',
+    'fasttag-scraper-controller.js',
     'fasttag-preview.js',
     'fasttag-cover-editor.js',
     'fasttag-ui.js',
@@ -39,7 +41,7 @@ assert.deepEqual(configuredOrder, expectedOrder, 'Stash must load FastTag module
 for (const file of expectedOrder) {
     assert.ok(fs.existsSync(path.join(pluginDirectory, file)), `${file} should exist`);
 }
-for (const namespace of ['Core', 'Entities', 'Storage', 'Diagnostics', 'Api', 'Notifications', 'Settings', 'Integrations', 'Gemini', 'Scraper', 'ScraperUi', 'Preview', 'CoverEditor', 'Ui', 'Editors', 'Workflows']) {
+for (const namespace of ['Core', 'Entities', 'Storage', 'Diagnostics', 'Api', 'Notifications', 'Settings', 'Integrations', 'Gemini', 'Scraper', 'ScraperUi', 'ScraperController', 'Preview', 'CoverEditor', 'Ui', 'Editors', 'Workflows']) {
     assert.ok(mainSource.includes(`FastTag${namespace}`), `main entry point should require FastTag${namespace}`);
 }
 assert.equal(mainSource.includes('LEGACY_'), false, 'legacy comparison declarations should be removed');
@@ -112,10 +114,10 @@ assert.ok(mainSource.includes('const initialResultLimit = getScraperMatchingSett
 assert.ok(mainSource.includes('font-variant-numeric: tabular-nums'), 'scraper navigation counters should use stable-width numerals');
 assert.ok(mainSource.includes('>✕ Dismiss</button>'), 'result dismissal should be clearly labelled away from the navigation arrows');
 assert.ok(mainSource.includes("value=\"${escapeHtml(match._searchQuery || '')}\""), 'manual scraper search should retain the complete contextual query');
-assert.ok(mainSource.includes('function isScraperPopupActive(popup)'), 'scraper rendering should reject stale popup work');
+assert.ok(scraperControllerSource.includes('function isPopupActive(popup)'), 'scraper rendering should reject stale popup work');
 assert.ok(mainSource.includes('watchFloatingScraperHudOwner(popup);'), 'detached scraper HUD should monitor its owning popup');
 assert.ok(mainSource.includes('activePopup._fastTagClosed = true;'), 'popup closure should invalidate pending scraper work');
-assert.ok(mainSource.includes('function beginScraperRequest(popup, sceneId)'), 'scrapes should receive a per-popup request generation');
+assert.ok(scraperControllerSource.includes('function beginRequest(popup, sceneId)'), 'scrapes should receive a per-popup request generation');
 assert.ok(mainSource.includes('if (!isScraperRequestCurrent(popup, activeSceneId, scrapeRequestId)) return null;'), 'late automatic scrape responses should be discarded');
 assert.ok(mainSource.includes('invalidateScraperRequests(popup);\n            popup.currentSceneId = sceneId;'), 'scene navigation should invalidate requests for the previous scene');
 assert.ok(mainSource.includes('{ endpoint: match._sourceEndpoint, name: match._sourceName }'), 'scraper acceptance should pass source identity into new performer creation');
