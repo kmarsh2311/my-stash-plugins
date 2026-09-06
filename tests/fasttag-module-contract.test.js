@@ -19,6 +19,7 @@ const expectedOrder = [
     'fasttag-scraper.js',
     'fasttag-scraper-ui.js',
     'fasttag-preview.js',
+    'fasttag-cover-editor.js',
     'fasttag-ui.js',
     'fasttag-editors.js',
     'fasttag-workflows.js',
@@ -31,7 +32,7 @@ assert.deepEqual(configuredOrder, expectedOrder, 'Stash must load FastTag module
 for (const file of expectedOrder) {
     assert.ok(fs.existsSync(path.join(pluginDirectory, file)), `${file} should exist`);
 }
-for (const namespace of ['Core', 'Entities', 'Storage', 'Integrations', 'Gemini', 'Scraper', 'ScraperUi', 'Preview', 'Ui', 'Editors', 'Workflows']) {
+for (const namespace of ['Core', 'Entities', 'Storage', 'Integrations', 'Gemini', 'Scraper', 'ScraperUi', 'Preview', 'CoverEditor', 'Ui', 'Editors', 'Workflows']) {
     assert.ok(mainSource.includes(`FastTag${namespace}`), `main entry point should require FastTag${namespace}`);
 }
 assert.equal(mainSource.includes('LEGACY_'), false, 'legacy comparison declarations should be removed');
@@ -116,6 +117,8 @@ assert.ok(mainSource.includes('buildScrapedPerformerPreviewData(performer, match
 assert.ok(mainSource.includes('data-scrape-performer-index='), 'scraper performer pills should be identifiable hover targets');
 assert.ok(mainSource.includes('schedulePerformerHoverCardHide(delay = 260)'), 'performer previews should remain reachable across the pointer gap');
 assert.ok(mainSource.includes("toastError(`AI Parse Error: ${err.message}`, undefined, 4500)"), 'AI Parse error notifications should use the shorter display duration');
+assert.ok(mainSource.includes('FastTagCoverEditor.mountLauncher({'), 'Edit Everything media controls should mount the cover editor launcher');
+assert.ok(mainSource.includes('getCaptureState: () =>'), 'the active media preview should expose safe frame-capture availability');
 const aiApplyMetadataBlock = mainSource.match(/mutation FastTagAIApplyMetadata[\s\S]*?syncSceneToApolloCache\(metadataRes\.data\.sceneUpdate\);/)?.[0] || '';
 assert.ok(aiApplyMetadataBlock.includes('title date'), 'AI Apply All should return updated title and date');
 assert.ok(aiApplyMetadataBlock.includes('syncSceneToApolloCache'), 'AI Apply All should synchronize metadata to live scene cards');

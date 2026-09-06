@@ -4,6 +4,11 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Added
+- **Cover Editor (development)**: Edit Everything now provides a separate cover-editor HUD for reviewing the current cover and proposing a replacement from the current full-video frame, an uploaded JPEG/PNG/WebP image, or the clipboard. Saving remains explicit, and upload/clipboard options remain available when the browser cannot play or capture the full video.
+
 ## [4.2.13] - 2026-09-06
 
 ### Added

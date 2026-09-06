@@ -31,6 +31,8 @@
     if (!FastTagScraperUi) throw new Error('[FastTag] fasttag-scraper-ui.js must load before fasttag.js');
     const FastTagPreview = window.FastTag?.preview;
     if (!FastTagPreview) throw new Error('[FastTag] fasttag-preview.js must load before fasttag.js');
+    const FastTagCoverEditor = window.FastTag?.coverEditor;
+    if (!FastTagCoverEditor) throw new Error('[FastTag] fasttag-cover-editor.js must load before fasttag.js');
     const FastTagUi = window.FastTag?.ui;
     if (!FastTagUi) throw new Error('[FastTag] fasttag-ui.js must load before fasttag.js');
     const FastTagEditors = window.FastTag?.editors;
@@ -177,6 +179,13 @@
         setCache: (type, data) => setCache(type, data)
     });
     FastTagPreview.configure({ fetchGQL: (...args) => fetchGQL(...args) });
+    FastTagCoverEditor.configure({
+        fetchGQL: (...args) => fetchGQL(...args),
+        refreshSceneCards: sceneId => refreshSceneCards(sceneId),
+        showToast: (...args) => showToast(...args),
+        getTheme: () => getEffectiveTheme(),
+        log: (...args) => ftLog(...args)
+    });
     FastTagUi.configure({
         getDefaultPopoutSize,
         log: (...args) => ftLog(...args)
@@ -3131,7 +3140,8 @@
             }
         };
 
-        const { previewUrl, coverUrl, streamUrl } = await fetchSceneMediaUrlsFromModule(sceneId, cardElement);
+        const mediaUrls = await fetchSceneMediaUrlsFromModule(sceneId, cardElement);
+        const { previewUrl, coverUrl, streamUrl } = mediaUrls;
         if (signal.aborted) return;
 
         if (!previewUrl && !coverUrl && !streamUrl) {
@@ -3149,6 +3159,7 @@
         let originalLoop = true;
         let shiftHeld = false;
         let isHovered = false;
+        let streamCaptureFailure = '';
 
         // Slim Progress Bar at the very bottom edge (no text/numbers)
         const progressBarBg = document.createElement('div');
@@ -3648,7 +3659,9 @@
             clearTimeout(progressBarTimer);
 
             if (mode === 'stream') {
+                streamCaptureFailure = '';
                 if (!streamUrl) {
+                    streamCaptureFailure = 'This scene has no full-video stream. Upload or paste an image instead.';
                     showToast('Stream URL not available', 'warning');
                     renderMedia('preview');
                     return;
@@ -3687,12 +3700,16 @@
                     const msg = errCode === 4
                         ? 'Full video format not supported by browser — showing preview'
                         : 'Full stream unavailable — showing preview';
+                    streamCaptureFailure = errCode === 4
+                        ? 'This video format cannot be played by the browser. Upload or paste an image instead.'
+                        : 'The full-video stream is unavailable. Upload or paste an image instead.';
                     showToast(msg, 'info', 3000);
                     renderMedia('preview');
                 };
 
                 video.addEventListener('timeupdate', updateProgressBar);
                 video.onloadedmetadata = () => {
+                    streamCaptureFailure = '';
                     showProgressBar();
                 };
 
@@ -3889,6 +3906,40 @@
                 window._fastTagActiveToggleVideoMode = null;
             }
         });
+
+        const mediaController = {
+            switchToFullVideo: () => renderMedia('stream'),
+            getCurrentVideo: () => currentMode === 'stream' && currentMedia?.tagName === 'VIDEO' ? currentMedia : null,
+            getCoverUrl: () => coverUrl,
+            getCaptureState: () => {
+                if (streamCaptureFailure) return { available: false, reason: streamCaptureFailure };
+                if (!streamUrl) return { available: false, reason: 'This scene has no full-video stream. Upload or paste an image instead.' };
+                const video = currentMode === 'stream' && currentMedia?.tagName === 'VIDEO' ? currentMedia : null;
+                if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
+                    return { available: false, reason: 'Loading the full video for frame capture…' };
+                }
+                return { available: true, reason: '' };
+            }
+        };
+        hostContainer._fastTagMediaController = mediaController;
+        if (isEverythingHost) {
+            FastTagCoverEditor.mountLauncher({
+                container: controlsRow,
+                beforeElement: popoutBtn,
+                hostElement: hostContainer,
+                anchorElement: hostContainer.closest('form') || hostContainer,
+                sceneId,
+                currentCoverUrl: coverUrl,
+                mediaController,
+                onSaved: async () => {
+                    if (!signal.aborted) await attachScenePreview(hostContainer, sceneId, cardElement);
+                }
+            });
+        }
+        signal.addEventListener('abort', () => {
+            FastTagCoverEditor.closeForHost(hostContainer);
+            if (hostContainer._fastTagMediaController === mediaController) delete hostContainer._fastTagMediaController;
+        }, { once: true });
 
         // Initial render (honors Always Play Full Video setting)
         renderMedia(getAlwaysPlayFullVideo() ? 'stream' : 'preview');

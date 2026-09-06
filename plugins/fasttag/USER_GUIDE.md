@@ -34,6 +34,14 @@ Preview mode uses Stash preview media. Full Video uses the scene stream. With th
 
 The scrubbing instruction overlay appears once per browser session and no more than five times until **Reset Defaults** is used in Video Settings.
 
+### Editing a scene cover
+
+In Edit Everything, select the picture button in the video controls to open the separate Cover Editor HUD. It shows the cover currently stored by Stash and a preview of any proposed replacement. Opening it switches the player to Full Video when possible so **Capture Frame** can use the exact frame currently displayed.
+
+Alternatively, select **Upload** for a JPEG, PNG, or WebP image, or **Paste** to read an image from the clipboard. Where direct clipboard access is unavailable, click the Cover Editor and press `Ctrl+V` or `Cmd+V`. Large images are scaled to a maximum dimension of 1920 pixels and prepared as JPEG covers. Review the proposed image and select **Set Cover** to save it through Stash; closing or cancelling the HUD makes no change.
+
+If the browser cannot play the full-video format, frame capture is disabled with an explanation. Upload and clipboard options remain available. A playable preview animation is not treated as the full source video for frame capture.
+
 ## StashDB scraping
 
 Scraping is restricted to Edit Everything so all returned fields can be reviewed. FastTag attempts Stash scene lookup, then cleaned title/filename and contextual keyword searches. When a studio or performers are linked, the editable search box is prefilled with the studio and all linked performer names; individual-performer searches remain automatic fallbacks.
