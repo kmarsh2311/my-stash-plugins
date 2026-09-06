@@ -122,6 +122,8 @@ assert.ok(mainSource.includes('FastTagCoverEditor.mountLauncher({'), 'Edit Every
 assert.ok(mainSource.includes('getCaptureState: () =>'), 'the active media preview should expose safe frame-capture availability');
 assert.ok(mainSource.includes('mountForCoverEditor: target =>'), 'the existing player should move into the cover editor rather than opening a second stream');
 assert.ok(mainSource.includes('releaseFromCoverEditor: () =>'), 'closing the cover editor should return the existing player to Edit Everything');
+assert.ok(mainSource.includes('coverEditorWasPoppedOut = isVideoPoppedOut;'), 'cover editing should remember whether the player started in its floating HUD');
+assert.ok(mainSource.includes('if (restorePopout) togglePopout(true);'), 'closing the cover editor should restore the prior floating-video state');
 assert.ok(coverEditorSource.includes("options.mediaController?.pause?.();\n                setCandidate(captureVideoFrame"), 'capturing a cover should pause the selected video frame first');
 assert.ok(coverEditorSource.includes("const playPauseButton = createActionButton('⏸ Pause')"), 'the cover editor should provide persistent playback controls');
 assert.ok(mainSource.includes("e.target.closest('#fasttag-cover-editor-hud')"), 'cover-editor interactions should remain inside the owning popup boundary');

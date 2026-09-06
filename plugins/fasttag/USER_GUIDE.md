@@ -40,7 +40,7 @@ In Edit Everything, select the picture button in the video controls to open the 
 
 Alternatively, select **Upload** for a JPEG, PNG, or WebP image, or **Paste** to read an image from the clipboard. Where direct clipboard access is unavailable, click the Cover Editor and press `Ctrl+V` or `Cmd+V`. Large images are scaled to a maximum dimension of 1920 pixels and prepared as JPEG covers. Review the proposed image and select **Set Cover** to save it through Stash; closing or cancelling the HUD makes no change.
 
-Closing the Cover Editor returns the existing player to Edit Everything and restores its previous Preview or Full Video mode. If the browser cannot play the full-video format, frame capture and playback controls are disabled with an explanation. Upload and clipboard options remain available. A playable preview animation is not treated as the full source video for frame capture.
+Closing the Cover Editor returns the existing player to its previous location—embedded in Edit Everything or in the floating video HUD—and restores its previous Preview or Full Video mode. If the browser cannot play the full-video format, frame capture and playback controls are disabled with an explanation. Upload and clipboard options remain available. A playable preview animation is not treated as the full source video for frame capture.
 
 ## StashDB scraping
 

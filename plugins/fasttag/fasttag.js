@@ -3162,6 +3162,7 @@
         let streamCaptureFailure = '';
         let coverEditing = false;
         let coverEditorPreviousMode = null;
+        let coverEditorWasPoppedOut = false;
 
         // Slim Progress Bar at the very bottom edge (no text/numbers)
         const progressBarBg = document.createElement('div');
@@ -3915,6 +3916,7 @@
             getCoverUrl: () => coverUrl,
             mountForCoverEditor: target => {
                 if (!target) return;
+                coverEditorWasPoppedOut = isVideoPoppedOut;
                 if (isVideoPoppedOut) togglePopout(false);
                 coverEditorPreviousMode = currentMode;
                 coverEditing = true;
@@ -3953,8 +3955,11 @@
                 if (launcher) launcher.style.display = 'flex';
                 popoutBtn.style.display = 'flex';
                 const restoreMode = coverEditorPreviousMode;
+                const restorePopout = coverEditorWasPoppedOut;
                 coverEditorPreviousMode = null;
+                coverEditorWasPoppedOut = false;
                 if (restoreMode && restoreMode !== currentMode) renderMedia(restoreMode);
+                if (restorePopout) togglePopout(true);
             },
             pause: () => {
                 const video = currentMode === 'stream' && currentMedia?.tagName === 'VIDEO' ? currentMedia : null;
