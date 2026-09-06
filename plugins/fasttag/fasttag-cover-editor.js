@@ -279,13 +279,13 @@
         panel.addEventListener('mousedown', event => event.stopPropagation(), { signal });
 
         const header = document.createElement('header');
-        header.style.cssText = `display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 11px;border-bottom:1px solid ${isDark ? '#334155' : '#cbd5e1'};cursor:grab;user-select:none;position:sticky;top:0;background:${isDark ? '#111827' : '#f8fafc'};z-index:2;`;
+        header.style.cssText = `display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:20px;padding:5px 10px;border-bottom:1px solid ${isDark ? '#334155' : '#cbd5e1'};cursor:grab;user-select:none;position:sticky;top:0;background:${isDark ? '#111827' : '#f8fafc'};z-index:2;`;
         header.innerHTML = '<strong style="font-size:13px;">🖼️ Cover Editor</strong><span style="font-size:9px;color:#94a3b8;margin-left:auto;">Drag header · Resize at bottom-right</span>';
         const closeButton = document.createElement('button');
         closeButton.type = 'button';
         closeButton.textContent = '✕';
         closeButton.title = 'Close cover editor';
-        closeButton.style.cssText = 'border:0;background:transparent;color:inherit;font-size:15px;cursor:pointer;padding:2px 4px;';
+        closeButton.style.cssText = 'border:0;background:transparent;color:inherit;font-size:15px;cursor:pointer;padding:1px 4px;line-height:1;';
         header.appendChild(closeButton);
         panel.appendChild(header);
 

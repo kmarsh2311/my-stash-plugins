@@ -140,6 +140,7 @@ assert.ok(mainSource.includes("currentMediaSource = 'preview-image'"), 'animated
 assert.ok(mainSource.includes("source: 'preview-image'"), 'the cover editor should expose animated preview capture availability');
 assert.ok(coverEditorSource.includes("'Captured preview frame'"), 'fallback captures should be identified as preview frames');
 assert.ok(coverEditorSource.includes('overflow:auto;resize:both'), 'the cover-editor HUD should be resizable from its browser corner');
+assert.ok(coverEditorSource.includes('min-height:20px;padding:5px 10px'), 'the cover-editor title bar should match the compact main-popup header height');
 assert.ok(coverEditorSource.includes("EDITOR_SIZE_STORAGE_KEY = 'fasttag_cover_editor_size'"), 'the cover editor should remember its resized dimensions');
 assert.ok(coverEditorSource.includes('grid-template-columns:auto auto minmax(68px,1fr) auto auto'), 'cover playback and capture controls should remain on one line');
 assert.ok(coverEditorSource.includes("padding:7px 12px;min-width:44px"), 'the cover editor frame-step buttons should provide a comfortably wide target');
