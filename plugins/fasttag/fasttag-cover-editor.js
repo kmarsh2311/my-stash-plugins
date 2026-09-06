@@ -9,7 +9,6 @@
     const EDITOR_SIZE_STORAGE_KEY = 'fasttag_cover_editor_size';
     let dependencies = null;
     let activeEditor = null;
-    let pendingNavigationLayout = null;
 
     function configure(options) {
         dependencies = options || null;
@@ -213,14 +212,13 @@
         signal.addEventListener('abort', up, { once: true });
     }
 
-    function closeActiveEditor(force = false, preserveNavigation = false) {
+    function closeActiveEditor(force = false) {
         if (!activeEditor) return true;
         const editor = activeEditor;
         if (!force && editor.hasUnsavedChanges?.()) {
             const discard = root.confirm?.('Discard the new cover without saving?');
             if (discard === false) return false;
         }
-        if (!preserveNavigation) pendingNavigationLayout = null;
         activeEditor = null;
         saveEditorSize(editor.element);
         editor.mediaController?.releaseFromCoverEditor?.();
@@ -232,22 +230,24 @@
     function prepareForSceneNavigation() {
         if (!activeEditor) return true;
         const editor = activeEditor;
+        if (editor.isSaving?.()) {
+            editor.showStatus?.('Wait for the cover to finish saving before changing scenes.');
+            return false;
+        }
         if (editor.hasUnsavedChanges?.()) {
             const discard = root.confirm?.('Discard the new cover and continue to the next scene?');
             if (discard === false) return false;
         }
-        const rect = editor.element?.getBoundingClientRect?.();
-        pendingNavigationLayout = rect ? {
-            left: rect.left,
-            top: rect.top,
-            width: rect.width,
-            height: rect.height
-        } : {};
-        return closeActiveEditor(true, true);
+        editor.awaitingNavigation = true;
+        editor.beginNavigation?.();
+        return true;
     }
 
     function closeForHost(hostElement) {
-        if (activeEditor?.hostElement === hostElement) return closeActiveEditor();
+        if (activeEditor?.hostElement === hostElement) {
+            if (activeEditor.awaitingNavigation) return true;
+            return closeActiveEditor();
+        }
         return true;
     }
 
@@ -261,7 +261,8 @@
 
     function openEditor(options) {
         if (!dependencies) throw new Error('[FastTag] Cover editor is not configured');
-        const sceneId = String(options?.sceneId || '');
+        let currentOptions = options;
+        let sceneId = String(currentOptions?.sceneId || '');
         if (!sceneId) return;
         if (!closeActiveEditor()) return;
 
@@ -274,15 +275,7 @@
         panel.setAttribute('role', 'dialog');
         panel.setAttribute('aria-label', 'Scene cover editor');
         panel.style.cssText = `position:fixed;z-index:1000007;display:flex;flex-direction:column;overflow:auto;resize:both;box-sizing:border-box;padding:0;background:${isDark ? '#111827' : '#f8fafc'};color:${isDark ? '#f8fafc' : '#0f172a'};border:1px solid ${isDark ? '#475569' : '#94a3b8'};border-radius:11px;box-shadow:0 22px 55px rgba(0,0,0,.7);font-family:system-ui,-apple-system,sans-serif;`;
-        positionEditor(panel, options.anchorElement || options.hostElement);
-        if (options.navigationLayout) {
-            const size = resolveEditorSize(options.navigationLayout, root.innerWidth, root.innerHeight);
-            const margin = 8;
-            panel.style.width = `${size.width}px`;
-            panel.style.height = `${size.height}px`;
-            panel.style.left = `${Math.round(Math.max(margin, Math.min(root.innerWidth - size.width - margin, Number(options.navigationLayout.left) || margin)))}px`;
-            panel.style.top = `${Math.round(Math.max(margin, Math.min(root.innerHeight - size.height - margin, Number(options.navigationLayout.top) || margin)))}px`;
-        }
+        positionEditor(panel, currentOptions.anchorElement || currentOptions.hostElement);
         panel.addEventListener('mousedown', event => event.stopPropagation(), { signal });
 
         const header = document.createElement('header');
@@ -325,10 +318,12 @@
         const actions = body.querySelector('.fasttag-cover-actions');
         const fileInput = body.querySelector('.fasttag-cover-file');
         const footer = body.querySelector('.fasttag-cover-footer');
-        const currentCoverUrl = options.currentCoverUrl || options.mediaController?.getCoverUrl?.();
-        currentBox.innerHTML = currentCoverUrl
-            ? `<img src="${escapeAttribute(currentCoverUrl)}" alt="Current scene cover" style="width:100%;height:100%;object-fit:contain;">`
-            : '<span style="font-size:11px;color:#64748b;">No current cover</span>';
+        const renderCurrentCover = coverUrl => {
+            currentBox.innerHTML = coverUrl
+                ? `<img src="${escapeAttribute(coverUrl)}" alt="Current scene cover" style="width:100%;height:100%;object-fit:contain;">`
+                : '<span style="font-size:11px;color:#64748b;">No current cover</span>';
+        };
+        renderCurrentCover(currentOptions.currentCoverUrl || currentOptions.mediaController?.getCoverUrl?.());
 
         const captureButton = createActionButton('📷 Capture Frame');
         const uploadButton = createActionButton('⬆ Upload');
@@ -356,12 +351,27 @@
         let preparingImage = false;
         let statusLocked = false;
         let manualPastePending = false;
+        let sceneGeneration = 0;
 
         const setStatus = (message, error = false, lock = false) => {
             if (lock) statusLocked = true;
             status.textContent = message;
             status.style.color = error ? '#fca5a5' : (isDark ? '#cbd5e1' : '#334155');
             status.style.border = error ? '1px solid rgba(239,68,68,.45)' : '1px solid transparent';
+        };
+        const resetCandidate = () => {
+            candidateDataUrl = '';
+            candidateSource = '';
+            saving = false;
+            preparingImage = false;
+            statusLocked = false;
+            manualPastePending = false;
+            candidateBox.textContent = 'Capture, upload, paste or drop an image';
+            restoreCandidateDropStyle?.();
+            pasteButton.textContent = '📋 Paste';
+            saveButton.textContent = 'Set Cover';
+            saveButton.disabled = true;
+            saveButton.style.opacity = '0.45';
         };
         const requestManualPaste = () => {
             manualPastePending = true;
@@ -390,12 +400,16 @@
             setStatus(`${source} is ready. Review it, then select Set Cover.`);
         };
         const useBlob = async (blob, source) => {
+            const generation = sceneGeneration;
             try {
                 preparingImage = true;
                 statusLocked = false;
                 setStatus(`Preparing ${source.toLowerCase()}…`);
-                setCandidate(await normalizeImageBlob(blob), source);
+                const normalized = await normalizeImageBlob(blob);
+                if (generation !== sceneGeneration) return;
+                setCandidate(normalized, source);
             } catch (error) {
+                if (generation !== sceneGeneration) return;
                 preparingImage = false;
                 setStatus(error?.message || 'The image could not be prepared.', true, true);
             }
@@ -403,10 +417,10 @@
 
         captureButton.onclick = () => {
             try {
-                const captureState = options.mediaController?.getCaptureState?.() || {};
-                options.mediaController?.pause?.();
+                const captureState = currentOptions.mediaController?.getCaptureState?.() || {};
+                currentOptions.mediaController?.pause?.();
                 const source = captureState.source === 'full-video' ? 'Captured video frame' : 'Captured preview frame';
-                setCandidate(captureMediaFrame(options.mediaController?.getCurrentCaptureMedia?.()), source);
+                setCandidate(captureMediaFrame(currentOptions.mediaController?.getCurrentCaptureMedia?.()), source);
             } catch (error) {
                 setStatus(error?.message || 'The video frame could not be captured.', true, true);
             }
@@ -439,6 +453,7 @@
             else setStatus('Drop a JPEG, PNG or WebP image here.', true, true);
         }, { signal });
         pasteButton.onclick = async () => {
+            const generation = sceneGeneration;
             if (!navigator.clipboard?.read) {
                 requestManualPaste();
                 return;
@@ -448,6 +463,7 @@
                 for (const item of clipboardItems) {
                     const type = item.types?.find(value => String(value).startsWith('image/'));
                     if (type) {
+                        if (generation !== sceneGeneration) return;
                         await useBlob(await item.getType(type), 'Clipboard image');
                         return;
                     }
@@ -458,13 +474,13 @@
             }
         };
         playPauseButton.onclick = () => {
-            const playback = options.mediaController?.getPlaybackState?.();
+            const playback = currentOptions.mediaController?.getPlaybackState?.();
             if (!playback?.available) return;
-            if (playback.paused) options.mediaController?.play?.();
-            else options.mediaController?.pause?.();
+            if (playback.paused) currentOptions.mediaController?.play?.();
+            else currentOptions.mediaController?.pause?.();
         };
-        stepBackButton.onclick = event => options.mediaController?.stepBy?.(resolveStepSeconds(-1, event.shiftKey));
-        stepForwardButton.onclick = event => options.mediaController?.stepBy?.(resolveStepSeconds(1, event.shiftKey));
+        stepBackButton.onclick = event => currentOptions.mediaController?.stepBy?.(resolveStepSeconds(-1, event.shiftKey));
+        stepForwardButton.onclick = event => currentOptions.mediaController?.stepBy?.(resolveStepSeconds(1, event.shiftKey));
 
         document.addEventListener('paste', event => {
             const item = findClipboardImage(event.clipboardData?.items);
@@ -498,7 +514,7 @@
                 dependencies.showToast?.('Scene cover updated', 'success', 3000);
                 await dependencies.refreshSceneCards?.(sceneId);
                 closeActiveEditor(true);
-                await options.onSaved?.();
+                await currentOptions.onSaved?.();
             } catch (error) {
                 saving = false;
                 saveButton.disabled = false;
@@ -510,8 +526,8 @@
         };
 
         const refreshCaptureState = () => {
-            const state = options.mediaController?.getCaptureState?.() || { available: false, reason: 'Full video is unavailable.' };
-            const playback = options.mediaController?.getPlaybackState?.() || { available: false, paused: true, currentTime: 0, duration: 0 };
+            const state = currentOptions.mediaController?.getCaptureState?.() || { available: false, reason: 'Full video is unavailable.' };
+            const playback = currentOptions.mediaController?.getPlaybackState?.() || { available: false, paused: true, currentTime: 0, duration: 0 };
             captureButton.disabled = !state.available;
             captureButton.style.opacity = state.available ? '1' : '0.45';
             captureButton.textContent = state.source === 'full-video' ? '📷 Capture Frame' : '📷 Capture Preview Frame';
@@ -528,15 +544,46 @@
                 setStatus(state.reason || (state.available ? 'Seek or scrub to the frame you want, then select Capture Frame.' : 'Preparing full video…'));
             }
         };
+        const beginNavigation = () => {
+            sceneGeneration += 1;
+            currentOptions.mediaController?.releaseFromCoverEditor?.({ forNavigation: true });
+            videoStage.innerHTML = '<span style="font-size:11px;color:#94a3b8;">Loading next scene…</span>';
+            currentBox.innerHTML = '<span style="font-size:11px;color:#94a3b8;">Loading cover…</span>';
+            resetCandidate();
+            setStatus('Loading the next scene…', false, true);
+            for (const button of [playPauseButton, stepBackButton, stepForwardButton, captureButton]) {
+                button.disabled = true;
+                button.style.opacity = '0.45';
+            }
+        };
+        const rebindScene = nextOptions => {
+            if (!nextOptions?.sceneId || !activeEditor) return;
+            currentOptions = nextOptions;
+            sceneId = String(nextOptions.sceneId);
+            activeEditor.hostElement = nextOptions.hostElement;
+            activeEditor.mediaController = nextOptions.mediaController;
+            activeEditor.awaitingNavigation = false;
+            renderCurrentCover(nextOptions.currentCoverUrl || nextOptions.mediaController?.getCoverUrl?.());
+            resetCandidate();
+            setStatus('Opening the full video for frame capture…');
+            nextOptions.mediaController?.mountForCoverEditor?.(videoStage);
+            nextOptions.mediaController?.switchToFullVideo?.();
+            refreshCaptureState();
+        };
         activeEditor = {
             element: panel,
             abortController,
-            hostElement: options.hostElement,
-            mediaController: options.mediaController,
-            hasUnsavedChanges: () => Boolean(candidateDataUrl)
+            hostElement: currentOptions.hostElement,
+            mediaController: currentOptions.mediaController,
+            awaitingNavigation: false,
+            hasUnsavedChanges: () => Boolean(candidateDataUrl || preparingImage || saving),
+            isSaving: () => saving,
+            showStatus: message => setStatus(message, false, true),
+            beginNavigation,
+            rebindScene
         };
-        options.mediaController?.mountForCoverEditor?.(videoStage);
-        options.mediaController?.switchToFullVideo?.();
+        currentOptions.mediaController?.mountForCoverEditor?.(videoStage);
+        currentOptions.mediaController?.switchToFullVideo?.();
         panel.focus({ preventScroll: true });
         refreshCaptureState();
         const capturePoll = root.setInterval(refreshCaptureState, 300);
@@ -578,11 +625,9 @@
         };
         if (options.beforeElement?.parentNode === options.container) options.container.insertBefore(button, options.beforeElement);
         else options.container.appendChild(button);
-        if (pendingNavigationLayout) {
-            const navigationLayout = pendingNavigationLayout;
-            pendingNavigationLayout = null;
+        if (activeEditor?.awaitingNavigation) {
             root.setTimeout(() => {
-                if (button.isConnected) openEditor({ ...options, navigationLayout });
+                if (button.isConnected && activeEditor?.awaitingNavigation) activeEditor.rebindScene?.(options);
             }, 0);
         }
         return button;

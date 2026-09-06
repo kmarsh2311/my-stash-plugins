@@ -4016,12 +4016,18 @@
                 target.innerHTML = '';
                 target.appendChild(mediaContainer);
             },
-            releaseFromCoverEditor: () => {
+            releaseFromCoverEditor: (releaseOptions = {}) => {
                 coverEditing = false;
                 if (!hostContainer.isConnected) return;
                 progressBarBg.style.pointerEvents = currentMode === 'stream' ? 'auto' : 'none';
                 if (currentMode !== 'stream') progressBarBg.style.opacity = '0';
                 detachWheel();
+                if (releaseOptions.forNavigation) {
+                    mediaContainer.remove();
+                    coverEditorPreviousMode = null;
+                    coverEditorWasPoppedOut = false;
+                    return;
+                }
                 hostContainer.innerHTML = '';
                 hostContainer.style.display = 'block';
                 hostContainer.style.position = 'relative';

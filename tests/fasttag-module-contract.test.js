@@ -121,10 +121,10 @@ assert.ok(mainSource.includes("toastError(`AI Parse Error: ${err.message}`, unde
 assert.ok(mainSource.includes('FastTagCoverEditor.mountLauncher({'), 'Edit Everything media controls should mount the cover editor launcher');
 assert.ok(mainSource.includes('getCaptureState: () =>'), 'the active media preview should expose safe frame-capture availability');
 assert.ok(mainSource.includes('mountForCoverEditor: target =>'), 'the existing player should move into the cover editor rather than opening a second stream');
-assert.ok(mainSource.includes('releaseFromCoverEditor: () =>'), 'closing the cover editor should return the existing player to Edit Everything');
+assert.ok(mainSource.includes('releaseFromCoverEditor: (releaseOptions = {}) =>'), 'closing the cover editor should return the existing player to Edit Everything');
 assert.ok(mainSource.includes('coverEditorWasPoppedOut = isVideoPoppedOut;'), 'cover editing should remember whether the player started in its floating HUD');
 assert.ok(mainSource.includes('if (restorePopout) togglePopout(true);'), 'closing the cover editor should restore the prior floating-video state');
-assert.ok(coverEditorSource.includes("options.mediaController?.pause?.();\n                const source = captureState.source"), 'capturing a cover should pause controllable video media first');
+assert.ok(coverEditorSource.includes("currentOptions.mediaController?.pause?.();\n                const source = captureState.source"), 'capturing a cover should pause controllable video media first');
 assert.ok(coverEditorSource.includes("const playPauseButton = createActionButton('⏸ Pause')"), 'the cover editor should provide persistent playback controls');
 assert.ok(mainSource.includes("e.target.closest('#fasttag-cover-editor-hud')"), 'cover-editor interactions should remain inside the owning popup boundary');
 assert.ok(mainSource.includes("#fasttag-create-modal, #fasttag-cover-editor-hud"), 'Escape should be delegated to the cover editor before the owning popup');
@@ -157,7 +157,10 @@ assert.ok(mainSource.includes('if (FastTagCoverEditor.closeActiveEditor?.() === 
 assert.ok(mainSource.includes("hostContainer.style.height = 'auto';"), 'loading a new scene should restore a preview container collapsed by the cover editor');
 assert.ok(!mainSource.includes('if (signal.aborted || !hostContainer.isConnected) return;'), 'aborted scene previews should still restore their connected host before navigation');
 assert.ok((mainSource.match(/FastTagCoverEditor\.prepareForSceneNavigation\?\.\(\) === false/g) || []).length >= 4, 'all Edit Everything scene-navigation paths should hand the open cover editor to the next scene');
-assert.ok(coverEditorSource.includes('pendingNavigationLayout') && coverEditorSource.includes('navigationLayout'), 'scene navigation should preserve and restore the cover-editor layout');
+assert.ok(coverEditorSource.includes('beginNavigation') && coverEditorSource.includes('rebindScene'), 'scene navigation should rebind the existing cover-editor HUD in place');
+assert.ok(coverEditorSource.includes('releaseFromCoverEditor?.({ forNavigation: true })') && mainSource.includes('if (releaseOptions.forNavigation)'), 'in-place navigation should detach the old player without briefly restoring it behind the HUD');
+assert.ok(coverEditorSource.includes('generation !== sceneGeneration') && coverEditorSource.includes('sceneGeneration += 1'), 'late image processing must not populate the next scene after navigation');
+assert.ok(coverEditorSource.includes("videoStage.innerHTML = '<span style=\"font-size:11px;color:#94a3b8;\">Loading next scene…</span>'"), 'the persistent cover editor should show an in-place loading state');
 assert.ok(coverEditorSource.includes('Discard the new cover and continue to the next scene?'), 'cover-editor handoff should protect unsaved proposed covers');
 const aiApplyMetadataBlock = mainSource.match(/mutation FastTagAIApplyMetadata[\s\S]*?syncSceneToApolloCache\(metadataRes\.data\.sceneUpdate\);/)?.[0] || '';
 assert.ok(aiApplyMetadataBlock.includes('title date'), 'AI Apply All should return updated title and date');
