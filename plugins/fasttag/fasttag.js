@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash FastTag
 // @namespace    http://tampermonkey.net/
-// @version      4.2.13
+// @version      4.3.0
 // @description  Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
@@ -31,6 +31,8 @@
     if (!FastTagScraperUi) throw new Error('[FastTag] fasttag-scraper-ui.js must load before fasttag.js');
     const FastTagPreview = window.FastTag?.preview;
     if (!FastTagPreview) throw new Error('[FastTag] fasttag-preview.js must load before fasttag.js');
+    const FastTagCoverEditor = window.FastTag?.coverEditor;
+    if (!FastTagCoverEditor) throw new Error('[FastTag] fasttag-cover-editor.js must load before fasttag.js');
     const FastTagUi = window.FastTag?.ui;
     if (!FastTagUi) throw new Error('[FastTag] fasttag-ui.js must load before fasttag.js');
     const FastTagEditors = window.FastTag?.editors;
@@ -142,6 +144,7 @@
         getWheelNotches,
         selectScrubStep,
         calculateScrubTarget,
+        calculateSeekTarget,
         getDefaultPopoutSize,
         calculateVideoPopoutPosition,
         fetchSceneMediaUrls: fetchSceneMediaUrlsFromModule
@@ -177,12 +180,19 @@
         setCache: (type, data) => setCache(type, data)
     });
     FastTagPreview.configure({ fetchGQL: (...args) => fetchGQL(...args) });
+    FastTagCoverEditor.configure({
+        fetchGQL: (...args) => fetchGQL(...args),
+        refreshSceneCards: sceneId => refreshSceneCards(sceneId),
+        showToast: (...args) => showToast(...args),
+        getTheme: () => getEffectiveTheme(),
+        log: (...args) => ftLog(...args)
+    });
     FastTagUi.configure({
         getDefaultPopoutSize,
         log: (...args) => ftLog(...args)
     });
 
-    console.log('[FastTag v4.2.13] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
+    console.log('[FastTag v4.3.0] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
 
     let fastTagHelpLoadPromise = null;
     function loadFastTagHelpModule() {
@@ -2982,7 +2992,7 @@
             helpBtn.textContent = '⏳ Loading Guide…';
             try {
                 const help = await loadFastTagHelpModule();
-                help.openGuide({ theme: getEffectiveTheme(), version: '4.2.13' });
+                help.openGuide({ theme: getEffectiveTheme(), version: '4.3.0' });
             } catch (error) {
                 toastError(`Unable to open help: ${error.message}`);
             } finally {
@@ -3100,6 +3110,7 @@
         hostContainer.style.display = 'block';
         hostContainer.style.position = 'relative';
         hostContainer.style.width = '100%';
+        hostContainer.style.height = 'auto';
         hostContainer.style.aspectRatio = '16 / 9';
         const isEverythingHost = hostContainer.id === 'everything-preview-container';
         hostContainer.style.maxHeight = isEverythingHost ? '205px' : '280px';
@@ -3122,7 +3133,7 @@
         let startLeft = 0, startTop = 0;
 
         mediaContainer.onclick = (e) => {
-            if (isVideoPoppedOut) return; // Do NOT open scene when video is popped out into floating HUD
+            if (isVideoPoppedOut || coverEditing) return; // Keep floating and cover-editor video clicks inside their HUDs
             if (e.shiftKey || hasDragged || isDragging) return;
             if (e.target && (e.target.closest('#fasttag-stream-toggle-pill') || e.target.closest('#fasttag-stream-popout-btn') || e.target.closest('#fasttag-hud-close-btn') || e.target.closest('#fasttag-inline-dock-btn'))) return;
             const sceneUrl = getSceneUrl(sceneId, cardElement);
@@ -3131,7 +3142,8 @@
             }
         };
 
-        const { previewUrl, coverUrl, streamUrl } = await fetchSceneMediaUrlsFromModule(sceneId, cardElement);
+        const mediaUrls = await fetchSceneMediaUrlsFromModule(sceneId, cardElement);
+        const { previewUrl, coverUrl, streamUrl } = mediaUrls;
         if (signal.aborted) return;
 
         if (!previewUrl && !coverUrl && !streamUrl) {
@@ -3141,6 +3153,7 @@
 
         let currentMode = 'preview'; // 'preview' or 'stream'
         let currentMedia = null;
+        let currentMediaSource = '';
         let wheelListenerAttached = false;
         let resumeTimer = null;
         let hudTimer = null;
@@ -3149,16 +3162,28 @@
         let originalLoop = true;
         let shiftHeld = false;
         let isHovered = false;
+        let streamCaptureFailure = '';
+        let coverEditing = false;
+        let coverEditorPreviousMode = null;
+        let coverEditorWasPoppedOut = false;
+        const hasControllableVideo = () => Boolean(
+            currentMedia?.tagName === 'VIDEO' &&
+            (currentMode === 'stream' || (coverEditing && currentMediaSource === 'preview-video'))
+        );
 
         // Slim Progress Bar at the very bottom edge (no text/numbers)
         const progressBarBg = document.createElement('div');
         progressBarBg.id = 'fasttag-progress-bar-bg';
-        progressBarBg.style.cssText = 'position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: rgba(0, 0, 0, 0.45); z-index: 15; pointer-events: none; opacity: 0; transition: opacity 0.2s ease;';
+        progressBarBg.style.cssText = 'position: absolute; bottom: 0; left: 0; right: 0; height: 16px; background: transparent; z-index: 30; pointer-events: none; cursor: pointer; opacity: 0; transition: opacity 0.2s ease;';
+
+        const progressBarTrack = document.createElement('div');
+        progressBarTrack.style.cssText = 'position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(0,0,0,0.62);pointer-events:none;transition:height .14s ease,background .14s ease;';
 
         const progressBarFill = document.createElement('div');
         progressBarFill.id = 'fasttag-progress-bar-fill';
         progressBarFill.style.cssText = 'height: 100%; width: 0%; background: #6366f1; border-radius: 0 2px 2px 0; transition: width 0.08s linear;';
-        progressBarBg.appendChild(progressBarFill);
+        progressBarTrack.appendChild(progressBarFill);
+        progressBarBg.appendChild(progressBarTrack);
 
         const updateProgressBar = () => {
             if (currentMedia && currentMedia.tagName === 'VIDEO' && currentMedia.duration > 0 && isFinite(currentMedia.duration)) {
@@ -3169,16 +3194,78 @@
 
         let progressBarTimer = null;
         const showProgressBar = () => {
-            if (currentMode !== 'stream') return;
+            if (!hasControllableVideo()) return;
             updateProgressBar();
             progressBarBg.style.opacity = '1';
             clearTimeout(progressBarTimer);
             if (!shiftHeld) {
                 progressBarTimer = setTimeout(() => {
-                    progressBarBg.style.opacity = '0';
-                }, 1500);
+                    if (!isTimelineSeeking && !progressBarBg.matches(':hover')) progressBarBg.style.opacity = '0';
+                }, 3500);
             }
         };
+
+        let isTimelineSeeking = false;
+        let timelineWasPlaying = false;
+        const seekTimelineToPointer = event => {
+            if (!hasControllableVideo()) return;
+            const rect = progressBarBg.getBoundingClientRect();
+            const target = calculateSeekTarget(event.clientX, rect.left, rect.width, currentMedia.duration);
+            if (target === null) return;
+            currentMedia.currentTime = target;
+            updateProgressBar();
+            progressBarBg.style.opacity = '1';
+        };
+        progressBarBg.addEventListener('pointerdown', event => {
+            if (event.button !== 0 || !hasControllableVideo()) return;
+            event.preventDefault();
+            event.stopPropagation();
+            isTimelineSeeking = true;
+            timelineWasPlaying = !currentMedia.paused;
+            clearTimeout(progressBarTimer);
+            progressBarTrack.style.height = '7px';
+            progressBarTrack.style.background = 'rgba(0,0,0,0.72)';
+            try { currentMedia.pause(); } catch (error) {}
+            try { progressBarBg.setPointerCapture(event.pointerId); } catch (error) {}
+            seekTimelineToPointer(event);
+        }, { signal });
+        progressBarBg.addEventListener('pointermove', event => {
+            if (!isTimelineSeeking) return;
+            event.preventDefault();
+            event.stopPropagation();
+            seekTimelineToPointer(event);
+        }, { signal });
+        const finishTimelineSeek = (event, applyFinalPosition = true) => {
+            if (!isTimelineSeeking) return;
+            event.preventDefault();
+            event.stopPropagation();
+            if (applyFinalPosition) seekTimelineToPointer(event);
+            isTimelineSeeking = false;
+            try { progressBarBg.releasePointerCapture(event.pointerId); } catch (error) {}
+            if (timelineWasPlaying && currentMedia?.tagName === 'VIDEO') currentMedia.play().catch(() => {});
+            timelineWasPlaying = false;
+            progressBarTrack.style.height = progressBarBg.matches(':hover') ? '7px' : '4px';
+            progressBarTrack.style.background = progressBarBg.matches(':hover') ? 'rgba(0,0,0,0.72)' : 'rgba(0,0,0,0.62)';
+            showProgressBar();
+        };
+        progressBarBg.addEventListener('pointerup', finishTimelineSeek, { signal });
+        progressBarBg.addEventListener('pointercancel', event => finishTimelineSeek(event, false), { signal });
+        progressBarBg.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+        }, { signal });
+        progressBarBg.addEventListener('mouseenter', () => {
+            progressBarTrack.style.height = '7px';
+            progressBarTrack.style.background = 'rgba(0,0,0,0.72)';
+            showProgressBar();
+        }, { signal });
+        progressBarBg.addEventListener('mouseleave', () => {
+            if (!isTimelineSeeking) {
+                progressBarTrack.style.height = '4px';
+                progressBarTrack.style.background = 'rgba(0,0,0,0.62)';
+            }
+            showProgressBar();
+        }, { signal });
 
         // Floating Stream Cue Hint (appears once per session on switching to Full Video)
         const cueBadge = document.createElement('div');
@@ -3564,7 +3651,7 @@
         };
 
         const attachWheel = () => {
-            if (!wheelListenerAttached && currentMode === 'stream') {
+            if (!wheelListenerAttached && hasControllableVideo()) {
                 mediaContainer.addEventListener('wheel', onWheel, { passive: false, signal });
                 wheelListenerAttached = true;
             }
@@ -3584,7 +3671,7 @@
         let lastWheelTimestamp = 0;
 
         var onWheel = (e) => {
-            if (currentMode !== 'stream') return;
+            if (!hasControllableVideo()) return;
             e.preventDefault();
             hideCueImmediate();
             if (!currentMedia || currentMedia.tagName !== 'VIDEO' || currentMedia.duration <= 0 || !isFinite(currentMedia.duration)) return;
@@ -3628,6 +3715,7 @@
         const renderMedia = (mode) => {
             if (signal.aborted) return;
             currentMode = mode;
+            progressBarBg.style.pointerEvents = 'none';
             updatePill(mode);
 
             // Teardown previous media
@@ -3635,12 +3723,14 @@
                 if (currentMedia.tagName === 'VIDEO') {
                     try {
                         currentMedia.pause();
+                        currentMedia.onerror = null;
                         currentMedia.removeAttribute('src');
                         currentMedia.load();
                     } catch (e) {}
                 }
                 currentMedia.remove();
                 currentMedia = null;
+                currentMediaSource = '';
             }
 
             detachWheel();
@@ -3648,7 +3738,9 @@
             clearTimeout(progressBarTimer);
 
             if (mode === 'stream') {
+                streamCaptureFailure = '';
                 if (!streamUrl) {
+                    streamCaptureFailure = 'This scene has no full-video stream. Upload or paste an image instead.';
                     showToast('Stream URL not available', 'warning');
                     renderMedia('preview');
                     return;
@@ -3687,17 +3779,23 @@
                     const msg = errCode === 4
                         ? 'Full video format not supported by browser — showing preview'
                         : 'Full stream unavailable — showing preview';
+                    streamCaptureFailure = errCode === 4
+                        ? 'This video format cannot be played by the browser. Upload or paste an image instead.'
+                        : 'The full-video stream is unavailable. Upload or paste an image instead.';
                     showToast(msg, 'info', 3000);
                     renderMedia('preview');
                 };
 
                 video.addEventListener('timeupdate', updateProgressBar);
                 video.onloadedmetadata = () => {
+                    streamCaptureFailure = '';
                     showProgressBar();
                 };
 
                 currentMedia = video;
+                currentMediaSource = 'full-video';
                 mediaContainer.insertBefore(video, mediaContainer.firstChild);
+                progressBarBg.style.pointerEvents = 'auto';
                 video.load();
                 video.play().catch(() => {});
                 if (isHovered) attachWheel();
@@ -3706,9 +3804,11 @@
                 progressBarBg.style.opacity = '0';
                 progressBarFill.style.width = '0%';
 
-                // Preview mode
+                // Preview mode. The /preview endpoint can return MP4 or animated WebP,
+                // so try video first and fall back to an image if decoding fails.
                 if (previewUrl) {
-                    const isVideo = /\/preview(?:[?#]|$)|\.(mp4|webm|mov|m4v|ogg)(\?.*)?$/i.test(previewUrl);
+                    const forceImage = mode === 'preview-image';
+                    const isVideo = !forceImage && /\/preview(?:[?#]|$)|\.(mp4|webm|mov|m4v|ogg)(\?.*)?$/i.test(previewUrl);
                     if (isVideo) {
                         const video = document.createElement('video');
                         video.style.cssText = 'display: block; width: 100%; height: 100%; object-fit: contain; background: #0f172a; pointer-events: none;';
@@ -3725,21 +3825,19 @@
                         video.src = previewUrl;
 
                         video.onerror = () => {
-                            if (streamUrl) {
-                                renderMedia('stream');
-                            } else {
-                                renderCoverOnly();
-                            }
+                            if (currentMedia === video) renderMedia('preview-image');
                         };
-                        video.addEventListener('error', () => {
-                            if (streamUrl) {
-                                renderMedia('stream');
-                            } else {
-                                renderCoverOnly();
+                        video.addEventListener('loadedmetadata', () => {
+                            if (coverEditing && currentMedia === video) {
+                                progressBarBg.style.pointerEvents = 'auto';
+                                showProgressBar();
+                                if (isHovered) attachWheel();
                             }
                         });
+                        video.addEventListener('timeupdate', updateProgressBar);
 
                         currentMedia = video;
+                        currentMediaSource = 'preview-video';
                         mediaContainer.insertBefore(video, mediaContainer.firstChild);
                         video.load();
                         video.play().catch(() => {});
@@ -3751,13 +3849,14 @@
                         img.loading = 'eager';
                         img.src = previewUrl;
                         img.onerror = () => {
-                            if (streamUrl) {
+                            if (streamUrl && !streamCaptureFailure) {
                                 renderMedia('stream');
                             } else {
                                 renderCoverOnly();
                             }
                         };
                         currentMedia = img;
+                        currentMediaSource = 'preview-image';
                         mediaContainer.insertBefore(img, mediaContainer.firstChild);
                     }
                 } else if (streamUrl) {
@@ -3792,6 +3891,7 @@
             };
             img.src = coverUrl;
             currentMedia = img;
+            currentMediaSource = 'cover';
             mediaContainer.insertBefore(img, mediaContainer.firstChild);
         };
 
@@ -3803,7 +3903,7 @@
         // Hover & Key Listeners for Scrubbing & Hold-to-Freeze attached to mediaContainer
         mediaContainer.onmouseenter = () => {
             isHovered = true;
-            if (currentMode === 'stream') {
+            if (hasControllableVideo()) {
                 attachWheel();
             }
         };
@@ -3817,14 +3917,14 @@
                 clearTimeout(progressBarTimer);
                 progressBarBg.style.opacity = '0';
                 if (currentMedia && currentMedia.tagName === 'VIDEO') {
-                    currentMedia.play().catch(() => {});
+                    if (!coverEditing || wasPlaying) currentMedia.play().catch(() => {});
                 }
             }
             endScrubbing();
         };
 
         const onKeyDown = (e) => {
-            if (currentMode !== 'stream') return;
+            if (!hasControllableVideo()) return;
             if (e.key === 'Shift' && !shiftHeld && isHovered) {
                 shiftHeld = true;
                 hideCueImmediate();
@@ -3842,17 +3942,17 @@
         };
 
         const onKeyUp = (e) => {
-            if (currentMode !== 'stream') return;
+            if (!hasControllableVideo()) return;
             if (e.key === 'Shift' && shiftHeld) {
                 shiftHeld = false;
                 clearTimeout(resumeTimer);
                 clearTimeout(progressBarTimer);
                 progressBarTimer = setTimeout(() => {
-                    progressBarBg.style.opacity = '0';
-                }, 1500);
+                    if (!isTimelineSeeking && !progressBarBg.matches(':hover')) progressBarBg.style.opacity = '0';
+                }, 3500);
                 if (currentMedia && currentMedia.tagName === 'VIDEO') {
                     try { currentMedia.loop = !!originalLoop; } catch (err) {}
-                    currentMedia.play().catch(() => {});
+                    if (!coverEditing || wasPlaying) currentMedia.play().catch(() => {});
                     wasPlaying = false;
                 }
             }
@@ -3865,7 +3965,7 @@
                 clearTimeout(progressBarTimer);
                 progressBarBg.style.opacity = '0';
                 if (currentMedia && currentMedia.tagName === 'VIDEO') {
-                    currentMedia.play().catch(() => {});
+                    if (!coverEditing || wasPlaying) currentMedia.play().catch(() => {});
                 }
             }
         };
@@ -3889,6 +3989,149 @@
                 window._fastTagActiveToggleVideoMode = null;
             }
         });
+
+        const mediaController = {
+            switchToFullVideo: () => renderMedia('stream'),
+            getCurrentCaptureMedia: () => {
+                if (currentMediaSource === 'full-video' && currentMedia?.tagName === 'VIDEO') return currentMedia;
+                if (coverEditing && ['preview-video', 'preview-image'].includes(currentMediaSource)) return currentMedia;
+                return null;
+            },
+            getCoverUrl: () => coverUrl,
+            mountForCoverEditor: target => {
+                if (!target) return;
+                coverEditorWasPoppedOut = isVideoPoppedOut;
+                if (isVideoPoppedOut) togglePopout(false);
+                coverEditorPreviousMode = currentMode;
+                coverEditing = true;
+                hostContainer.style.display = 'none';
+                hostContainer.style.height = '0';
+                hostContainer.style.maxHeight = '0';
+                hostContainer.style.margin = '0';
+                mediaContainer.style.cursor = 'default';
+                mediaContainer.title = '';
+                const launcher = mediaContainer.querySelector('#fasttag-cover-editor-btn');
+                if (launcher) launcher.style.display = 'none';
+                popoutBtn.style.display = 'none';
+                target.innerHTML = '';
+                target.appendChild(mediaContainer);
+            },
+            releaseFromCoverEditor: (releaseOptions = {}) => {
+                coverEditing = false;
+                if (!hostContainer.isConnected) return;
+                progressBarBg.style.pointerEvents = currentMode === 'stream' ? 'auto' : 'none';
+                if (currentMode !== 'stream') progressBarBg.style.opacity = '0';
+                detachWheel();
+                if (releaseOptions.forNavigation) {
+                    if (currentMedia?.tagName === 'VIDEO') {
+                        try { currentMedia.pause(); } catch (error) {}
+                    }
+                    coverEditorPreviousMode = null;
+                    coverEditorWasPoppedOut = false;
+                    return;
+                }
+                hostContainer.innerHTML = '';
+                hostContainer.style.display = 'block';
+                hostContainer.style.position = 'relative';
+                hostContainer.style.width = '100%';
+                hostContainer.style.height = 'auto';
+                hostContainer.style.aspectRatio = '16 / 9';
+                hostContainer.style.maxHeight = '205px';
+                hostContainer.style.margin = '0 0 8px 0';
+                hostContainer.style.borderRadius = '8px';
+                hostContainer.style.overflow = 'hidden';
+                hostContainer.style.background = '#0f172a';
+                hostContainer.style.padding = '0';
+                hostContainer.style.cursor = 'pointer';
+                mediaContainer.style.cursor = 'pointer';
+                mediaContainer.title = 'Click to open scene in new tab';
+                hostContainer.appendChild(mediaContainer);
+                const launcher = mediaContainer.querySelector('#fasttag-cover-editor-btn');
+                if (launcher) launcher.style.display = 'flex';
+                popoutBtn.style.display = 'flex';
+                const restoreMode = coverEditorPreviousMode;
+                const restorePopout = coverEditorWasPoppedOut;
+                coverEditorPreviousMode = null;
+                coverEditorWasPoppedOut = false;
+                if (restoreMode && restoreMode !== currentMode) renderMedia(restoreMode);
+                if (restorePopout) togglePopout(true);
+            },
+            pause: () => {
+                const video = hasControllableVideo() ? currentMedia : null;
+                if (!video) return false;
+                clearTimeout(resumeTimer);
+                wasPlaying = false;
+                try { video.pause(); } catch (error) {}
+                return true;
+            },
+            play: () => {
+                const video = hasControllableVideo() ? currentMedia : null;
+                if (!video) return false;
+                clearTimeout(resumeTimer);
+                video.play().catch(() => {});
+                return true;
+            },
+            stepBy: seconds => {
+                const video = hasControllableVideo() ? currentMedia : null;
+                if (!video || !isFinite(video.duration)) return false;
+                clearTimeout(resumeTimer);
+                wasPlaying = false;
+                try { video.pause(); } catch (error) {}
+                video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + Number(seconds || 0)));
+                showProgressBar();
+                return true;
+            },
+            getPlaybackState: () => {
+                const video = hasControllableVideo() ? currentMedia : null;
+                return video ? {
+                    available: true,
+                    paused: video.paused,
+                    currentTime: Number(video.currentTime || 0),
+                    duration: Number(video.duration || 0)
+                } : { available: false, paused: true, currentTime: 0, duration: 0 };
+            },
+            getCaptureState: () => {
+                if (currentMediaSource === 'full-video') {
+                    const video = currentMedia?.tagName === 'VIDEO' ? currentMedia : null;
+                    if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
+                        return { available: false, reason: 'Loading the full video for frame capture…', source: 'full-video' };
+                    }
+                    return { available: true, reason: '', source: 'full-video' };
+                }
+                if (coverEditing && currentMediaSource === 'preview-video') {
+                    const ready = currentMedia?.readyState >= 2 && currentMedia.videoWidth && currentMedia.videoHeight;
+                    return ready
+                        ? { available: true, reason: 'Full video unavailable — using the lower-resolution MP4 preview.', source: 'preview-video' }
+                        : { available: false, reason: 'Loading the MP4 preview…', source: 'preview-video' };
+                }
+                if (coverEditing && currentMediaSource === 'preview-image') {
+                    const ready = currentMedia?.complete && currentMedia.naturalWidth && currentMedia.naturalHeight;
+                    return ready
+                        ? { available: true, reason: 'Full video unavailable — capture the currently visible preview frame.', source: 'preview-image' }
+                        : { available: false, reason: 'Loading the animated preview…', source: 'preview-image' };
+                }
+                return { available: false, reason: streamCaptureFailure || 'No playable video or preview is available. Upload, paste or drop an image instead.', source: '' };
+            }
+        };
+        hostContainer._fastTagMediaController = mediaController;
+        if (isEverythingHost) {
+            FastTagCoverEditor.mountLauncher({
+                container: controlsRow,
+                beforeElement: popoutBtn,
+                hostElement: hostContainer,
+                anchorElement: hostContainer.closest('form') || hostContainer,
+                sceneId,
+                currentCoverUrl: coverUrl,
+                mediaController,
+                onSaved: async saveOptions => {
+                    if (!saveOptions?.keepEditorOpen && !signal.aborted) await attachScenePreview(hostContainer, sceneId, cardElement);
+                }
+            });
+        }
+        signal.addEventListener('abort', () => {
+            FastTagCoverEditor.closeForHost(hostContainer);
+            if (hostContainer._fastTagMediaController === mediaController) delete hostContainer._fastTagMediaController;
+        }, { once: true });
 
         // Initial render (honors Always Play Full Video setting)
         renderMedia(getAlwaysPlayFullVideo() ? 'stream' : 'preview');
@@ -4887,6 +5130,7 @@
     }
 
     function closePopup(resetSequential = true) {
+        if (FastTagCoverEditor.closeActiveEditor?.() === false) return false;
         isModalClosing = true;
         try {
             if (activePopup) {
@@ -4945,6 +5189,7 @@
                 window._fastTagEverythingScraperOpen = false;
             }
             refreshSceneCardsDebounced(null, 50);
+            return true;
         } finally {
             setTimeout(() => {
                 isModalClosing = false;
@@ -7379,6 +7624,7 @@
                     e.target.closest('#fasttag-sort-dropdown-menu') ||
                     e.target.closest('#fasttag-floating-video-hud') ||
                     e.target.closest('#fasttag-floating-scraper-hud') ||
+                    e.target.closest('#fasttag-cover-editor-hud') ||
                     e.target.closest('#fasttag-performer-hover-card') ||
                     e.target.closest('#fasttag-settings-modal') ||
                     e.target.closest('#fasttag-create-modal') ||
@@ -7402,16 +7648,18 @@
 
             const scraperHud = document.querySelector('#fasttag-floating-scraper-hud');
             const videoHud = document.querySelector('#fasttag-floating-video-hud');
+            const coverEditorHud = document.querySelector('#fasttag-cover-editor-hud');
             const settingsModal = document.querySelector('#fasttag-settings-modal');
             const isInsideAllowed = (el) => Boolean(
                 (popup && popup.contains(el)) ||
                 (scraperHud && scraperHud.contains(el)) ||
                 (videoHud && videoHud.contains(el)) ||
+                (coverEditorHud && coverEditorHud.contains(el)) ||
                 (settingsModal && settingsModal.contains(el))
             );
 
             // 1. Allow video player & preview containers to handle mouse wheel freely for frame scrubbing
-            if (e.target.closest('[id$="-preview-container"], .fasttag-video-preview, video, #fasttag-floating-video-hud, #fasttag-video-container, #fasttag-video-element')) {
+            if (e.target.closest('[id$="-preview-container"], .fasttag-video-preview, video, #fasttag-floating-video-hud, #fasttag-cover-editor-hud #fasttag-media-container, #fasttag-video-container, #fasttag-video-element')) {
                 return;
             }
 
@@ -7430,7 +7678,7 @@
                 return;
             }
 
-            const scrollable = e.target.closest('.tabulator-tableholder, #fasttag-scrape-items-preview, [id$="-quick-actions"], [id*="-chips"], .fasttag-chip-row, textarea');
+            const scrollable = e.target.closest('.tabulator-tableholder, #fasttag-scrape-items-preview, #fasttag-cover-editor-hud, [id$="-quick-actions"], [id*="-chips"], .fasttag-chip-row, textarea');
             if (scrollable && isInsideAllowed(scrollable)) {
                 const hasScrollableY = scrollable.scrollHeight > scrollable.clientHeight;
                 const atTop = scrollable.scrollTop <= 0 && e.deltaY < 0;
@@ -7480,7 +7728,7 @@
 
             // Handle Escape key: 2-stage (Stage 1: clear search if text present; Stage 2: close popup)
             if (e.key === 'Escape') {
-                const subModal = document.querySelector('#fasttag-settings-modal, #fasttag-create-modal, .fasttag-create-dialog-overlay, .fasttag-bulk-confirm-overlay');
+                const subModal = document.querySelector('#fasttag-settings-modal, #fasttag-create-modal, #fasttag-cover-editor-hud, .fasttag-create-dialog-overlay, .fasttag-bulk-confirm-overlay');
                 if (subModal && subModal.style.display !== 'none') return;
 
                 const searchBox = form.querySelector('#everything-global-search, #scenes-popup-global-filter, #scenes-popup-filter, input[type="text"], input[type="search"]');
@@ -7503,6 +7751,8 @@
                 closePopup();
                 return;
             }
+
+            if (e.target?.closest?.('#fasttag-cover-editor-hud')) return;
 
             // Alt+S for Scrape
             if (e.altKey && (e.key === 's' || e.key === 'S')) {
@@ -9542,6 +9792,7 @@
 
             const targetScene = scenes[0];
             if (popup && popup.element && popup.element.isConnected) {
+                if (FastTagCoverEditor.prepareForSceneNavigation?.() === false) return;
                 popup._isRandomMode = true;
                 popup._randomUntaggedCount = count;
                 if (!popup._randomHistoryState) {
@@ -9564,6 +9815,7 @@
     async function navigateRandomSceneHistory(popup, direction, doSaveFn) {
         const history = popup?._randomHistoryState;
         if (!popup?._isRandomMode || !history) return;
+        if (FastTagCoverEditor.prepareForSceneNavigation?.() === false) return;
 
         const previousIndex = history.index;
         const target = moveRandomSceneHistory(history, direction);
@@ -9644,6 +9896,7 @@
             toastError('Error resolving next scene');
             return;
         }
+        if (FastTagCoverEditor.prepareForSceneNavigation?.() === false) return;
 
         sequentialEditState.currentIndex = nextIndex;
         sequentialEditState.currentSceneId = nextSceneId;
@@ -10498,6 +10751,7 @@
 
             // If the Everything popup is already open, reuse it in-place! Zero redraw flash!
             if (activePopup && activePopup.type === 'everything' && activePopup.element && activePopup.element.isConnected) {
+                if (FastTagCoverEditor.prepareForSceneNavigation?.() === false) return;
                 activePopup._isRandomMode = isRandomMode;
                 activePopup._randomUntaggedCount = randomCount;
                 if (isRandomMode) {

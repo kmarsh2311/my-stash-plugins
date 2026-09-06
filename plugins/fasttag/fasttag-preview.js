@@ -29,6 +29,14 @@
         return Math.min(duration, Math.max(0, currentTime + (direction * step)));
     }
 
+    function calculateSeekTarget(clientX, trackLeft, trackWidth, duration) {
+        const width = Number(trackWidth);
+        const length = Number(duration);
+        if (!(width > 0) || !(length > 0) || !isFinite(length)) return null;
+        const ratio = Math.min(1, Math.max(0, (Number(clientX) - Number(trackLeft || 0)) / width));
+        return ratio * length;
+    }
+
     function getDefaultPopoutSize() {
         const screenWidth = root.innerWidth;
         let targetWidth = 600;
@@ -169,6 +177,7 @@
         getWheelNotches,
         selectScrubStep,
         calculateScrubTarget,
+        calculateSeekTarget,
         getDefaultPopoutSize,
         calculateVideoPopoutPosition,
         extractMediaUrlsFromCard,

@@ -1,6 +1,6 @@
 # FastTag User Guide
 
-FastTag adds rapid scene-card metadata editing to Stash. This guide covers version 4.2.13 and is also available as a searchable offline guide from FastTag Settings.
+FastTag adds rapid scene-card metadata editing to Stash. This guide covers version 4.3.0 and is also available as a searchable offline guide from FastTag Settings.
 
 ## Opening FastTag
 
@@ -30,9 +30,21 @@ Sequential mode works through the scenes represented by the active Stash page or
 
 ## Video and mouse-wheel scrubbing
 
-Preview mode uses Stash preview media. Full Video uses the scene stream. With the pointer over Full Video, scroll to scrub. Slow, normal, and fast wheel movement use configurable skip distances; hold Shift for the fine freeze step. The pop-out control creates a draggable, resizable video HUD.
+Preview mode uses Stash preview media. Full Video uses the scene stream. With the pointer over Full Video, scroll to scrub. Slow, normal, and fast wheel movement use configurable skip distances; hold Shift for the fine freeze step. The progress bar along the bottom also works as a normal timeline: click a position or drag along it to seek. Dragging pauses temporarily and resumes only when the video was playing beforehand. The pop-out control creates a draggable, resizable video HUD.
 
 The scrubbing instruction overlay appears once per browser session and no more than five times until **Reset Defaults** is used in Video Settings.
+
+### Editing a scene cover
+
+In Edit Everything, select the picture button in the video controls to open the Cover Editor HUD. The existing player temporarily moves into the cover workspace and switches to Full Video when possible. Use the persistent **Play/Pause** and arrow controls to select a frame: an ordinary arrow click moves one second, while `Shift` plus an arrow click moves one frame. Hold an arrow briefly to repeat that movement automatically; releasing it, moving away or leaving the window stops immediately. Moving the pointer away does not resume a deliberately paused video. **Capture Frame** pauses automatically before capturing the displayed frame. The current Stash cover and proposed replacement remain visible below the player.
+
+Alternatively, select **Upload** for a JPEG, PNG, or WebP image, drag an image file onto **New Cover**, or select **Paste** to read an image from the clipboard. On localhost or an HTTPS connection, the browser can normally read the clipboard directly after permission is granted. On an HTTP network address, such as a LAN IP or hostname, browser security blocks direct clipboard reading: select **Paste** and then press `Ctrl+V` or `Cmd+V` when FastTag prompts you. This fallback applies to any HTTP LAN address and is not tied to a particular IP address or port. Large images are scaled to a maximum dimension of 1920 pixels and prepared as JPEG covers. Review the proposed image and select **Set Cover** to save it through Stash. Saving updates Current Cover without closing the editor, allowing immediate next/previous navigation. If a proposed cover has not been saved, closing the editor—including through its parent popup—asks before discarding it.
+
+The Cover Editor opens in a compact layout with playback, capture, upload, paste, and save controls visible together. Resize it from the bottom-right corner; FastTag remembers the resized width and height for its next opening while keeping it inside the available screen. Closing it returns the existing player to its previous location—embedded in Edit Everything or in the floating video HUD—and restores its previous Preview or Full Video mode.
+
+When the Edit Everything next/previous controls move to another scene, an open Cover Editor stays open in the same position and size and loads the incoming scene’s video and covers. If a proposed cover has not been saved, FastTag asks before discarding it; cancelling that warning also cancels navigation.
+
+FastTag prefers the full-video stream for the highest-quality frame capture. If that stream is unavailable or the browser cannot play its format, an MP4 preview becomes the fallback player with Play/Pause, frame stepping, timeline and wheel scrubbing, and **Capture Preview Frame**. If the fallback is an animated WebP image, it cannot be paused or scrubbed, but **Capture Preview Frame** captures the animation frame visible when the button is pressed. Preview captures are identified in the proposed-cover status and can be lower resolution. Upload, Paste and Drop remain available when no preview can be captured.
 
 ## StashDB scraping
 

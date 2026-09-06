@@ -1,3 +1,14 @@
+## 4.3.0 - Cover Editor
+
+### Highlights
+- **Integrated Cover Editing**: Open a dedicated resizable workspace from Edit Everything to compare the current cover with a captured, uploaded, pasted, or dropped replacement before saving it through Stash.
+- **Precise Frame Selection**: Seek with the video timeline, step one second with the arrow controls, hold an arrow to repeat, or Shift-click for one-frame precision.
+- **Preview Fallbacks**: Full video is preferred, while MP4 previews retain playback and capture controls and animated WebP previews can capture the visible frame when the full stream is unavailable.
+- **Continuous Sequential Workflow**: The editor stays open and updates in place across scenes, preserves its size, avoids unnecessary redraws, and protects unsaved cover changes.
+- **LAN Clipboard Guidance**: Upload and drag-and-drop work everywhere; insecure LAN sessions receive concise guidance when browser security prevents programmatic clipboard access.
+
+---
+
 ## 3.9.2 - Search Input Bugfixes, Scraper Hotkey Guard & Sidecar 8-Direction Resizing
 
 ### Bug Fixes & Refinements

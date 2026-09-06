@@ -4,6 +4,17 @@ All notable changes to the **FastTag** Stash plugin will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+## [4.3.0] - 2026-09-06
+
+### Added
+- **Cover Editor**: Edit Everything now provides a compact, resizable cover workspace that remembers its dimensions and temporarily incorporates the existing Full Video player. Persistent Play/Pause, one-second arrow stepping (or precise one-frame Shift-click), press-and-hold repeat, and Capture Frame controls remain together, video clicks stay within the editor, and current/proposed cover previews support upload, drag-and-drop, and clipboard input—including a guided keyboard-paste fallback on insecure LAN connections. When Full Video is unavailable, MP4 previews retain playback, seeking and lower-resolution capture, while animated WebP previews allow capture of the currently visible frame. Unsaved proposed covers are protected by a discard warning, capture pauses automatically, and saving remains explicit.
+- **Interactive Video Timeline**: The Full Video progress bar now supports ordinary click-and-drag seeking while preserving whether playback was previously playing or paused. Its larger pointer target expands the visible track on hover/drag and keeps it visible longer after use.
+
+### Fixed
+- **Cover Editor Scene Navigation**: Saving promotes the proposed image to Current Cover without closing the editor. Moving to another scene keeps the same HUD mounted, holds the previous frame beneath a loading overlay until the incoming player is ready, and stops navigation when an unsaved-cover discard warning is cancelled. Explicit closure still restores the normal embedded or floating preview.
+
 ## [4.2.13] - 2026-09-06
 
 ### Added
