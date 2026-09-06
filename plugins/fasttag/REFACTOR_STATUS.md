@@ -7,11 +7,11 @@ passed.
 
 ## Current phase
 
-Step 3 is complete. In addition to the 4.3.0 baseline in
-`REFACTOR_BASELINE.md`, `fasttag-runtime-characterization.test.js` now protects
-the coordinator's startup ownership, popup and HUD cleanup, scraper request
-generations, scene rebinding, sequential navigation, Cover Editor handoff, and
-serialized Edit Everything saves.
+Step 4 is complete. GraphQL transport, diagnostics, and native notifications
+now have explicit module APIs, dedicated tests, and separate extraction commits.
+`fasttag.js` has moved from the 839,005-byte baseline to 825,340 bytes without a
+behavioural change. The characterization suite continues to protect coordinator
+startup, cleanup, navigation, scraper, Cover Editor, and save ordering.
 
 ## Extracted modules
 
@@ -46,10 +46,9 @@ suites.
 
 ## Next work
 
-Begin the first low-risk extraction by separating GraphQL transport,
-notifications, and diagnostics behind explicit module APIs. Preserve the
-characterized ordering and behaviour and move only one responsibility per
-commit.
+Extract the Settings interface behind an explicit UI/controller boundary while
+leaving preference persistence in `fasttag-storage.js`. Preserve tab selection,
+validation, preset behaviour, cache/debug actions, and all automatic saves.
 
 ## Still required before a merge or release
 
