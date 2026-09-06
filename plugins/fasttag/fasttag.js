@@ -25,6 +25,8 @@
     if (!FastTagDiagnostics) throw new Error('[FastTag] fasttag-diagnostics.js must load before fasttag.js');
     const FastTagApi = window.FastTag?.api;
     if (!FastTagApi) throw new Error('[FastTag] fasttag-api.js must load before fasttag.js');
+    const FastTagNotifications = window.FastTag?.notifications;
+    if (!FastTagNotifications) throw new Error('[FastTag] fasttag-notifications.js must load before fasttag.js');
     const FastTagIntegrations = window.FastTag?.integrations;
     if (!FastTagIntegrations) throw new Error('[FastTag] fasttag-integrations.js must load before fasttag.js');
     const FastTagGemini = window.FastTag?.gemini;
@@ -130,6 +132,7 @@
         attachGlobalErrorListeners
     } = FastTagDiagnostics;
     const { fetchGQL } = FastTagApi;
+    const { showToast, toastSuccess, toastError } = FastTagNotifications;
     const {
         resetRefractSceneCards,
         syncSceneToApolloCache,
@@ -184,6 +187,11 @@
         fetchImpl: (...args) => window.fetch(...args),
         log: (...args) => ftLog(...args),
         getDebugMode: () => getDebugMode()
+    });
+    FastTagNotifications.configure({
+        escapeHtml,
+        getDebugMode: () => getDebugMode(),
+        log: (...args) => ftLog(...args)
     });
 
     FastTagGemini.configure({
@@ -1368,163 +1376,6 @@
         `;
         document.head.appendChild(style);
     }
-
-    function showToast(message, type = "success", duration = 3000, debugPayload = null) {
-        try {
-            const isDebug = getDebugMode();
-            const effectiveDuration = isDebug ? Math.max(duration, 15000) : duration;
-
-            ftLog(type === 'error' ? 'ERROR' : (type === 'info' ? 'INFO' : 'ACTION'), 'TOAST', message, debugPayload);
-
-            const existing = document.getElementById('fasttag-native-toast');
-            if (existing) existing.remove();
-
-            const toast = document.createElement('div');
-            toast.id = 'fasttag-native-toast';
-            const bg = type === "success" ? "#059669" : (type === "info" ? "#6366f1" : "#dc2626");
-            const icon = type === "success" ? "✓" : (type === "info" ? "ℹ" : "✕");
-
-            toast.style.cssText = `
-                position: fixed;
-                top: 18px;
-                left: 50%;
-                transform: translateX(-50%) translateY(-10px);
-                background: ${bg};
-                color: #ffffff;
-                padding: 8px 16px;
-                border-radius: 8px;
-                font-size: 12px;
-                font-weight: 600;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-                z-index: 20000000;
-                opacity: 0;
-                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-                pointer-events: auto;
-                display: inline-flex;
-                align-items: center;
-                gap: 8px;
-                max-width: 90vw;
-                font-family: system-ui, -apple-system, sans-serif;
-            `;
-
-            let copyBtnHtml = '';
-            if (type === 'error' || debugPayload || isDebug) {
-                copyBtnHtml = `<button id="fasttag-toast-copy-btn" type="button" style="background: rgba(255,255,255,0.22); border: 1px solid rgba(255,255,255,0.35); color: #ffffff; padding: 2px 7px; border-radius: 4px; font-size: 10.5px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; line-height: 1.3;" title="Copy details to clipboard">📋 Copy</button>`;
-            }
-
-            let closeBtnHtml = '';
-            if (isDebug || type === 'error') {
-                closeBtnHtml = `<button id="fasttag-toast-close-btn" type="button" style="background: none; border: none; color: rgba(255,255,255,0.85); padding: 0 0 0 4px; font-size: 14px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center;" title="Dismiss">✕</button>`;
-            }
-
-            toast.innerHTML = `
-                <span style="font-size: 13px; line-height: 1; flex-shrink: 0;">${icon}</span>
-                <span class="fasttag-toast-msg" style="word-break: break-word; max-width: 600px;">${escapeHtml(message)}</span>
-                ${copyBtnHtml}
-                ${closeBtnHtml}
-            `;
-            document.body.appendChild(toast);
-
-            const copyBtn = toast.querySelector('#fasttag-toast-copy-btn');
-            if (copyBtn) {
-                copyBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    const msgEl = toast.querySelector('.fasttag-toast-msg');
-                    let copyText = (msgEl ? msgEl.innerText : message.replace(/<[^>]*>/g, '')).trim();
-                    if (debugPayload) {
-                        try {
-                            copyText += '\n\nDetails:\n' + (typeof debugPayload === 'object' ? JSON.stringify(debugPayload, null, 2) : String(debugPayload));
-                        } catch (err) {
-                            copyText += '\n\nDetails:\n' + String(debugPayload);
-                        }
-                    }
-
-                    const fallbackCopy = (txt) => {
-                        const ta = document.createElement('textarea');
-                        ta.value = txt;
-                        ta.setAttribute('readonly', '');
-                        ta.style.position = 'fixed';
-                        ta.style.left = '-9999px';
-                        ta.style.top = '0';
-                        document.body.appendChild(ta);
-                        ta.focus();
-                        ta.select();
-                        ta.setSelectionRange(0, ta.value.length);
-                        try {
-                            document.execCommand('copy');
-                            copyBtn.textContent = '✓ Copied!';
-                        } catch (err) {
-                            copyBtn.textContent = '❌ Failed';
-                        }
-                        ta.remove();
-                    };
-
-                    if (navigator.clipboard && navigator.clipboard.writeText) {
-                        navigator.clipboard.writeText(copyText).then(() => {
-                            copyBtn.textContent = '✓ Copied!';
-                        }).catch(() => {
-                            fallbackCopy(copyText);
-                        });
-                    } else {
-                        fallbackCopy(copyText);
-                    }
-
-                    setTimeout(() => { if (copyBtn) copyBtn.textContent = '📋 Copy'; }, 2500);
-                };
-            }
-
-            let dismissTimer = null;
-            const startDismiss = (time) => {
-                dismissTimer = setTimeout(() => {
-                    toast.style.opacity = '0';
-                    toast.style.transform = 'translateX(-50%) translateY(-10px)';
-                    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 220);
-                }, time);
-            };
-
-            const closeBtn = toast.querySelector('#fasttag-toast-close-btn');
-            if (closeBtn) {
-                closeBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    if (dismissTimer) clearTimeout(dismissTimer);
-                    toast.style.opacity = '0';
-                    toast.style.transform = 'translateX(-50%) translateY(-10px)';
-                    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 220);
-                };
-            }
-
-            // Pause on hover
-            toast.addEventListener('mouseenter', () => {
-                if (dismissTimer) clearTimeout(dismissTimer);
-            });
-            toast.addEventListener('mouseleave', () => {
-                startDismiss(Math.min(effectiveDuration, 5000));
-            });
-
-            requestAnimationFrame(() => {
-                toast.style.opacity = '1';
-                toast.style.transform = 'translateX(-50%) translateY(0)';
-            });
-
-            startDismiss(effectiveDuration);
-        } catch (e) {
-            console.log(`[Toast ${type}]: ${message}`);
-        }
-    }
-
-    const toastSuccess = (message, debug) => {
-        showToast(message, 'success', 3000, debug);
-        if (debug) console.log(debug);
-    };
-
-    const toastError = (message, debug, duration = 8000) => {
-        showToast(message, 'error', duration, debug);
-        if (debug) {
-            console.error(debug);
-        } else {
-            console.error(`[FastTag Error]: ${message}`);
-        }
-    };
 
     // --- Milestone & Usage Helpers ---
     const USAGE_STORAGE_KEY = 'stash_fast_tag_usage_count';

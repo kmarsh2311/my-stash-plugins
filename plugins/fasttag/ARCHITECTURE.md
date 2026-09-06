@@ -11,6 +11,7 @@ final `fasttag.js` file coordinates those APIs and owns browser lifecycle.
 - `fasttag-storage.js`: settings, IndexedDB caches, recent items, and pinned items.
 - `fasttag-diagnostics.js`: debug preferences, bounded logs, exports, and global error capture.
 - `fasttag-api.js`: GraphQL transport and its stable error-response contract.
+- `fasttag-notifications.js`: native toast rendering, timing, dismissal, and copy controls.
 - `fasttag-integrations.js`: Apollo cache and theme-specific scene-card refreshes.
 - `fasttag-gemini.js`: Gemini bridge transport, timeouts, and parsed results.
 - `fasttag-scraper.js`: scraper requests, evidence scoring, ranking, and save payloads.

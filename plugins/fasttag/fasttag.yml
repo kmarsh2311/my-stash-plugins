@@ -9,6 +9,7 @@ ui:
     - fasttag-storage.js
     - fasttag-diagnostics.js
     - fasttag-api.js
+    - fasttag-notifications.js
     - fasttag-integrations.js
     - fasttag-gemini.js
     - fasttag-scraper.js
