@@ -7,12 +7,14 @@ passed.
 
 ## Current phase
 
-Step 5 is complete. The complete Settings HUD, its tab and control wiring,
-validation, close lifecycle, matching presets, Gemini test controls, and system
-actions now belong to `fasttag-settings.js`. Its dependencies are injected
-explicitly and a smoke test opens the HUD with an isolated browser substitute.
-`fasttag.js` has moved from the 839,005-byte baseline to 764,717 bytes without an
-intentional behavioural change.
+Step 6 is complete. `fasttag-preview.js` now owns media discovery and rendering,
+timeline and wheel scrubbing, floating-HUD state and geometry, abort cleanup,
+session cues, persisted layout state, and the Cover Editor player handoff. The
+coordinator supplies its external services through explicit callbacks. Source
+comparison confirms the moved implementation differs only at those dependency
+and state boundaries, and an isolated smoke test covers preview creation and
+abort teardown. `fasttag.js` has moved from the 839,005-byte baseline to 709,747
+bytes without an intentional behavioural change.
 
 ## Extracted modules
 
@@ -47,10 +49,10 @@ suites.
 
 ## Next work
 
-Expand `fasttag-preview.js` into the complete preview controller, including
-media selection, scrubbing, floating-HUD lifecycle, restoration, and the Cover
-Editor player handoff. This is a higher-risk extraction and requires additional
-characterization before implementation moves.
+Separate scraper request and HUD lifecycle coordination from the main runtime.
+Preserve request-generation checks, active scene ownership, hidden-result state,
+docking, search refresh, and acceptance ordering before considering shared popup
+infrastructure.
 
 ## Still required before a merge or release
 
