@@ -21,6 +21,8 @@
     if (!FastTagEntities) throw new Error('[FastTag] fasttag-entities.js must load before fasttag.js');
     const FastTagStorage = window.FastTag?.storage;
     if (!FastTagStorage) throw new Error('[FastTag] fasttag-storage.js must load before fasttag.js');
+    const FastTagApi = window.FastTag?.api;
+    if (!FastTagApi) throw new Error('[FastTag] fasttag-api.js must load before fasttag.js');
     const FastTagIntegrations = window.FastTag?.integrations;
     if (!FastTagIntegrations) throw new Error('[FastTag] fasttag-integrations.js must load before fasttag.js');
     const FastTagGemini = window.FastTag?.gemini;
@@ -114,6 +116,7 @@
         addRecentEntry,
         addRecentEntriesFromSelection
     } = FastTagStorage;
+    const { fetchGQL } = FastTagApi;
     const {
         resetRefractSceneCards,
         syncSceneToApolloCache,
@@ -161,6 +164,12 @@
         calculateBulkSelectionDelta,
         applyBulkSelectionDelta
     } = FastTagEditors;
+
+    FastTagApi.configure({
+        fetchImpl: (...args) => window.fetch(...args),
+        log: (...args) => ftLog(...args),
+        getDebugMode: () => getDebugMode()
+    });
 
     FastTagGemini.configure({
         fetchGQL: (...args) => fetchGQL(...args),
@@ -1500,43 +1509,6 @@
             }
         });
     }
-
-    // --- Core GraphQL Network Operations ---
-    const fetchGQL = async (query, variables = {}) => {
-        const queryName = (query.match(/(query|mutation)\s+([A-Za-z0-9_]+)/) || [])[2] || 'GQL';
-        try {
-            const res = await fetch('/graphql', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query, variables })
-            });
-
-            if (!res.ok) {
-                const errPayload = { errors: [{ message: `GraphQL request failed: ${res.status} ${res.statusText}` }] };
-                ftLog('ERROR', 'GQL', `${queryName} failed with HTTP ${res.status}`, { queryName, variables, error: errPayload });
-                return errPayload;
-            }
-
-            const payload = await res.json();
-            if (!payload || typeof payload !== 'object') {
-                const errPayload = { errors: [{ message: 'GraphQL response was not valid JSON.' }] };
-                ftLog('ERROR', 'GQL', `${queryName} invalid JSON response`, { queryName, error: errPayload });
-                return errPayload;
-            }
-
-            if (payload.errors && payload.errors.length > 0) {
-                ftLog('WARN', 'GQL', `${queryName} returned GraphQL errors`, { queryName, variables, errors: payload.errors });
-            } else if (getDebugMode()) {
-                ftLog('DEBUG', 'GQL', `${queryName} success`, { queryName, variables });
-            }
-
-            return payload;
-        } catch (err) {
-            ftLog('ERROR', 'GQL', `${queryName} network exception: ${err.message || err}`, { queryName, variables, error: String(err) });
-            console.error('Stash Scene Manager: Network error', err);
-            return { errors: [{ message: err.message || 'Unknown network error' }] };
-        }
-    };
 
     function showToast(message, type = "success", duration = 3000, debugPayload = null) {
         try {

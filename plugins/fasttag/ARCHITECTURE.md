@@ -9,6 +9,7 @@ final `fasttag.js` file coordinates those APIs and owns browser lifecycle.
 - `fasttag-core.js`: pure text, time, filename, matching, and card-discovery helpers.
 - `fasttag-entities.js`: entity definitions and reusable entity GraphQL operations.
 - `fasttag-storage.js`: settings, IndexedDB caches, recent items, and pinned items.
+- `fasttag-api.js`: GraphQL transport and its stable error-response contract.
 - `fasttag-integrations.js`: Apollo cache and theme-specific scene-card refreshes.
 - `fasttag-gemini.js`: Gemini bridge transport, timeouts, and parsed results.
 - `fasttag-scraper.js`: scraper requests, evidence scoring, ranking, and save payloads.
