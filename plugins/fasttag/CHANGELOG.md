@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
-- **Cover Editor (development)**: Edit Everything now provides a unified cover workspace that temporarily incorporates the existing Full Video player, persistent Play/Pause and frame-step controls, current/proposed cover previews, upload, and clipboard input. Capture pauses the selected frame automatically, saving remains explicit, and upload/clipboard remain available when the browser cannot play or capture the video.
+- **Cover Editor (development)**: Edit Everything now provides a compact, resizable cover workspace that remembers its dimensions and temporarily incorporates the existing Full Video player. Persistent Play/Pause, frame-step, and Capture Frame controls remain together, current/proposed cover previews support upload and clipboard input, capture pauses automatically, and saving remains explicit.
 
 ## [4.2.13] - 2026-09-06
 

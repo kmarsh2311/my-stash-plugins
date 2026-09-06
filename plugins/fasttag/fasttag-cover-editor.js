@@ -4,6 +4,9 @@
     const DEFAULT_MAX_SOURCE_BYTES = 25 * 1024 * 1024;
     const DEFAULT_MAX_DIMENSION = 1920;
     const DEFAULT_JPEG_QUALITY = 0.9;
+    const DEFAULT_EDITOR_WIDTH = 450;
+    const DEFAULT_EDITOR_HEIGHT = 740;
+    const EDITOR_SIZE_STORAGE_KEY = 'fasttag_cover_editor_size';
     let dependencies = null;
     let activeEditor = null;
 
@@ -113,9 +116,45 @@
         }
     }
 
+    function resolveEditorSize(savedSize, viewportWidth, viewportHeight) {
+        const availableWidth = Math.max(300, Number(viewportWidth || 0) - 24);
+        const availableHeight = Math.max(320, Number(viewportHeight || 0) - 24);
+        const minWidth = Math.min(360, availableWidth);
+        const minHeight = Math.min(420, availableHeight);
+        const requestedWidth = Number(savedSize?.width) || DEFAULT_EDITOR_WIDTH;
+        const requestedHeight = Number(savedSize?.height) || DEFAULT_EDITOR_HEIGHT;
+        return {
+            width: Math.round(Math.max(minWidth, Math.min(availableWidth, requestedWidth))),
+            height: Math.round(Math.max(minHeight, Math.min(availableHeight, requestedHeight))),
+            minWidth: Math.round(minWidth),
+            minHeight: Math.round(minHeight),
+            maxWidth: Math.round(availableWidth),
+            maxHeight: Math.round(availableHeight)
+        };
+    }
+
+    function readSavedEditorSize() {
+        try {
+            const parsed = JSON.parse(root.localStorage?.getItem(EDITOR_SIZE_STORAGE_KEY) || 'null');
+            return parsed && typeof parsed === 'object' ? parsed : null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function saveEditorSize(element) {
+        if (!element) return;
+        try {
+            root.localStorage?.setItem(EDITOR_SIZE_STORAGE_KEY, JSON.stringify({
+                width: Math.round(element.offsetWidth),
+                height: Math.round(element.offsetHeight)
+            }));
+        } catch (error) {}
+    }
+
     function positionEditor(element, anchorElement) {
-        const width = Math.min(860, Math.max(330, root.innerWidth - 24));
-        const height = Math.min(780, Math.max(420, root.innerHeight - 24));
+        const size = resolveEditorSize(readSavedEditorSize(), root.innerWidth, root.innerHeight);
+        const { width, height } = size;
         const margin = 12;
         const anchor = anchorElement?.getBoundingClientRect?.();
         let left = anchor ? anchor.left - width - margin : margin;
@@ -126,10 +165,10 @@
         element.style.top = `${Math.round(top)}px`;
         element.style.width = `${Math.round(width)}px`;
         element.style.height = `${Math.round(height)}px`;
-        element.style.minWidth = `${Math.min(360, Math.max(300, root.innerWidth - 24))}px`;
-        element.style.minHeight = `${Math.min(420, Math.max(320, root.innerHeight - 24))}px`;
-        element.style.maxWidth = `${Math.max(300, root.innerWidth - 16)}px`;
-        element.style.maxHeight = `${Math.max(320, root.innerHeight - 16)}px`;
+        element.style.minWidth = `${size.minWidth}px`;
+        element.style.minHeight = `${size.minHeight}px`;
+        element.style.maxWidth = `${size.maxWidth}px`;
+        element.style.maxHeight = `${size.maxHeight}px`;
     }
 
     function makeDraggable(element, handle, signal) {
@@ -168,6 +207,7 @@
         if (!activeEditor) return;
         const editor = activeEditor;
         activeEditor = null;
+        saveEditorSize(editor.element);
         editor.mediaController?.releaseFromCoverEditor?.();
         editor.abortController.abort();
         editor.element.remove();
@@ -220,7 +260,7 @@
             <div>
                 <div style="font-size:10px;font-weight:700;color:#a5b4fc;margin-bottom:4px;text-transform:uppercase;">Choose a video frame</div>
                 <div class="fasttag-cover-video-stage" style="width:100%;aspect-ratio:16/9;max-height:410px;background:#020617;border:1px solid #334155;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;"></div>
-                <div class="fasttag-cover-playback-controls" style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:7px;"></div>
+                <div class="fasttag-cover-playback-controls" style="display:grid;grid-template-columns:auto auto minmax(68px,1fr) auto auto;align-items:center;gap:4px;margin-top:7px;white-space:nowrap;"></div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;min-height:170px;">
                 <div><div style="font-size:10px;font-weight:700;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;">Current cover</div><div class="fasttag-cover-current" style="height:165px;background:#020617;border:1px solid #334155;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;"></div></div>
@@ -253,11 +293,15 @@
         const pasteButton = createActionButton('📋 Paste');
         actions.append(uploadButton, pasteButton);
         const playPauseButton = createActionButton('⏸ Pause');
-        const stepBackButton = createActionButton('◀ Step');
-        const stepForwardButton = createActionButton('Step ▶');
+        const stepBackButton = createActionButton('◀');
+        const stepForwardButton = createActionButton('▶');
+        stepBackButton.title = 'Step backward while paused';
+        stepForwardButton.title = 'Step forward while paused';
+        stepBackButton.style.padding = '7px 9px';
+        stepForwardButton.style.padding = '7px 9px';
         const timeDisplay = document.createElement('span');
-        timeDisplay.style.cssText = `font:600 10.5px ui-monospace,SFMono-Regular,Menlo,monospace;color:${isDark ? '#cbd5e1' : '#334155'};min-width:92px;text-align:center;`;
-        captureButton.style.marginLeft = 'auto';
+        timeDisplay.style.cssText = `font:600 9.5px ui-monospace,SFMono-Regular,Menlo,monospace;color:${isDark ? '#cbd5e1' : '#334155'};min-width:68px;text-align:center;`;
+        captureButton.style.padding = '7px 9px';
         playbackControls.append(playPauseButton, stepBackButton, timeDisplay, stepForwardButton, captureButton);
         const cancelButton = createActionButton('Cancel');
         const saveButton = createActionButton('Set Cover', true);
@@ -409,6 +453,19 @@
         refreshCaptureState();
         const capturePoll = root.setInterval(refreshCaptureState, 300);
         signal.addEventListener('abort', () => root.clearInterval(capturePoll), { once: true });
+        let sizeSaveTimer = null;
+        const queueSizeSave = () => {
+            root.clearTimeout(sizeSaveTimer);
+            sizeSaveTimer = root.setTimeout(() => saveEditorSize(panel), 180);
+        };
+        if (typeof root.ResizeObserver === 'function') {
+            const resizeObserver = new root.ResizeObserver(queueSizeSave);
+            resizeObserver.observe(panel);
+            signal.addEventListener('abort', () => resizeObserver.disconnect(), { once: true });
+        } else {
+            root.addEventListener('mouseup', queueSizeSave, { signal });
+        }
+        signal.addEventListener('abort', () => root.clearTimeout(sizeSaveTimer), { once: true });
 
         closeButton.onclick = closeActiveEditor;
         cancelButton.onclick = closeActiveEditor;
@@ -441,6 +498,7 @@
         configure,
         calculateImageSize,
         formatTime,
+        resolveEditorSize,
         validateImageBlob,
         findClipboardImage,
         normalizeImageBlob,
