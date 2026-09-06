@@ -212,6 +212,234 @@
     function isHudOpen() { return Boolean(floatingHudElement && root.document?.body?.contains(floatingHudElement)); }
     function resetLayoutState() { floatingHudPosition = null; floatingHudSize = null; }
 
+    async function acceptMatch(match, container, sceneId, ctx, popup) {
+        if (!dependencies) throw new Error('[FastTag] Scraper controller is not configured');
+        const {
+            log: ftLog,
+            readScrapeFieldSelection,
+            resolveScrapedStudioResult,
+            resolveScrapedEntityIdsResult,
+            fetchGQL,
+            buildAcceptedSceneStashIds,
+            buildScrapeUpdateInput,
+            sceneCardUpdateFields: SCENE_CARD_UPDATE_FIELDS,
+            syncSceneToApolloCache,
+            setLiveEverythingPopupTitle,
+            refreshSceneCards,
+            recordSaveUsage,
+            deleteSessionCache,
+            toastError,
+            toastSuccess
+        } = dependencies;
+        try {
+            ftLog('ACTION', 'SCRAPE', `Accept match clicked for scene ${sceneId}: "${match.title || ''}"`, {
+                sceneId,
+                title: match.title,
+                studio: match.studio?.name,
+                performersCount: match.performers?.length,
+                tagsCount: match.tags?.length,
+                date: match.date
+            });
+
+            const scrapeSelection = readScrapeFieldSelection(container);
+
+            // 1–3. Resolve studio, performers and tags against stored IDs and the local library.
+            const studioResolution = await resolveScrapedStudioResult(match.studio, scrapeSelection.studio);
+            const performerResolution = await resolveScrapedEntityIdsResult(
+                'performers',
+                match.performers,
+                scrapeSelection.performerIndices,
+                { endpoint: match._sourceEndpoint, name: match._sourceName }
+            );
+            const tagResolution = await resolveScrapedEntityIdsResult('tags', match.tags, scrapeSelection.tagIndices);
+            const studioIdToSet = studioResolution.id;
+            const performerIdsToAdd = performerResolution.ids;
+            const tagIdsToAdd = tagResolution.ids;
+            const resolutionFailures = [
+                ...studioResolution.failures.map(name => `studio “${name}”`),
+                ...performerResolution.failures.map(name => `performer “${name}”`),
+                ...tagResolution.failures.map(name => `tag “${name}”`)
+            ];
+            const scraperSourceName = String(match?._sourceName || 'scraper source');
+            const scraperIdLabel = `${scraperSourceName} ID`;
+
+            // 4. Update Scene & Synchronize Context
+            const effectiveCtx = ctx || popup?._context || dependencies.getActivePopup?.()?._context;
+            const isEverythingModal = popup?.element?.getAttribute('data-popup-type') === 'everything' || popup?.element?.getAttribute('data-popup-type') === 'bulk-everything' || dependencies.getActivePopup?.()?.type === 'everything' || Boolean(effectiveCtx);
+
+            if (isEverythingModal && effectiveCtx) {
+                // Save scraper fields DIRECTLY. Do not route Accept through the general doSave()
+                // mutation because that also includes unrelated fields (for example groups) and can
+                // cause the whole GraphQL mutation to fail on Stash versions with a different schema.
+                // Cover image is deliberately saved in a SECOND mutation so an image-specific error
+                // cannot prevent title/studio/performers/date/details/tags from being saved.
+
+                const sceneRes = await fetchGQL(`
+                    query FastTagAcceptCurrentScene($id: ID!) {
+                        findScene(id: $id) {
+                            id
+                            performers { id }
+                            tags { id }
+                            studio { id }
+                            stash_ids { endpoint stash_id }
+                        }
+                    }
+                `, { id: sceneId });
+
+                if (sceneRes?.errors?.length) {
+                    throw new Error(sceneRes.errors.map(e => e.message).join('; '));
+                }
+
+                const existingPerformerIds = (sceneRes?.data?.findScene?.performers || []).map(p => String(p.id));
+                const existingTagIds = (sceneRes?.data?.findScene?.tags || []).map(t => String(t.id));
+                let stashIdResolution = { stashIds: sceneRes?.data?.findScene?.stash_ids || [], added: false, reason: null };
+                try {
+                    const configRes = await fetchGQL(`query FastTagStashBoxes { configuration { general { stashBoxes { endpoint name } } } }`);
+                    stashIdResolution = buildAcceptedSceneStashIds(
+                        sceneRes?.data?.findScene?.stash_ids,
+                        match,
+                        configRes?.data?.configuration?.general?.stashBoxes
+                    );
+                } catch (error) {
+                    if (match?.remote_site_id || match?.urls?.some?.(url => /^https?:\/\//i.test(url))) {
+                        stashIdResolution.reason = 'the configured scraper endpoint could not be loaded';
+                    }
+                }
+                if (stashIdResolution.reason) resolutionFailures.push(`${scraperIdLabel} (${stashIdResolution.reason})`);
+                const { updateInput, mergedPerformerIds, mergedTagIds } = buildScrapeUpdateInput({
+                    sceneId,
+                    match,
+                    selection: scrapeSelection,
+                    studioIdToSet,
+                    performerIdsToAdd,
+                    tagIdsToAdd,
+                    existingPerformerIds,
+                    existingTagIds
+                });
+
+                const saveRes = await fetchGQL(`
+                    mutation FastTagAcceptSave($input: SceneUpdateInput!) {
+                        sceneUpdate(input: $input) {
+                            ${SCENE_CARD_UPDATE_FIELDS}
+                            title
+                            date
+                        }
+                    }
+                `, { input: updateInput });
+
+                if (saveRes?.errors?.length || !saveRes?.data?.sceneUpdate?.id) {
+                    const msg = saveRes?.errors?.map(e => e.message).join('; ') || 'Stash did not return a saved scene.';
+                    throw new Error(msg);
+                }
+
+                syncSceneToApolloCache(saveRes.data.sceneUpdate);
+                if (scrapeSelection.title && match.title) {
+                    setLiveEverythingPopupTitle(popup, match.title);
+                }
+
+                // Save and verify the StashDB ID independently. Keeping this separate from the
+                // metadata mutation makes any endpoint/ID problem visible without rolling back
+                // title, studio, performer, tag, date or details changes that already succeeded.
+                if (stashIdResolution.added) {
+                    const expectedStashId = stashIdResolution.stashIds[stashIdResolution.stashIds.length - 1];
+                    const stashIdSaveRes = await fetchGQL(`
+                        mutation FastTagAcceptStashId($input: SceneUpdateInput!) {
+                            sceneUpdate(input: $input) {
+                                id
+                                stash_ids { endpoint stash_id }
+                            }
+                        }
+                    `, { input: { id: sceneId, stash_ids: stashIdResolution.stashIds } });
+                    const returnedStashIds = stashIdSaveRes?.data?.sceneUpdate?.stash_ids || [];
+                    const expectedEndpoint = String(expectedStashId.endpoint).replace(/\/+$/, '').toLowerCase();
+                    const idWasSaved = returnedStashIds.some(item =>
+                        String(item?.endpoint || '').replace(/\/+$/, '').toLowerCase() === expectedEndpoint
+                        && String(item?.stash_id || '') === String(expectedStashId.stash_id)
+                    );
+                    if (stashIdSaveRes?.errors?.length || !idWasSaved) {
+                        const reason = stashIdSaveRes?.errors?.map(error => error.message).join('; ')
+                            || 'Stash did not return the accepted ID after saving';
+                        resolutionFailures.push(`${scraperIdLabel} (${reason})`);
+                    }
+                }
+
+                // Save cover separately. If Stash rejects the image value, all other metadata is
+                // already safely committed and the user gets a warning rather than losing everything.
+                let coverSaved = true;
+                if (scrapeSelection.cover && match.image) {
+                    const coverRes = await fetchGQL(`
+                        mutation FastTagAcceptCover($input: SceneUpdateInput!) {
+                            sceneUpdate(input: $input) { id }
+                        }
+                    `, { input: { id: sceneId, cover_image: match.image } });
+                    if (coverRes?.errors?.length || !coverRes?.data?.sceneUpdate?.id) {
+                        coverSaved = false;
+                        console.warn('[FastTag] Cover image save failed:', coverRes?.errors || coverRes);
+                    }
+                }
+
+                // Keep the Edit Everything popup state in sync with what was actually saved.
+                if (typeof effectiveCtx.setSelectedStudio === 'function' && studioIdToSet) {
+                    effectiveCtx.setSelectedStudio(studioIdToSet);
+                }
+                if (typeof effectiveCtx.setSelectedPerformers === 'function') {
+                    effectiveCtx.setSelectedPerformers(new Set(mergedPerformerIds));
+                }
+                if (typeof effectiveCtx.setSelectedTags === 'function') {
+                    effectiveCtx.setSelectedTags(new Set(mergedTagIds));
+                }
+                if (typeof effectiveCtx.setInitialStudio === 'function' && studioIdToSet) {
+                    effectiveCtx.setInitialStudio(studioIdToSet);
+                }
+                if (typeof effectiveCtx.setInitialPerformers === 'function') {
+                    effectiveCtx.setInitialPerformers(new Set(mergedPerformerIds));
+                }
+                if (typeof effectiveCtx.setInitialTags === 'function') {
+                    effectiveCtx.setInitialTags(new Set(mergedTagIds));
+                }
+
+                if (typeof effectiveCtx.fetchColumnData === 'function' && popup) {
+                    if (popup.tagsTable) await effectiveCtx.fetchColumnData('tags', popup.tagsTable, '', new Set(mergedTagIds));
+                    if (popup.performersTable) await effectiveCtx.fetchColumnData('performers', popup.performersTable, '', new Set(mergedPerformerIds));
+                }
+                if (typeof effectiveCtx.renderStudioBar === 'function') await effectiveCtx.renderStudioBar('');
+                if (typeof effectiveCtx.refreshAllUI === 'function') effectiveCtx.refreshAllUI();
+
+                await refreshSceneCards(sceneId);
+                recordSaveUsage();
+                deleteSessionCache(sceneId);
+
+                root._fastTagEverythingScraperOpen = true;
+                const acceptBtn = container ? container.querySelector('#fasttag-scrape-accept-btn') : null;
+                if (acceptBtn) {
+                    acceptBtn.innerHTML = resolutionFailures.length > 0
+                        ? '<span>⚠ Saved with warnings</span>'
+                        : (coverSaved ? '<span>✓ Saved</span>' : '<span>✓ Saved (cover failed)</span>');
+                    acceptBtn.disabled = true;
+                    acceptBtn.style.opacity = '0.7';
+                    acceptBtn.style.cursor = 'default';
+                    acceptBtn.style.background = '#059669';
+                }
+
+                if (resolutionFailures.length > 0) {
+                    const coverNote = coverSaved ? '' : ' The cover also failed to save.';
+                    toastError(`Metadata saved, but FastTag could not apply: ${resolutionFailures.join(', ')}.${coverNote}`);
+                } else if (coverSaved) {
+                    toastSuccess(`Matched & Saved from ${scraperSourceName}!`);
+                } else {
+                    toastError('Metadata saved, but Stash rejected the cover image.');
+                }
+                return;
+            } else {
+                throw new Error('Scraping is only supported from Edit Everything.');
+            }
+        } catch (err) {
+            console.error('[FastTag] Error accepting scrape match:', err);
+            toastError('Failed to apply match: ' + (err?.message || err));
+        }
+    }
+
+
     root.FastTag = root.FastTag || {};
     root.FastTag.scraperController = Object.freeze({
         configure,
@@ -231,6 +459,7 @@
         setHudSize,
         getHudOwnerPopup,
         isHudOpen,
-        resetLayoutState
+        resetLayoutState,
+        acceptMatch
     });
 }(typeof window !== 'undefined' ? window : globalThis));

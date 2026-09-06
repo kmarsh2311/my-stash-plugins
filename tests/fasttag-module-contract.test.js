@@ -54,15 +54,15 @@ assert.ok(mainSource.includes('/plugin/fasttag/assets/fasttag-help.js'), 'help l
 assert.ok(mainSource.includes('/plugin/mypluginrc/assets/fasttag-help.js'), 'help loader should support the installed package ID asset URL');
 assert.ok(fs.existsSync(path.join(pluginDirectory, 'USER_GUIDE.md')), 'offline Markdown user guide should ship with FastTag');
 
-const scraperSaveMutation = mainSource.match(/mutation FastTagAcceptSave[\s\S]*?`, \{ input: updateInput \}\);/)?.[0] || '';
+const scraperSaveMutation = scraperControllerSource.match(/mutation FastTagAcceptSave[\s\S]*?`, \{ input: updateInput \}\);/)?.[0] || '';
 assert.ok(scraperSaveMutation.includes('title'), 'scraper save should return the updated title for live card refresh');
 assert.ok(scraperSaveMutation.includes('date'), 'scraper save should return the updated date for live card refresh');
 assert.ok(
-    mainSource.includes('syncSceneToApolloCache(saveRes.data.sceneUpdate);'),
+    scraperControllerSource.includes('syncSceneToApolloCache(saveRes.data.sceneUpdate);'),
     'scraper save should synchronize returned metadata to the live scene-card cache'
 );
 assert.ok(
-    mainSource.includes('setLiveEverythingPopupTitle(popup, match.title);'),
+    scraperControllerSource.includes('setLiveEverythingPopupTitle(popup, match.title);'),
     'scraper acceptance should update the open popup title immediately'
 );
 assert.ok(
@@ -75,11 +75,11 @@ assert.equal(
     'obsolete single-popup scraper save path should remain removed'
 );
 assert.ok(mainSource.includes('createSerialTaskQueue()'), 'Edit Everything saves should use the serial workflow queue');
-assert.ok(mainSource.includes('resolutionFailures'), 'scraper saves should report unresolved selected entities');
-assert.ok(mainSource.includes('stash_ids { endpoint stash_id }'), 'scraper acceptance should preserve existing scene Stash IDs');
-assert.ok(mainSource.includes('mutation FastTagAcceptStashId'), 'accepted StashDB matches should save their remote ID independently');
-assert.ok(mainSource.includes('stash_ids: stashIdResolution.stashIds'), 'the Stash ID mutation should preserve existing IDs and add the accepted remote ID');
-assert.ok(mainSource.includes('!idWasSaved'), 'scraper acceptance should verify that Stash returned the accepted remote ID');
+assert.ok(scraperControllerSource.includes('resolutionFailures'), 'scraper saves should report unresolved selected entities');
+assert.ok(scraperControllerSource.includes('stash_ids { endpoint stash_id }'), 'scraper acceptance should preserve existing scene Stash IDs');
+assert.ok(scraperControllerSource.includes('mutation FastTagAcceptStashId'), 'accepted StashDB matches should save their remote ID independently');
+assert.ok(scraperControllerSource.includes('stash_ids: stashIdResolution.stashIds'), 'the Stash ID mutation should preserve existing IDs and add the accepted remote ID');
+assert.ok(scraperControllerSource.includes('!idWasSaved'), 'scraper acceptance should verify that Stash returned the accepted remote ID');
 assert.ok(
     mainSource.includes('!form.contains(e.target) && !isTextEntryTarget'),
     'background hotkey blocking must not consume typing in detached FastTag inputs'
@@ -120,7 +120,7 @@ assert.ok(mainSource.includes('activePopup._fastTagClosed = true;'), 'popup clos
 assert.ok(scraperControllerSource.includes('function beginRequest(popup, sceneId)'), 'scrapes should receive a per-popup request generation');
 assert.ok(mainSource.includes('if (!isScraperRequestCurrent(popup, activeSceneId, scrapeRequestId)) return null;'), 'late automatic scrape responses should be discarded');
 assert.ok(mainSource.includes('invalidateScraperRequests(popup);\n            popup.currentSceneId = sceneId;'), 'scene navigation should invalidate requests for the previous scene');
-assert.ok(mainSource.includes('{ endpoint: match._sourceEndpoint, name: match._sourceName }'), 'scraper acceptance should pass source identity into new performer creation');
+assert.ok(scraperControllerSource.includes('{ endpoint: match._sourceEndpoint, name: match._sourceName }'), 'scraper acceptance should pass source identity into new performer creation');
 assert.ok(settingsSource.includes('fasttag-match-fill-performer-images'), 'Match settings should expose missing performer image enrichment');
 assert.ok(mainSource.includes('buildScrapedPerformerPreviewData(performer, match, cachedPerformers)'), 'scraper performer pills should provide local-or-source hover previews');
 assert.ok(mainSource.includes('data-scrape-performer-index='), 'scraper performer pills should be identifiable hover targets');

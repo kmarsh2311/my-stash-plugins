@@ -56,13 +56,13 @@ assert.ok(scraperHudOwnership.includes('floatingHudElement = null;'), 'HUD closu
 // Accept reads the visible field choices once, resolves all selected entities,
 // commits ordinary metadata first, then stores the remote ID and cover in
 // independent mutations so either optional save cannot roll back metadata.
-const scraperAcceptance = section('async function handleAcceptScrapeMatch(', '// --- Smart Suggestions Engine ---');
+const scraperAcceptance = section('async function acceptMatch(', 'root.FastTag = root.FastTag || {};', scraperControllerSource);
 assertBefore(scraperAcceptance, 'const scrapeSelection = readScrapeFieldSelection(container);', 'const studioResolution = await resolveScrapedStudioResult(', 'acceptance must snapshot field choices before asynchronous resolution');
 assertBefore(scraperAcceptance, 'const tagResolution = await resolveScrapedEntityIdsResult(', 'const sceneRes = await fetchGQL(`', 'all selected entities must resolve before scene mutation preparation');
 assertBefore(scraperAcceptance, 'mutation FastTagAcceptSave', 'mutation FastTagAcceptStashId', 'ordinary metadata must save before the accepted remote ID');
 assertBefore(scraperAcceptance, 'mutation FastTagAcceptStashId', 'mutation FastTagAcceptCover', 'the remote ID must save before the independently protected cover');
 assertBefore(scraperAcceptance, 'syncSceneToApolloCache(saveRes.data.sceneUpdate);', 'await refreshSceneCards(sceneId);', 'the local GraphQL cache must update before scene cards are refreshed');
-assertBefore(scraperAcceptance, 'await refreshSceneCards(sceneId);', 'sessionScrapeCache.delete(sceneId);', 'the accepted result cache must only clear after the refreshed scene is available');
+assertBefore(scraperAcceptance, 'await refreshSceneCards(sceneId);', 'deleteSessionCache(sceneId);', 'the accepted result cache must only clear after the refreshed scene is available');
 
 const sceneReload = section('async function loadEditEverythingDataIntoPopup(', 'function renderEverythingAIMatchCard(');
 assertBefore(sceneReload, 'invalidateScraperRequests(popup);', 'popup.currentSceneId = sceneId;', 'scene changes must invalidate old scraper work before changing identity');
