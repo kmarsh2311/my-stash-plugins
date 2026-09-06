@@ -144,7 +144,7 @@ assert.ok(coverEditorSource.includes("EDITOR_SIZE_STORAGE_KEY = 'fasttag_cover_e
 assert.ok(coverEditorSource.includes('grid-template-columns:auto auto minmax(68px,1fr) auto auto'), 'cover playback and capture controls should remain on one line');
 assert.ok(coverEditorSource.includes("padding:7px 12px;min-width:44px"), 'the cover editor frame-step buttons should provide a comfortably wide target');
 assert.ok(!coverEditorSource.includes('Step backward while paused') && !coverEditorSource.includes('Step forward while paused'), 'the frame-step buttons should not display redundant tooltips');
-assert.ok(coverEditorSource.includes('resolveStepSeconds(-1, event.shiftKey)') && coverEditorSource.includes('resolveStepSeconds(1, event.shiftKey)'), 'Shift-clicking the frame controls should jump one second');
+assert.ok(coverEditorSource.includes('resolveStepSeconds(-1, event.shiftKey)') && coverEditorSource.includes('resolveStepSeconds(1, event.shiftKey)'), 'the cover editor arrows should support normal and Shift-click stepping');
 assert.ok(coverEditorSource.includes("pasteButton.textContent = '⌨ Press Ctrl+V / Cmd+V'"), 'blocked clipboard reads should present an explicit keyboard-paste prompt');
 assert.ok(coverEditorSource.includes("panel.focus?.({ preventScroll: true })"), 'the manual paste fallback should focus the cover editor');
 assert.ok(coverEditorSource.includes("root.location?.protocol === 'http:' && root.isSecureContext === false"), 'the clipboard explanation should only identify insecure HTTP connections');

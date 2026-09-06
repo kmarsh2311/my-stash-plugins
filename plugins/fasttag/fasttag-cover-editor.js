@@ -59,7 +59,7 @@
 
     function resolveStepSeconds(direction, shiftKey = false, frameDuration = 1 / 30) {
         const sign = Number(direction) < 0 ? -1 : 1;
-        return sign * (shiftKey ? 1 : Math.max(0, Number(frameDuration) || (1 / 30)));
+        return sign * (shiftKey ? Math.max(0, Number(frameDuration) || (1 / 30)) : 1);
     }
 
     function readBlobAsDataUrl(blob) {
