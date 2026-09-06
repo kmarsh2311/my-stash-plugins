@@ -119,6 +119,8 @@ assert.ok(mainSource.includes('schedulePerformerHoverCardHide(delay = 260)'), 'p
 assert.ok(mainSource.includes("toastError(`AI Parse Error: ${err.message}`, undefined, 4500)"), 'AI Parse error notifications should use the shorter display duration');
 assert.ok(mainSource.includes('FastTagCoverEditor.mountLauncher({'), 'Edit Everything media controls should mount the cover editor launcher');
 assert.ok(mainSource.includes('getCaptureState: () =>'), 'the active media preview should expose safe frame-capture availability');
+assert.ok(mainSource.includes("e.target.closest('#fasttag-cover-editor-hud')"), 'cover-editor interactions should remain inside the owning popup boundary');
+assert.ok(mainSource.includes("#fasttag-create-modal, #fasttag-cover-editor-hud"), 'Escape should be delegated to the cover editor before the owning popup');
 const aiApplyMetadataBlock = mainSource.match(/mutation FastTagAIApplyMetadata[\s\S]*?syncSceneToApolloCache\(metadataRes\.data\.sceneUpdate\);/)?.[0] || '';
 assert.ok(aiApplyMetadataBlock.includes('title date'), 'AI Apply All should return updated title and date');
 assert.ok(aiApplyMetadataBlock.includes('syncSceneToApolloCache'), 'AI Apply All should synchronize metadata to live scene cards');

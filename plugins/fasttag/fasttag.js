@@ -7430,6 +7430,7 @@
                     e.target.closest('#fasttag-sort-dropdown-menu') ||
                     e.target.closest('#fasttag-floating-video-hud') ||
                     e.target.closest('#fasttag-floating-scraper-hud') ||
+                    e.target.closest('#fasttag-cover-editor-hud') ||
                     e.target.closest('#fasttag-performer-hover-card') ||
                     e.target.closest('#fasttag-settings-modal') ||
                     e.target.closest('#fasttag-create-modal') ||
@@ -7453,11 +7454,13 @@
 
             const scraperHud = document.querySelector('#fasttag-floating-scraper-hud');
             const videoHud = document.querySelector('#fasttag-floating-video-hud');
+            const coverEditorHud = document.querySelector('#fasttag-cover-editor-hud');
             const settingsModal = document.querySelector('#fasttag-settings-modal');
             const isInsideAllowed = (el) => Boolean(
                 (popup && popup.contains(el)) ||
                 (scraperHud && scraperHud.contains(el)) ||
                 (videoHud && videoHud.contains(el)) ||
+                (coverEditorHud && coverEditorHud.contains(el)) ||
                 (settingsModal && settingsModal.contains(el))
             );
 
@@ -7481,7 +7484,7 @@
                 return;
             }
 
-            const scrollable = e.target.closest('.tabulator-tableholder, #fasttag-scrape-items-preview, [id$="-quick-actions"], [id*="-chips"], .fasttag-chip-row, textarea');
+            const scrollable = e.target.closest('.tabulator-tableholder, #fasttag-scrape-items-preview, #fasttag-cover-editor-hud, [id$="-quick-actions"], [id*="-chips"], .fasttag-chip-row, textarea');
             if (scrollable && isInsideAllowed(scrollable)) {
                 const hasScrollableY = scrollable.scrollHeight > scrollable.clientHeight;
                 const atTop = scrollable.scrollTop <= 0 && e.deltaY < 0;
@@ -7531,7 +7534,7 @@
 
             // Handle Escape key: 2-stage (Stage 1: clear search if text present; Stage 2: close popup)
             if (e.key === 'Escape') {
-                const subModal = document.querySelector('#fasttag-settings-modal, #fasttag-create-modal, .fasttag-create-dialog-overlay, .fasttag-bulk-confirm-overlay');
+                const subModal = document.querySelector('#fasttag-settings-modal, #fasttag-create-modal, #fasttag-cover-editor-hud, .fasttag-create-dialog-overlay, .fasttag-bulk-confirm-overlay');
                 if (subModal && subModal.style.display !== 'none') return;
 
                 const searchBox = form.querySelector('#everything-global-search, #scenes-popup-global-filter, #scenes-popup-filter, input[type="text"], input[type="search"]');

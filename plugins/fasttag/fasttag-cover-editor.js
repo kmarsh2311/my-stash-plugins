@@ -184,6 +184,7 @@
         panel.setAttribute('aria-label', 'Scene cover editor');
         panel.style.cssText = `position:fixed;z-index:1000007;display:flex;flex-direction:column;overflow:auto;box-sizing:border-box;padding:0;background:${isDark ? '#111827' : '#f8fafc'};color:${isDark ? '#f8fafc' : '#0f172a'};border:1px solid ${isDark ? '#475569' : '#94a3b8'};border-radius:11px;box-shadow:0 22px 55px rgba(0,0,0,.7);font-family:system-ui,-apple-system,sans-serif;`;
         positionEditor(panel, options.anchorElement || options.hostElement);
+        panel.addEventListener('mousedown', event => event.stopPropagation(), { signal });
 
         const header = document.createElement('header');
         header.style.cssText = `display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 11px;border-bottom:1px solid ${isDark ? '#334155' : '#cbd5e1'};cursor:grab;user-select:none;position:sticky;top:0;background:${isDark ? '#111827' : '#f8fafc'};z-index:2;`;
