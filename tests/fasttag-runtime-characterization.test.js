@@ -120,16 +120,16 @@ assert.ok(popupPositioning.includes('focus({ preventScroll: true })'), 'position
 // Every shared listener follows the popup abort signal. Escape clears a search
 // before closing, sidecar/submodal clicks remain inside ownership, and drag or
 // resize completion persists the appropriate layout state.
-const popupListeners = section('function setupPopupListeners(', 'function syncSuggestionsAlignment(');
+const popupListeners = section('function setupListeners(', 'root.FastTag = root.FastTag || {};', popupSource);
 assert.ok(popupListeners.includes("form.addEventListener('submit'"), 'popup submission must be contained');
-assert.ok(popupListeners.includes("window.addEventListener('wheel'"), 'popup wheel containment must remain installed');
+assert.ok(popupListeners.includes("root.addEventListener('wheel'"), 'popup wheel containment must remain installed');
 assert.ok(popupListeners.includes("document.addEventListener('keydown'"), 'popup keyboard containment must remain installed');
 assert.ok(popupListeners.includes("e.target.closest('#fasttag-cover-editor-hud')"), 'Cover Editor interactions must remain within popup ownership');
 const escapeHandling = section("if (e.key === 'Escape')", "if (e.target?.closest?.('#fasttag-cover-editor-hud'))", popupListeners);
 assertBefore(escapeHandling, 'if (searchBox && searchBox.value.trim().length > 0)', 'closePopup();', 'Escape must clear active search text before closing the popup');
 assert.ok(popupListeners.includes("localStorage.setItem('fasttag_everything_pos'"), 'dragging Edit Everything must persist its position');
 assert.ok(popupListeners.includes("localStorage.setItem('fasttag_single_pos'"), 'dragging a single editor must persist its position');
-assert.ok(popupListeners.includes('setSavedPopupSize(form.offsetWidth, form.offsetHeight, popupType);'), 'resize completion must persist popup dimensions');
+assert.ok(popupListeners.includes('setSavedSize(form.offsetWidth, form.offsetHeight, popupType);'), 'resize completion must persist popup dimensions');
 assert.ok((popupListeners.match(/\{ signal \}/g) || []).length >= 8, 'shared event listeners must remain abort-owned');
 
 // Sequential navigation saves dirty metadata before changing scene, checks

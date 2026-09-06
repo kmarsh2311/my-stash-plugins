@@ -83,7 +83,7 @@ assert.ok(scraperControllerSource.includes('mutation FastTagAcceptStashId'), 'ac
 assert.ok(scraperControllerSource.includes('stash_ids: stashIdResolution.stashIds'), 'the Stash ID mutation should preserve existing IDs and add the accepted remote ID');
 assert.ok(scraperControllerSource.includes('!idWasSaved'), 'scraper acceptance should verify that Stash returned the accepted remote ID');
 assert.ok(
-    mainSource.includes('!form.contains(e.target) && !isTextEntryTarget'),
+    popupSource.includes('!form.contains(e.target) && !isTextEntryTarget'),
     'background hotkey blocking must not consume typing in detached FastTag inputs'
 );
 assert.ok(scraperControllerSource.includes('fasttag-scrape-empty-query'), 'zero-result scraper state should provide an editable manual-search field');
@@ -136,9 +136,9 @@ assert.ok(previewSource.includes('coverEditorWasPoppedOut = isVideoPoppedOut;'),
 assert.ok(previewSource.includes('if (restorePopout) togglePopout(true);'), 'closing the cover editor should restore the prior floating-video state');
 assert.ok(coverEditorSource.includes("currentOptions.mediaController?.pause?.();\n                const source = captureState.source"), 'capturing a cover should pause controllable video media first');
 assert.ok(coverEditorSource.includes("const playPauseButton = createActionButton('⏸ Pause')"), 'the cover editor should provide persistent playback controls');
-assert.ok(mainSource.includes("e.target.closest('#fasttag-cover-editor-hud')"), 'cover-editor interactions should remain inside the owning popup boundary');
-assert.ok(mainSource.includes("#fasttag-create-modal, #fasttag-cover-editor-hud"), 'Escape should be delegated to the cover editor before the owning popup');
-assert.ok(mainSource.includes('#fasttag-cover-editor-hud #fasttag-media-container'), 'the relocated cover-editor player should bypass the modal wheel trap for two-way scrubbing');
+assert.ok(popupSource.includes("e.target.closest('#fasttag-cover-editor-hud')"), 'cover-editor interactions should remain inside the owning popup boundary');
+assert.ok(popupSource.includes("#fasttag-create-modal, #fasttag-cover-editor-hud"), 'Escape should be delegated to the cover editor before the owning popup');
+assert.ok(popupSource.includes('#fasttag-cover-editor-hud #fasttag-media-container'), 'the relocated cover-editor player should bypass the modal wheel trap for two-way scrubbing');
 assert.ok(previewSource.includes("progressBarBg.addEventListener('pointerdown'"), 'the full-video progress bar should support drag seeking');
 assert.ok(previewSource.includes('timelineWasPlaying = !currentMedia.paused;'), 'timeline seeking should preserve the prior playback state');
 assert.ok(previewSource.includes("height: 16px; background: transparent"), 'the interactive timeline should provide an accessible pointer target');

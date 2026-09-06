@@ -260,12 +260,493 @@
         });
     }
 
+    function setupListeners(form, signal, onSaveCallback) {
+        if (!dependencies) throw new Error('[FastTag] Popup integration is not configured');
+        const sequentialEditState = dependencies.getSequentialEditState();
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }, { signal });
+
+        setTimeout(() => {
+            root.document.addEventListener('mousedown', (e) => {
+                if (e.target && (
+                    form.contains(e.target) ||
+                    e.target.closest('#fasttag-sort-dropdown-menu') ||
+                    e.target.closest('#fasttag-floating-video-hud') ||
+                    e.target.closest('#fasttag-floating-scraper-hud') ||
+                    e.target.closest('#fasttag-cover-editor-hud') ||
+                    e.target.closest('#fasttag-performer-hover-card') ||
+                    e.target.closest('#fasttag-settings-modal') ||
+                    e.target.closest('#fasttag-create-modal') ||
+                    e.target.closest('#fasttag-scrape-cover-tooltip') ||
+                    e.target.closest('#fasttag-micro-tooltip') ||
+                    e.target.closest('.toastify')
+                )) {
+                    return;
+                }
+                dependencies.closePopup();
+            }, { signal });
+        }, 0);
+
+        root.document.body.classList.add('fasttag-modal-open');
+
+        // Global Wheel Trap for FastTag Modal:
+        // Completely locks background Stash page from scrolling, while allowing popup & sidecar scroll containers to scroll
+        root.addEventListener('wheel', (e) => {
+            const popup = root.document.querySelector('#scenes-popup');
+            if (!popup || popup.style.display === 'none') return;
+
+            const scraperHud = root.document.querySelector('#fasttag-floating-scraper-hud');
+            const videoHud = root.document.querySelector('#fasttag-floating-video-hud');
+            const coverEditorHud = root.document.querySelector('#fasttag-cover-editor-hud');
+            const settingsModal = root.document.querySelector('#fasttag-settings-modal');
+            const isInsideAllowed = (el) => Boolean(
+                (popup && popup.contains(el)) ||
+                (scraperHud && scraperHud.contains(el)) ||
+                (videoHud && videoHud.contains(el)) ||
+                (coverEditorHud && coverEditorHud.contains(el)) ||
+                (settingsModal && settingsModal.contains(el))
+            );
+
+            // 1. Allow video player & preview containers to handle mouse wheel freely for frame scrubbing
+            if (e.target.closest('[id$="-preview-container"], .fasttag-video-preview, video, #fasttag-floating-video-hud, #fasttag-cover-editor-hud #fasttag-media-container, #fasttag-video-container, #fasttag-video-element')) {
+                return;
+            }
+
+            // 2. Check if mouse is over a horizontal scroll container (Studio/Groups bar, Suggestion chips, Recent chips)
+            const hScrollable = e.target.closest('#everything-studio-scroll, #everything-groups-scroll, #everything-studio-half, #everything-groups-half, #everything-sugg-tags-chips, #everything-sugg-performers-chips, [id$="-suggestions-container"], .fasttag-chip-row, [id*="-chips"]');
+            if (hScrollable && isInsideAllowed(hScrollable)) {
+                const target = hScrollable.closest('#everything-studio-scroll, #everything-groups-scroll, #everything-sugg-tags-chips, #everything-sugg-performers-chips, [id$="-suggestions-container"], .fasttag-chip-row, [id*="-chips"]') || hScrollable;
+                let delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+                if (e.deltaMode === 1) delta *= 28;
+                else if (e.deltaMode === 2) delta *= 400;
+                if (delta !== 0) {
+                    target.scrollLeft += delta;
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                return;
+            }
+
+            const scrollable = e.target.closest('.tabulator-tableholder, #fasttag-scrape-items-preview, #fasttag-cover-editor-hud, [id$="-quick-actions"], [id*="-chips"], .fasttag-chip-row, textarea');
+            if (scrollable && isInsideAllowed(scrollable)) {
+                const hasScrollableY = scrollable.scrollHeight > scrollable.clientHeight;
+                const atTop = scrollable.scrollTop <= 0 && e.deltaY < 0;
+                const atBottom = (scrollable.scrollTop + scrollable.clientHeight >= scrollable.scrollHeight - 1) && e.deltaY > 0;
+                if (atTop || atBottom || !hasScrollableY) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            } else if (scraperHud && scraperHud.contains(e.target)) {
+                // Forward the scroll to #fasttag-scrape-items-preview so wheel scrolling works anywhere in the sidecar!
+                const preview = scraperHud.querySelector('#fasttag-scrape-items-preview');
+                if (preview) {
+                    let delta = e.deltaY;
+                    if (e.deltaMode === 1) delta *= 28;
+                    else if (e.deltaMode === 2) delta *= 400;
+                    preview.scrollTop += delta;
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            } else {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }, { passive: false, capture: true, signal });
+
+        // Strictly contain all popup keyboard events so they never bubble out to Stash
+        form.addEventListener('keydown', (e) => {
+            // Alt+V / Option+V to toggle Full Video Stream vs Preview (prevent Mac from typing special character √ into inputs)
+            if (e.altKey && (e.code === 'KeyV' || e.key === 'v' || e.key === 'V' || e.key === '√')) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (typeof root._fastTagActiveToggleVideoMode === 'function') {
+                    root._fastTagActiveToggleVideoMode();
+                }
+                return;
+            }
+
+            e.stopPropagation();
+            const isTyping = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+            if (!isTyping && (e.key === ' ' || e.key === 'Spacebar' || e.key === 'j' || e.key === 'k' || e.key === 'l' || e.key === 'n' || e.key === 'p')) {
+                e.preventDefault();
+            }
+        }, { signal });
+
+        root.document.addEventListener('keydown', (e) => {
+            if (!root.document.body.contains(form)) return;
+
+            // Handle Escape key: 2-stage (Stage 1: clear search if text present; Stage 2: close popup)
+            if (e.key === 'Escape') {
+                const subModal = root.document.querySelector('#fasttag-settings-modal, #fasttag-create-modal, #fasttag-cover-editor-hud, .fasttag-create-dialog-overlay, .fasttag-bulk-confirm-overlay');
+                if (subModal && subModal.style.display !== 'none') return;
+
+                const searchBox = form.querySelector('#everything-global-search, #scenes-popup-global-filter, #scenes-popup-filter, input[type="text"], input[type="search"]');
+                if (searchBox && searchBox.value.trim().length > 0) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const clearBtn = form.querySelector('#everything-global-clear, [id$="-search-clear"]');
+                    if (clearBtn) {
+                        clearBtn.click();
+                    } else {
+                        searchBox.value = '';
+                        searchBox.dispatchEvent(new root.Event('input', { bubbles: true }));
+                    }
+                    searchBox.focus({ preventScroll: true });
+                    return;
+                }
+
+                e.preventDefault();
+                e.stopPropagation();
+                dependencies.closePopup();
+                return;
+            }
+
+            if (e.target?.closest?.('#fasttag-cover-editor-hud')) return;
+
+            // Alt+S for Scrape
+            if (e.altKey && (e.key === 's' || e.key === 'S')) {
+                const scrapeBtn = form.querySelector('.popup-scrape-btn');
+                if (scrapeBtn && !scrapeBtn.disabled) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    scrapeBtn.click();
+                    return;
+                }
+            }
+
+            // Alt+V / Option+V to toggle Full Video Stream vs Preview
+            if (e.altKey && (e.code === 'KeyV' || e.key === 'v' || e.key === 'V' || e.key === '√')) {
+                if (typeof root._fastTagActiveToggleVideoMode === 'function') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    root._fastTagActiveToggleVideoMode();
+                    return;
+                }
+            }
+
+            // Alt+Left / Alt+Right for Sequential
+            if ((sequentialEditState.enabled || dependencies.getActivePopup?.()?._isRandomMode) && e.altKey) {
+                if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const nextBtn = form.querySelector('button[id$="-next-btn"]');
+                    if (nextBtn && !nextBtn.disabled) nextBtn.click();
+                    return;
+                } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const prevBtn = form.querySelector('button[id$="-prev-btn"]');
+                    if (prevBtn && !prevBtn.disabled) prevBtn.click();
+                    return;
+                }
+            }
+
+            // If key event originated OUTSIDE form, block Stash hotkeys from running in the
+            // background, but never consume typing inside detached FastTag inputs (such as
+            // the floating scraper's manual-search field).
+            const isTextEntryTarget = Boolean(e.target && (
+                e.target.isContentEditable
+                || e.target.tagName === 'INPUT'
+                || e.target.tagName === 'TEXTAREA'
+                || e.target.tagName === 'SELECT'
+            ));
+            if (!form.contains(e.target) && !isTextEntryTarget) {
+                const pageNavKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ', 'Spacebar', 'n', 'N', 'p', 'P', 'j', 'J', 'k', 'K', 'l', 'L'];
+                if (pageNavKeys.includes(e.key) && !e.altKey && !e.ctrlKey && !e.metaKey) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                }
+            }
+        }, { capture: true, signal });
+
+        root.document.addEventListener('keydown', (e) => {
+            if (e.defaultPrevented) return;
+            if (e.key === 'Enter') {
+                const isSearchFocused = root.document.activeElement && (root.document.activeElement.tagName === 'INPUT' || root.document.activeElement.tagName === 'TEXTAREA');
+
+                if (isSearchFocused && !e.ctrlKey && !e.metaKey) return;
+
+                if (!isSearchFocused || e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const saveBtn = form.querySelector('button[id$="-save-btn"]');
+                    if (saveBtn) {
+                        saveBtn.click();
+                    } else if (onSaveCallback) {
+                        onSaveCallback();
+                    }
+                }
+            }
+        }, { signal });
+
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+        let startLeft = 0;
+        let startTop = 0;
+        const header = form.querySelector('.popup-header') || form.querySelector('.popup-drag-handle');
+
+        if (header) {
+            header.addEventListener('mousedown', (e) => {
+                if (e.target.closest('input, button, label')) return;
+                isDragging = true;
+                header.style.cursor = 'grabbing';
+                root.document.body.style.userSelect = 'none';
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = form.getBoundingClientRect();
+                startLeft = rect.left;
+                startTop = rect.top;
+            }, { signal });
+
+            root.document.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const dx = e.clientX - startX;
+                    const dy = e.clientY - startY;
+                    let targetX = startLeft + dx;
+                    let targetY = startTop + dy;
+
+                    // Strictly clamp to viewport bounds so the popup stays 100% inside visible screen
+                    const minTop = 8;
+                    const maxTop = Math.max(minTop, root.innerHeight - form.offsetHeight - 8);
+                    const minLeft = 8;
+                    const maxLeft = Math.max(minLeft, root.innerWidth - form.offsetWidth - 8);
+
+                    targetY = Math.max(minTop, Math.min(maxTop, targetY));
+                    targetX = Math.max(minLeft, Math.min(maxLeft, targetX));
+
+                    form.style.left = `${targetX}px`;
+                    form.style.top = `${targetY}px`;
+                }
+            }, { signal });
+
+            root.document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    header.style.cursor = 'grab';
+                    root.document.body.style.userSelect = '';
+                    const popupType = form.getAttribute('data-popup-type') || dependencies.getActivePopup?.()?.type;
+                    if (popupType === 'everything' || popupType === 'bulk-everything') {
+                        try {
+                            localStorage.setItem('fasttag_everything_pos', JSON.stringify({
+                                left: form.style.left,
+                                top: form.style.top
+                            }));
+                        } catch (e) {}
+                    } else {
+                        try {
+                            localStorage.setItem('fasttag_single_pos', JSON.stringify({
+                                left: form.style.left,
+                                top: form.style.top
+                            }));
+                        } catch (e) {}
+                    }
+                    if (sequentialEditState.enabled) {
+                        const rect = form.getBoundingClientRect();
+                        sequentialEditState.popupPosition = { left: rect.left, top: rect.top };
+                    }
+                }
+            }, { signal });
+        }
+
+        // --- Type-to-Search (Omnibox Auto-Focus) & Background Hotkey Blocker ---
+        root.document.addEventListener('keydown', (e) => {
+            const isInputFocused = root.document.activeElement && (root.document.activeElement.tagName === 'INPUT' || root.document.activeElement.tagName === 'TEXTAREA');
+
+            const isSubModalOpen = root.document.querySelector('#fasttag-settings-modal, #fasttag-create-modal');
+            if (isSubModalOpen && isSubModalOpen.style.display !== 'none') return;
+
+            if (!isInputFocused) {
+                if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    const searchBox = form.querySelector('#everything-global-search, #scenes-popup-global-filter, #scenes-popup-filter, input[type="text"], input[type="search"]');
+                    if (searchBox && root.document.body.contains(searchBox)) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.stopImmediatePropagation();
+                        searchBox.focus({ preventScroll: true });
+                        searchBox.value += e.key;
+                        const len = searchBox.value.length;
+                        try { searchBox.setSelectionRange(len, len); } catch (err) {}
+                        searchBox.dispatchEvent(new root.Event('input', { bubbles: true }));
+                        return;
+                    }
+                } else if (e.key === 'Backspace') {
+                    const searchBox = form.querySelector('#everything-global-search, #scenes-popup-global-filter, #scenes-popup-filter, input[type="text"], input[type="search"]');
+                    if (searchBox && root.document.body.contains(searchBox)) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.stopImmediatePropagation();
+                        searchBox.focus({ preventScroll: true });
+                        if (searchBox.value.length > 0) {
+                            searchBox.value = searchBox.value.slice(0, -1);
+                            const len = searchBox.value.length;
+                            try { searchBox.setSelectionRange(len, len); } catch (err) {}
+                            searchBox.dispatchEvent(new root.Event('input', { bubbles: true }));
+                        }
+                        return;
+                    }
+                } else {
+                    const stashHotkeys = [' ', 'Spacebar', 'n', 'N', 'p', 'P', 'j', 'J', 'k', 'K', 'l', 'L'];
+                    if (stashHotkeys.includes(e.key) && !e.altKey && !e.ctrlKey && !e.metaKey) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.stopImmediatePropagation();
+                    }
+                }
+            }
+        }, { capture: true, signal });
+
+        // --- 8-Direction Resizing ---
+        let isResizing = false;
+        let resizeDir = '';
+        let resizeStartX = 0;
+        let resizeStartY = 0;
+        let resizeStartLeft = 0;
+        let resizeStartTop = 0;
+        let resizeStartWidth = 0;
+        let resizeStartHeight = 0;
+
+        const resizeHandles = form.querySelectorAll('.popup-resize-handle');
+        resizeHandles.forEach(handle => {
+            handle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                isResizing = true;
+                resizeDir = handle.getAttribute('data-dir') || '';
+                resizeStartX = e.clientX;
+                resizeStartY = e.clientY;
+                const rect = form.getBoundingClientRect();
+                resizeStartLeft = rect.left;
+                resizeStartTop = rect.top;
+                resizeStartWidth = form.offsetWidth;
+                resizeStartHeight = form.offsetHeight;
+
+                root.document.body.style.cursor = handle.style.cursor;
+                root.document.body.style.userSelect = 'none';
+            }, { signal });
+        });
+
+        root.document.addEventListener('mousemove', (e) => {
+            if (isResizing) {
+                const deltaX = e.clientX - resizeStartX;
+                const deltaY = e.clientY - resizeStartY;
+
+                let newWidth = resizeStartWidth;
+                let newHeight = resizeStartHeight;
+                let newLeft = resizeStartLeft;
+                let newTop = resizeStartTop;
+
+                if (resizeDir.includes('e')) {
+                    newWidth = resizeStartWidth + deltaX;
+                }
+                if (resizeDir.includes('w')) {
+                    newWidth = resizeStartWidth - deltaX;
+                    newLeft = resizeStartLeft + deltaX;
+                }
+                if (resizeDir.includes('s')) {
+                    newHeight = resizeStartHeight + deltaY;
+                }
+                if (resizeDir.includes('n')) {
+                    newHeight = resizeStartHeight - deltaY;
+                    newTop = resizeStartTop + deltaY;
+                }
+
+                // Bounds clamping
+                const minW = 320;
+                const maxW = Math.max(minW, root.innerWidth - 16);
+                const minH = 380;
+                const maxH = Math.max(minH, root.innerHeight - 16);
+                const minTop = 8;
+                const maxBottom = root.innerHeight - 8;
+                const minLeft = 8;
+                const maxRight = root.innerWidth - 8;
+
+                if (newTop < minTop) {
+                    if (resizeDir.includes('n')) {
+                        newHeight = resizeStartHeight - (minTop - resizeStartTop);
+                        newTop = minTop;
+                    }
+                }
+                if (newLeft < minLeft) {
+                    if (resizeDir.includes('w')) {
+                        newWidth = resizeStartWidth - (minLeft - resizeStartLeft);
+                        newLeft = minLeft;
+                    }
+                }
+
+                // South clamping (bottom of screen >= 8px)
+                if (resizeDir.includes('s')) {
+                    if (resizeStartTop + newHeight > maxBottom) {
+                        newHeight = Math.max(minH, maxBottom - resizeStartTop);
+                    }
+                }
+
+                // East clamping (right of screen >= 8px)
+                if (resizeDir.includes('e')) {
+                    if (resizeStartLeft + newWidth > maxRight) {
+                        newWidth = Math.max(minW, maxRight - resizeStartLeft);
+                    }
+                }
+
+                if (newWidth < minW) {
+                    if (resizeDir.includes('w')) newLeft = resizeStartLeft + (resizeStartWidth - minW);
+                    newWidth = minW;
+                } else if (newWidth > maxW) {
+                    if (resizeDir.includes('w')) newLeft = resizeStartLeft - (maxW - resizeStartWidth);
+                    newWidth = maxW;
+                }
+
+                if (newHeight < minH) {
+                    if (resizeDir.includes('n')) newTop = resizeStartTop + (resizeStartHeight - minH);
+                    newHeight = minH;
+                } else if (newHeight > maxH) {
+                    if (resizeDir.includes('n')) newTop = resizeStartTop - (maxH - resizeStartHeight);
+                    newHeight = maxH;
+                }
+
+                form.style.width = `${newWidth}px`;
+                form.style.height = `${newHeight}px`;
+                if (resizeDir.includes('w')) form.style.left = `${newLeft}px`;
+                if (resizeDir.includes('n')) form.style.top = `${newTop}px`;
+
+                if (dependencies.getActiveTableInstance?.()) {
+                    dependencies.getActiveTableInstance?.().redraw(true);
+                }
+                if (typeof form._fastTagOnResize === 'function') {
+                    form._fastTagOnResize();
+                }
+            }
+        }, { signal });
+
+        root.document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                root.document.body.style.cursor = '';
+                root.document.body.style.userSelect = '';
+                const popupType = form.getAttribute('data-popup-type') || (form.querySelector('#everything-columns-container') ? 'everything' : 'single');
+                setSavedSize(form.offsetWidth, form.offsetHeight, popupType);
+                if (dependencies.getActiveTableInstance?.()) {
+                    dependencies.getActiveTableInstance?.().redraw(true);
+                }
+                if (typeof form._fastTagOnResize === 'function') {
+                    form._fastTagOnResize();
+                }
+            }
+        }, { signal });
+    }
+
+
     root.FastTag = root.FastTag || {};
     root.FastTag.popup = Object.freeze({
         configure,
         getSavedSize,
         setSavedSize,
         createShell,
-        positionNearCard
+        positionNearCard,
+        setupListeners
     });
 }(typeof window !== 'undefined' ? window : globalThis));
