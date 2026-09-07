@@ -150,6 +150,8 @@ assert.ok(source.includes('selectTableRowsById(activeTableInstance, selectedIds)
 assert.ok(source.includes('activeTableInstance?._fastTagSingleRowClickBound'), 'single-editor handler cleanup must only remove a previously bound event');
 assert.equal(source.includes('.off("rowSelected")'), false, 'editor setup must not remove Tabulator events it never registered');
 assert.equal(source.includes('.off("rowDeselected")'), false, 'editor setup must not remove Tabulator events it never registered');
+assert.ok(source.includes("table.initialized !== true || typeof table.redraw !== 'function'"), 'editor redraws must wait for Tabulator initialization');
+assert.equal(source.includes('tableInstance.redraw(true);'), false, 'initial table loading must not redraw an uninitialized table directly');
 
 const singleEditorSave = section('function createSingleEditorSaveWorkflow(', 'root.FastTag = root.FastTag || {};', editorSource);
 assertBefore(singleEditorSave, 'const saveSequence = ++pendingSaveSequence;', 'const selectionSnapshot = normalizeIdSet(selectedIds);', 'single-editor saves must claim a sequence before snapshotting selections');

@@ -18,6 +18,12 @@
         return isClosing;
     }
 
+    function redrawTableIfReady(table, force = true) {
+        if (!table || table.initialized !== true || typeof table.redraw !== 'function') return false;
+        table.redraw(force);
+        return true;
+    }
+
     function closeActive(resetSequential = true) {
         if (!dependencies) throw new Error('[FastTag] Popup integration is not configured');
         if (dependencies.coverEditor.closeActiveEditor?.() === false) return false;
@@ -787,9 +793,7 @@
                 if (resizeDir.includes('w')) form.style.left = `${newLeft}px`;
                 if (resizeDir.includes('n')) form.style.top = `${newTop}px`;
 
-                if (dependencies.getActiveTableInstance?.()) {
-                    dependencies.getActiveTableInstance?.().redraw(true);
-                }
+                redrawTableIfReady(dependencies.getActiveTableInstance?.(), true);
                 if (typeof form._fastTagOnResize === 'function') {
                     form._fastTagOnResize();
                 }
@@ -803,9 +807,7 @@
                 root.document.body.style.userSelect = '';
                 const popupType = form.getAttribute('data-popup-type') || (form.querySelector('#everything-columns-container') ? 'everything' : 'single');
                 setSavedSize(form.offsetWidth, form.offsetHeight, popupType);
-                if (dependencies.getActiveTableInstance?.()) {
-                    dependencies.getActiveTableInstance?.().redraw(true);
-                }
+                redrawTableIfReady(dependencies.getActiveTableInstance?.(), true);
                 if (typeof form._fastTagOnResize === 'function') {
                     form._fastTagOnResize();
                 }

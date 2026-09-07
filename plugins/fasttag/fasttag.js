@@ -477,6 +477,12 @@
         });
     }
 
+    function redrawTableIfReady(table, force = true) {
+        if (!table || table.initialized !== true || typeof table.redraw !== 'function') return false;
+        table.redraw(force);
+        return true;
+    }
+
     function loadScriptWithFallback(urls, id) {
         return new Promise((resolve, reject) => {
             if (isTabulatorLoaded()) {
@@ -3109,13 +3115,13 @@
                 setTimeout(() => {
                     if (activePopup?.element) activePopup.element.style.transition = '';
                     if (activeTableInstance) {
-                        try { activeTableInstance.redraw(true); } catch (e) {}
+                        try { redrawTableIfReady(activeTableInstance, true); } catch (e) {}
                     }
                     if (activePopup?.tagsTable) {
-                        try { activePopup.tagsTable.redraw(true); } catch (e) {}
+                        try { redrawTableIfReady(activePopup.tagsTable, true); } catch (e) {}
                     }
                     if (activePopup?.performersTable) {
-                        try { activePopup.performersTable.redraw(true); } catch (e) {}
+                        try { redrawTableIfReady(activePopup.performersTable, true); } catch (e) {}
                     }
                 }, 260);
             }
@@ -8082,8 +8088,8 @@
                 form._fastTagOnResize = () => {
                     refreshAllUI();
                     try {
-                        tagsTable.redraw(false);
-                        performersTable.redraw(false);
+                        redrawTableIfReady(tagsTable, false);
+                        redrawTableIfReady(performersTable, false);
                     } catch (e) {}
                 };
 
@@ -8261,8 +8267,8 @@
 
             makeColumnResizable(popup.columnsContainer, popup.colTags, popup.colPerformers, popup.colResizer, () => {
                 try {
-                    tagsTable.redraw(false);
-                    performersTable.redraw(false);
+                    redrawTableIfReady(tagsTable, false);
+                    redrawTableIfReady(performersTable, false);
                 } catch (e) {}
             }, signal);
 
@@ -8893,7 +8899,7 @@
                         tableInstance.deselectRow();
                     }
                     selectTableRowsById(tableInstance, selIds);
-                    tableInstance.redraw(true);
+                    redrawTableIfReady(tableInstance, true);
 
                     const rawTerm = (popup.globalSearch?.value || '').trim();
                     const bottomCreateEl = popup[type]?.bottomCreateContainer;
