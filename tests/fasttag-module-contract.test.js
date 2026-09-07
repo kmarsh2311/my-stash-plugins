@@ -176,7 +176,7 @@ assert.ok(!coverEditorSource.includes('Step backward while paused') && !coverEdi
 assert.ok(coverEditorSource.includes('bindStepButton(stepBackButton, -1)') && coverEditorSource.includes('bindStepButton(stepForwardButton, 1)'), 'both cover editor arrows should support click-and-hold stepping');
 assert.ok(coverEditorSource.includes('root.setTimeout(repeatStep, 400)') && coverEditorSource.includes('holdUsesShift ? 100 : 150'), 'arrow holds should use a safety delay followed by responsive frame or second repeats');
 assert.ok(coverEditorSource.includes("button.addEventListener('pointercancel', stopHolding") && coverEditorSource.includes("root.addEventListener('blur', stopHolding"), 'interrupted arrow holds should stop safely');
-assert.ok(coverEditorSource.includes("pasteButton.textContent = '⌨ Press Ctrl+V / Cmd+V'"), 'blocked clipboard reads should present an explicit keyboard-paste prompt');
+assert.ok(coverEditorSource.includes("pasteButton.textContent = isCompact ? '📋 Paste' : '⌨ Press Ctrl+V / Cmd+V'"), 'blocked clipboard reads should preserve the compact footer while providing an explicit standard-layout prompt');
 assert.ok(coverEditorSource.includes("panel.focus?.({ preventScroll: true })"), 'the manual paste fallback should focus the cover editor');
 assert.ok(coverEditorSource.includes("root.location?.protocol === 'http:' && root.isSecureContext === false"), 'the clipboard explanation should only identify insecure HTTP connections');
 assert.ok(coverEditorSource.includes('This HTTP network address cannot read the clipboard directly'), 'pressing Paste on an insecure HTTP connection should explain the keyboard fallback');

@@ -393,7 +393,7 @@
         };
         const requestManualPaste = () => {
             manualPastePending = true;
-            pasteButton.textContent = '⌨ Press Ctrl+V / Cmd+V';
+            pasteButton.textContent = isCompact ? '📋 Paste' : '⌨ Press Ctrl+V / Cmd+V';
             const insecureHttp = root.location?.protocol === 'http:' && root.isSecureContext === false;
             setStatus(insecureHttp
                 ? 'This HTTP network address cannot read the clipboard directly. Press Ctrl+V or Cmd+V now.'
