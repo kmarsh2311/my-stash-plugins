@@ -1029,11 +1029,16 @@
                 if (!scraperHeader || !scraperHeaderPrimary || !scraperHeaderActions) return;
                 const containerWidth = targetContainer.getBoundingClientRect?.().width || targetContainer.clientWidth || 0;
                 const compact = containerWidth > 0 && containerWidth < 370;
-                scraperHeader.style.flexDirection = compact ? 'column' : 'row';
+                scraperHeader.style.display = compact ? 'grid' : 'flex';
+                scraperHeader.style.gridTemplateColumns = compact ? 'minmax(0, 1fr)' : '';
+                scraperHeader.style.gridTemplateRows = compact ? '24px 24px' : '';
+                scraperHeader.style.height = compact ? '52px' : 'auto';
+                scraperHeader.style.flexDirection = 'row';
                 scraperHeader.style.alignItems = compact ? 'stretch' : 'center';
                 scraperHeaderPrimary.style.flex = compact ? '0 0 auto' : '1 1 150px';
                 scraperHeaderPrimary.style.width = compact ? '100%' : 'auto';
                 scraperHeaderActions.style.alignSelf = compact ? 'flex-end' : 'auto';
+                scraperHeaderActions.style.justifySelf = compact ? 'end' : 'auto';
             };
             targetContainer._fastTagScraperHeaderResizeObserver?.disconnect?.();
             updateScraperHeaderLayout();

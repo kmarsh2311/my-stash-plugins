@@ -115,7 +115,9 @@ assert.ok(scraperControllerSource.includes('fasttag-scrape-toggle-overflow'), 'l
 assert.ok(scraperControllerSource.includes('const initialResultLimit = getScraperMatchingSettings().initialResultLimit;'), 'large scraper result limits should use the matching preference');
 assert.ok(scraperControllerSource.includes('font-variant-numeric: tabular-nums'), 'scraper navigation counters should use stable-width numerals');
 assert.ok(scraperControllerSource.includes("const compact = containerWidth > 0 && containerWidth < 370;"), 'the scraper header should use an explicit compact layout at narrow HUD widths');
-assert.ok(scraperControllerSource.includes("scraperHeader.style.flexDirection = compact ? 'column' : 'row';"), 'the narrow scraper header should reserve a separate row for its actions');
+assert.ok(scraperControllerSource.includes("scraperHeader.style.display = compact ? 'grid' : 'flex';"), 'the narrow scraper header should use a measured grid instead of wrapping flex controls');
+assert.ok(scraperControllerSource.includes("scraperHeader.style.gridTemplateRows = compact ? '24px 24px' : '';"), 'the narrow scraper header should reserve two explicit control rows');
+assert.ok(scraperControllerSource.includes("scraperHeader.style.height = compact ? '52px' : 'auto';"), 'the compact header must reserve enough height above the search row');
 assert.ok(scraperControllerSource.includes('flex-shrink: 0; max-width: 100%; margin-left: auto;'), 'scraper actions must remain inside the HUD when the header wraps');
 assert.ok(scraperControllerSource.includes('>✕ Dismiss</button>'), 'result dismissal should be clearly labelled away from the navigation arrows');
 assert.ok(scraperControllerSource.includes("value=\"${escapeHtml(match._searchQuery || '')}\""), 'manual scraper search should retain the complete contextual query');
