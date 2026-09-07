@@ -1,6 +1,10 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const source = fs.readFileSync(path.resolve(__dirname, '..', 'plugins', 'fasttag', 'fasttag-help.js'), 'utf8');
 
 global.FastTag = {};
 require('../plugins/fasttag/fasttag-help.js');
@@ -15,5 +19,8 @@ assert.ok(help.searchGuide('cache refresh').some(section => section.id === 'cach
 assert.ok(help.searchGuide('HTTP LAN address').some(section => section.id === 'video'));
 assert.equal(help.searchGuide('words-that-do-not-exist').length, 0);
 assert.equal(help.stripHtml('<p>Hello <strong>world</strong></p>'), 'Hello world');
+assert.ok(source.includes('class="fasttag-help-header"'), 'the guide header should use a plugin-scoped element');
+assert.ok(source.includes('id="fasttag-help-nav" role="navigation"'), 'the guide navigation should avoid host-theme semantic nav rules');
+assert.ok(source.includes('id="fasttag-help-content" role="main"'), 'the guide content should avoid host-theme semantic main rules');
 
 console.log('fasttag-help tests passed');

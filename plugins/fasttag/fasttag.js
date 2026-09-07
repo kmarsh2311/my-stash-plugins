@@ -3021,7 +3021,9 @@
 
     function showCustomMenu(event, sceneId, cardElement) {
         closeMenu();
-        closePopup();
+        // The global context-menu handler already declines to open while a FastTag
+        // popup is active. Avoid full popup cleanup here: it refreshes every Refract
+        // card and makes all of its metadata icons flash merely from right-clicking.
 
         menuAbortController = new AbortController();
         const { signal } = menuAbortController;

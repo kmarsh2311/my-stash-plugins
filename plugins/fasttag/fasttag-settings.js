@@ -518,7 +518,10 @@
         if (themeSelect) {
             themeSelect.addEventListener('change', (e) => {
                 setThemePreference(e.target.value);
-                modal.className = `theme-${getEffectiveTheme()}`;
+                // Most settings colours are deliberately inline so host themes
+                // cannot override them. Rebuild the modal to apply the new palette.
+                closeModal();
+                setTimeout(() => open(options), 0);
                 showToast(`Theme set to ${e.target.value}`, 'info');
             });
         }

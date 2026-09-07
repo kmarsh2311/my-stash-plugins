@@ -197,5 +197,7 @@ assert.ok(aiApplyMetadataBlock.includes('title date'), 'AI Apply All should retu
 assert.ok(aiApplyMetadataBlock.includes('syncSceneToApolloCache'), 'AI Apply All should synchronize metadata to live scene cards');
 assert.ok(mainSource.includes("btn.dataset.aiActionState === 'pending' || btn.dataset.aiActionState === 'complete'"), 'AI entity pills should ignore repeated clicks while saving or after completion');
 assert.ok(mainSource.includes('btn.textContent = `✓ ${label}`;'), 'AI entity pills should render one exact completion tick rather than prefixing repeated ticks');
+const customMenuOpenBlock = mainSource.slice(mainSource.indexOf('function showCustomMenu('), mainSource.indexOf('function showCustomMenu(') + 500);
+assert.equal(customMenuOpenBlock.includes('closePopup();'), false, 'opening the context menu must not trigger a Refract-wide card refresh');
 
 console.log('fasttag-module-contract tests passed');

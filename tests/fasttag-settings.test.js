@@ -38,6 +38,7 @@ assert.match(source, /setScraperMatchingSettings\(\{[\s\S]*initialResultLimit/, 
 assert.match(source, /resetScraperMatchingSettings\(\)/, 'matching defaults should remain restorable');
 assert.match(source, /promptDebugModeWarningDialog\(\)/, 'enabling debug mode should retain its warning gate');
 assert.match(source, /await callGeminiAPI\(/, 'Gemini connection testing should remain asynchronous');
+assert.match(source, /setThemePreference\(e\.target\.value\);[\s\S]*closeModal\(\);[\s\S]*setTimeout\(\(\) => open\(options\), 0\)/, 'theme changes should rebuild the inline-coloured settings modal immediately');
 
 const falseGetter = () => false;
 const noOp = () => {};

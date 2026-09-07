@@ -112,14 +112,14 @@
         overlay.style.cssText = 'position:fixed;inset:0;z-index:100000001;background:rgba(0,0,0,.72);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;font-family:system-ui,-apple-system,sans-serif;';
         overlay.innerHTML = `
             <div role="dialog" aria-modal="true" aria-labelledby="fasttag-help-title" style="width:min(1080px,96vw);height:min(780px,92vh);display:flex;flex-direction:column;background:${colors.bg};color:${colors.text};border:1px solid ${colors.border};border-radius:12px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.65);">
-                <header style="display:flex;align-items:center;gap:12px;padding:13px 16px;background:${colors.panel};border-bottom:1px solid ${colors.border};">
+                <div class="fasttag-help-header" style="display:flex;align-items:center;gap:12px;padding:13px 16px;background:${colors.panel};border-bottom:1px solid ${colors.border};">
                     <div style="min-width:0;flex:1"><div id="fasttag-help-title" style="font-size:16px;font-weight:800;">⚡ FastTag User Guide</div><div style="font-size:10.5px;color:${colors.muted};">Version ${options.version || '4.3.0'} · Available offline</div></div>
                     <input id="fasttag-help-search" type="search" placeholder="Search the guide…" aria-label="Search the FastTag guide" style="width:min(330px,42vw);padding:7px 10px;border-radius:7px;border:1px solid ${colors.border};background:${colors.card};color:${colors.text};outline:none;">
                     <button id="fasttag-help-close" type="button" aria-label="Close guide" style="border:0;background:transparent;color:${colors.muted};font-size:19px;cursor:pointer;padding:5px;">✕</button>
-                </header>
+                </div>
                 <div style="display:flex;flex:1;min-height:0;">
-                    <nav id="fasttag-help-nav" aria-label="Guide sections" style="width:225px;max-width:32%;padding:9px;overflow-y:auto;background:${colors.panel};border-right:1px solid ${colors.border};"></nav>
-                    <main id="fasttag-help-content" tabindex="0" style="flex:1;min-width:0;padding:20px 24px;overflow-y:auto;line-height:1.55;font-size:13px;"></main>
+                    <div id="fasttag-help-nav" role="navigation" aria-label="Guide sections" style="width:225px;max-width:32%;padding:9px;overflow-y:auto;background:${colors.panel};border-right:1px solid ${colors.border};"></div>
+                    <div id="fasttag-help-content" role="main" tabindex="0" style="flex:1;min-width:0;padding:20px 24px;overflow-y:auto;line-height:1.55;font-size:13px;"></div>
                 </div>
             </div>`;
         documentRef.body.appendChild(overlay);
