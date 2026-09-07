@@ -91,4 +91,6 @@ switching back to the released live plugin.
   remains responsible for releasing all handlers.
 - Initial Edit Everything table rendering could request redraws before Tabulator
   emitted its `tableBuilt` event. Commit `1839674` guards every coordinator and
-  popup redraw against Tabulator's initialization state. Browser retest pending.
+  popup redraw against Tabulator's initialization state. After reloading the
+  plugin and clearing the console, opening and closing both the Performer and
+  Studio editors produced no new console messages.
