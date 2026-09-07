@@ -55,7 +55,7 @@ Never enable it while the live FastTag plugin is enabled.
 - [x] Organized-state updates
 - [x] Preview/full-video switching and scrubbing
 - [ ] Floating video and scraper HUD lifecycle
-- [ ] Cover Editor capture, upload, paste/drop, save, and navigation
+- [x] Cover Editor capture, upload, paste/drop, save, and navigation
 - [ ] Standard Stash scene-card refresh
 - [ ] Refract scene-card refresh
 - [ ] Right-click metadata menu and native media context menu
@@ -138,6 +138,8 @@ switching back to the released live plugin.
 - Cover Editor playback and intentional pausing worked normally. Capturing the
   paused frame, setting it as the Stash cover, keeping the editor open after
   saving, and moving to the next scene without closing the HUD all passed.
+  Upload, clipboard paste, drag-and-drop, and saving each resulting cover also
+  worked correctly.
 - Scraper search population and adjustment, false-positive/result-limit
   controls, candidate navigation, dismissal, and cross-scene loading behaviour
   worked without new functional errors. CSP messages for optional third-party
