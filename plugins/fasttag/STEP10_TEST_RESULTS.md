@@ -45,7 +45,7 @@ Never enable it while the live FastTag plugin is enabled.
 - [x] Sequential navigation with dirty metadata
 - [x] Random-scene navigation and history
 - [x] Bulk single-entity editing
-- [ ] Bulk Edit Everything
+- [x] Bulk Edit Everything
 - [ ] Bulk partial-failure reporting and retry behavior
 - [ ] Scraper search, filtering, navigation, and dismissal
 - [ ] Scraper field checkboxes and acceptance
@@ -115,3 +115,5 @@ switching back to the released live plugin.
   controls traversed the same scenes in the correct history order.
 - Bulk single-entity Tag editing added a tag to every selected scene and then
   removed it from every selected scene; the affected cards updated correctly.
+- Bulk Edit Everything applied and removed metadata across all selected scenes,
+  reported the expected outcome, and produced no browser-console errors.
