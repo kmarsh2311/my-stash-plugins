@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `b16b4a3`
+- Runtime source commit: `4cc0c50`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -200,8 +200,10 @@ switching back to the released live plugin.
   request, preventing the embedded loading flash. Browser retest pending.
 - Cover Editor status messages alternated between one and two lines while
   scrubbing, moving the Upload, Paste, Cancel, and Set Cover controls vertically.
-  Commit `b16b4a3` reserves a stable two-line status area while allowing unusually
-  long errors to expand when necessary. Browser retest pending.
+ Commit `b16b4a3` reserves a stable two-line status area while allowing unusually
+  Browser testing found a smaller residual movement when longer text exceeded
+  that minimum. Commit `4cc0c50` gives the status area a fixed scrollable height,
+  so no message can move the actions below it. Browser retest pending.
 - Accepting a StashDB result stored the correct remote scene ID. With Cover
   selected it also saved the remote cover; with Cover cleared it retained the
   existing cover while still storing the ID. No warnings or console errors
