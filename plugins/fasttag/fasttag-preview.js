@@ -287,6 +287,14 @@
         hostContainer.style.background = '#0f172a';
         hostContainer.style.boxShadow = 'none';
         hostContainer.style.cursor = 'pointer';
+        if (isEverythingHost) {
+            FastTagCoverEditor.restoreForHost?.({
+                hostElement: hostContainer,
+                anchorElement: hostContainer.closest('form') || hostContainer,
+                sceneId,
+                currentCoverUrl: ''
+            });
+        }
 
         // Media container holds the active video/img, progress bar, cue badge, and top-right controls
         const mediaContainer = document.createElement('div');

@@ -282,6 +282,11 @@
         panel.setAttribute('role', 'dialog');
         panel.setAttribute('aria-label', 'Scene cover editor');
         panel.style.cssText = `position:fixed;z-index:1000007;display:flex;flex-direction:column;overflow:auto;resize:both;box-sizing:border-box;padding:0;background:${isDark ? '#111827' : '#f8fafc'};color:${isDark ? '#f8fafc' : '#0f172a'};border:1px solid ${isDark ? '#475569' : '#94a3b8'};border-radius:11px;box-shadow:0 22px 55px rgba(0,0,0,.7);font-family:system-ui,-apple-system,sans-serif;`;
+        if (currentOptions.restoring) {
+            panel.style.opacity = '0';
+            panel.style.transform = 'scale(.985)';
+            panel.style.transition = 'opacity .16s ease, transform .16s ease';
+        }
         positionEditor(panel, currentOptions.anchorElement || currentOptions.hostElement, isCompact);
         panel.addEventListener('mousedown', event => event.stopPropagation(), { signal });
 
@@ -325,6 +330,19 @@
         const actions = body.querySelector('.fasttag-cover-actions');
         const fileInput = body.querySelector('.fasttag-cover-file');
         const footer = body.querySelector('.fasttag-cover-footer');
+        if (currentOptions.restoring) {
+            const restoringOverlay = document.createElement('div');
+            restoringOverlay.className = 'fasttag-cover-restoring-overlay';
+            restoringOverlay.textContent = 'Preparing video…';
+            restoringOverlay.style.cssText = 'position:absolute;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:#020617;color:#94a3b8;font-size:11px;font-weight:700;pointer-events:none;';
+            videoStage.appendChild(restoringOverlay);
+            const reveal = () => {
+                panel.style.opacity = '1';
+                panel.style.transform = 'scale(1)';
+            };
+            if (typeof root.requestAnimationFrame === 'function') root.requestAnimationFrame(reveal);
+            else root.setTimeout(reveal, 0);
+        }
         const renderCurrentCover = coverUrl => {
             currentBox.innerHTML = coverUrl
                 ? `<img src="${escapeAttribute(coverUrl)}" alt="Current scene cover" style="width:100%;height:100%;object-fit:contain;">`
@@ -669,6 +687,8 @@
             activeEditor.hostElement = nextOptions.hostElement;
             activeEditor.mediaController = nextOptions.mediaController;
             activeEditor.awaitingNavigation = false;
+            activeEditor.restoring = false;
+            videoStage.querySelector('.fasttag-cover-restoring-overlay')?.remove();
             renderCurrentCover(nextOptions.currentCoverUrl || nextOptions.mediaController?.getCoverUrl?.());
             resetCandidate();
             setStatus('Opening the full video for frame capture…');
@@ -683,6 +703,7 @@
             mediaController: currentOptions.mediaController,
             compactMode: isCompact,
             awaitingNavigation: false,
+            restoring: Boolean(currentOptions.restoring),
             hasUnsavedChanges: () => Boolean(candidateDataUrl || preparingImage || saving),
             isSaving: () => saving,
             showStatus: message => setStatus(message, false, true),
@@ -740,9 +761,9 @@
         };
         if (options.beforeElement?.parentNode === options.container) options.container.insertBefore(button, options.beforeElement);
         else options.container.appendChild(button);
-        if (activeEditor?.awaitingNavigation) {
+        if (activeEditor?.awaitingNavigation || (activeEditor?.restoring && activeEditor.hostElement === options.hostElement)) {
             root.setTimeout(() => {
-                if (button.isConnected && activeEditor?.awaitingNavigation) activeEditor.rebindScene?.(options);
+                if (button.isConnected && (activeEditor?.awaitingNavigation || activeEditor?.restoring)) activeEditor.rebindScene?.(options);
             }, 0);
         } else if (!activeEditor && dependencies?.isPersistedOpen?.()) {
             root.setTimeout(() => {
@@ -750,6 +771,19 @@
             }, 0);
         }
         return button;
+    }
+
+    function restoreForHost(options) {
+        if (activeEditor || !dependencies?.isPersistedOpen?.() || !options?.hostElement) return false;
+        const placeholderController = {
+            getCaptureState: () => ({ available: false, reason: 'Preparing video…' }),
+            getPlaybackState: () => ({ available: false, paused: true, currentTime: 0, duration: 0 }),
+            mountForCoverEditor() {},
+            switchToFullVideo() {},
+            releaseFromCoverEditor() {}
+        };
+        openEditor({ ...options, restoring: true, mediaController: placeholderController });
+        return true;
     }
 
     root.FastTag = root.FastTag || {};
@@ -765,6 +799,7 @@
         captureVideoFrame,
         captureMediaFrame,
         mountLauncher,
+        restoreForHost,
         openEditor,
         closeActiveEditor,
         prepareForSceneNavigation,

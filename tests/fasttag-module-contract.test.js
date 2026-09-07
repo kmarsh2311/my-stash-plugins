@@ -189,6 +189,8 @@ assert.ok(previewSource.includes("if (!saveOptions?.keepEditorOpen && !signal.ab
 assert.ok(popupSource.includes('if (dependencies.coverEditor.closeActiveEditor?.(false, true) === false) return false;'), 'parent-popup closure should respect the unsaved-cover warning while remembering an open Cover Editor');
 assert.ok(coverEditorSource.includes("dependencies.setPersistedOpen?.(true);") && coverEditorSource.includes("dependencies?.setPersistedOpen?.(false);"), 'the Cover Editor should remember whether it was explicitly left open or closed');
 assert.ok(coverEditorSource.includes("button.isConnected && !activeEditor && dependencies?.isPersistedOpen?.()"), 'Edit Everything should restore a Cover Editor that was left open');
+assert.ok(previewSource.includes('FastTagCoverEditor.restoreForHost?.({'), 'a remembered Cover Editor shell should open before scene media lookup completes');
+assert.ok(coverEditorSource.includes("restoringOverlay.textContent = 'Preparing video…'"), 'the early restored shell should explain that its video is being prepared');
 assert.ok(previewSource.includes("hostContainer.style.height = 'auto';"), 'loading a new scene should restore a preview container collapsed by the cover editor');
 assert.ok(!previewSource.includes('if (signal.aborted || !hostContainer.isConnected) return;'), 'aborted scene previews should still restore their connected host before navigation');
 assert.ok((mainSource.match(/FastTagCoverEditor\.prepareForSceneNavigation\?\.\(\) === false/g) || []).length >= 4, 'all Edit Everything scene-navigation paths should hand the open cover editor to the next scene');
