@@ -10172,7 +10172,10 @@
             return;
         }
 
-        closePopup(false);
+        // Direct card-icon clicks reach this path with no existing popup. Avoid
+        // running full popup cleanup in that case because it refreshes every
+        // Refract scene card and makes all card icons flash.
+        if (activePopup) closePopup(false);
 
         const signal = beginPopupSession();
 
