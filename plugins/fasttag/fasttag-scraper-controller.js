@@ -205,6 +205,49 @@
         });
     }
 
+    function attachHudDragging(hudElement, headerElement) {
+        if (!hudElement || !headerElement) return;
+        const document = root.document;
+        headerElement.style.cursor = 'grab';
+        let isDragging = false;
+        let startX = 0, startY = 0, startL = 0, startT = 0;
+        const onMouseMove = event => {
+            if (!isDragging || !hudElement) return;
+            const newLeft = Math.max(8, Math.min(root.innerWidth - hudElement.offsetWidth - 8, startL + event.clientX - startX));
+            const newTop = Math.max(8, Math.min(root.innerHeight - hudElement.offsetHeight - 8, startT + event.clientY - startY));
+            hudElement.style.left = `${newLeft}px`;
+            hudElement.style.top = `${newTop}px`;
+            hudElement.style.right = 'auto';
+            const position = { top: `${newTop}px`, left: `${newLeft}px` };
+            setHudPosition(position);
+            try {
+                root.localStorage.setItem('fasttag_scraper_hud_pos', JSON.stringify(position));
+            } catch (error) {}
+        };
+        const onMouseUp = () => {
+            isDragging = false;
+            hudElement._isDragging = false;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            document.body.style.userSelect = '';
+            headerElement.style.cursor = 'grab';
+        };
+        headerElement.onmousedown = event => {
+            if (event.target.closest?.('button, a, input, select')) return;
+            const rect = hudElement.getBoundingClientRect();
+            isDragging = true;
+            hudElement._isDragging = true;
+            startX = event.clientX;
+            startY = event.clientY;
+            startL = rect.left;
+            startT = rect.top;
+            headerElement.style.cursor = 'grabbing';
+            document.body.style.userSelect = 'none';
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        };
+    }
+
     function getHudElement() { return floatingHudElement; }
     function setHudElement(element) { floatingHudElement = element || null; }
     function getHudPosition() { return floatingHudPosition; }
@@ -305,6 +348,7 @@
         const isDark = dependencies?.getEffectiveTheme?.() !== 'light';
         targetContainer.style.display = 'flex';
         targetContainer.innerHTML = `
+            ${detachedHud ? `<div id="fasttag-scrape-loading-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-shrink:0;min-height:38px;padding:8px 12px;border-bottom:1px solid ${isDark ? '#334155' : '#e2e8f0'};background:${isDark ? '#0f172a' : '#f8fafc'};color:${isDark ? '#e0e7ff' : '#312e81'};font-size:11.5px;font-weight:700;user-select:none;"><span>⚡ Searching for a match…</span><span style="color:${isDark ? '#64748b' : '#94a3b8'};font-size:9.5px;font-weight:600;">Drag to move</span></div>` : ''}
             <div data-fasttag-scrape-loading="true" role="status" aria-live="polite" style="box-sizing: border-box; width: 100%; min-height: 190px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 24px; overflow: hidden; background: ${isDark ? '#1e293b' : '#ffffff'}; color: ${isDark ? '#cbd5e1' : '#475569'};">
                 <div aria-hidden="true" style="position: relative; width: 190px; height: 75px; display: flex; align-items: flex-end; justify-content: center; overflow: hidden;">
                     <div class="fasttag-scrape-lens" style="position: absolute; top: 14px; left: calc(50% - 17px); z-index: 3; font-size: 31px; line-height: 1; filter: drop-shadow(0 5px 8px rgba(15,23,42,.3));">🔍</div>
@@ -318,6 +362,10 @@
                 <span style="max-width: 280px; text-align: center; font-size: 10.5px; line-height: 1.4; color: ${isDark ? '#94a3b8' : '#64748b'};">Checking fingerprints, titles and scene details for the strongest match.</span>
             </div>
         `;
+        if (detachedHud) {
+            attachHudDragging(detachedHud, detachedHud.querySelector?.('#fasttag-scrape-loading-header'));
+            attachResizeHandles(detachedHud);
+        }
         if (popup?.scrapeBtn) {
             popup.scrapeBtn.disabled = true;
             popup.scrapeBtn.innerHTML = '<span>⏳ Scraping...</span>';
@@ -1218,51 +1266,7 @@
             // Wire dragging when in detached floating window
             if (isDetached && floatingScraperHudElement) {
                 const headerEl = targetContainer.querySelector('#fasttag-scrape-header');
-                if (headerEl) {
-                    headerEl.style.cursor = 'grab';
-                    let isDragging = false;
-                    let startX = 0, startY = 0, startL = 0, startT = 0;
-                    const onMouseMove = (e) => {
-                        if (!isDragging || !floatingScraperHudElement) return;
-                        const dx = e.clientX - startX;
-                        const dy = e.clientY - startY;
-                        const newLeft = Math.max(8, Math.min(root.innerWidth - floatingScraperHudElement.offsetWidth - 8, startL + dx));
-                        const newTop = Math.max(8, Math.min(root.innerHeight - floatingScraperHudElement.offsetHeight - 8, startT + dy));
-                        floatingScraperHudElement.style.left = `${newLeft}px`;
-                        floatingScraperHudElement.style.top = `${newTop}px`;
-                        floatingScraperHudElement.style.right = 'auto';
-                        floatingScraperHudPosition = { top: `${newTop}px`, left: `${newLeft}px` };
-                        setHudPosition(floatingScraperHudPosition);
-                        try {
-                            root.localStorage.setItem('fasttag_scraper_hud_pos', JSON.stringify(floatingScraperHudPosition));
-                        } catch (e) {}
-                    };
-                    const onMouseUp = () => {
-                        isDragging = false;
-                        if (floatingScraperHudElement) floatingScraperHudElement._isDragging = false;
-                        document.removeEventListener('mousemove', onMouseMove);
-                        document.removeEventListener('mouseup', onMouseUp);
-                        document.body.style.userSelect = '';
-                        if (headerEl) headerEl.style.cursor = 'grab';
-                    };
-                    headerEl.onmousedown = (e) => {
-                        if (e.target.closest('button, a, input, select')) return;
-                        const rect = floatingScraperHudElement.getBoundingClientRect();
-                        const isResizeZone = (rect.right - e.clientX) <= 24 && (rect.bottom - e.clientY) <= 24;
-                        if (isResizeZone) return;
-
-                        isDragging = true;
-                        if (floatingScraperHudElement) floatingScraperHudElement._isDragging = true;
-                        startX = e.clientX;
-                        startY = e.clientY;
-                        startL = rect.left;
-                        startT = rect.top;
-                        headerEl.style.cursor = 'grabbing';
-                        document.body.style.userSelect = 'none';
-                        document.addEventListener('mousemove', onMouseMove);
-                        document.addEventListener('mouseup', onMouseUp);
-                    };
-                }
+                attachHudDragging(floatingScraperHudElement, headerEl);
             }
 
             // Wire vertical resize dragging (allows smooth split resizing between scraper card and tags table)

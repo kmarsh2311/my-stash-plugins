@@ -84,6 +84,7 @@ assert.doesNotMatch(loadingPopup.scraperCardContainer.innerHTML, /Previous scene
 assert.equal(loadingPopup.scrapeBtn.disabled, true);
 
 const connectedHudElements = new Set();
+const loadingHudHeader = { style: {}, onmousedown: null };
 global.innerWidth = 1200;
 global.innerHeight = 800;
 global.document = {
@@ -96,6 +97,11 @@ global.document = {
         innerHTML: '',
         offsetWidth: 390,
         offsetHeight: 480,
+        querySelector: selector => selector === '#fasttag-scrape-loading-header' ? loadingHudHeader : null,
+        querySelectorAll: () => [],
+        appendChild() {},
+        addEventListener() {},
+        setAttribute() {},
         remove() { connectedHudElements.delete(this); this.isConnected = false; }
     }),
     querySelector: () => null
@@ -120,6 +126,9 @@ assert.equal(controller.showLoadingState(loadingPopup), true);
 const detachedLoadingHud = controller.getHudElement();
 assert.ok(detachedLoadingHud && connectedHudElements.has(detachedLoadingHud), 'remembered detached mode should create the HUD before scraping begins');
 assert.match(detachedLoadingHud.innerHTML, /Scraping new scene/);
+assert.match(detachedLoadingHud.innerHTML, /Drag to move/);
+assert.equal(loadingHudHeader.style.cursor, 'grab');
+assert.equal(typeof loadingHudHeader.onmousedown, 'function', 'the loading HUD header should remain draggable');
 assert.equal(loadingPopup.scraperCardContainer.style.display, 'none', 'detached loading should not flash inside the main popup');
 controller.closeHud();
 
