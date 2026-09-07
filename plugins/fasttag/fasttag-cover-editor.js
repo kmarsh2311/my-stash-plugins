@@ -8,7 +8,7 @@
     const DEFAULT_EDITOR_HEIGHT = 740;
     const DEFAULT_COMPACT_EDITOR_HEIGHT = 545;
     const EDITOR_SIZE_STORAGE_KEY = 'fasttag_cover_editor_size';
-    const COMPACT_EDITOR_SIZE_STORAGE_KEY = 'fasttag_cover_editor_size_compact_v2';
+    const COMPACT_EDITOR_SIZE_STORAGE_KEY = 'fasttag_cover_editor_size_compact_v3';
     let dependencies = null;
     let activeEditor = null;
 
@@ -225,6 +225,7 @@
         }
         activeEditor = null;
         if (!preserveOpenState) dependencies?.setPersistedOpen?.(false);
+        editor.restoreBaseSize?.();
         saveEditorSize(editor.element, editor.compactMode);
         editor.mediaController?.releaseFromCoverEditor?.();
         editor.abortController.abort();
@@ -685,6 +686,12 @@
             hasUnsavedChanges: () => Boolean(candidateDataUrl || preparingImage || saving),
             isSaving: () => saving,
             showStatus: message => setStatus(message, false, true),
+            restoreBaseSize: () => {
+                if (!compactStatusExpanded || !compactBaseHeight) return;
+                panel.style.top = `${compactBaseTop}px`;
+                panel.style.height = `${compactBaseHeight}px`;
+                compactStatusExpanded = false;
+            },
             beginNavigation,
             rebindScene
         };
