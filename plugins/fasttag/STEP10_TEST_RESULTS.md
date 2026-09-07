@@ -53,7 +53,7 @@ Never enable it while the live FastTag plugin is enabled.
 - [x] Scraper performer image enrichment
 - [ ] Gemini bridge start, parse, timeout, and fallback behavior
 - [x] Organized-state updates
-- [ ] Preview/full-video switching and scrubbing
+- [x] Preview/full-video switching and scrubbing
 - [ ] Floating video and scraper HUD lifecycle
 - [ ] Cover Editor capture, upload, paste/drop, save, and navigation
 - [ ] Standard Stash scene-card refresh
@@ -185,7 +185,8 @@ switching back to the released live plugin.
   and adds window-level completion fallbacks. Commit `77d3316` further enforces
   that ordinary Edit Everything and single-editor videos always resume their
   loop after seeking; only the Cover Editor preserves an intentional paused
-  state for frame capture. No Play button was added. Browser retest pending.
+  state for frame capture. No Play button was added. Browser testing confirmed
+  switching, looping playback, wheel scrubbing, and timeline dragging all work.
 - Accepting a StashDB result stored the correct remote scene ID. With Cover
   selected it also saved the remote cover; with Cover cleared it retained the
   existing cover while still storing the ID. No warnings or console errors
