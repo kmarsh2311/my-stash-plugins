@@ -206,5 +206,7 @@ assert.ok((mainSource.match(/Finished \$\{/g) || []).length >= 2, 'single and Ev
 assert.ok((mainSource.match(/cancelBtn\.style\.display = isLast \? 'none' : 'block';/g) || []).length >= 2, 'single and Everything workflows should hide the redundant Close button on the final sequential scene');
 assert.ok((mainSource.match(/classList\.toggle\('fasttag-btn-finished-pulse', isLast\)/g) || []).length >= 2, 'both final sequential actions should use the gentle completion pulse');
 assert.ok(mainSource.includes('@media (prefers-reduced-motion: reduce)'), 'the final-action pulse should respect reduced-motion preferences');
+const everythingSequentialButtonBlock = mainSource.slice(mainSource.indexOf('} else if (sequentialEditState.enabled) {', mainSource.indexOf('const updateSaveButton = () =>')), mainSource.indexOf('} else {', mainSource.indexOf('} else if (sequentialEditState.enabled) {', mainSource.indexOf('const updateSaveButton = () =>'))));
+assert.ok(everythingSequentialButtonBlock.includes("popup.cancelBtn.style.display = isLast ? 'none' : 'block';"), 'Edit Everything must apply final-scene hiding inside its Sequential branch');
 
 console.log('fasttag-module-contract tests passed');

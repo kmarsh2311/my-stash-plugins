@@ -6580,7 +6580,7 @@
             const updateSaveButton = () => {
                 if (popup._isRandomMode) {
                     if (popup.cancelBtn) {
-                        popup.cancelBtn.style.display = isLast ? 'none' : 'block';
+                        popup.cancelBtn.style.display = 'block';
                         popup.cancelBtn.style.flex = 'none';
                         popup.cancelBtn.style.width = 'auto';
                         popup.cancelBtn.style.fontWeight = '500';
@@ -6604,7 +6604,7 @@
                     const isLast = idx !== -1 && idx === cards.length - 1;
 
                     if (popup.cancelBtn) {
-                        popup.cancelBtn.style.display = 'block';
+                        popup.cancelBtn.style.display = isLast ? 'none' : 'block';
                         popup.cancelBtn.style.flex = 'none';
                         popup.cancelBtn.style.width = 'auto';
                         popup.cancelBtn.style.fontWeight = '500';
