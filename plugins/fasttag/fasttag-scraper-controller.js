@@ -751,8 +751,8 @@
             targetContainer.innerHTML = `
                 <div style="background: ${isDark ? 'rgba(15, 23, 42, 0.95)' : '#f8fafc'}; border: ${isDetached ? 'none' : (isDark ? '1px solid rgba(99, 102, 241, 0.5)' : '1px solid #818cf8')}; border-radius: 8px; box-shadow: ${isDetached ? 'none' : '0 10px 25px rgba(0,0,0,0.5)'}, inset 0 0 0 1px rgba(255,255,255,0.06); padding: 9px 12px 6px 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 7px; ${isDetached ? 'height: 100%; min-height: 0; flex: 1 1 auto;' : 'height: auto;'} font-family: system-ui, -apple-system, sans-serif; transition: all 0.2s ease;">
                     <!-- Top Navigation & Link Header -->
-                    <div id="fasttag-scrape-header" style="display: flex; align-items: center; justify-content: space-between; gap: 6px; user-select: none; white-space: nowrap; overflow: visible; min-height: 26px; padding: 1px 0;">
-                        <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: ${isDark ? '#e0e7ff' : '#312e81'}; min-width: 0; flex: 0 0 auto; overflow: visible;">
+                    <div id="fasttag-scrape-header" style="display: flex; align-items: center; justify-content: space-between; gap: 4px 6px; flex-wrap: wrap; user-select: none; white-space: nowrap; overflow: hidden; min-height: 26px; padding: 1px 0;">
+                        <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: ${isDark ? '#e0e7ff' : '#312e81'}; min-width: 0; flex: 1 1 150px; overflow: hidden;">
                             <span style="font-size: 13px; line-height: 1; flex-shrink: 0;">⚡</span>
                             <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 0 48px; width: 48px;" title="${escapeHtml(match._sourceName || 'StashDB')} Match">${escapeHtml(match._sourceName || 'StashDB')} Match</span>
                             ${results.length > 1 ? `
@@ -763,7 +763,7 @@
                                 </div>
                             ` : ''}
                         </div>
-                        <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0; white-space: nowrap;">
+                        <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0; max-width: 100%; margin-left: auto; white-space: nowrap;">
                             ${remoteResultUrl ? `
                                 <a href="${remoteResultUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 600; color: #818cf8; text-decoration: none; padding: 2.5px 6px; border-radius: 4px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); transition: background 0.15s ease; white-space: nowrap; line-height: 1;" title="Open in ${escapeHtml(match._sourceName || 'source')} in new tab">
                                     <span>🔗</span><span>↗</span>
