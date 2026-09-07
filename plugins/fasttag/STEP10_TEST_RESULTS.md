@@ -49,7 +49,7 @@ Never enable it while the live FastTag plugin is enabled.
 - [x] Bulk partial-failure reporting and retry behavior
 - [x] Scraper search, filtering, navigation, and dismissal
 - [x] Scraper field checkboxes and acceptance
-- [ ] Separate StashDB ID and cover saving
+- [x] Separate StashDB ID and cover saving
 - [ ] Scraper performer image enrichment
 - [ ] Gemini bridge start, parse, timeout, and fallback behavior
 - [x] Organized-state updates
@@ -141,3 +141,7 @@ switching back to the released live plugin.
   source maps were classified as harmless developer-tool noise.
 - Scraper acceptance respected individual field selections: checked metadata
   saved and refreshed immediately, while unchecked fields remained unchanged.
+- Accepting a StashDB result stored the correct remote scene ID. With Cover
+  selected it also saved the remote cover; with Cover cleared it retained the
+  existing cover while still storing the ID. No warnings or console errors
+  occurred.
