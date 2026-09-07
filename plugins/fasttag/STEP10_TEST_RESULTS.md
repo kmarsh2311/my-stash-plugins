@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `e2574ef`
+- Runtime source commit: `dd95e82`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -144,9 +144,11 @@ switching back to the released live plugin.
 - Performer-image enrichment populated missing performer artwork successfully
   during scraper acceptance and produced no console errors.
 - At narrow saved HUD widths, the fixed-width scraper header could place Accept
-  beyond the right edge. Commit `e2574ef` lets the action group wrap inside the
-  HUD while retaining a single row whenever sufficient width is available.
-  Browser retest pending.
+  beyond the right edge. The first wrapping adjustment kept it horizontally
+  bounded but allowed its second line to sit behind the search row. Commit
+  `dd95e82` uses an explicit measured two-row layout below 370px, reserving the
+  action row's height while retaining one row at normal widths. Browser retest
+  pending.
 - Accepting a StashDB result stored the correct remote scene ID. With Cover
   selected it also saved the remote cover; with Cover cleared it retained the
   existing cover while still storing the ID. No warnings or console errors
