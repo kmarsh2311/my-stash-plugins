@@ -135,6 +135,9 @@ switching back to the released live plugin.
 
 ### Confirmed working
 
+- Cover Editor playback and intentional pausing worked normally. Capturing the
+  paused frame, setting it as the Stash cover, keeping the editor open after
+  saving, and moving to the next scene without closing the HUD all passed.
 - Scraper search population and adjustment, false-positive/result-limit
   controls, candidate navigation, dismissal, and cross-scene loading behaviour
   worked without new functional errors. CSP messages for optional third-party
