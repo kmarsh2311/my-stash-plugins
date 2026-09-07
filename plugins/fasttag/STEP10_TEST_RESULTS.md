@@ -52,7 +52,7 @@ Never enable it while the live FastTag plugin is enabled.
 - [ ] Separate StashDB ID and cover saving
 - [ ] Scraper performer image enrichment
 - [ ] Gemini bridge start, parse, timeout, and fallback behavior
-- [ ] Organized-state updates
+- [x] Organized-state updates
 - [ ] Preview/full-video switching and scrubbing
 - [ ] Floating video and scraper HUD lifecycle
 - [ ] Cover Editor capture, upload, paste/drop, save, and navigation
@@ -78,4 +78,10 @@ switching back to the released live plugin.
   searched row was selected. It also exposed Tabulator warnings caused by
   missing-row lookups and attempts to remove unregistered selection events.
   Commit `4a2e2c2` fixes all three sources and adds regression assertions. The
-  isolated test package was refreshed from that commit; browser retest pending.
+  isolated test package was refreshed from that commit. After reloading plugins
+  and hard-refreshing, the same add/remove and sequential actions produced no
+  console errors or repeated Tabulator warnings.
+- The Organised pill and search action both worked. Automatic organisation did
+  not initially run because **Auto-Mark Scene as Organised** was disabled; once
+  enabled, metadata changes correctly marked scenes Organised in both the
+  single editor and Edit Everything.
