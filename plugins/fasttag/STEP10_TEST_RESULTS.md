@@ -63,7 +63,7 @@ Never enable it while the live FastTag plugin is enabled.
 - [x] Dark and light themes
 - [x] Desktop, tablet-width, and phone-width layouts
 - [x] Browser console checked for new FastTag errors
-- [ ] Stash server log checked for new FastTag errors
+- [x] Stash server log checked for new FastTag errors
 
 ## Results and defects
 
@@ -164,6 +164,10 @@ switching back to the released live plugin.
   stopping the working Gemini bridge. Successful live parsing confirmed the
   connection and request path, while the historical timeout entries confirmed
   that failures are surfaced and later requests remain usable.
+- The final Stash server log contained no FastTag errors. Its visible errors
+  were unrelated: macOS notification delivery failures and community Path
+  Parser failures (`findTags` using invalid modifier `EQUALS`, plus a
+  `Scene.Create.Post` hook reporting `id is not defined`).
 - Scraper search population and adjustment, false-positive/result-limit
   controls, candidate navigation, dismissal, and cross-scene loading behaviour
   worked without new functional errors. CSP messages for optional third-party
