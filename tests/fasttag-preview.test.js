@@ -42,6 +42,10 @@ assert.equal(preview.calculateSeekTarget(150, 100, 200, 120), 30);
 assert.equal(preview.calculateSeekTarget(50, 100, 200, 120), 0);
 assert.equal(preview.calculateSeekTarget(400, 100, 200, 120), 120);
 assert.equal(preview.calculateSeekTarget(150, 100, 0, 120), null);
+assert.equal(preview.shouldResumeAfterTimelineSeek(false, false, false), true, 'a playing video should resume after timeline seeking');
+assert.equal(preview.shouldResumeAfterTimelineSeek(true, true, false), true, 'a wheel-scrub pause should retain its pending resume through timeline seeking');
+assert.equal(preview.shouldResumeAfterTimelineSeek(true, true, true), false, 'Shift freeze should remain paused after timeline seeking');
+assert.equal(preview.shouldResumeAfterTimelineSeek(true, false, false), false, 'an intentionally paused video should remain paused');
 
 for (const [screenWidth, expected] of [
     [2400, { width: '760px', height: '428px' }],

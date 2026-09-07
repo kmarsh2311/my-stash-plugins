@@ -153,7 +153,8 @@ assert.ok(popupSource.includes("e.target.closest('#fasttag-cover-editor-hud')"),
 assert.ok(popupSource.includes("#fasttag-create-modal, #fasttag-cover-editor-hud"), 'Escape should be delegated to the cover editor before the owning popup');
 assert.ok(popupSource.includes('#fasttag-cover-editor-hud #fasttag-media-container'), 'the relocated cover-editor player should bypass the modal wheel trap for two-way scrubbing');
 assert.ok(previewSource.includes("progressBarBg.addEventListener('pointerdown'"), 'the full-video progress bar should support drag seeking');
-assert.ok(previewSource.includes('timelineWasPlaying = !currentMedia.paused;'), 'timeline seeking should preserve the prior playback state');
+assert.ok(previewSource.includes('timelineWasPlaying = shouldResumeAfterTimelineSeek('), 'timeline seeking should preserve normal and pending wheel-scrub playback state');
+assert.ok(previewSource.includes("window.addEventListener('pointerup', finishTimelineSeek"), 'timeline seeking should finish even when pointer capture is lost outside the bar');
 assert.ok(previewSource.includes("height: 16px; background: transparent"), 'the interactive timeline should provide an accessible pointer target');
 assert.ok(previewSource.includes("progressBarTrack.style.height = '7px'"), 'the visible timeline should grow while hovered or dragged');
 assert.ok(previewSource.includes('}, 3500);'), 'the interactive timeline should remain visible longer after use');

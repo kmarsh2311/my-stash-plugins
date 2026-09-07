@@ -37,6 +37,10 @@
         return ratio * length;
     }
 
+    function shouldResumeAfterTimelineSeek(isPaused, wheelScrubWasPlaying, shiftHeld) {
+        return !isPaused || (Boolean(wheelScrubWasPlaying) && !shiftHeld);
+    }
+
     function getDefaultPopoutSize() {
         const screenWidth = root.innerWidth;
         let targetWidth = 600;
@@ -368,6 +372,7 @@
 
         let isTimelineSeeking = false;
         let timelineWasPlaying = false;
+        let timelineMedia = null;
         const seekTimelineToPointer = event => {
             if (!hasControllableVideo()) return;
             const rect = progressBarBg.getBoundingClientRect();
@@ -382,7 +387,15 @@
             event.preventDefault();
             event.stopPropagation();
             isTimelineSeeking = true;
-            timelineWasPlaying = !currentMedia.paused;
+            timelineMedia = currentMedia;
+            timelineWasPlaying = shouldResumeAfterTimelineSeek(
+                currentMedia.paused,
+                scrubbing && wasPlaying,
+                shiftHeld
+            );
+            clearTimeout(resumeTimer);
+            scrubbing = false;
+            wasPlaying = false;
             clearTimeout(progressBarTimer);
             progressBarTrack.style.height = '7px';
             progressBarTrack.style.background = 'rgba(0,0,0,0.72)';
@@ -398,19 +411,26 @@
         }, { signal });
         const finishTimelineSeek = (event, applyFinalPosition = true) => {
             if (!isTimelineSeeking) return;
-            event.preventDefault();
-            event.stopPropagation();
+            event?.preventDefault?.();
+            event?.stopPropagation?.();
             if (applyFinalPosition) seekTimelineToPointer(event);
             isTimelineSeeking = false;
             try { progressBarBg.releasePointerCapture(event.pointerId); } catch (error) {}
-            if (timelineWasPlaying && currentMedia?.tagName === 'VIDEO') currentMedia.play().catch(() => {});
+            const mediaToResume = timelineMedia;
+            if (timelineWasPlaying && mediaToResume === currentMedia && mediaToResume?.tagName === 'VIDEO') {
+                mediaToResume.play().catch(() => {});
+            }
             timelineWasPlaying = false;
+            timelineMedia = null;
             progressBarTrack.style.height = progressBarBg.matches(':hover') ? '7px' : '4px';
             progressBarTrack.style.background = progressBarBg.matches(':hover') ? 'rgba(0,0,0,0.72)' : 'rgba(0,0,0,0.62)';
             showProgressBar();
         };
         progressBarBg.addEventListener('pointerup', finishTimelineSeek, { signal });
         progressBarBg.addEventListener('pointercancel', event => finishTimelineSeek(event, false), { signal });
+        progressBarBg.addEventListener('lostpointercapture', event => finishTimelineSeek(event, false), { signal });
+        window.addEventListener('pointerup', finishTimelineSeek, { signal });
+        window.addEventListener('pointercancel', event => finishTimelineSeek(event, false), { signal });
         progressBarBg.addEventListener('click', event => {
             event.preventDefault();
             event.stopPropagation();
@@ -1314,6 +1334,7 @@
         selectScrubStep,
         calculateScrubTarget,
         calculateSeekTarget,
+        shouldResumeAfterTimelineSeek,
         getDefaultPopoutSize,
         calculateVideoPopoutPosition,
         extractMediaUrlsFromCard,
