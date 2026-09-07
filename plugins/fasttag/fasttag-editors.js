@@ -102,6 +102,46 @@
         };
     }
 
+    function snapshotEverythingSelection(selection = {}) {
+        return Object.freeze({
+            sceneId: selection.sceneId,
+            tagIds: Object.freeze(Array.from(normalizeIdSet(selection.tagIds))),
+            performerIds: Object.freeze(Array.from(normalizeIdSet(selection.performerIds))),
+            studioId: selection.studioId ? String(selection.studioId) : null,
+            groupIds: Object.freeze(Array.from(normalizeIdSet(selection.groupIds)))
+        });
+    }
+
+    function createEditEverythingSaveWorkflow(options = {}) {
+        if (typeof options.enqueue !== 'function') {
+            throw new TypeError('[FastTag] Edit Everything save workflow requires a serial queue');
+        }
+        if (typeof options.execute !== 'function') {
+            throw new TypeError('[FastTag] Edit Everything save workflow requires an execute function');
+        }
+
+        const onLatestSuccess = typeof options.onLatestSuccess === 'function'
+            ? options.onLatestSuccess
+            : () => {};
+        let pendingSaveSequence = 0;
+
+        function save(selection, context = null) {
+            const saveSequence = ++pendingSaveSequence;
+            const selectionSnapshot = snapshotEverythingSelection(selection);
+            const runSave = async () => {
+                const success = await options.execute(selectionSnapshot, context);
+                if (saveSequence !== pendingSaveSequence) return success;
+                if (success) {
+                    await onLatestSuccess(selectionSnapshot, context);
+                }
+                return success;
+            };
+            return options.enqueue(runSave);
+        }
+
+        return Object.freeze({ save });
+    }
+
     root.FastTag = root.FastTag || {};
     root.FastTag.editors = Object.freeze({
         normalizeIdSet,
@@ -109,6 +149,8 @@
         calculateBulkSelectionDelta,
         applyBulkSelectionDelta,
         createSingleEditorSaveWorkflow,
-        runBatchedSceneUpdates
+        runBatchedSceneUpdates,
+        snapshotEverythingSelection,
+        createEditEverythingSaveWorkflow
     });
 }(typeof window !== 'undefined' ? window : globalThis));

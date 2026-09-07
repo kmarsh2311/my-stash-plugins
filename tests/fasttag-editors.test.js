@@ -92,6 +92,75 @@ Promise.all([firstSave, secondSave]).then(async results => {
         { processedCount: 2, updatedCount: 1, failedCount: 1, totalCount: 3 },
         { processedCount: 3, updatedCount: 2, failedCount: 1, totalCount: 3 }
     ]);
+
+    const everythingEvents = [];
+    const latestEverythingSaves = [];
+    let releaseEverythingFirst;
+    const everythingFirstGate = new Promise(resolve => { releaseEverythingFirst = resolve; });
+    let queueTail = Promise.resolve();
+    const enqueue = task => {
+        const queued = queueTail.then(task, task);
+        queueTail = queued.then(() => undefined, () => undefined);
+        return queued;
+    };
+    const everythingWorkflow = editors.createEditEverythingSaveWorkflow({
+        enqueue,
+        execute: async selection => {
+            everythingEvents.push(`${selection.sceneId}-start`);
+            if (selection.sceneId === 'scene-1') await everythingFirstGate;
+            everythingEvents.push(`${selection.sceneId}-end`);
+            return true;
+        },
+        onLatestSuccess: (selection, context) => latestEverythingSaves.push({ selection, context })
+    });
+
+    const everythingTags = new Set([1]);
+    const everythingFirst = everythingWorkflow.save({
+        sceneId: 'scene-1',
+        tagIds: everythingTags,
+        performerIds: [2],
+        studioId: 3,
+        groupIds: [4]
+    }, { message: 'first' });
+    everythingTags.add(9);
+    const everythingSecond = everythingWorkflow.save({
+        sceneId: 'scene-2',
+        tagIds: [5],
+        performerIds: [6],
+        studioId: null,
+        groupIds: [7]
+    }, { message: 'second' });
+
+    await Promise.resolve();
+    assert.deepEqual(everythingEvents, ['scene-1-start'], 'Edit Everything saves should execute serially');
+    releaseEverythingFirst();
+    assert.deepEqual(await Promise.all([everythingFirst, everythingSecond]), [true, true]);
+    assert.deepEqual(everythingEvents, ['scene-1-start', 'scene-1-end', 'scene-2-start', 'scene-2-end']);
+    assert.equal(latestEverythingSaves.length, 1, 'only the newest queued save should run latest-success effects');
+    assert.deepEqual(latestEverythingSaves[0].selection, {
+        sceneId: 'scene-2',
+        tagIds: ['5'],
+        performerIds: ['6'],
+        studioId: null,
+        groupIds: ['7']
+    });
+    assert.deepEqual(latestEverythingSaves[0].context, { message: 'second' });
+
+    const frozenSnapshot = editors.snapshotEverythingSelection({
+        sceneId: 'scene-3',
+        tagIds: [1, '1'],
+        performerIds: [2],
+        studioId: 3,
+        groupIds: [4]
+    });
+    assert.ok(Object.isFrozen(frozenSnapshot) && Object.isFrozen(frozenSnapshot.tagIds));
+    assert.deepEqual(frozenSnapshot, {
+        sceneId: 'scene-3',
+        tagIds: ['1'],
+        performerIds: ['2'],
+        studioId: '3',
+        groupIds: ['4']
+    });
     console.log('fasttag-editors tests passed');
 }).catch(error => {
     console.error(error);

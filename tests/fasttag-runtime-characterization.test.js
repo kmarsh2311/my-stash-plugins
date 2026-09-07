@@ -202,12 +202,21 @@ assert.ok(sequentialNavigation.includes('finally {\n            popup._isNavigat
 
 // Edit Everything snapshots each save and serializes mutations. Only the newest
 // completed save may become the editor's clean baseline.
-const saveWorkflow = section('let pendingEverythingSaveSeq = 0;', 'const onSuggestionActivated = async (sug) =>');
-assertBefore(saveWorkflow, 'const saveSeq = ++pendingEverythingSaveSeq;', 'const variables = {', 'each save must obtain a sequence before snapshotting selections');
-assert.ok(saveWorkflow.includes('const targetSceneId = currentSceneId;'), 'a queued save must retain its original scene ID');
-assert.ok(saveWorkflow.includes('if (saveSeq !== pendingEverythingSaveSeq) return true;'), 'an older save must not replace the newest clean baseline');
-assert.ok(saveWorkflow.includes('latestEverythingSavePromise = enqueueEverythingSave(runSave);'), 'scene mutations must use the serial queue');
+const saveWorkflow = section('let latestEverythingSavePromise = Promise.resolve(true);', 'const onSuggestionActivated = async (sug) =>');
+assert.ok(saveWorkflow.includes('const everythingSaveWorkflow = createEditEverythingSaveWorkflow({'), 'Edit Everything saves must delegate queue ownership to the editor module');
+assert.ok(saveWorkflow.includes('enqueue: createSerialTaskQueue(),'), 'Edit Everything saves must retain their serial task queue');
+assertBefore(saveWorkflow, 'syncSceneToApolloCache(res.data.sceneUpdate);', 'return true;', 'every successful scene mutation must update the live cache');
+assert.ok(saveWorkflow.includes('initialTagIds = new Set(selection.tagIds);'), 'only the extracted latest-success stage may replace the clean baseline');
+assert.ok(saveWorkflow.includes('sceneId: currentSceneId,'), 'a queued save must snapshot its original scene ID');
+assert.ok(saveWorkflow.includes('tagIds: selectedTagIds,'), 'a queued save must snapshot its current tag selection');
+assert.ok(saveWorkflow.includes('latestEverythingSavePromise = everythingSaveWorkflow.save({'), 'the coordinator must retain the latest queued promise for refresh and navigation');
 assert.ok(saveWorkflow.includes('return latestEverythingSavePromise;'), 'callers must be able to await the queued mutation');
+
+const everythingSaveCoordinator = section('function createEditEverythingSaveWorkflow(', 'root.FastTag = root.FastTag || {};', editorSource);
+assertBefore(everythingSaveCoordinator, 'const saveSequence = ++pendingSaveSequence;', 'const selectionSnapshot = snapshotEverythingSelection(selection);', 'each Edit Everything save must claim a sequence before snapshotting selections');
+assertBefore(everythingSaveCoordinator, 'await options.execute(selectionSnapshot, context);', 'if (saveSequence !== pendingSaveSequence) return success;', 'queued mutations must complete before stale latest-success effects are rejected');
+assertBefore(everythingSaveCoordinator, 'if (saveSequence !== pendingSaveSequence) return success;', 'await onLatestSuccess(selectionSnapshot, context);', 'an older queued save must not replace the newest clean baseline');
+assert.ok(everythingSaveCoordinator.includes('return options.enqueue(runSave);'), 'Edit Everything mutations must execute through the supplied serial queue');
 
 // Edit Everything keeps editable and initial sets separate, exposes those sets
 // through one popup-owned context, and replaces both from a freshly loaded

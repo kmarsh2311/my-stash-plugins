@@ -198,7 +198,8 @@
         calculateBulkSelectionDelta,
         applyBulkSelectionDelta,
         createSingleEditorSaveWorkflow,
-        runBatchedSceneUpdates
+        runBatchedSceneUpdates,
+        createEditEverythingSaveWorkflow
     } = FastTagEditors;
 
     FastTagDiagnostics.configure({ getUsageCount: () => getUsageCount() });
@@ -8091,24 +8092,11 @@
                     } catch (e) {}
                 };
 
-            let pendingEverythingSaveSeq = 0;
-            const enqueueEverythingSave = createSerialTaskQueue();
             let latestEverythingSavePromise = Promise.resolve(true);
-            const doSave = (customSuccessMessage = null, shouldCloseScraper = false) => {
-                const saveSeq = ++pendingEverythingSaveSeq;
-                const targetSceneId = currentSceneId;
-                const autoMarkOrg = getAutoMarkOrganized();
-                const variables = {
-                    id: targetSceneId,
-                    tag_ids: Array.from(selectedTagIds),
-                    performer_ids: Array.from(selectedPerformerIds),
-                    studio_id: selectedStudioId || null,
-                    groups: Array.from(selectedGroupIds).map(gid => ({ group_id: gid }))
-                };
-                if (autoMarkOrg) variables.organized = true;
-
-                const runSave = async () => {
-                    if (shouldCloseScraper && !window._fastTagEverythingScraperOpen) {
+            const everythingSaveWorkflow = createEditEverythingSaveWorkflow({
+                enqueue: createSerialTaskQueue(),
+                execute: async (selection, context) => {
+                    if (context.shouldCloseScraper && !window._fastTagEverythingScraperOpen) {
                         if (popup.scraperCardContainer) {
                             popup.scraperCardContainer.innerHTML = '';
                             popup.scraperCardContainer.style.display = 'none';
@@ -8116,6 +8104,7 @@
                         hideScrapeCoverTooltip();
                     }
 
+                    const autoMarkOrg = context.autoMarkOrganized;
                     const mutation = `
                         mutation SceneUpdateEverything($id: ID!, $tag_ids: [ID!], $performer_ids: [ID!], $studio_id: ID, $groups: [SceneGroupInput!]${autoMarkOrg ? ', $organized: Boolean' : ''}) {
                             sceneUpdate(input: {
@@ -8129,56 +8118,76 @@
                             }
                         }
                     `;
+                    const variables = {
+                        id: selection.sceneId,
+                        tag_ids: selection.tagIds,
+                        performer_ids: selection.performerIds,
+                        studio_id: selection.studioId,
+                        groups: selection.groupIds.map(groupId => ({ group_id: groupId }))
+                    };
+                    if (autoMarkOrg) variables.organized = true;
+
                     try {
                         const res = await fetchGQL(mutation, variables);
-
                         if (res?.data?.sceneUpdate?.id) {
                             syncSceneToApolloCache(res.data.sceneUpdate);
                             if (autoMarkOrg && popup._organizedController) {
                                 popup._organizedController.update(true);
                             }
-                            if (saveSeq !== pendingEverythingSaveSeq) return true;
-                            initialTagIds = new Set(selectedTagIds);
-                            initialPerformerIds = new Set(selectedPerformerIds);
-                            initialStudioId = selectedStudioId;
-                            initialGroupIds = new Set(selectedGroupIds);
-
-                            selectedTagIds.forEach(id => {
-                                const row = tagsTable.getRow(id);
-                                if (row) addRecentEntry('tags', row.getData());
-                            });
-                            selectedPerformerIds.forEach(id => {
-                                const row = performersTable.getRow(id);
-                                if (row) addRecentEntry('performers', row.getData());
-                            });
-                            if (selectedStudioId) {
-                                const allStudios = getCachedOrNull('studios') || [];
-                                const st = allStudios.find(s => String(s.id) === String(selectedStudioId));
-                                if (st) addRecentEntry('studios', st);
-                            }
-                            selectedGroupIds.forEach(gid => {
-                                const allGroups = getCachedOrNull('groups') || [];
-                                const grp = allGroups.find(g => String(g.id) === String(gid));
-                                if (grp) addRecentEntry('groups', grp);
-                            });
-
-                            resetRefractSceneCards(targetSceneId);
-
-                            refreshSceneCardsDebounced(targetSceneId);
-                            recordSaveUsage();
-                            toastSuccess(customSuccessMessage || 'Scene saved successfully');
-                            updateSaveButton();
                             return true;
                         }
                     } catch (e) {
                         toastError('Failed to save scene', e);
                     }
                     return false;
-                };
+                },
+                onLatestSuccess: (selection, context) => {
+                    initialTagIds = new Set(selection.tagIds);
+                    initialPerformerIds = new Set(selection.performerIds);
+                    initialStudioId = selection.studioId;
+                    initialGroupIds = new Set(selection.groupIds);
 
-                latestEverythingSavePromise = enqueueEverythingSave(runSave);
+                    selection.tagIds.forEach(id => {
+                        const row = tagsTable.getRow(id);
+                        if (row) addRecentEntry('tags', row.getData());
+                    });
+                    selection.performerIds.forEach(id => {
+                        const row = performersTable.getRow(id);
+                        if (row) addRecentEntry('performers', row.getData());
+                    });
+                    if (selection.studioId) {
+                        const allStudios = getCachedOrNull('studios') || [];
+                        const studio = allStudios.find(item => String(item.id) === String(selection.studioId));
+                        if (studio) addRecentEntry('studios', studio);
+                    }
+                    selection.groupIds.forEach(groupId => {
+                        const allGroups = getCachedOrNull('groups') || [];
+                        const group = allGroups.find(item => String(item.id) === String(groupId));
+                        if (group) addRecentEntry('groups', group);
+                    });
+
+                    resetRefractSceneCards(selection.sceneId);
+                    refreshSceneCardsDebounced(selection.sceneId);
+                    recordSaveUsage();
+                    toastSuccess(context.customSuccessMessage || 'Scene saved successfully');
+                    updateSaveButton();
+                }
+            });
+            const doSave = (customSuccessMessage = null, shouldCloseScraper = false) => {
+                const autoMarkOrganized = getAutoMarkOrganized();
+                latestEverythingSavePromise = everythingSaveWorkflow.save({
+                    sceneId: currentSceneId,
+                    tagIds: selectedTagIds,
+                    performerIds: selectedPerformerIds,
+                    studioId: selectedStudioId,
+                    groupIds: selectedGroupIds
+                }, {
+                    customSuccessMessage,
+                    shouldCloseScraper,
+                    autoMarkOrganized
+                });
                 return latestEverythingSavePromise;
-                };
+            };
 
                 const onSuggestionActivated = async (sug) => {
                     if (popup.globalSearch && popup.globalSearch.value) {
