@@ -44,7 +44,7 @@ Never enable it while the live FastTag plugin is enabled.
 - [x] Edit Everything automatic save
 - [x] Sequential navigation with dirty metadata
 - [x] Random-scene navigation and history
-- [ ] Bulk single-entity editing
+- [x] Bulk single-entity editing
 - [ ] Bulk Edit Everything
 - [ ] Bulk partial-failure reporting and retry behavior
 - [ ] Scraper search, filtering, navigation, and dismissal
@@ -113,3 +113,5 @@ switching back to the released live plugin.
   confirmed that the change persisted and navigation loaded the correct scene.
 - Random Scene navigation worked across several scenes; backward and forward
   controls traversed the same scenes in the correct history order.
+- Bulk single-entity Tag editing added a tag to every selected scene and then
+  removed it from every selected scene; the affected cards updated correctly.
