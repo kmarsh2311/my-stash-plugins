@@ -192,5 +192,7 @@ assert.ok(coverEditorSource.includes('Discard the new cover and continue to the 
 const aiApplyMetadataBlock = mainSource.match(/mutation FastTagAIApplyMetadata[\s\S]*?syncSceneToApolloCache\(metadataRes\.data\.sceneUpdate\);/)?.[0] || '';
 assert.ok(aiApplyMetadataBlock.includes('title date'), 'AI Apply All should return updated title and date');
 assert.ok(aiApplyMetadataBlock.includes('syncSceneToApolloCache'), 'AI Apply All should synchronize metadata to live scene cards');
+assert.ok(mainSource.includes("btn.dataset.aiActionState === 'pending' || btn.dataset.aiActionState === 'complete'"), 'AI entity pills should ignore repeated clicks while saving or after completion');
+assert.ok(mainSource.includes('btn.textContent = `✓ ${label}`;'), 'AI entity pills should render one exact completion tick rather than prefixing repeated ticks');
 
 console.log('fasttag-module-contract tests passed');

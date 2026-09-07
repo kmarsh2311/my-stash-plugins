@@ -6003,7 +6003,7 @@
                                     const pillBorder = isAdded ? '1px solid #059669' : '1px solid rgba(56, 189, 248, 0.5)';
                                     const pillColor = isAdded ? '#ffffff' : (isDark ? '#bae6fd' : '#0369a1');
                                     const pillText = isAdded ? `✓ ${escapeHtml(p.item.name)}` : `+ ${escapeHtml(p.item.name)}`;
-                                    return `<button type="button" class="fasttag-ai-chip-perf" data-id="${p.item.id}" style="background: ${pillBg}; border: ${pillBorder}; color: ${pillColor}; font-size: 10px; font-weight: 600; padding: 1.5px 6px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 2px;" title="${isAdded ? 'Already added to scene' : 'Add to scene'}">${pillText}</button>`;
+                                    return `<button type="button" class="fasttag-ai-chip-perf" data-id="${p.item.id}" data-ai-action-state="${isAdded ? 'complete' : 'idle'}" ${isAdded ? 'disabled' : ''} style="background: ${pillBg}; border: ${pillBorder}; color: ${pillColor}; font-size: 10px; font-weight: 600; padding: 1.5px 6px; border-radius: 999px; cursor: ${isAdded ? 'default' : 'pointer'}; display: flex; align-items: center; gap: 2px;" title="${isAdded ? 'Already added to scene' : 'Add to scene'}">${pillText}</button>`;
                                 } else if (p.possibleItem) {
                                     return `<span style="display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap;"><span style="background: rgba(245, 158, 11, 0.16); border: 1px solid rgba(245, 158, 11, 0.7); color: ${isDark ? '#fde68a' : '#92400e'}; font-size: 10px; font-weight: 650; padding: 1.5px 7px; border-radius: 999px;" title="Gemini returned '${escapeHtml(p.rawName)}'; this may refer to the performer already linked to the scene.">⚠ ${escapeHtml(p.rawName)} → ${escapeHtml(p.possibleItem.name)}?</span><button type="button" class="fasttag-ai-chip-create-perf" data-name="${escapeHtml(p.rawName)}" style="background: rgba(168, 85, 247, 0.15); border: 1px dashed rgba(168, 85, 247, 0.6); color: ${isDark ? '#e9d5ff' : '#7e22ce'}; font-size: 10px; font-weight: 600; padding: 1.5px 7px; border-radius: 999px; cursor: pointer;" title="Create '${escapeHtml(p.rawName)}' only if this is a different performer">+ Create separately</button></span>`;
                                 } else {
@@ -6026,7 +6026,7 @@
                                     const pillBorder = isAdded ? '1px solid #059669' : '1px solid rgba(99, 102, 241, 0.5)';
                                     const pillColor = isAdded ? '#ffffff' : (isDark ? '#c7d2fe' : '#4338ca');
                                     const pillText = isAdded ? `✓ ${escapeHtml(t.item.name)}` : `+ ${escapeHtml(t.item.name)}`;
-                                    return `<button type="button" class="fasttag-ai-chip-tag" data-id="${t.item.id}" style="background: ${pillBg}; border: ${pillBorder}; color: ${pillColor}; font-size: 10px; font-weight: 600; padding: 1.5px 6px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 2px;" title="${isAdded ? 'Already added to scene' : 'Add to scene'}">${pillText}</button>`;
+                                    return `<button type="button" class="fasttag-ai-chip-tag" data-id="${t.item.id}" data-ai-action-state="${isAdded ? 'complete' : 'idle'}" ${isAdded ? 'disabled' : ''} style="background: ${pillBg}; border: ${pillBorder}; color: ${pillColor}; font-size: 10px; font-weight: 600; padding: 1.5px 6px; border-radius: 999px; cursor: ${isAdded ? 'default' : 'pointer'}; display: flex; align-items: center; gap: 2px;" title="${isAdded ? 'Already added to scene' : 'Add to scene'}">${pillText}</button>`;
                                 } else {
                                     return `<button type="button" class="fasttag-ai-chip-create-tag" data-name="${escapeHtml(t.rawName)}" style="background: rgba(168, 85, 247, 0.15); border: 1px dashed rgba(168, 85, 247, 0.6); color: ${isDark ? '#e9d5ff' : '#7e22ce'}; font-size: 10px; font-weight: 600; padding: 1.5px 7px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 3px;" title="Create tag '${escapeHtml(t.rawName)}' in Stash & add to scene">+ Create "${escapeHtml(t.rawName)}"</button>`;
                                 }
@@ -6038,6 +6038,26 @@
         `;
 
         // Wire event handlers on the AI Match Card
+        const beginAiPillAction = (btn) => {
+            if (!btn || btn.disabled || btn.dataset.aiActionState === 'pending' || btn.dataset.aiActionState === 'complete') return false;
+            btn.dataset.aiActionState = 'pending';
+            btn.disabled = true;
+            return true;
+        };
+        const completeAiPillAction = (btn, label) => {
+            btn.dataset.aiActionState = 'complete';
+            btn.disabled = true;
+            btn.style.background = '#059669';
+            btn.style.color = '#fff';
+            btn.style.cursor = 'default';
+            btn.title = 'Already added to scene';
+            btn.textContent = `✓ ${label}`;
+        };
+        const resetAiPillAction = (btn) => {
+            btn.dataset.aiActionState = 'idle';
+            btn.disabled = false;
+        };
+
         const closeBtn = container.querySelector('#fasttag-ai-close-card-btn');
         if (closeBtn) {
             closeBtn.onclick = (e) => {
@@ -6162,11 +6182,20 @@
         container.querySelectorAll('.fasttag-ai-chip-perf').forEach(btn => {
             btn.onclick = async (e) => {
                 e.preventDefault();
+                if (!beginAiPillAction(btn)) return;
                 const pId = btn.getAttribute('data-id');
                 const perfSet = ctx.getSelectedPerformers ? ctx.getSelectedPerformers() : ctx.selectedPerformerIds;
-                if (pId && perfSet) {
+                const item = allPerformers.find(p => String(p.id) === String(pId));
+                if (!pId || !perfSet) {
+                    resetAiPillAction(btn);
+                    return;
+                }
+                if (perfSet.has(String(pId))) {
+                    completeAiPillAction(btn, item?.name || pId);
+                    return;
+                }
+                try {
                     perfSet.add(String(pId));
-                    const item = allPerformers.find(p => String(p.id) === String(pId));
                     if (item) addRecentEntry('performers', item);
                     if (typeof ctx.fetchColumnData === 'function') {
                         await ctx.fetchColumnData('performers', popup.performersTable, '', perfSet);
@@ -6175,9 +6204,11 @@
                     if (typeof ctx.doSave === 'function') {
                         await ctx.doSave(`Added performer "${item?.name || pId}"`);
                     }
-                    btn.style.background = '#059669';
-                    btn.style.color = '#fff';
-                    btn.textContent = `✓ ${btn.textContent.replace(/^\+\s*/, '')}`;
+                    completeAiPillAction(btn, item?.name || pId);
+                } catch (err) {
+                    perfSet.delete(String(pId));
+                    resetAiPillAction(btn);
+                    toastError(`Failed to add performer: ${err.message}`);
                 }
             };
         });
@@ -6225,11 +6256,20 @@
         container.querySelectorAll('.fasttag-ai-chip-tag').forEach(btn => {
             btn.onclick = async (e) => {
                 e.preventDefault();
+                if (!beginAiPillAction(btn)) return;
                 const tId = btn.getAttribute('data-id');
                 const tagSet = ctx.getSelectedTags ? ctx.getSelectedTags() : ctx.selectedTagIds;
-                if (tId && tagSet) {
+                const item = allTags.find(t => String(t.id) === String(tId));
+                if (!tId || !tagSet) {
+                    resetAiPillAction(btn);
+                    return;
+                }
+                if (tagSet.has(String(tId))) {
+                    completeAiPillAction(btn, item?.name || tId);
+                    return;
+                }
+                try {
                     tagSet.add(String(tId));
-                    const item = allTags.find(t => String(t.id) === String(tId));
                     if (item) addRecentEntry('tags', item);
                     if (typeof ctx.fetchColumnData === 'function') {
                         await ctx.fetchColumnData('tags', popup.tagsTable, '', tagSet);
@@ -6238,9 +6278,11 @@
                     if (typeof ctx.doSave === 'function') {
                         await ctx.doSave(`Added tag "${item?.name || tId}"`);
                     }
-                    btn.style.background = '#059669';
-                    btn.style.color = '#fff';
-                    btn.textContent = `✓ ${btn.textContent.replace(/^\+\s*/, '')}`;
+                    completeAiPillAction(btn, item?.name || tId);
+                } catch (err) {
+                    tagSet.delete(String(tId));
+                    resetAiPillAction(btn);
+                    toastError(`Failed to add tag: ${err.message}`);
                 }
             };
         });
