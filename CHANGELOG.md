@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Compact Status Visibility**: The Cover Editor temporarily expands and moves upward when an actionable message appears, keeping its footer visible without permanently reserving empty space or changing the saved size.
 - **Compact Size Persistence**: Closing Edit Everything while a temporary status message is visible no longer saves the expanded message height as the normal Cover Editor size.
 - **Graceful Cover Restoration**: A remembered Cover Editor now opens its shell immediately with Edit Everything and binds the video when ready instead of appearing abruptly after the media lookup.
+- **Unified Popup Entrance**: Edit Everything now uses the same subtle fade-and-scale entrance as a restored Cover Editor, while respecting the browser's reduced-motion preference.
 
 ## [4.3.0] - 2026-09-06
 

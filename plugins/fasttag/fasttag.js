@@ -4883,6 +4883,12 @@
         form.style.flexDirection = 'column';
         form.style.overflow = 'hidden';
         form.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+        const animateEntrance = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        if (animateEntrance) {
+            form.style.opacity = '0';
+            form.style.transform = 'scale(.985)';
+            form.style.transition = 'opacity .16s ease, transform .16s ease';
+        }
 
         form.innerHTML = `
             <div id="everything-popup-header" class="popup-header" style="margin: 0 0 7px 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: grab; user-select: none; flex-shrink: 0; min-height: 20px;">
@@ -5037,6 +5043,12 @@
         `;
 
         document.body.appendChild(form);
+        if (animateEntrance) {
+            window.requestAnimationFrame(() => {
+                form.style.opacity = '1';
+                form.style.transform = 'scale(1)';
+            });
+        }
         return {
             element: form,
             titleSpan: form.querySelector('#everything-popup-title'),
