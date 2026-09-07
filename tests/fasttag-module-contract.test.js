@@ -191,8 +191,10 @@ assert.ok(coverEditorSource.includes("dependencies.setPersistedOpen?.(true);") &
 assert.ok(coverEditorSource.includes("button.isConnected && !activeEditor && dependencies?.isPersistedOpen?.()"), 'Edit Everything should restore a Cover Editor that was left open');
 assert.ok(previewSource.includes('FastTagCoverEditor.restoreForHost?.({'), 'a remembered Cover Editor shell should open before scene media lookup completes');
 assert.ok(coverEditorSource.includes("restoringOverlay.textContent = 'Preparing video…'"), 'the early restored shell should explain that its video is being prepared');
-assert.ok(mainSource.includes("form.style.transform = 'scale(.985)'") && mainSource.includes("form.style.transition = 'opacity .16s ease, transform .16s ease'"), 'Edit Everything should share the restored Cover Editor entrance motion');
+assert.ok(mainSource.includes("{ opacity: 0, transform: 'scale(.985)' }") && mainSource.includes("{ duration: 160, easing: 'ease-out' }"), 'Edit Everything should animate only after its full-size positioning geometry is available');
 assert.ok(mainSource.includes("prefers-reduced-motion: reduce"), 'Edit Everything entrance motion should respect reduced-motion preferences');
+assert.ok(previewSource.includes('const animateHudEntrance = !window.matchMedia?.') && previewSource.includes('floatingHudElement.animate?.(['), 'the floating video HUD should use the subtle accessible entrance');
+assert.ok(scraperControllerSource.includes('const animateHudEntrance = !root.matchMedia?.') && scraperControllerSource.includes('hudElement.animate?.(['), 'the detached scraper HUD should use the subtle accessible entrance');
 assert.ok(previewSource.includes("hostContainer.style.height = 'auto';"), 'loading a new scene should restore a preview container collapsed by the cover editor');
 assert.ok(!previewSource.includes('if (signal.aborted || !hostContainer.isConnected) return;'), 'aborted scene previews should still restore their connected host before navigation');
 assert.ok((mainSource.match(/FastTagCoverEditor\.prepareForSceneNavigation\?\.\(\) === false/g) || []).length >= 4, 'all Edit Everything scene-navigation paths should hand the open cover editor to the next scene');

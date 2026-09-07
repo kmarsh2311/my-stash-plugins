@@ -692,7 +692,8 @@
                         }
                     }
 
-                    floatingHudElement.style.cssText = `position: fixed; top: ${finalTop}; ${finalLeft ? `left: ${finalLeft};` : `right: ${finalRight};`} width: ${finalWidth}; height: ${finalHeight}; min-width: 260px; min-height: 150px; max-width: 90vw; max-height: 85vh; z-index: 1000000; background: #0f172a; border: 2px solid #000000; border-radius: 10px; box-shadow: 0 20px 50px rgba(0,0,0,0.85); overflow: hidden; resize: both; cursor: default;`;
+                    const animateHudEntrance = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+                    floatingHudElement.style.cssText = `position: fixed; top: ${finalTop}; ${finalLeft ? `left: ${finalLeft};` : `right: ${finalRight};`} width: ${finalWidth}; height: ${finalHeight}; min-width: 260px; min-height: 150px; max-width: 90vw; max-height: 85vh; z-index: 1000000; background: #0f172a; border: 2px solid #000000; border-radius: 10px; box-shadow: 0 20px 50px rgba(0,0,0,0.85); overflow: hidden; resize: both; cursor: default;${animateHudEntrance ? ' opacity:0;' : ''}`;
                     document.body.appendChild(floatingHudElement);
 
                     // Draggable logic directly on floating video
@@ -718,6 +719,18 @@
                     };
 
                     document.body.appendChild(floatingHudElement);
+                    if (animateHudEntrance) {
+                        const revealHud = () => {
+                            if (!floatingHudElement) return;
+                            floatingHudElement.style.opacity = '1';
+                            floatingHudElement.animate?.([
+                                { opacity: 0, transform: 'scale(.985)' },
+                                { opacity: 1, transform: 'scale(1)' }
+                            ], { duration: 160, easing: 'ease-out' });
+                        };
+                        if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(revealHud);
+                        else setTimeout(revealHud, 0);
+                    }
 
                     const resizeObserver = new ResizeObserver((entries) => {
                         for (let entry of entries) {

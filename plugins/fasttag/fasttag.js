@@ -4886,8 +4886,6 @@
         const animateEntrance = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
         if (animateEntrance) {
             form.style.opacity = '0';
-            form.style.transform = 'scale(.985)';
-            form.style.transition = 'opacity .16s ease, transform .16s ease';
         }
 
         form.innerHTML = `
@@ -5046,7 +5044,10 @@
         if (animateEntrance) {
             window.requestAnimationFrame(() => {
                 form.style.opacity = '1';
-                form.style.transform = 'scale(1)';
+                form.animate?.([
+                    { opacity: 0, transform: 'scale(.985)' },
+                    { opacity: 1, transform: 'scale(1)' }
+                ], { duration: 160, easing: 'ease-out' });
             });
         }
         return {
