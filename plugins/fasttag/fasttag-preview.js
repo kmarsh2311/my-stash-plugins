@@ -37,7 +37,8 @@
         return ratio * length;
     }
 
-    function shouldResumeAfterTimelineSeek(isPaused, wheelScrubWasPlaying, shiftHeld) {
+    function shouldResumeAfterTimelineSeek(isPaused, wheelScrubWasPlaying, shiftHeld, isCoverEditing) {
+        if (!isCoverEditing) return true;
         return !isPaused || (Boolean(wheelScrubWasPlaying) && !shiftHeld);
     }
 
@@ -391,7 +392,8 @@
             timelineWasPlaying = shouldResumeAfterTimelineSeek(
                 currentMedia.paused,
                 scrubbing && wasPlaying,
-                shiftHeld
+                shiftHeld,
+                coverEditing
             );
             clearTimeout(resumeTimer);
             scrubbing = false;
@@ -842,7 +844,7 @@
             scrubbing = false;
             if (currentMedia && currentMedia.tagName === 'VIDEO' && !shiftHeld) {
                 try { currentMedia.loop = !!originalLoop; } catch (err) {}
-                if (wasPlaying) {
+                if (!coverEditing || wasPlaying) {
                     currentMedia.play().catch(() => {});
                     wasPlaying = false;
                 }
