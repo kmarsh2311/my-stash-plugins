@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `d75a1a8`
+- Runtime source commit: `270bb96`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -154,7 +154,13 @@ switching back to the released live plugin.
   removed element's `0px` dimensions. CSS then forced every subsequent opening
   to the cramped 300px minimum. Commit `d75a1a8` disconnects HUD observers before
   removal, ignores detached or invalid dimensions, and migrates an invalid saved
-  size back to the 390×480 default. Browser retest pending.
+  size back to the 390×480 default. Browser testing confirmed that valid resized
+  dimensions are remembered again.
+- The initial compact-header correction used a fixed 370px breakpoint, so it
+  sometimes moved the controls to a second row even though their actual contents
+  still fitted. Commit `270bb96` measures the title and action controls on every
+  resize and uses the second row only when they genuinely overflow. Browser
+  retest pending.
 - Accepting a StashDB result stored the correct remote scene ID. With Cover
   selected it also saved the remote cover; with Cover cleared it retained the
   existing cover while still storing the ID. No warnings or console errors
