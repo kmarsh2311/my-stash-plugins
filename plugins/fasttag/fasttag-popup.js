@@ -29,16 +29,12 @@
                 dependencies.invalidateScraperRequests(activePopup);
                 if (activePopup.tagsTable) {
                     try {
-                        activePopup.tagsTable.off('rowSelected');
-                        activePopup.tagsTable.off('rowDeselected');
                         activePopup.tagsTable.destroy();
                     } catch (error) {}
                     activePopup.tagsTable = null;
                 }
                 if (activePopup.performersTable) {
                     try {
-                        activePopup.performersTable.off('rowSelected');
-                        activePopup.performersTable.off('rowDeselected');
                         activePopup.performersTable.destroy();
                     } catch (error) {}
                     activePopup.performersTable = null;
@@ -48,8 +44,6 @@
             const activeTableInstance = dependencies.getActiveTableInstance?.();
             if (activeTableInstance) {
                 try {
-                    activeTableInstance.off('rowSelected');
-                    activeTableInstance.off('rowDeselected');
                     activeTableInstance.destroy();
                 } catch (error) {}
                 dependencies.setActiveTableInstance(null);

@@ -93,6 +93,8 @@ for (const expected of [
 ]) {
     assert.ok(popupClose.includes(expected), `popup teardown must retain: ${expected}`);
 }
+assert.equal(popupClose.includes(".off('rowSelected')"), false, 'popup teardown must not remove unregistered Tabulator selection events');
+assert.equal(popupClose.includes(".off('rowDeselected')"), false, 'popup teardown must let table destruction release event handlers');
 assert.ok(popupClose.includes('if (resetSequential) {'), 'session state should only be reset when requested');
 assert.ok(popupClose.includes('dependencies.sessionScrapeCache.clear();'), 'full popup closure must clear session scrape results');
 
