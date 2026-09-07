@@ -7,7 +7,8 @@ passed.
 
 ## Current phase
 
-Step 9 is complete and Step 10 manual validation has begun. The three editor
+Step 9 is complete and Step 10 manual validation is in progress against staged
+runtime commit `dbd0f2b`. The three editor
 families now have independent workflow
 contracts. `fasttag-editors.js` owns normalized save snapshots, the
 single-editor latest-save gate, shared bounded bulk batching and result totals,

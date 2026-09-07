@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `1839674`
+- Runtime source commit: `dbd0f2b`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -94,3 +94,8 @@ switching back to the released live plugin.
   popup redraw against Tabulator's initialization state. After reloading the
   plugin and clearing the console, opening and closing both the Performer and
   Studio editors produced no new console messages.
+- Edit Everything metadata changes occasionally exposed Apollo's warning that
+  a performer reference was not yet part of its normalized store. Commit
+  `dbd0f2b` makes tag, performer, and studio references merge their returned
+  entity data into the store during direct scene-card synchronization. Saving
+  was already successful; browser-console retest pending.
