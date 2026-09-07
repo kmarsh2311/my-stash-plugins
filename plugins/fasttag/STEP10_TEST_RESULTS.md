@@ -38,7 +38,7 @@ Never enable it while the live FastTag plugin is enabled.
 - [ ] Single Gallery editor — unavailable: test library currently has no galleries
 - [x] Single-editor automatic save and refresh
 - [x] Single-editor sequential previous/next navigation
-- [ ] Edit Everything tags, performers, studio, and groups
+- [x] Edit Everything tags, performers, studio, and groups
 - [ ] Recent and pinned pills
 - [ ] Suggestions and global search
 - [ ] Edit Everything automatic save
@@ -98,4 +98,8 @@ switching back to the released live plugin.
   a performer reference was not yet part of its normalized store. Commit
   `dbd0f2b` makes tag, performer, and studio references merge their returned
   entity data into the store during direct scene-card synchronization. Saving
-  was already successful; browser-console retest pending.
+  was already successful. After reloading, Edit Everything tag, performer,
+  studio, and group changes worked and the Apollo warning did not recur. The
+  remaining grey navigation-object messages originate from generic injected
+  `javascript`, contain no warning/error severity, and are not emitted by any
+  FastTag logging statement.
