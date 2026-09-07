@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `270bb96`
+- Runtime source commit: `2af6e6d`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -160,7 +160,11 @@ switching back to the released live plugin.
   sometimes moved the controls to a second row even though their actual contents
   still fitted. Commit `270bb96` measures the title and action controls on every
   resize and uses the second row only when they genuinely overflow. Browser
-  retest pending.
+  testing confirmed the controls remain on one row when they fit.
+- The header's previous “Source Match” wording was both truncated at narrow
+  widths and could imply that an unconfirmed candidate was correct. Commit
+  `2af6e6d` displays only the actual scraper source name, such as “StashDB”.
+  Browser retest pending.
 - Accepting a StashDB result stored the correct remote scene ID. With Cover
   selected it also saved the remote cover; with Cover cleared it retained the
   existing cover while still storing the ID. No warnings or console errors
