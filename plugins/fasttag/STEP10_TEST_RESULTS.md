@@ -103,3 +103,6 @@ switching back to the released live plugin.
   remaining grey navigation-object messages originate from generic injected
   `javascript`, contain no warning/error severity, and are not emitted by any
   FastTag logging statement.
+- Recent tag pills and automatic suggestions appeared and applied correctly.
+  The combined checklist entries remain open pending pinned-pill persistence
+  and global-search testing.
