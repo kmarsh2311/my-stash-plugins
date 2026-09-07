@@ -54,6 +54,23 @@ controller.resetLayoutState();
 assert.equal(controller.getHudPosition(), null);
 assert.equal(controller.getHudSize(), null);
 
+const loadingPopup = {
+    currentSceneId: 'scene-loading',
+    element: { isConnected: true },
+    scraperCardContainer: { style: { display: 'none' }, innerHTML: 'Previous scene result' },
+    scrapeBtn: { disabled: false, innerHTML: '<span>Scrape</span>' }
+};
+activePopup = loadingPopup;
+controller.configure({
+    getActivePopup: () => activePopup,
+    getEffectiveTheme: () => 'dark'
+});
+assert.equal(controller.showLoadingState(loadingPopup), true);
+assert.equal(loadingPopup.scraperCardContainer.style.display, 'flex');
+assert.match(loadingPopup.scraperCardContainer.innerHTML, /Scraping new scene/);
+assert.doesNotMatch(loadingPopup.scraperCardContainer.innerHTML, /Previous scene result/);
+assert.equal(loadingPopup.scrapeBtn.disabled, true);
+
 async function testTriggerRejectsLateResults() {
     let resolveFetch;
     const lateResult = new Promise(resolve => { resolveFetch = resolve; });

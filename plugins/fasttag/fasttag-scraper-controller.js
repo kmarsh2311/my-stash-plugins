@@ -213,6 +213,26 @@
     function isHudOpen() { return Boolean(floatingHudElement && root.document?.body?.contains(floatingHudElement)); }
     function resetLayoutState() { floatingHudPosition = null; floatingHudSize = null; }
 
+    function showLoadingState(popup, message = 'Scraping new scene…') {
+        if (!isPopupActive(popup)) return false;
+        const detachedHud = isHudOpen() ? getHudElement() : null;
+        const targetContainer = detachedHud || popup?.scraperCardContainer;
+        if (!targetContainer) return false;
+
+        const isDark = dependencies?.getEffectiveTheme?.() !== 'light';
+        targetContainer.style.display = 'flex';
+        targetContainer.innerHTML = `
+            <div data-fasttag-scrape-loading="true" style="box-sizing: border-box; width: 100%; min-height: 150px; flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; background: ${isDark ? '#1e293b' : '#ffffff'}; color: ${isDark ? '#cbd5e1' : '#475569'};">
+                <span style="font-size: 12px; font-weight: 650;">⏳ ${message}</span>
+            </div>
+        `;
+        if (popup?.scrapeBtn) {
+            popup.scrapeBtn.disabled = true;
+            popup.scrapeBtn.innerHTML = '<span>⏳ Scraping...</span>';
+        }
+        return true;
+    }
+
     function createTrigger(options) {
         if (!dependencies) throw new Error('[FastTag] Scraper controller is not configured');
         const {
@@ -1649,6 +1669,7 @@
         getHudOwnerPopup,
         isHudOpen,
         resetLayoutState,
+        showLoadingState,
         sessionCache,
         createTrigger,
         renderMatches,

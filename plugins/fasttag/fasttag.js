@@ -167,6 +167,7 @@
     const {
         invalidateRequests: invalidateScraperRequests,
         closeHud: closeFloatingScraperHud,
+        showLoadingState: showScraperLoadingState,
         sessionCache: sessionScrapeCache,
         renderMatches: renderScraperMatchCard
     } = FastTagScraperController;
@@ -5720,7 +5721,10 @@
             popup.currentSceneId = sceneId;
             popup.currentCardElement = cardElement;
 
-            if (!window._fastTagEverythingScraperOpen && popup.scraperCardContainer) {
+            const scraperShouldRemainOpen = Boolean(window._fastTagEverythingScraperOpen || isScraperHudPersistedOpen());
+            if (scraperShouldRemainOpen) {
+                showScraperLoadingState(popup);
+            } else if (popup.scraperCardContainer) {
                 popup.scraperCardContainer.innerHTML = '';
                 popup.scraperCardContainer.style.display = 'none';
             }
