@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `4cc0c50`
+- Runtime source commit: `fca4a95`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -56,9 +56,9 @@ Never enable it while the live FastTag plugin is enabled.
 - [x] Preview/full-video switching and scrubbing
 - [x] Floating video and scraper HUD lifecycle
 - [x] Cover Editor capture, upload, paste/drop, save, and navigation
-- [ ] Standard Stash scene-card refresh
-- [ ] Refract scene-card refresh
-- [ ] Right-click metadata menu and native media context menu
+- [x] Standard Stash scene-card refresh
+- [x] Refract scene-card refresh
+- [x] Right-click metadata menu and native media context menu
 - [ ] Left-click entity-icon shortcuts
 - [ ] Dark and light themes
 - [ ] Desktop, tablet-width, and phone-width layouts
@@ -200,10 +200,23 @@ switching back to the released live plugin.
   request, preventing the embedded loading flash. Browser retest pending.
 - Cover Editor status messages alternated between one and two lines while
   scrubbing, moving the Upload, Paste, Cancel, and Set Cover controls vertically.
- Commit `b16b4a3` reserves a stable two-line status area while allowing unusually
-  Browser testing found a smaller residual movement when longer text exceeded
-  that minimum. Commit `4cc0c50` gives the status area a fixed scrollable height,
-  so no message can move the actions below it. Browser retest pending.
+  Commit `b16b4a3` first reserved a two-line status area. Browser testing found a
+  smaller residual movement when longer text exceeded that minimum. Commit
+  `4cc0c50` gives the status area a fixed scrollable height, so no message can move
+  the actions below it. Browser testing confirmed the wobble is gone.
+- Standard and Refract scene cards both updated after metadata additions and
+  removals. Opening FastTag's right-click menu under Refract made every card's
+  metadata icons flash because it ran full popup cleanup and a page-wide Refract
+  reset even though no popup was open. Commit `fca4a95` removes that redundant
+  cleanup from menu opening. Browser retest pending.
+- Refract's global semantic `header`, `nav`, and `main` styling separated the User
+  Guide into disconnected regions. Commit `fca4a95` replaces those semantic tags
+  with plugin-scoped guide elements while preserving their accessible roles.
+  Browser retest pending.
+- Changing FastTag's theme preference updated only the Settings overlay class,
+  while its protected inline palette remained unchanged until a page refresh.
+  Commit `fca4a95` immediately rebuilds Settings with the selected palette.
+  Browser retest pending.
 - Accepting a StashDB result stored the correct remote scene ID. With Cover
   selected it also saved the remote cover; with Cover cleared it retained the
   existing cover while still storing the ID. No warnings or console errors
