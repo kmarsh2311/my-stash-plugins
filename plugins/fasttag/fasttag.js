@@ -82,6 +82,8 @@
         setEnableSuggestions,
         getEnableCardIconClicks,
         setEnableCardIconClicks,
+        getCompactCoverEditor,
+        setCompactCoverEditor,
         getAlwaysPlayFullVideo,
         setAlwaysPlayFullVideo,
         getShowRecentChips,
@@ -301,6 +303,7 @@
         refreshSceneCards: sceneId => refreshSceneCards(sceneId),
         showToast: (...args) => showToast(...args),
         getTheme: () => getEffectiveTheme(),
+        getCompactMode: () => getCompactCoverEditor(),
         log: (...args) => ftLog(...args)
     });
     FastTagUi.configure({
@@ -1852,6 +1855,7 @@
             getShowRecentChips,
             getShowPinnedChips,
             getEnableCardIconClicks,
+            getCompactCoverEditor,
             getAlwaysPlayFullVideo,
             getOrganizedWord,
             getAutoMarkOrganized,
@@ -1868,6 +1872,7 @@
             setShowRecentChips,
             setShowPinnedChips,
             setEnableCardIconClicks,
+            setCompactCoverEditor,
             setAlwaysPlayFullVideo,
             setAutoMarkOrganized,
             setAutoScrapeSequential,

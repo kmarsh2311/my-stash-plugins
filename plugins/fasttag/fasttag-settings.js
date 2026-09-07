@@ -16,6 +16,7 @@
             getShowRecentChips,
             getShowPinnedChips,
             getEnableCardIconClicks,
+            getCompactCoverEditor,
             getAlwaysPlayFullVideo,
             getOrganizedWord,
             getAutoMarkOrganized,
@@ -32,6 +33,7 @@
             setShowRecentChips,
             setShowPinnedChips,
             setEnableCardIconClicks,
+            setCompactCoverEditor,
             setAlwaysPlayFullVideo,
             setAutoMarkOrganized,
             setAutoScrapeSequential,
@@ -184,6 +186,16 @@
                                 <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Display pinned chips (📌) in quick action bars.</div>
                             </div>
                             <input type="checkbox" id="fasttag-setting-show-pinned" ${getShowPinnedChips() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
+                        </div>
+
+                        <div style="height: 1px; background: ${border};"></div>
+
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 13px;">Compact Cover Editor</div>
+                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Reduce helper text and place Upload/Paste directly beneath New Cover to save vertical space.</div>
+                            </div>
+                            <input type="checkbox" id="fasttag-setting-compact-cover" ${getCompactCoverEditor() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
                         </div>
 
                         <div style="height: 1px; background: ${border};"></div>
@@ -563,6 +575,14 @@
             iconClicksToggle.addEventListener('change', (e) => {
                 setEnableCardIconClicks(e.target.checked);
                 showToast(`Card icon clicks ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
+            });
+        }
+
+        const compactCoverToggle = modal.querySelector('#fasttag-setting-compact-cover');
+        if (compactCoverToggle) {
+            compactCoverToggle.addEventListener('change', (e) => {
+                setCompactCoverEditor(e.target.checked);
+                showToast(`Compact Cover Editor ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
             });
         }
 

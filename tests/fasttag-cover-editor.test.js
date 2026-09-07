@@ -1,12 +1,18 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const source = fs.readFileSync(path.resolve(__dirname, '..', 'plugins', 'fasttag', 'fasttag-cover-editor.js'), 'utf8');
 
 global.FastTag = {};
 require('../plugins/fasttag/fasttag-cover-editor.js');
 const coverEditor = global.FastTag.coverEditor;
 
 assert.ok(coverEditor, 'FastTag cover editor namespace should be installed');
+assert.ok(source.includes("dependencies.getCompactMode?.() === true"), 'Cover Editor should read the optional compact-layout preference');
+assert.ok(source.includes("isCompact ? '<div class=\"fasttag-cover-actions\""), 'compact Upload/Paste controls should sit beneath New Cover rather than over its image');
 
 assert.deepEqual(coverEditor.calculateImageSize(3840, 2160), { width: 1920, height: 1080 });
 assert.deepEqual(coverEditor.calculateImageSize(1080, 1920), { width: 1080, height: 1920 });
@@ -28,6 +34,7 @@ assert.deepEqual(coverEditor.resolveEditorSize(null, 1920, 1080), {
     maxWidth: 1896,
     maxHeight: 1056
 });
+assert.equal(coverEditor.resolveEditorSize(null, 1920, 1080, true).height, 580);
 assert.deepEqual(coverEditor.resolveEditorSize({ width: 700, height: 900 }, 600, 700), {
     width: 576,
     height: 676,

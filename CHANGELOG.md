@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- **Optional Compact Cover Editor**: A Display setting removes secondary guidance, tightens spacing, and places Upload/Paste beneath the New Cover preview without overlaying the image. Normal and compact layouts remember their resized dimensions separately.
+
 ## [4.3.0] - 2026-09-06
 
 ### Added

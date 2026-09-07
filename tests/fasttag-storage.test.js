@@ -42,6 +42,11 @@ assert.equal(storage.getAlwaysPlayFullVideo(), false);
 storage.setAlwaysPlayFullVideo(true);
 assert.equal(values.get('fasttag_always_play_full_video'), 'true');
 
+values.delete('fasttag_compact_cover_editor');
+assert.equal(storage.getCompactCoverEditor(), false);
+storage.setCompactCoverEditor(true);
+assert.equal(values.get('fasttag_compact_cover_editor'), 'true');
+
 values.delete('stash_fast_tag_auto_mark_organized');
 assert.equal(storage.getAutoMarkOrganized(), false);
 storage.setAutoMarkOrganized(true);

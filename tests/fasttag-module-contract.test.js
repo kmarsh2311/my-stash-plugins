@@ -167,8 +167,9 @@ assert.ok(previewSource.includes("source: 'preview-image'"), 'the cover editor s
 assert.ok(coverEditorSource.includes("'Captured preview frame'"), 'fallback captures should be identified as preview frames');
 assert.ok(coverEditorSource.includes('overflow:auto;resize:both'), 'the cover-editor HUD should be resizable from its browser corner');
 assert.ok(coverEditorSource.includes('min-height:20px;padding:5px 10px'), 'the cover-editor title bar should match the compact main-popup header height');
-assert.ok(coverEditorSource.includes('line-height:1.35;height:44px;flex:0 0 44px;overflow-y:auto;box-sizing:border-box;display:flex;align-items:center'), 'the cover-editor status area should have a fixed scrollable height so changing messages cannot move its actions');
+assert.ok(coverEditorSource.includes("height:${isCompact ? '28px' : '44px'};flex:0 0 ${isCompact ? '28px' : '44px'};overflow-y:auto;box-sizing:border-box;display:flex;align-items:center"), 'both cover-editor layouts should keep a fixed scrollable status height so changing messages cannot move their actions');
 assert.ok(coverEditorSource.includes("EDITOR_SIZE_STORAGE_KEY = 'fasttag_cover_editor_size'"), 'the cover editor should remember its resized dimensions');
+assert.ok(coverEditorSource.includes("COMPACT_EDITOR_SIZE_STORAGE_KEY = 'fasttag_cover_editor_size_compact'"), 'compact Cover Editor dimensions should be remembered separately');
 assert.ok(coverEditorSource.includes('grid-template-columns:auto auto minmax(68px,1fr) auto auto'), 'cover playback and capture controls should remain on one line');
 assert.ok(coverEditorSource.includes("padding:7px 12px;min-width:44px"), 'the cover editor frame-step buttons should provide a comfortably wide target');
 assert.ok(!coverEditorSource.includes('Step backward while paused') && !coverEditorSource.includes('Step forward while paused'), 'the frame-step buttons should not display redundant tooltips');

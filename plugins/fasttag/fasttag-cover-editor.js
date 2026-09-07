@@ -6,7 +6,9 @@
     const DEFAULT_JPEG_QUALITY = 0.9;
     const DEFAULT_EDITOR_WIDTH = 450;
     const DEFAULT_EDITOR_HEIGHT = 740;
+    const DEFAULT_COMPACT_EDITOR_HEIGHT = 580;
     const EDITOR_SIZE_STORAGE_KEY = 'fasttag_cover_editor_size';
+    const COMPACT_EDITOR_SIZE_STORAGE_KEY = 'fasttag_cover_editor_size_compact';
     let dependencies = null;
     let activeEditor = null;
 
@@ -125,13 +127,13 @@
 
     const captureVideoFrame = captureMediaFrame;
 
-    function resolveEditorSize(savedSize, viewportWidth, viewportHeight) {
+    function resolveEditorSize(savedSize, viewportWidth, viewportHeight, compactMode = false) {
         const availableWidth = Math.max(300, Number(viewportWidth || 0) - 24);
         const availableHeight = Math.max(320, Number(viewportHeight || 0) - 24);
         const minWidth = Math.min(360, availableWidth);
         const minHeight = Math.min(420, availableHeight);
         const requestedWidth = Number(savedSize?.width) || DEFAULT_EDITOR_WIDTH;
-        const requestedHeight = Number(savedSize?.height) || DEFAULT_EDITOR_HEIGHT;
+        const requestedHeight = Number(savedSize?.height) || (compactMode ? DEFAULT_COMPACT_EDITOR_HEIGHT : DEFAULT_EDITOR_HEIGHT);
         return {
             width: Math.round(Math.max(minWidth, Math.min(availableWidth, requestedWidth))),
             height: Math.round(Math.max(minHeight, Math.min(availableHeight, requestedHeight))),
@@ -142,27 +144,29 @@
         };
     }
 
-    function readSavedEditorSize() {
+    function readSavedEditorSize(compactMode = false) {
         try {
-            const parsed = JSON.parse(root.localStorage?.getItem(EDITOR_SIZE_STORAGE_KEY) || 'null');
+            const storageKey = compactMode ? COMPACT_EDITOR_SIZE_STORAGE_KEY : EDITOR_SIZE_STORAGE_KEY;
+            const parsed = JSON.parse(root.localStorage?.getItem(storageKey) || 'null');
             return parsed && typeof parsed === 'object' ? parsed : null;
         } catch (error) {
             return null;
         }
     }
 
-    function saveEditorSize(element) {
+    function saveEditorSize(element, compactMode = false) {
         if (!element) return;
         try {
-            root.localStorage?.setItem(EDITOR_SIZE_STORAGE_KEY, JSON.stringify({
+            const storageKey = compactMode ? COMPACT_EDITOR_SIZE_STORAGE_KEY : EDITOR_SIZE_STORAGE_KEY;
+            root.localStorage?.setItem(storageKey, JSON.stringify({
                 width: Math.round(element.offsetWidth),
                 height: Math.round(element.offsetHeight)
             }));
         } catch (error) {}
     }
 
-    function positionEditor(element, anchorElement) {
-        const size = resolveEditorSize(readSavedEditorSize(), root.innerWidth, root.innerHeight);
+    function positionEditor(element, anchorElement, compactMode = false) {
+        const size = resolveEditorSize(readSavedEditorSize(compactMode), root.innerWidth, root.innerHeight, compactMode);
         const { width, height } = size;
         const margin = 12;
         const anchor = anchorElement?.getBoundingClientRect?.();
@@ -220,7 +224,7 @@
             if (discard === false) return false;
         }
         activeEditor = null;
-        saveEditorSize(editor.element);
+        saveEditorSize(editor.element, editor.compactMode);
         editor.mediaController?.releaseFromCoverEditor?.();
         editor.abortController.abort();
         editor.element.remove();
@@ -269,13 +273,14 @@
         const abortController = new AbortController();
         const { signal } = abortController;
         const isDark = dependencies.getTheme?.() !== 'light';
+        const isCompact = dependencies.getCompactMode?.() === true;
         const panel = document.createElement('section');
         panel.id = 'fasttag-cover-editor-hud';
         panel.tabIndex = -1;
         panel.setAttribute('role', 'dialog');
         panel.setAttribute('aria-label', 'Scene cover editor');
         panel.style.cssText = `position:fixed;z-index:1000007;display:flex;flex-direction:column;overflow:auto;resize:both;box-sizing:border-box;padding:0;background:${isDark ? '#111827' : '#f8fafc'};color:${isDark ? '#f8fafc' : '#0f172a'};border:1px solid ${isDark ? '#475569' : '#94a3b8'};border-radius:11px;box-shadow:0 22px 55px rgba(0,0,0,.7);font-family:system-ui,-apple-system,sans-serif;`;
-        positionEditor(panel, currentOptions.anchorElement || currentOptions.hostElement);
+        positionEditor(panel, currentOptions.anchorElement || currentOptions.hostElement, isCompact);
         panel.addEventListener('mousedown', event => event.stopPropagation(), { signal });
 
         const header = document.createElement('header');
@@ -290,22 +295,22 @@
         panel.appendChild(header);
 
         const body = document.createElement('div');
-        body.style.cssText = 'display:flex;flex-direction:column;gap:10px;padding:11px;';
+        body.style.cssText = `display:flex;flex-direction:column;gap:${isCompact ? '6px' : '10px'};padding:${isCompact ? '8px' : '11px'};`;
         body.innerHTML = `
             <div>
-                <div style="font-size:10px;font-weight:700;color:#a5b4fc;margin-bottom:4px;text-transform:uppercase;">Choose a video frame</div>
+                ${isCompact ? '' : '<div style="font-size:10px;font-weight:700;color:#a5b4fc;margin-bottom:4px;text-transform:uppercase;">Choose a video frame</div>'}
                 <div class="fasttag-cover-video-stage" style="position:relative;width:100%;aspect-ratio:16/9;max-height:410px;background:#020617;border:1px solid #334155;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;"></div>
-                <div class="fasttag-cover-playback-controls" style="display:grid;grid-template-columns:auto auto minmax(68px,1fr) auto auto;align-items:center;gap:4px;margin-top:7px;white-space:nowrap;"></div>
+                <div class="fasttag-cover-playback-controls" style="display:grid;grid-template-columns:auto auto minmax(68px,1fr) auto auto;align-items:center;gap:4px;margin-top:${isCompact ? '4px' : '7px'};white-space:nowrap;"></div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;min-height:170px;">
-                <div><div style="font-size:10px;font-weight:700;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;">Current cover</div><div class="fasttag-cover-current" style="height:165px;background:#020617;border:1px solid #334155;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;"></div></div>
-                <div><div style="font-size:10px;font-weight:700;color:#a5b4fc;margin-bottom:4px;text-transform:uppercase;">New cover</div><div class="fasttag-cover-candidate" style="height:165px;background:#020617;border:1px dashed #6366f1;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#64748b;font-size:11px;text-align:center;padding:8px;box-sizing:border-box;">Capture, upload, paste or drop an image</div></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;min-height:${isCompact ? '156px' : '170px'};">
+                <div><div style="font-size:10px;font-weight:700;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;">Current cover</div><div class="fasttag-cover-current" style="height:${isCompact ? '148px' : '165px'};background:#020617;border:1px solid #334155;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;"></div></div>
+                <div><div style="font-size:10px;font-weight:700;color:#a5b4fc;margin-bottom:4px;text-transform:uppercase;">New cover</div><div class="fasttag-cover-candidate" style="height:${isCompact ? '112px' : '165px'};background:#020617;border:1px dashed #6366f1;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#64748b;font-size:11px;text-align:center;padding:8px;box-sizing:border-box;">Capture, upload, paste or drop an image</div>${isCompact ? '<div class="fasttag-cover-actions" style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:5px;"></div>' : ''}</div>
             </div>
-            <div class="fasttag-cover-status" role="status" style="font-size:10.5px;line-height:1.35;height:44px;flex:0 0 44px;overflow-y:auto;box-sizing:border-box;display:flex;align-items:center;padding:7px 8px;border-radius:6px;background:${isDark ? 'rgba(30,41,59,.8)' : '#e2e8f0'};color:${isDark ? '#cbd5e1' : '#334155'};">Opening the full video for frame capture…</div>
-            <div class="fasttag-cover-actions" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;"></div>
+            <div class="fasttag-cover-status" role="status" style="font-size:${isCompact ? '9.5px' : '10.5px'};line-height:1.3;height:${isCompact ? '28px' : '44px'};flex:0 0 ${isCompact ? '28px' : '44px'};overflow-y:auto;box-sizing:border-box;display:flex;align-items:center;padding:${isCompact ? '4px 7px' : '7px 8px'};border-radius:6px;background:${isDark ? 'rgba(30,41,59,.8)' : '#e2e8f0'};color:${isDark ? '#cbd5e1' : '#334155'};">Opening the full video for frame capture…</div>
+            ${isCompact ? '' : '<div class="fasttag-cover-actions" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;"></div>'}
             <input class="fasttag-cover-file" type="file" accept="image/jpeg,image/png,image/webp" style="display:none;">
-            <div style="font-size:9.5px;color:#94a3b8;line-height:1.35;">Nothing is changed until you select <strong>Set Cover</strong>. Upload and clipboard remain available when the full video cannot be played.</div>
-            <div class="fasttag-cover-footer" style="display:flex;gap:7px;border-top:1px solid ${isDark ? '#334155' : '#cbd5e1'};padding-top:9px;"></div>
+            ${isCompact ? '' : '<div style="font-size:9.5px;color:#94a3b8;line-height:1.35;">Nothing is changed until you select <strong>Set Cover</strong>. Upload and clipboard remain available when the full video cannot be played.</div>'}
+            <div class="fasttag-cover-footer" style="display:flex;gap:7px;border-top:1px solid ${isDark ? '#334155' : '#cbd5e1'};padding-top:${isCompact ? '6px' : '9px'};"></div>
         `;
         panel.appendChild(body);
         document.body.appendChild(panel);
@@ -639,6 +644,7 @@
             abortController,
             hostElement: currentOptions.hostElement,
             mediaController: currentOptions.mediaController,
+            compactMode: isCompact,
             awaitingNavigation: false,
             hasUnsavedChanges: () => Boolean(candidateDataUrl || preparingImage || saving),
             isSaving: () => saving,
@@ -655,7 +661,7 @@
         let sizeSaveTimer = null;
         const queueSizeSave = () => {
             root.clearTimeout(sizeSaveTimer);
-            sizeSaveTimer = root.setTimeout(() => saveEditorSize(panel), 180);
+            sizeSaveTimer = root.setTimeout(() => saveEditorSize(panel, isCompact), 180);
         };
         if (typeof root.ResizeObserver === 'function') {
             const resizeObserver = new root.ResizeObserver(queueSizeSave);

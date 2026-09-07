@@ -10,6 +10,7 @@
         showPinned: 'fasttag_show_pinned_chips',
         alwaysPlayFullVideo: 'fasttag_always_play_full_video',
         cardIconClicks: 'fasttag_enable_card_icon_clicks',
+        compactCoverEditor: 'fasttag_compact_cover_editor',
         geminiApiKey: 'fasttag_gemini_api_key',
         geminiModel: 'fasttag_gemini_model',
         geminiAutoParse: 'fasttag_gemini_auto_parse',
@@ -75,6 +76,8 @@
     function setEnableSuggestions(enabled) { writeBoolean(KEYS.suggestions, enabled); }
     function getEnableCardIconClicks() { return readBoolean(KEYS.cardIconClicks, true); }
     function setEnableCardIconClicks(enabled) { writeBoolean(KEYS.cardIconClicks, enabled); }
+    function getCompactCoverEditor() { return readBoolean(KEYS.compactCoverEditor, false); }
+    function setCompactCoverEditor(enabled) { writeBoolean(KEYS.compactCoverEditor, enabled); }
     function getAlwaysPlayFullVideo() { return readBoolean(KEYS.alwaysPlayFullVideo, false); }
     function setAlwaysPlayFullVideo(enabled) { writeBoolean(KEYS.alwaysPlayFullVideo, enabled); }
     function getShowRecentChips() { return readBoolean(KEYS.showRecent, true); }
@@ -335,6 +338,8 @@
         setEnableSuggestions,
         getEnableCardIconClicks,
         setEnableCardIconClicks,
+        getCompactCoverEditor,
+        setCompactCoverEditor,
         getAlwaysPlayFullVideo,
         setAlwaysPlayFullVideo,
         getShowRecentChips,
