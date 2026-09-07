@@ -196,7 +196,8 @@
     const {
         hasSelectionSetChanged,
         calculateBulkSelectionDelta,
-        applyBulkSelectionDelta
+        applyBulkSelectionDelta,
+        createSingleEditorSaveWorkflow
     } = FastTagEditors;
 
     FastTagDiagnostics.configure({ getUsageCount: () => getUsageCount() });
@@ -10282,28 +10283,29 @@
         };
         form._fastTagOnResize = refreshUI;
 
-        let pendingSaveSeq = 0;
-        const saveWithoutReload = async (sId, ids, showToast = true) => {
-            const currentSeq = ++pendingSaveSeq;
-            sessionStorage.setItem(scrollKey, window.scrollY);
-            const success = await updateEntityForScene(type, sId, Array.from(ids));
-            if (currentSeq !== pendingSaveSeq) return success;
-            if (success) {
+        const singleEditorSaveWorkflow = createSingleEditorSaveWorkflow({
+            commit: (targetSceneId, targetIds) => updateEntityForScene(type, targetSceneId, targetIds),
+            replaceBaseline: ids => {
+                sequentialEditState.initialSelectedIds = ids;
+            },
+            onLatestSuccess: ({ sceneId: targetSceneId, selectedIds: savedIds, context }) => {
                 if (getAutoMarkOrganized()) {
-                    updateSceneOrganized(sId, true);
+                    updateSceneOrganized(targetSceneId, true);
                     if (popup._organizedController) {
                         popup._organizedController.update(true);
                     }
                 }
-                sequentialEditState.initialSelectedIds = new Set(ids);
-                refreshSceneCardsDebounced(sId);
+                refreshSceneCardsDebounced(targetSceneId);
                 recordSaveUsage();
-                if (showToast) {
+                if (context?.showToast) {
                     toastSuccess(`${config.pluralTitle} updated`);
                 }
-                updateSequentialEditUI(form, type, ids);
+                updateSequentialEditUI(form, type, savedIds);
             }
-            return success;
+        });
+        const saveWithoutReload = async (sId, ids, showToast = true) => {
+            sessionStorage.setItem(scrollKey, window.scrollY);
+            return singleEditorSaveWorkflow.save(sId, ids, { showToast });
         };
 
         if (activeTableInstance) {

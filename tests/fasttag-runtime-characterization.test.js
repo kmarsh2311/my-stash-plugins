@@ -9,6 +9,7 @@ const source = fs.readFileSync(path.join(repositoryRoot, 'plugins', 'fasttag', '
 const previewSource = fs.readFileSync(path.join(repositoryRoot, 'plugins', 'fasttag', 'fasttag-preview.js'), 'utf8');
 const scraperControllerSource = fs.readFileSync(path.join(repositoryRoot, 'plugins', 'fasttag', 'fasttag-scraper-controller.js'), 'utf8');
 const popupSource = fs.readFileSync(path.join(repositoryRoot, 'plugins', 'fasttag', 'fasttag-popup.js'), 'utf8');
+const editorSource = fs.readFileSync(path.join(repositoryRoot, 'plugins', 'fasttag', 'fasttag-editors.js'), 'utf8');
 
 function section(startMarker, endMarker, text = source) {
     const start = text.indexOf(startMarker);
@@ -138,10 +139,15 @@ assert.ok((popupListeners.match(/\{ signal \}/g) || []).length >= 8, 'shared eve
 const singleEditorWorkflow = section('async function loadEntityDataIntoPopup(', '// --- Global DOM Triggers ---');
 assertBefore(singleEditorWorkflow, 'form._fastTagSceneId = sceneId;', 'await fetchGQL(config.fetchExistingQuery, { id: sceneId });', 'single-editor scene identity must be set before loading its metadata');
 assertBefore(singleEditorWorkflow, 'sequentialEditState.initialSelectedIds = new Set(selectedIds);', 'setupSequentialEditHandlers(', 'single-editor navigation must bind after the clean selection baseline exists');
-assertBefore(singleEditorWorkflow, 'const currentSeq = ++pendingSaveSeq;', 'await updateEntityForScene(type, sId, Array.from(ids));', 'single-editor saves must claim a sequence before starting a mutation');
-assertBefore(singleEditorWorkflow, 'if (currentSeq !== pendingSaveSeq) return success;', 'sequentialEditState.initialSelectedIds = new Set(ids);', 'an older single-editor save must not replace the newest clean baseline');
+assert.ok(singleEditorWorkflow.includes('createSingleEditorSaveWorkflow({'), 'single-editor saves must delegate to the editor workflow module');
+assert.ok(singleEditorWorkflow.includes('return singleEditorSaveWorkflow.save(sId, ids, { showToast });'), 'single-editor callers must await the extracted save result');
 assertBefore(singleEditorWorkflow, 'refreshUI();\n            saveWithoutReload(sceneId, selectedIds);', 'const hasSearch = filterInput', 'row selection must update the UI and start its automatic save before search cleanup');
 assert.ok(singleEditorWorkflow.includes('if (hasSelectionChanged(selectedIds))'), 'manual single-editor saves must avoid unchanged mutations');
+
+const singleEditorSave = section('function createSingleEditorSaveWorkflow(', 'root.FastTag = root.FastTag || {};', editorSource);
+assertBefore(singleEditorSave, 'const saveSequence = ++pendingSaveSequence;', 'const selectionSnapshot = normalizeIdSet(selectedIds);', 'single-editor saves must claim a sequence before snapshotting selections');
+assertBefore(singleEditorSave, 'await options.commit(sceneId, Array.from(selectionSnapshot), context);', 'if (saveSequence !== pendingSaveSequence) return success;', 'single-editor mutations must finish before stale results are rejected');
+assertBefore(singleEditorSave, 'if (saveSequence !== pendingSaveSequence) return success;', 'replaceBaseline(new Set(selectionSnapshot), context);', 'an older single-editor save must not replace the newest clean baseline');
 
 // Single-editor sequential navigation commits a changed selection against the
 // current scene before advancing state and loading the next scene in-place.
