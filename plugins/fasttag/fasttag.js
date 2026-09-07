@@ -351,7 +351,9 @@
                 }
                 const script = document.createElement('script');
                 script.id = 'fasttag-help-script';
-                script.src = new URL(assetPaths[index], window.location.origin).href;
+                const scriptUrl = new URL(assetPaths[index], window.location.origin);
+                scriptUrl.searchParams.set('v', '4.3.0-help-2');
+                script.src = scriptUrl.href;
                 script.async = true;
                 script.onload = () => {
                     if (window.FastTag?.help?.openGuide) resolve(window.FastTag.help);
