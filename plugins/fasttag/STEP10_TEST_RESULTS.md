@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `199e6e3`
+- Runtime source commit: `77d3316`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -182,8 +182,10 @@ switching back to the released live plugin.
 - The draggable Full Video timeline could leave Edit Everything's player paused
   when pointer capture ended outside the bar or when seeking began during the
   short wheel-scrub pause. Commit `199e6e3` preserves the intended playback state
-  and adds window-level completion fallbacks, so a previously playing video
-  resumes after seeking without adding a Play button. Browser retest pending.
+  and adds window-level completion fallbacks. Commit `77d3316` further enforces
+  that ordinary Edit Everything and single-editor videos always resume their
+  loop after seeking; only the Cover Editor preserves an intentional paused
+  state for frame capture. No Play button was added. Browser retest pending.
 - Accepting a StashDB result stored the correct remote scene ID. With Cover
   selected it also saved the remote cover; with Cover cleared it retained the
   existing cover while still storing the ID. No warnings or console errors
