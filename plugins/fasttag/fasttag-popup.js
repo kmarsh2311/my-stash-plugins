@@ -293,32 +293,13 @@
             return;
         }
 
-        let savedSinglePos = null;
+        // A fresh single-entity editor belongs to the card that opened it. Older
+        // builds persisted dragged single-editor positions across sessions; clear
+        // that legacy value so it cannot override the current card anchor. During
+        // an active sequential session the branch above still retains a user move.
         try {
-            savedSinglePos = JSON.parse(root.localStorage.getItem('fasttag_single_pos') || 'null');
+            root.localStorage.removeItem('fasttag_single_pos');
         } catch (error) {}
-
-        if (savedSinglePos && savedSinglePos.left && savedSinglePos.top) {
-            const parsedX = parseInt(savedSinglePos.left, 10);
-            const parsedY = parseInt(savedSinglePos.top, 10);
-            if (!isNaN(parsedX) && !isNaN(parsedY)) {
-                const pos = clampPos(parsedX, parsedY);
-                form.style.left = `${pos.x}px`;
-                form.style.top = `${pos.y}px`;
-                if (sequentialEditState.enabled) sequentialEditState.popupPosition = { left: pos.x, top: pos.y };
-                root.requestAnimationFrame(() => {
-                    const actualFormRect = form.getBoundingClientRect();
-                    const clamped = clampPos(actualFormRect.left, actualFormRect.top);
-                    form.style.left = `${clamped.x}px`;
-                    form.style.top = `${clamped.y}px`;
-                    form.classList.add('popup-visible');
-                    if (typeof form._fastTagOnResize === 'function') form._fastTagOnResize();
-                    const firstInput = form.querySelector('input[type="text"], input[type="search"]');
-                    if (firstInput) firstInput.focus({ preventScroll: true });
-                });
-                return;
-            }
-        }
 
         const cardRect = cardElement ? cardElement.getBoundingClientRect() : { right: 100, top: 100, left: 100 };
         let popupX = cardRect.right + 10;
@@ -619,10 +600,7 @@
                         } catch (e) {}
                     } else {
                         try {
-                            localStorage.setItem('fasttag_single_pos', JSON.stringify({
-                                left: form.style.left,
-                                top: form.style.top
-                            }));
+                            localStorage.removeItem('fasttag_single_pos');
                         } catch (e) {}
                     }
                     if (sequentialEditState.enabled) {

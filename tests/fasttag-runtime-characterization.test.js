@@ -110,13 +110,14 @@ for (const selector of ['preview-container', 'tabulator-table', 'search-input', 
 assert.equal((popupShell.match(/class="popup-resize-handle"/g) || []).length, 8, 'popup shell must retain all eight resize handles');
 assertBefore(popupShell, 'document.body.appendChild(form);', 'return {', 'the popup must be connected before its control references are returned');
 
-// Positioning honours persisted positions and sequential continuity before
-// falling back to card anchoring, then exposes and focuses the popup in a frame.
+// Edit Everything honours its persisted workstation position. Single editors
+// retain a user move only during sequential navigation and otherwise return to
+// their current card anchor before becoming visible and focusing their input.
 const popupPositioning = section('function positionNearCard(', 'root.FastTag = root.FastTag || {};', popupSource);
 assert.ok(popupPositioning.includes("localStorage.getItem('fasttag_everything_pos')"), 'Edit Everything position must be restored');
-assert.ok(popupPositioning.includes("localStorage.getItem('fasttag_single_pos')"), 'single-editor position must be restored');
+assert.ok(popupPositioning.includes("localStorage.removeItem('fasttag_single_pos')"), 'obsolete persistent single-editor positions must be cleared');
 assertBefore(popupPositioning, 'if (isEverythingModal)', 'if (sequentialEditState.enabled && sequentialEditState.popupPosition.left !== 0)', 'Edit Everything placement must be decided before single-editor sequential continuity');
-assertBefore(popupPositioning, "localStorage.getItem('fasttag_single_pos')", 'const cardRect = cardElement ?', 'a saved single-editor position must take priority over card anchoring');
+assertBefore(popupPositioning, 'if (sequentialEditState.enabled && sequentialEditState.popupPosition.left !== 0)', 'const cardRect = cardElement ?', 'active sequential positioning must take priority over fresh card anchoring');
 assert.ok(popupPositioning.includes("form.classList.add('popup-visible');"), 'positioned popups must become visible');
 assert.ok(popupPositioning.includes('focus({ preventScroll: true })'), 'positioned popups must focus their first input without moving the page');
 
@@ -131,7 +132,8 @@ assert.ok(popupListeners.includes("e.target.closest('#fasttag-cover-editor-hud')
 const escapeHandling = section("if (e.key === 'Escape')", "if (e.target?.closest?.('#fasttag-cover-editor-hud'))", popupListeners);
 assertBefore(escapeHandling, 'if (searchBox && searchBox.value.trim().length > 0)', 'closeActive();', 'Escape must clear active search text before closing the popup');
 assert.ok(popupListeners.includes("localStorage.setItem('fasttag_everything_pos'"), 'dragging Edit Everything must persist its position');
-assert.ok(popupListeners.includes("localStorage.setItem('fasttag_single_pos'"), 'dragging a single editor must persist its position');
+assert.equal(popupListeners.includes("localStorage.setItem('fasttag_single_pos'"), false, 'dragging a single editor must not persist its position beyond the current session');
+assert.ok(popupListeners.includes('sequentialEditState.popupPosition = { left: rect.left, top: rect.top };'), 'dragging during sequential editing must retain the position for that session');
 assert.ok(popupListeners.includes('setSavedSize(form.offsetWidth, form.offsetHeight, popupType);'), 'resize completion must persist popup dimensions');
 assert.ok((popupListeners.match(/\{ signal \}/g) || []).length >= 8, 'shared event listeners must remain abort-owned');
 

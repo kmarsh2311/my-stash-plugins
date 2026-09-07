@@ -108,9 +108,19 @@ assert.deepEqual(single.visibleClasses, ['popup-visible']);
 
 values.set('fasttag_single_pos', JSON.stringify({ left: '5000px', top: '-20px' }));
 const restored = createForm('single', 400, 300);
-popup.positionNearCard(restored.form, null);
-assert.equal(restored.form.style.left, '792px');
-assert.equal(restored.form.style.top, '8px');
+popup.positionNearCard(restored.form, { getBoundingClientRect: () => ({ right: 310, left: 60, top: 140 }) });
+assert.equal(restored.form.style.left, '320px', 'a fresh single editor should ignore a legacy saved position and anchor beside its card');
+assert.equal(restored.form.style.top, '140px');
+assert.equal(values.has('fasttag_single_pos'), false, 'obsolete saved single-editor positions should be removed');
+
+sequentialState.enabled = true;
+sequentialState.popupPosition = { left: 360, top: 180 };
+const sequentialSingle = createForm('single', 400, 300);
+popup.positionNearCard(sequentialSingle.form, { getBoundingClientRect: () => ({ right: 110, left: 20, top: 20 }) });
+assert.equal(sequentialSingle.form.style.left, '360px', 'sequential navigation should retain a user-moved popup position');
+assert.equal(sequentialSingle.form.style.top, '180px');
+sequentialState.enabled = false;
+sequentialState.popupPosition = { left: 0, top: 0 };
 
 const closeEvents = [];
 const makeTable = name => ({
