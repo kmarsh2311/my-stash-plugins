@@ -43,7 +43,7 @@ Never enable it while the live FastTag plugin is enabled.
 - [x] Suggestions and global search
 - [x] Edit Everything automatic save
 - [x] Sequential navigation with dirty metadata
-- [ ] Random-scene navigation and history
+- [x] Random-scene navigation and history
 - [ ] Bulk single-entity editing
 - [ ] Bulk Edit Everything
 - [ ] Bulk partial-failure reporting and retry behavior
@@ -111,3 +111,5 @@ switching back to the released live plugin.
 - In sequential Edit Everything mode, metadata saved quickly enough to complete
   before the immediate Next Scene action. Returning to the previous scene
   confirmed that the change persisted and navigation loaded the correct scene.
+- Random Scene navigation worked across several scenes; backward and forward
+  controls traversed the same scenes in the correct history order.
