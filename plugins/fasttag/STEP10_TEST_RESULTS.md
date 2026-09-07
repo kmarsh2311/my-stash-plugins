@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `dbd0f2b`
+- Runtime source commit: `ce9a29c`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -121,3 +121,8 @@ switching back to the released live plugin.
   automated workflow test separately verifies mixed-success result totals.
 - Bulk Edit Everything applied and removed metadata across all selected scenes,
   reported the expected outcome, and produced no browser-console errors.
+- Navigating while the scraper HUD remained open left the previous scene's
+  result visible until the new scrape completed. Commit `ce9a29c` replaces it
+  immediately with a scene-neutral loading state in docked and detached modes,
+  while retaining the existing request-generation ownership guard. Browser
+  retest pending.
