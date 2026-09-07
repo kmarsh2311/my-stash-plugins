@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `0192000`
+- Runtime source commit: `4e76ddd`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -167,6 +167,11 @@ switching back to the released live plugin.
   Some configured names include a domain suffix such as “StashDB.org”; commit
   `0192000` removes that suffix from the compact label while retaining the full
   configured name in its title. Browser retest pending.
+- Clicking an existing Gemini tag or performer suggestion repeatedly could run
+  multiple saves and notifications and prefix another tick after each run.
+  Commit `4e76ddd` locks each pill before its asynchronous work, treats an
+  already-selected entity as complete, and renders one stable completion tick.
+  Browser retest pending.
 - Accepting a StashDB result stored the correct remote scene ID. With Cover
   selected it also saved the remote cover; with Cover cleared it retained the
   existing cover while still storing the ID. No warnings or console errors
