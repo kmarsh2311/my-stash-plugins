@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `d05c4fb`
+- Runtime source commit: `4a2e2c2`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -32,12 +32,12 @@ Never enable it while the live FastTag plugin is enabled.
 
 ## Manual regression checklist
 
-- [ ] Single Tag editor
+- [x] Single Tag editor
 - [ ] Single Performer editor and hover preview
 - [ ] Single Studio editor
 - [ ] Single Gallery editor
-- [ ] Single-editor automatic save and refresh
-- [ ] Single-editor sequential previous/next navigation
+- [x] Single-editor automatic save and refresh
+- [x] Single-editor sequential previous/next navigation
 - [ ] Edit Everything tags, performers, studio, and groups
 - [ ] Recent and pinned pills
 - [ ] Suggestions and global search
@@ -70,3 +70,12 @@ Never enable it while the live FastTag plugin is enabled.
 Record each failure with the scene ID, editor/mode, exact action, expected
 result, actual result, browser-console message, and whether it reproduces after
 switching back to the released live plugin.
+
+### Fixed during testing
+
+- Single Tag add/remove and sequential navigation saved and refreshed correctly.
+- The first pass exposed `ReferenceError: searchClear is not defined` after a
+  searched row was selected. It also exposed Tabulator warnings caused by
+  missing-row lookups and attempts to remove unregistered selection events.
+  Commit `4a2e2c2` fixes all three sources and adds regression assertions. The
+  isolated test package was refreshed from that commit; browser retest pending.
