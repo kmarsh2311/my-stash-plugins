@@ -1033,18 +1033,31 @@
             const scraperHeaderActions = targetContainer.querySelector('#fasttag-scrape-header-actions');
             const updateScraperHeaderLayout = () => {
                 if (!scraperHeader || !scraperHeaderPrimary || !scraperHeaderActions) return;
-                const containerWidth = targetContainer.getBoundingClientRect?.().width || targetContainer.clientWidth || 0;
-                const compact = containerWidth > 0 && containerWidth < 370;
-                scraperHeader.style.display = compact ? 'grid' : 'flex';
-                scraperHeader.style.gridTemplateColumns = compact ? 'minmax(0, 1fr)' : '';
-                scraperHeader.style.gridTemplateRows = compact ? '24px 24px' : '';
-                scraperHeader.style.height = compact ? '52px' : 'auto';
-                scraperHeader.style.flexDirection = 'row';
-                scraperHeader.style.alignItems = compact ? 'stretch' : 'center';
-                scraperHeaderPrimary.style.flex = compact ? '0 0 auto' : '1 1 150px';
-                scraperHeaderPrimary.style.width = compact ? '100%' : 'auto';
-                scraperHeaderActions.style.alignSelf = compact ? 'flex-end' : 'auto';
-                scraperHeaderActions.style.justifySelf = compact ? 'end' : 'auto';
+                // Always measure from the normal one-row layout. Measuring while the
+                // compact grid is active would include its forced full-width primary
+                // row and could leave the header stuck in compact mode after widening.
+                scraperHeader.style.display = 'flex';
+                scraperHeader.style.gridTemplateColumns = '';
+                scraperHeader.style.gridTemplateRows = '';
+                scraperHeader.style.height = 'auto';
+                scraperHeader.style.alignItems = 'center';
+                scraperHeaderPrimary.style.flex = '1 1 150px';
+                scraperHeaderPrimary.style.width = 'auto';
+                scraperHeaderActions.style.alignSelf = 'auto';
+                scraperHeaderActions.style.justifySelf = 'auto';
+                const availableWidth = scraperHeader.clientWidth || targetContainer.getBoundingClientRect?.().width || targetContainer.clientWidth || 0;
+                const requiredWidth = scraperHeaderPrimary.scrollWidth + scraperHeaderActions.scrollWidth + 6;
+                const compact = availableWidth > 0 && requiredWidth > availableWidth;
+                if (!compact) return;
+                scraperHeader.style.display = 'grid';
+                scraperHeader.style.gridTemplateColumns = 'minmax(0, 1fr)';
+                scraperHeader.style.gridTemplateRows = '24px 24px';
+                scraperHeader.style.height = '52px';
+                scraperHeader.style.alignItems = 'stretch';
+                scraperHeaderPrimary.style.flex = '0 0 auto';
+                scraperHeaderPrimary.style.width = '100%';
+                scraperHeaderActions.style.alignSelf = 'flex-end';
+                scraperHeaderActions.style.justifySelf = 'end';
             };
             targetContainer._fastTagScraperHeaderResizeObserver?.disconnect?.();
             updateScraperHeaderLayout();
