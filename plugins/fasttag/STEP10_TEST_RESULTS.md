@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `80aaa3b`
+- Runtime source commit: `199e6e3`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -179,6 +179,11 @@ switching back to the released live plugin.
   editor beside its current card while retaining a user-moved position during
   the active Sequential session only. Browser testing confirmed both behaviours;
   Edit Everything retains its existing independent positioning behaviour.
+- The draggable Full Video timeline could leave Edit Everything's player paused
+  when pointer capture ended outside the bar or when seeking began during the
+  short wheel-scrub pause. Commit `199e6e3` preserves the intended playback state
+  and adds window-level completion fallbacks, so a previously playing video
+  resumes after seeking without adding a Play button. Browser retest pending.
 - Accepting a StashDB result stored the correct remote scene ID. With Cover
   selected it also saved the remote cover; with Cover cleared it retained the
   existing cover while still storing the ID. No warnings or console errors
