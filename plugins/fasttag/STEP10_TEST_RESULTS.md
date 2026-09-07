@@ -46,7 +46,7 @@ Never enable it while the live FastTag plugin is enabled.
 - [x] Random-scene navigation and history
 - [x] Bulk single-entity editing
 - [x] Bulk Edit Everything
-- [ ] Bulk partial-failure reporting and retry behavior
+- [x] Bulk partial-failure reporting and retry behavior
 - [ ] Scraper search, filtering, navigation, and dismissal
 - [ ] Scraper field checkboxes and acceptance
 - [ ] Separate StashDB ID and cover saving
@@ -115,5 +115,9 @@ switching back to the released live plugin.
   controls traversed the same scenes in the correct history order.
 - Bulk single-entity Tag editing added a tag to every selected scene and then
   removed it from every selected scene; the affected cards updated correctly.
+- With the browser temporarily Offline, Bulk Edit Everything reported that all
+  updates failed, kept the editor open, and exposed Retry Changes. Restoring
+  connectivity and retrying updated every selected scene successfully. The
+  automated workflow test separately verifies mixed-success result totals.
 - Bulk Edit Everything applied and removed metadata across all selected scenes,
   reported the expected outcome, and produced no browser-console errors.
