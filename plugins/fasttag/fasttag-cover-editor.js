@@ -304,13 +304,13 @@
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;min-height:${isCompact ? '156px' : '170px'};">
                 <div><div style="font-size:10px;font-weight:700;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;">Current cover</div><div class="fasttag-cover-current" style="height:${isCompact ? '148px' : '165px'};background:#020617;border:1px solid #334155;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;"></div></div>
-                <div><div style="font-size:10px;font-weight:700;color:#a5b4fc;margin-bottom:4px;text-transform:uppercase;">New cover</div><div class="fasttag-cover-candidate" style="height:${isCompact ? '112px' : '165px'};background:#020617;border:1px dashed #6366f1;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#64748b;font-size:11px;text-align:center;padding:8px;box-sizing:border-box;">Capture, upload, paste or drop an image</div>${isCompact ? '<div class="fasttag-cover-actions" style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:5px;"></div>' : ''}</div>
+                <div><div style="font-size:10px;font-weight:700;color:#a5b4fc;margin-bottom:4px;text-transform:uppercase;">New cover</div><div class="fasttag-cover-candidate" style="height:${isCompact ? '148px' : '165px'};background:#020617;border:1px dashed #6366f1;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#64748b;font-size:11px;text-align:center;padding:8px;box-sizing:border-box;">Capture, upload, paste or drop an image</div></div>
             </div>
-            <div class="fasttag-cover-status" role="status" style="font-size:${isCompact ? '9.5px' : '10.5px'};line-height:1.3;height:${isCompact ? '28px' : '44px'};flex:0 0 ${isCompact ? '28px' : '44px'};overflow-y:auto;box-sizing:border-box;display:flex;align-items:center;padding:${isCompact ? '4px 7px' : '7px 8px'};border-radius:6px;background:${isDark ? 'rgba(30,41,59,.8)' : '#e2e8f0'};color:${isDark ? '#cbd5e1' : '#334155'};">Opening the full video for frame capture…</div>
+            <div class="fasttag-cover-status" role="status" style="font-size:${isCompact ? '9.5px' : '10.5px'};line-height:1.3;height:${isCompact ? '28px' : '44px'};flex:0 0 ${isCompact ? '28px' : '44px'};overflow-y:auto;box-sizing:border-box;display:${isCompact ? 'none' : 'flex'};align-items:center;padding:${isCompact ? '4px 7px' : '7px 8px'};border-radius:6px;background:${isDark ? 'rgba(30,41,59,.8)' : '#e2e8f0'};color:${isDark ? '#cbd5e1' : '#334155'};">Opening the full video for frame capture…</div>
             ${isCompact ? '' : '<div class="fasttag-cover-actions" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;"></div>'}
             <input class="fasttag-cover-file" type="file" accept="image/jpeg,image/png,image/webp" style="display:none;">
             ${isCompact ? '' : '<div style="font-size:9.5px;color:#94a3b8;line-height:1.35;">Nothing is changed until you select <strong>Set Cover</strong>. Upload and clipboard remain available when the full video cannot be played.</div>'}
-            <div class="fasttag-cover-footer" style="display:flex;gap:7px;border-top:1px solid ${isDark ? '#334155' : '#cbd5e1'};padding-top:${isCompact ? '6px' : '9px'};"></div>
+            <div class="fasttag-cover-footer" style="display:${isCompact ? 'grid' : 'flex'};grid-template-columns:${isCompact ? 'auto minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr)' : 'none'};gap:${isCompact ? '5px' : '7px'};border-top:1px solid ${isDark ? '#334155' : '#cbd5e1'};padding-top:${isCompact ? '6px' : '9px'};"></div>
         `;
         panel.appendChild(body);
         document.body.appendChild(panel);
@@ -333,7 +333,7 @@
         const captureButton = createActionButton('📷 Capture Frame');
         const uploadButton = createActionButton('⬆ Upload');
         const pasteButton = createActionButton('📋 Paste');
-        actions.append(uploadButton, pasteButton);
+        if (!isCompact) actions.append(uploadButton, pasteButton);
         const playPauseButton = createActionButton('⏸ Pause');
         const stepBackButton = createActionButton('◀');
         const stepForwardButton = createActionButton('▶');
@@ -348,7 +348,9 @@
         saveButton.disabled = true;
         saveButton.style.opacity = '0.45';
         saveButton.style.flex = '1';
-        footer.append(cancelButton, saveButton);
+        footer.append(...(isCompact
+            ? [cancelButton, uploadButton, pasteButton, saveButton]
+            : [cancelButton, saveButton]));
 
         let candidateDataUrl = '';
         let candidateSource = '';
@@ -358,9 +360,10 @@
         let manualPastePending = false;
         let sceneGeneration = 0;
 
-        const setStatus = (message, error = false, lock = false) => {
+        const setStatus = (message, error = false, lock = false, showInCompact = false) => {
             if (lock) statusLocked = true;
             status.textContent = message;
+            status.style.display = isCompact && !error && !showInCompact ? 'none' : 'flex';
             status.style.color = error ? '#fca5a5' : (isDark ? '#cbd5e1' : '#334155');
             status.style.border = error ? '1px solid rgba(239,68,68,.45)' : '1px solid transparent';
         };
@@ -384,7 +387,7 @@
             const insecureHttp = root.location?.protocol === 'http:' && root.isSecureContext === false;
             setStatus(insecureHttp
                 ? 'This HTTP network address cannot read the clipboard directly. Press Ctrl+V or Cmd+V now.'
-                : 'Direct clipboard access was unavailable. Press Ctrl+V or Cmd+V now.', false, true);
+                : 'Direct clipboard access was unavailable. Press Ctrl+V or Cmd+V now.', false, true, true);
             status.style.border = '1px solid rgba(99,102,241,.7)';
             status.style.color = isDark ? '#c7d2fe' : '#3730a3';
             panel.focus?.({ preventScroll: true });
