@@ -48,7 +48,7 @@ Never enable it while the live FastTag plugin is enabled.
 - [x] Bulk Edit Everything
 - [x] Bulk partial-failure reporting and retry behavior
 - [x] Scraper search, filtering, navigation, and dismissal
-- [ ] Scraper field checkboxes and acceptance
+- [x] Scraper field checkboxes and acceptance
 - [ ] Separate StashDB ID and cover saving
 - [ ] Scraper performer image enrichment
 - [ ] Gemini bridge start, parse, timeout, and fallback behavior
@@ -139,3 +139,5 @@ switching back to the released live plugin.
   controls, candidate navigation, dismissal, and cross-scene loading behaviour
   worked without new functional errors. CSP messages for optional third-party
   source maps were classified as harmless developer-tool noise.
+- Scraper acceptance respected individual field selections: checked metadata
+  saved and refreshed immediately, while unchecked fields remained unchanged.
