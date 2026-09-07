@@ -171,12 +171,14 @@ switching back to the released live plugin.
   multiple saves and notifications and prefix another tick after each run.
   Commit `4e76ddd` locks each pill before its asynchronous work, treats an
   already-selected entity as complete, and renders one stable completion tick.
-  Browser retest pending.
+  Browser testing confirmed AI Parse still works and repeated pill clicks no
+  longer duplicate the completion state or notifications.
 - A dragged single-entity editor position was persisted across later popup
   sessions, which could make a fresh Tag, Performer, Studio, or Gallery editor
   open away from the scene card. Commit `80aaa3b` anchors every fresh single
   editor beside its current card while retaining a user-moved position during
-  the active Sequential session only. Browser retest pending.
+  the active Sequential session only. Browser testing confirmed both behaviours;
+  Edit Everything retains its existing independent positioning behaviour.
 - Accepting a StashDB result stored the correct remote scene ID. With Cover
   selected it also saved the remote cover; with Cover cleared it retained the
   existing cover while still storing the ID. No warnings or console errors
