@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `51b81eb`
+- Runtime source commit: `d75a1a8`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -149,7 +149,12 @@ switching back to the released live plugin.
   `dd95e82` introduced a measured compact layout, but browser testing showed
   that its flexible height could still overlap the search row. Commit `51b81eb`
   uses two explicit grid rows and reserves 52px below 370px, while retaining one
-  row at normal widths. Browser retest pending.
+  row at normal widths.
+- Closing the floating scraper HUD could allow its ResizeObserver to persist the
+  removed element's `0px` dimensions. CSS then forced every subsequent opening
+  to the cramped 300px minimum. Commit `d75a1a8` disconnects HUD observers before
+  removal, ignores detached or invalid dimensions, and migrates an invalid saved
+  size back to the 390×480 default. Browser retest pending.
 - Accepting a StashDB result stored the correct remote scene ID. With Cover
   selected it also saved the remote cover; with Cover cleared it retained the
   existing cover while still storing the ID. No warnings or console errors
