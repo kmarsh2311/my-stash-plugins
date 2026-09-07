@@ -215,11 +215,92 @@
     function isHudOpen() { return Boolean(floatingHudElement && root.document?.body?.contains(floatingHudElement)); }
     function resetLayoutState() { floatingHudPosition = null; floatingHudSize = null; }
 
+    function ensureHud(popup) {
+        const document = root.document;
+        let hudElement = getHudElement();
+        if (hudElement && document.body.contains(hudElement)) {
+            watchHudOwner(popup);
+            return hudElement;
+        }
+
+        hudElement = document.createElement('div');
+        setHudElement(hudElement);
+        hudElement.id = 'fasttag-floating-scraper-hud';
+        const defaultPos = getInitialPopoutPosition(390, 480);
+        let finalWidth = defaultPos.width || '390px';
+        let finalHeight = defaultPos.height || '480px';
+        let finalLeft = defaultPos.left;
+        let finalTop = defaultPos.top;
+        let finalRight = defaultPos.right;
+
+        let savedPos = getHudPosition();
+        if (!savedPos) {
+            try {
+                savedPos = JSON.parse(root.localStorage.getItem('fasttag_scraper_hud_pos') || 'null');
+            } catch (error) {}
+        }
+        let savedSize = getHudSize();
+        if (!savedSize) {
+            try {
+                savedSize = JSON.parse(root.localStorage.getItem('fasttag_scraper_hud_size') || 'null');
+            } catch (error) {}
+        }
+
+        if (savedPos && savedPos.left && savedPos.top) {
+            const pLeft = parseInt(savedPos.left, 10);
+            const pTop = parseInt(savedPos.top, 10);
+            const savedWidth = savedSize?.width ? parseInt(savedSize.width, 10) : NaN;
+            const savedHeight = savedSize?.height ? parseInt(savedSize.height, 10) : NaN;
+            const pW = Number.isFinite(savedWidth) && savedWidth >= 300 ? savedWidth : (parseInt(defaultPos.width, 10) || 390);
+            const pH = Number.isFinite(savedHeight) && savedHeight >= 220 ? savedHeight : (parseInt(defaultPos.height, 10) || 480);
+            if (!isNaN(pLeft) && !isNaN(pTop)) {
+                finalLeft = `${Math.max(8, Math.min(root.innerWidth - pW - 8, pLeft))}px`;
+                finalTop = `${Math.max(8, Math.min(root.innerHeight - pH - 8, pTop))}px`;
+                finalRight = null;
+                finalWidth = `${pW}px`;
+                finalHeight = `${pH}px`;
+                setHudPosition({ left: finalLeft, top: finalTop });
+                if (savedSize) setHudSize(savedSize);
+            }
+        }
+
+        const isDarkTheme = dependencies.getEffectiveTheme() === 'dark';
+        hudElement.style.cssText = `position: fixed; top: ${finalTop}; ${finalLeft ? `left: ${finalLeft};` : `right: ${finalRight};`} width: ${finalWidth}; height: ${finalHeight}; min-width: 300px; min-height: 220px; max-width: 92vw; max-height: 92vh; z-index: 1000000; background: ${isDarkTheme ? '#1e293b' : '#ffffff'}; border: 1.5px solid ${isDarkTheme ? '#4338ca' : '#a5b4fc'}; border-radius: 10px; box-shadow: 0 20px 50px rgba(0,0,0,0.85); overflow: visible; display: flex; flex-direction: column;`;
+        document.body.appendChild(hudElement);
+
+        if (typeof root.ResizeObserver === 'function') {
+            const scraperResizeObserver = new root.ResizeObserver(() => {
+                if (hudElement?.isConnected && !hudElement._isDragging
+                    && hudElement.offsetWidth >= 300 && hudElement.offsetHeight >= 220) {
+                    const currentSize = {
+                        width: `${hudElement.offsetWidth}px`,
+                        height: `${hudElement.offsetHeight}px`
+                    };
+                    setHudSize(currentSize);
+                    try {
+                        root.localStorage.setItem('fasttag_scraper_hud_size', JSON.stringify(currentSize));
+                    } catch (error) {}
+                }
+            });
+            hudElement._fastTagResizeObserver = scraperResizeObserver;
+            scraperResizeObserver.observe(hudElement);
+        }
+        watchHudOwner(popup);
+        return hudElement;
+    }
+
     function showLoadingState(popup, message = 'Scraping new scene…') {
         if (!isPopupActive(popup)) return false;
-        const detachedHud = isHudOpen() ? getHudElement() : null;
+        const detachedHud = dependencies?.getDetachScraper?.()
+            ? ensureHud(popup)
+            : (isHudOpen() ? getHudElement() : null);
         const targetContainer = detachedHud || popup?.scraperCardContainer;
         if (!targetContainer) return false;
+
+        if (detachedHud && popup?.scraperCardContainer) {
+            popup.scraperCardContainer.innerHTML = '';
+            popup.scraperCardContainer.style.display = 'none';
+        }
 
         const isDark = dependencies?.getEffectiveTheme?.() !== 'light';
         targetContainer.style.display = 'flex';
@@ -413,78 +494,15 @@
         let targetContainer = container;
         let floatingScraperHudElement = getHudElement();
         let floatingScraperHudPosition = getHudPosition();
-        let floatingScraperHudSize = getHudSize();
 
         if (isDetached) {
             if (popup?.scraperCardContainer) {
                 popup.scraperCardContainer.innerHTML = '';
                 popup.scraperCardContainer.style.display = 'none';
             }
-            if (!floatingScraperHudElement || !document.body.contains(floatingScraperHudElement)) {
-                floatingScraperHudElement = document.createElement('div');
-                setHudElement(floatingScraperHudElement);
-                floatingScraperHudElement.id = 'fasttag-floating-scraper-hud';
-                const defaultPos = getInitialPopoutPosition(390, 480);
-                let finalWidth = defaultPos.width || '390px';
-                let finalHeight = defaultPos.height || '480px';
-                let finalLeft = defaultPos.left;
-                let finalTop = defaultPos.top;
-                let finalRight = defaultPos.right;
-
-                let savedPos = floatingScraperHudPosition;
-                if (!savedPos) {
-                    try {
-                        savedPos = JSON.parse(root.localStorage.getItem('fasttag_scraper_hud_pos') || 'null');
-                    } catch (e) {}
-                }
-                let savedSize = floatingScraperHudSize;
-                if (!savedSize) {
-                    try {
-                        savedSize = JSON.parse(root.localStorage.getItem('fasttag_scraper_hud_size') || 'null');
-                    } catch (e) {}
-                }
-
-                if (savedPos && savedPos.left && savedPos.top) {
-                    const pLeft = parseInt(savedPos.left, 10);
-                    const pTop = parseInt(savedPos.top, 10);
-                    const savedWidth = savedSize?.width ? parseInt(savedSize.width, 10) : NaN;
-                    const savedHeight = savedSize?.height ? parseInt(savedSize.height, 10) : NaN;
-                    const pW = Number.isFinite(savedWidth) && savedWidth >= 300 ? savedWidth : (parseInt(defaultPos.width, 10) || 390);
-                    const pH = Number.isFinite(savedHeight) && savedHeight >= 220 ? savedHeight : (parseInt(defaultPos.height, 10) || 480);
-                    if (!isNaN(pLeft) && !isNaN(pTop)) {
-                        finalLeft = `${Math.max(8, Math.min(root.innerWidth - pW - 8, pLeft))}px`;
-                        finalTop = `${Math.max(8, Math.min(root.innerHeight - pH - 8, pTop))}px`;
-                        finalRight = null;
-                        finalWidth = `${pW}px`;
-                        finalHeight = `${pH}px`;
-                        floatingScraperHudPosition = { left: finalLeft, top: finalTop };
-                        setHudPosition(floatingScraperHudPosition);
-                        if (savedSize) floatingScraperHudSize = savedSize;
-                        if (savedSize) setHudSize(savedSize);
-                    }
-                }
-                const isDarkTheme = getEffectiveTheme() === 'dark';
-                floatingScraperHudElement.style.cssText = `position: fixed; top: ${finalTop}; ${finalLeft ? `left: ${finalLeft};` : `right: ${finalRight};`} width: ${finalWidth}; height: ${finalHeight}; min-width: 300px; min-height: 220px; max-width: 92vw; max-height: 92vh; z-index: 1000000; background: ${isDarkTheme ? '#1e293b' : '#ffffff'}; border: 1.5px solid ${isDarkTheme ? '#4338ca' : '#a5b4fc'}; border-radius: 10px; box-shadow: 0 20px 50px rgba(0,0,0,0.85); overflow: visible; display: flex; flex-direction: column;`;
-                document.body.appendChild(floatingScraperHudElement);
-
-                const scraperResizeObserver = new root.ResizeObserver(() => {
-                    if (floatingScraperHudElement?.isConnected && !floatingScraperHudElement._isDragging
-                        && floatingScraperHudElement.offsetWidth >= 300 && floatingScraperHudElement.offsetHeight >= 220) {
-                        floatingScraperHudSize = {
-                            width: `${floatingScraperHudElement.offsetWidth}px`,
-                            height: `${floatingScraperHudElement.offsetHeight}px`
-                        };
-                        setHudSize(floatingScraperHudSize);
-                        try {
-                            root.localStorage.setItem('fasttag_scraper_hud_size', JSON.stringify(floatingScraperHudSize));
-                        } catch (e) {}
-                    }
-                });
-                floatingScraperHudElement._fastTagResizeObserver = scraperResizeObserver;
-                scraperResizeObserver.observe(floatingScraperHudElement);
-            }
+            floatingScraperHudElement = ensureHud(popup);
+            floatingScraperHudPosition = getHudPosition();
             targetContainer = floatingScraperHudElement;
-            watchHudOwner(popup);
             targetContainer.style.display = 'flex';
         } else {
             closeHud();

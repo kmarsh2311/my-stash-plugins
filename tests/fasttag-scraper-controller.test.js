@@ -79,6 +79,46 @@ assert.match(loadingPopup.scraperCardContainer.innerHTML, /Scraping new scene/);
 assert.doesNotMatch(loadingPopup.scraperCardContainer.innerHTML, /Previous scene result/);
 assert.equal(loadingPopup.scrapeBtn.disabled, true);
 
+const connectedHudElements = new Set();
+global.innerWidth = 1200;
+global.innerHeight = 800;
+global.document = {
+    body: {
+        contains: element => connectedHudElements.has(element),
+        appendChild: element => { connectedHudElements.add(element); element.isConnected = true; }
+    },
+    createElement: () => ({
+        style: {},
+        innerHTML: '',
+        offsetWidth: 390,
+        offsetHeight: 480,
+        remove() { connectedHudElements.delete(this); this.isConnected = false; }
+    }),
+    querySelector: () => null
+};
+global.ResizeObserver = class {
+    constructor(callback) { this.callback = callback; }
+    observe() {}
+    disconnect() {}
+};
+global.localStorage = { getItem: () => null, setItem() {} };
+controller.configure({
+    getActivePopup: () => activePopup,
+    getEffectiveTheme: () => 'dark',
+    getDetachScraper: () => true,
+    getFloatingVideoHudElement: () => null,
+    isVideoPoppedOut: () => false,
+    getDefaultEverythingPosition: () => ({ x: 200, y: 100 })
+});
+loadingPopup.element.getBoundingClientRect = () => ({ left: 300, right: 900, top: 80, bottom: 680, width: 600, height: 600 });
+loadingPopup.scraperCardContainer.innerHTML = 'Previous embedded result';
+assert.equal(controller.showLoadingState(loadingPopup), true);
+const detachedLoadingHud = controller.getHudElement();
+assert.ok(detachedLoadingHud && connectedHudElements.has(detachedLoadingHud), 'remembered detached mode should create the HUD before scraping begins');
+assert.match(detachedLoadingHud.innerHTML, /Scraping new scene/);
+assert.equal(loadingPopup.scraperCardContainer.style.display, 'none', 'detached loading should not flash inside the main popup');
+controller.closeHud();
+
 async function testTriggerRejectsLateResults() {
     let resolveFetch;
     const lateResult = new Promise(resolve => { resolveFetch = resolve; });
