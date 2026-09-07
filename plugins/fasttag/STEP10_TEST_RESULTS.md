@@ -125,4 +125,10 @@ switching back to the released live plugin.
   result visible until the new scrape completed. Commit `ce9a29c` replaces it
   immediately with a scene-neutral loading state in docked and detached modes,
   while retaining the existing request-generation ownership guard. Browser
-  retest pending.
+  testing confirmed the previous result disappears immediately and the HUD
+  remains stable while the next scene is scraped.
+
+### Post-validation polish
+
+- Consider a lightweight CSS-only scraper-loading illustration: a magnifying
+  glass scanning small moving video-file tiles, with reduced-motion support.
