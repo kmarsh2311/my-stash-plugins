@@ -132,6 +132,52 @@ assert.ok(popupListeners.includes("localStorage.setItem('fasttag_single_pos'"), 
 assert.ok(popupListeners.includes('setSavedSize(form.offsetWidth, form.offsetHeight, popupType);'), 'resize completion must persist popup dimensions');
 assert.ok((popupListeners.match(/\{ signal \}/g) || []).length >= 8, 'shared event listeners must remain abort-owned');
 
+// The single-entity editor establishes scene identity and a clean selection
+// baseline before it binds scene-specific handlers. Automatic saves are
+// sequenced so a slower, older response cannot overwrite the newest baseline.
+const singleEditorWorkflow = section('async function loadEntityDataIntoPopup(', '// --- Global DOM Triggers ---');
+assertBefore(singleEditorWorkflow, 'form._fastTagSceneId = sceneId;', 'await fetchGQL(config.fetchExistingQuery, { id: sceneId });', 'single-editor scene identity must be set before loading its metadata');
+assertBefore(singleEditorWorkflow, 'sequentialEditState.initialSelectedIds = new Set(selectedIds);', 'setupSequentialEditHandlers(', 'single-editor navigation must bind after the clean selection baseline exists');
+assertBefore(singleEditorWorkflow, 'const currentSeq = ++pendingSaveSeq;', 'await updateEntityForScene(type, sId, Array.from(ids));', 'single-editor saves must claim a sequence before starting a mutation');
+assertBefore(singleEditorWorkflow, 'if (currentSeq !== pendingSaveSeq) return success;', 'sequentialEditState.initialSelectedIds = new Set(ids);', 'an older single-editor save must not replace the newest clean baseline');
+assertBefore(singleEditorWorkflow, 'refreshUI();\n            saveWithoutReload(sceneId, selectedIds);', 'const hasSearch = filterInput', 'row selection must update the UI and start its automatic save before search cleanup');
+assert.ok(singleEditorWorkflow.includes('if (hasSelectionChanged(selectedIds))'), 'manual single-editor saves must avoid unchanged mutations');
+
+// Single-editor sequential navigation commits a changed selection against the
+// current scene before advancing state and loading the next scene in-place.
+const singleEditorNavigation = section('async function navigateToNextScene(', 'function setupSequentialEditHandlers(');
+assertBefore(singleEditorNavigation, 'await updateEntityForScene(type, currentSceneId, currentSelectedIds);', 'const nextIndex = sequentialEditState.currentIndex + direction;', 'single-editor navigation must save the current scene before choosing the next one');
+assertBefore(singleEditorNavigation, 'if (nextIndex < 0 || nextIndex >= sequentialEditState.allSceneCards.length)', 'sequentialEditState.currentIndex = nextIndex;', 'single-editor navigation must validate bounds before advancing state');
+assertBefore(singleEditorNavigation, 'form._fastTagSceneId = nextSceneId;', 'await loadEntityDataIntoPopup(type, nextSceneId, nextCard, activePopup);', 'single-editor identity must advance before the next scene is loaded');
+
+// Bulk single-entity editing starts from values common to every scene, then
+// applies only the user's add/remove delta to each scene's current values.
+const bulkEntityWorkflow = section('async function openBulkEntityPopup(', 'function promptBulkConfirmationDialog(');
+assertBefore(bulkEntityWorkflow, 'let initialCommonIds = new Set();', 'const selectedIds = new Set(initialCommonIds);', 'bulk editing must derive common values before creating editable selection state');
+const bulkEntitySave = section('saveBtn.onclick = async () => {', 'setupPopupListeners(form, signal', bulkEntityWorkflow);
+assertBefore(bulkEntitySave, 'if (!confirmed) return;', 'calculateBulkSelectionDelta(initialCommonIds, selectedIds);', 'bulk deltas must only be computed after confirmation');
+assertBefore(bulkEntitySave, 'const existIds = (config.extractExisting(existRes?.data) || []).map(String);', 'targetIds = applyBulkSelectionDelta(existIds, removedIds, addedIds);', 'bulk editing must merge its delta with each scene\'s current values');
+assert.ok(bulkEntitySave.includes('const CONCURRENCY = 3;'), 'bulk mutations must retain their bounded concurrency');
+assertBefore(bulkEntitySave, 'await refreshSceneCards();', 'closePopup();', 'bulk editing must refresh scene cards before closing');
+
+// Bulk Edit Everything independently tracks common values for every entity
+// kind, preserves non-common per-scene metadata, and remains open on failures.
+const bulkEverythingWorkflow = section('async function openBulkEverythingPopup(', 'async function openEntityPopup(');
+for (const baseline of [
+    'initialCommonTagIds',
+    'initialCommonPerformerIds',
+    'initialCommonStudioId',
+    'initialCommonGroupIds'
+]) {
+    assert.ok(bulkEverythingWorkflow.includes(baseline), `bulk Edit Everything must retain its ${baseline} baseline`);
+}
+assertBefore(bulkEverythingWorkflow, 'const addedTagIds =', 'const confirmed = await promptBulkConfirmationDialog(', 'bulk Edit Everything must snapshot its selection delta before confirmation');
+assertBefore(bulkEverythingWorkflow, 'const currentTags = (scene.tags || []).map', 'const targetTags = Array.from(new Set([', 'bulk tag changes must merge with each scene\'s current tags');
+assertBefore(bulkEverythingWorkflow, 'const currentPerfs = (scene.performers || []).map', 'const targetPerfs = Array.from(new Set([', 'bulk performer changes must merge with each scene\'s current performers');
+assertBefore(bulkEverythingWorkflow, 'const currentGroups = (scene.groups || []).map', 'const targetGroups = Array.from(new Set([', 'bulk group changes must merge with each scene\'s current groups');
+assert.ok(bulkEverythingWorkflow.includes("popup.saveBtn.textContent = 'Retry Changes';"), 'a partial bulk failure must leave the editor available for retry');
+assert.ok(bulkEverythingWorkflow.includes('The editor has stayed open so you can retry.'), 'partial bulk failure messaging must explain retained editor ownership');
+
 // Sequential navigation saves dirty metadata before changing scene, checks
 // bounds, protects unsaved cover work, and always releases its busy flag.
 const sequentialNavigation = section('async function navigateSequentialEditEverything(', 'function setupSequentialEditEverythingHandlers(');
@@ -149,6 +195,24 @@ assert.ok(saveWorkflow.includes('const targetSceneId = currentSceneId;'), 'a que
 assert.ok(saveWorkflow.includes('if (saveSeq !== pendingEverythingSaveSeq) return true;'), 'an older save must not replace the newest clean baseline');
 assert.ok(saveWorkflow.includes('latestEverythingSavePromise = enqueueEverythingSave(runSave);'), 'scene mutations must use the serial queue');
 assert.ok(saveWorkflow.includes('return latestEverythingSavePromise;'), 'callers must be able to await the queued mutation');
+
+// Edit Everything keeps editable and initial sets separate, exposes those sets
+// through one popup-owned context, and replaces both from a freshly loaded
+// scene before rendering scene-dependent suggestions.
+const everythingEditorWorkflow = section('async function openEditEverythingPopup(', 'async function openBulkEverythingPopup(');
+assertBefore(everythingEditorWorkflow, 'let selectedTagIds = new Set();', 'let initialTagIds = new Set();', 'Edit Everything must keep editable tags separate from their clean baseline');
+assertBefore(everythingEditorWorkflow, 'let selectedPerformerIds = new Set();', 'let initialPerformerIds = new Set();', 'Edit Everything must keep editable performers separate from their clean baseline');
+assertBefore(everythingEditorWorkflow, 'const isDirty = () => {', 'const updateSaveButton = () => {', 'dirty-state ownership must exist before save controls are rendered');
+assert.ok(everythingEditorWorkflow.includes('setCurrentSceneId: (id) => { currentSceneId = id; }'), 'the popup context must own its active scene identity');
+assert.ok(everythingEditorWorkflow.includes('setInitialTags: (s) => {'), 'the popup context must expose clean-baseline replacement');
+assert.ok(everythingEditorWorkflow.includes('isDirty,'), 'the popup context must expose its dirty-state contract to navigation');
+
+const everythingSceneLoad = section('async function loadEditEverythingDataIntoPopup(', 'function renderEverythingAIMatchCard(');
+assertBefore(everythingSceneLoad, 'ctx.setCurrentSceneId(sceneId);', 'await fetchGQL(sceneQuery, { id: sceneId });', 'Edit Everything must claim the new scene before fetching its metadata');
+assertBefore(everythingSceneLoad, 'ctx.setSelectedTags(selTags);', 'ctx.setInitialTags(new Set(selTags));', 'loaded tag selections must be copied into a separate clean baseline');
+assertBefore(everythingSceneLoad, 'ctx.setSelectedPerformers(selPerfs);', 'ctx.setInitialPerformers(new Set(selPerfs));', 'loaded performer selections must be copied into a separate clean baseline');
+assertBefore(everythingSceneLoad, 'setupSequentialEditEverythingHandlers(', 'await Promise.all([\n                ctx.fetchColumnData', 'scene navigation handlers must bind before scene tables finish rendering');
+assertBefore(everythingSceneLoad, 'ctx.refreshAllUI();', 'await loadUnifiedSuggestions(', 'scene metadata and controls must be refreshed before asynchronous suggestions are loaded');
 
 // Preview ownership is characterized before its controller extraction. A host
 // aborts its previous player before claiming a replacement, global input
