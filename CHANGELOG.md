@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Remembered Cover Editor**: Reopening Edit Everything restores the Cover Editor when it was previously left open; explicitly closing the Cover Editor prevents restoration.
 
 ### Fixed
+- **Seamless Cover Navigation**: Moving to the next scene retains the previous video frame while the replacement is prepared, without briefly flashing an unnecessary loading message.
 - **Compact HTTP Paste Layout**: Waiting for a keyboard paste keeps the short Paste button label so its longer instruction cannot distort the compact footer.
 - **Compact Status Visibility**: The Cover Editor temporarily expands and moves upward when an actionable message appears, keeping its footer visible without permanently reserving empty space or changing the saved size.
 - **Compact Size Persistence**: Closing Edit Everything while a temporary status message is visible no longer saves the expanded message height as the normal Cover Editor size.

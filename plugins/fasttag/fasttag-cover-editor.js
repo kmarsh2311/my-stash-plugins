@@ -667,14 +667,7 @@
         const beginNavigation = () => {
             sceneGeneration += 1;
             currentOptions.mediaController?.releaseFromCoverEditor?.({ forNavigation: true });
-            videoStage.querySelector('.fasttag-cover-navigation-overlay')?.remove();
-            const overlay = document.createElement('div');
-            overlay.className = 'fasttag-cover-navigation-overlay';
-            overlay.textContent = 'Loading next scene…';
-            overlay.style.cssText = 'position:absolute;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(2,6,23,.38);color:#e2e8f0;font-size:11px;font-weight:700;backdrop-filter:blur(1px);pointer-events:none;';
-            videoStage.appendChild(overlay);
             resetCandidate();
-            setStatus('Loading the next scene…', false, true);
             for (const button of [playPauseButton, stepBackButton, stepForwardButton, captureButton]) {
                 button.disabled = true;
                 button.style.opacity = '0.45';

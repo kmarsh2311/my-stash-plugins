@@ -202,7 +202,7 @@ assert.ok((mainSource.match(/FastTagCoverEditor\.prepareForSceneNavigation\?\.\(
 assert.ok(coverEditorSource.includes('beginNavigation') && coverEditorSource.includes('rebindScene'), 'scene navigation should rebind the existing cover-editor HUD in place');
 assert.ok(coverEditorSource.includes('releaseFromCoverEditor?.({ forNavigation: true })') && previewSource.includes('if (releaseOptions.forNavigation)'), 'in-place navigation should detach the old player without briefly restoring it behind the HUD');
 assert.ok(coverEditorSource.includes('generation !== sceneGeneration') && coverEditorSource.includes('sceneGeneration += 1'), 'late image processing must not populate the next scene after navigation');
-assert.ok(coverEditorSource.includes("overlay.className = 'fasttag-cover-navigation-overlay'"), 'the persistent cover editor should overlay loading state without removing the previous frame');
+assert.ok(!coverEditorSource.includes('fasttag-cover-navigation-overlay') && !coverEditorSource.includes('Loading next scene…'), 'fast Cover Editor navigation should retain the previous frame without flashing a loading overlay');
 assert.ok(coverEditorSource.includes('Discard the new cover and continue to the next scene?'), 'cover-editor handoff should protect unsaved proposed covers');
 const aiApplyMetadataBlock = mainSource.match(/mutation FastTagAIApplyMetadata[\s\S]*?syncSceneToApolloCache\(metadataRes\.data\.sceneUpdate\);/)?.[0] || '';
 assert.ok(aiApplyMetadataBlock.includes('title date'), 'AI Apply All should return updated title and date');
