@@ -7,9 +7,9 @@ passed.
 
 ## Current phase
 
-Step 9 is complete and Step 10 manual validation is in progress against staged
-runtime commit `fca4a95`. The three editor
-families now have independent workflow
+Steps 1–10 are complete. The full automated suite and isolated manual
+regression pass succeeded through runtime commit `86c9ae1`; the remaining
+commits record the final test results. The three editor families now have independent workflow
 contracts. `fasttag-editors.js` owns normalized save snapshots, the
 single-editor latest-save gate, shared bounded bulk batching and result totals,
 and Edit Everything's serial/latest-save coordination. The coordinator still
@@ -56,21 +56,20 @@ The runner syntax-checks every FastTag JavaScript source and executes each test
 file in a separate Node process to prevent shared browser mocks leaking between
 suites.
 
-## Next work
+## Validation outcome
 
-The `fasttag-refactor-test` package has been staged from runtime commit
-`fca4a95` with a distinct manifest filename, display name, plugin task ID, and
-help-asset path. The released `fasttag` plugin is disabled and the isolated test
-build is now enabled for manual validation.
-Follow `STEP10_TEST_RESULTS.md` to switch safely from the live plugin and run the
-complete checklist against standard Stash and Refract. Do not merge or publish
-the refactor until that manual pass is complete.
+`STEP10_TEST_RESULTS.md` records the completed isolated test pass across single,
+Everything, bulk, sequential/random, scraper, Gemini, preview, Cover Editor,
+theme, responsive, standard-card, and Refract workflows. Browser and FastTag
+logs were clean in the final session. Stash server-log errors were traced to
+macOS notifications and the separate community Path Parser plugin. Gallery
+editing could not be exercised because the test library has no galleries; its
+shared single-editor path is covered by the other entity editors and automated
+tests.
 
-## Still required before a merge or release
+## Handoff
 
-1. Keep the test package disabled whenever the production FastTag plugin is enabled.
-2. Run the complete manual regression checklist in `REFACTOR_PLAN.md` using both
-   standard Stash and Refract.
-3. Compare browser-console errors and update latency with released v4.3.0.
-4. Only after successful testing, decide whether to merge, version, package, and
-   publish the refactor.
+The branch is ready for a local merge into `main`. After merging, reinstall the
+normal package, ensure the isolated `fasttag-refactor-test` package is disabled
+or removed, enable only normal FastTag, and perform one short smoke test. GitHub
+publication remains a separate, explicit action.

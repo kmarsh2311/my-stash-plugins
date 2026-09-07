@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+- Refactored the FastTag runtime into independently tested modules for API access, storage, integrations, Gemini, scraping, preview, popup lifecycle, editor workflows, notifications, and shared UI while preserving the existing Stash plugin loading model and stored settings.
+- Reduced the main `fasttag.js` coordinator from its 839 KB baseline to approximately 557 KB and added a complete automated verification runner covering 21 suites.
+
+### Fixed
+- Prevented redundant full-card refreshes when opening context menus, using left-click entity shortcuts, or closing popups, eliminating Refract scene-card icon flashes without affecting targeted save updates.
+- Isolated the offline User Guide from host-theme CSS and versioned its lazy-loaded asset so updated guide code is not hidden by browser caching.
+- Hardened table initialization and cleanup, single-editor search state, Apollo entity synchronization, repeated AI suggestion clicks, popup anchoring, media seeking/playback, scraper HUD sizing/navigation, and Cover Editor layout during the full regression pass.
+
 ## [4.3.0] - 2026-09-06
 
 ### Added
