@@ -47,7 +47,7 @@ Never enable it while the live FastTag plugin is enabled.
 - [x] Bulk single-entity editing
 - [x] Bulk Edit Everything
 - [x] Bulk partial-failure reporting and retry behavior
-- [ ] Scraper search, filtering, navigation, and dismissal
+- [x] Scraper search, filtering, navigation, and dismissal
 - [ ] Scraper field checkboxes and acceptance
 - [ ] Separate StashDB ID and cover saving
 - [ ] Scraper performer image enrichment
@@ -132,3 +132,10 @@ switching back to the released live plugin.
 
 - Consider a lightweight CSS-only scraper-loading illustration: a magnifying
   glass scanning small moving video-file tiles, with reduced-motion support.
+
+### Confirmed working
+
+- Scraper search population and adjustment, false-positive/result-limit
+  controls, candidate navigation, dismissal, and cross-scene loading behaviour
+  worked without new functional errors. CSP messages for optional third-party
+  source maps were classified as harmless developer-tool noise.
