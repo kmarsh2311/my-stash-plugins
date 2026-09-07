@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `4a2e2c2`
+- Runtime source commit: `ab02acf`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -33,9 +33,9 @@ Never enable it while the live FastTag plugin is enabled.
 ## Manual regression checklist
 
 - [x] Single Tag editor
-- [ ] Single Performer editor and hover preview
-- [ ] Single Studio editor
-- [ ] Single Gallery editor
+- [x] Single Performer editor and hover preview
+- [x] Single Studio editor
+- [ ] Single Gallery editor — unavailable: test library currently has no galleries
 - [x] Single-editor automatic save and refresh
 - [x] Single-editor sequential previous/next navigation
 - [ ] Edit Everything tags, performers, studio, and groups
@@ -85,3 +85,7 @@ switching back to the released live plugin.
   not initially run because **Auto-Mark Scene as Organised** was disabled; once
   enabled, metadata changes correctly marked scenes Organised in both the
   single editor and Edit Everything.
+- Single Performer and Studio editing saved correctly. Closing either editor
+  exposed two remaining Tabulator warnings from shared popup teardown. Commit
+  `ab02acf` removes those redundant event-removal calls; table destruction
+  remains responsible for releasing all handlers. Browser retest pending.
