@@ -8,7 +8,7 @@ passed.
 ## Current phase
 
 Step 9 is complete and Step 10 manual validation is in progress against staged
-runtime commit `77d3316`. The three editor
+runtime commit `9d54dd2`. The three editor
 families now have independent workflow
 contracts. `fasttag-editors.js` owns normalized save snapshots, the
 single-editor latest-save gate, shared bounded bulk batching and result totals,
@@ -59,7 +59,7 @@ suites.
 ## Next work
 
 The `fasttag-refactor-test` package has been staged from runtime commit
-`77d3316` with a distinct manifest filename, display name, plugin task ID, and
+`9d54dd2` with a distinct manifest filename, display name, plugin task ID, and
 help-asset path. The released `fasttag` plugin is disabled and the isolated test
 build is now enabled for manual validation.
 Follow `STEP10_TEST_RESULTS.md` to switch safely from the live plugin and run the

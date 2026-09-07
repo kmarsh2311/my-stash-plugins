@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `77d3316`
+- Runtime source commit: `9d54dd2`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -54,7 +54,7 @@ Never enable it while the live FastTag plugin is enabled.
 - [ ] Gemini bridge start, parse, timeout, and fallback behavior
 - [x] Organized-state updates
 - [x] Preview/full-video switching and scrubbing
-- [ ] Floating video and scraper HUD lifecycle
+- [x] Floating video and scraper HUD lifecycle
 - [x] Cover Editor capture, upload, paste/drop, save, and navigation
 - [ ] Standard Stash scene-card refresh
 - [ ] Refract scene-card refresh
@@ -192,6 +192,12 @@ switching back to the released live plugin.
   loop after seeking; only the Cover Editor preserves an intentional paused
   state for frame capture. No Play button was added. Browser testing confirmed
   switching, looping playback, wheel scrubbing, and timeline dragging all work.
+- Floating video and scraper HUD pop-out, movement, resizing, cross-scene reuse,
+  closure with Edit Everything, and remembered pop-out state all passed. On the
+  first scene after reopening, a remembered detached scraper initially rendered
+  its loading state inside Edit Everything and created the HUD only when results
+  arrived. Commit `9d54dd2` creates and reuses the detached HUD before that first
+  request, preventing the embedded loading flash. Browser retest pending.
 - Accepting a StashDB result stored the correct remote scene ID. With Cover
   selected it also saved the remote cover; with Cover cleared it retained the
   existing cover while still storing the ID. No warnings or console errors
