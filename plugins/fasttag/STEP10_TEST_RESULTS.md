@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `2af6e6d`
+- Runtime source commit: `0192000`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -164,7 +164,9 @@ switching back to the released live plugin.
 - The header's previous “Source Match” wording was both truncated at narrow
   widths and could imply that an unconfirmed candidate was correct. Commit
   `2af6e6d` displays only the actual scraper source name, such as “StashDB”.
-  Browser retest pending.
+  Some configured names include a domain suffix such as “StashDB.org”; commit
+  `0192000` removes that suffix from the compact label while retaining the full
+  configured name in its title. Browser retest pending.
 - Accepting a StashDB result stored the correct remote scene ID. With Cover
   selected it also saved the remote cover; with Cover cleared it retained the
   existing cover while still storing the ID. No warnings or console errors
