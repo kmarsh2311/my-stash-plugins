@@ -191,8 +191,8 @@ assert.ok(coverEditorSource.includes("dependencies.setPersistedOpen?.(true);") &
 assert.ok(coverEditorSource.includes("button.isConnected && !activeEditor && dependencies?.isPersistedOpen?.()"), 'Edit Everything should restore a Cover Editor that was left open');
 assert.ok(previewSource.includes('FastTagCoverEditor.restoreForHost?.({'), 'a remembered Cover Editor shell should open before scene media lookup completes');
 assert.ok(coverEditorSource.includes("restoringOverlay.textContent = 'Preparing video…'"), 'the early restored shell should explain that its video is being prepared');
-assert.ok(mainSource.includes("{ opacity: 0, transform: 'scale(.985)' }") && mainSource.includes("{ duration: 160, easing: 'ease-out' }"), 'Edit Everything should animate only after its full-size positioning geometry is available');
-assert.ok(mainSource.includes("form.style.transformOrigin = 'top left'"), 'Edit Everything entrance scaling should keep its positioned top-left corner stationary');
+assert.ok(mainSource.includes("form.animate?.([\n                    { opacity: 0 },\n                    { opacity: 1 }") && mainSource.includes("{ duration: 160, easing: 'ease-out' }"), 'Edit Everything should use a fade-only entrance that does not disturb theme compositing');
+assert.ok(!mainSource.includes("form.style.transformOrigin = 'top left'"), 'Edit Everything should not use a scale transform that can trigger Refract header artifacts');
 assert.ok(mainSource.includes("prefers-reduced-motion: reduce"), 'Edit Everything entrance motion should respect reduced-motion preferences');
 assert.ok(previewSource.includes('const animateHudEntrance = !window.matchMedia?.') && previewSource.includes('floatingHudElement.animate?.(['), 'the floating video HUD should use the subtle accessible entrance');
 assert.ok(scraperControllerSource.includes('const animateHudEntrance = !root.matchMedia?.') && scraperControllerSource.includes('hudElement.animate?.(['), 'the detached scraper HUD should use the subtle accessible entrance');
