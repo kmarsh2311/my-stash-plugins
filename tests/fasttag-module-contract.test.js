@@ -123,6 +123,9 @@ assert.ok(scraperControllerSource.includes('>✕ Dismiss</button>'), 'result dis
 assert.ok(scraperControllerSource.includes("value=\"${escapeHtml(match._searchQuery || '')}\""), 'manual scraper search should retain the complete contextual query');
 assert.ok(scraperControllerSource.includes('function isPopupActive(popup)'), 'scraper rendering should reject stale popup work');
 assert.ok(scraperControllerSource.includes('watchHudOwner(popup);'), 'detached scraper HUD should monitor its owning popup');
+assert.ok(scraperControllerSource.includes('floatingHudElement._fastTagResizeObserver?.disconnect?.();'), 'closing the scraper HUD must stop its size observer before removal');
+assert.ok(scraperControllerSource.includes('floatingScraperHudElement?.isConnected'), 'a detached scraper HUD must never persist its post-removal zero size');
+assert.ok(scraperControllerSource.includes('savedWidth >= 300') && scraperControllerSource.includes('savedHeight >= 220'), 'invalid saved scraper dimensions should fall back to safe defaults');
 assert.ok(popupSource.includes('activePopup._fastTagClosed = true;'), 'popup closure should invalidate pending scraper work');
 assert.ok(scraperControllerSource.includes('function beginRequest(popup, sceneId)'), 'scrapes should receive a per-popup request generation');
 assert.ok(scraperControllerSource.includes('if (!isRequestCurrent(popup, activeSceneId, scrapeRequestId)) return null;'), 'late automatic scrape responses should be discarded');

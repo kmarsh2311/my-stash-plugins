@@ -69,6 +69,8 @@
         }
         floatingHudOwnerPopup = null;
         if (floatingHudElement) {
+            floatingHudElement._fastTagResizeObserver?.disconnect?.();
+            floatingHudElement._fastTagScraperHeaderResizeObserver?.disconnect?.();
             floatingHudElement.remove();
             floatingHudElement = null;
         }
@@ -445,8 +447,10 @@
                 if (savedPos && savedPos.left && savedPos.top) {
                     const pLeft = parseInt(savedPos.left, 10);
                     const pTop = parseInt(savedPos.top, 10);
-                    const pW = savedSize?.width ? parseInt(savedSize.width, 10) : (parseInt(defaultPos.width, 10) || 390);
-                    const pH = savedSize?.height ? parseInt(savedSize.height, 10) : (parseInt(defaultPos.height, 10) || 480);
+                    const savedWidth = savedSize?.width ? parseInt(savedSize.width, 10) : NaN;
+                    const savedHeight = savedSize?.height ? parseInt(savedSize.height, 10) : NaN;
+                    const pW = Number.isFinite(savedWidth) && savedWidth >= 300 ? savedWidth : (parseInt(defaultPos.width, 10) || 390);
+                    const pH = Number.isFinite(savedHeight) && savedHeight >= 220 ? savedHeight : (parseInt(defaultPos.height, 10) || 480);
                     if (!isNaN(pLeft) && !isNaN(pTop)) {
                         finalLeft = `${Math.max(8, Math.min(root.innerWidth - pW - 8, pLeft))}px`;
                         finalTop = `${Math.max(8, Math.min(root.innerHeight - pH - 8, pTop))}px`;
@@ -464,7 +468,8 @@
                 document.body.appendChild(floatingScraperHudElement);
 
                 const scraperResizeObserver = new root.ResizeObserver(() => {
-                    if (floatingScraperHudElement && !floatingScraperHudElement._isDragging) {
+                    if (floatingScraperHudElement?.isConnected && !floatingScraperHudElement._isDragging
+                        && floatingScraperHudElement.offsetWidth >= 300 && floatingScraperHudElement.offsetHeight >= 220) {
                         floatingScraperHudSize = {
                             width: `${floatingScraperHudElement.offsetWidth}px`,
                             height: `${floatingScraperHudElement.offsetHeight}px`
@@ -475,6 +480,7 @@
                         } catch (e) {}
                     }
                 });
+                floatingScraperHudElement._fastTagResizeObserver = scraperResizeObserver;
                 scraperResizeObserver.observe(floatingScraperHudElement);
             }
             targetContainer = floatingScraperHudElement;

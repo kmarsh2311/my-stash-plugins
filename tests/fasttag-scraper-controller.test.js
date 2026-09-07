@@ -41,11 +41,19 @@ activePopup = {};
 assert.equal(controller.beginRequest(popup, 'scene-1'), null, 'inactive popups must not begin scraper work');
 
 let removed = false;
-const hud = { remove: () => { removed = true; } };
+let resizeObserverDisconnected = false;
+let headerObserverDisconnected = false;
+const hud = {
+    _fastTagResizeObserver: { disconnect: () => { resizeObserverDisconnected = true; } },
+    _fastTagScraperHeaderResizeObserver: { disconnect: () => { headerObserverDisconnected = true; } },
+    remove: () => { removed = true; }
+};
 controller.setHudElement(hud);
 assert.equal(controller.getHudElement(), hud);
 controller.closeHud();
 assert.equal(removed, true);
+assert.equal(resizeObserverDisconnected, true);
+assert.equal(headerObserverDisconnected, true);
 assert.equal(controller.getHudElement(), null);
 
 controller.setHudPosition({ left: '20px', top: '30px' });
