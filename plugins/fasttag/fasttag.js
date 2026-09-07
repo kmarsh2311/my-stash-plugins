@@ -107,6 +107,8 @@
         resetScrubCueCount,
         isVideoHudPersistedOpen,
         setVideoHudPersistedOpen,
+        isCoverEditorPersistedOpen,
+        setCoverEditorPersistedOpen,
         isScraperHudPersistedOpen,
         setScraperHudPersistedOpen,
         getDetachScraper,
@@ -304,6 +306,8 @@
         showToast: (...args) => showToast(...args),
         getTheme: () => getEffectiveTheme(),
         getCompactMode: () => getCompactCoverEditor(),
+        isPersistedOpen: () => isCoverEditorPersistedOpen(),
+        setPersistedOpen: enabled => setCoverEditorPersistedOpen(enabled),
         log: (...args) => ftLog(...args)
     });
     FastTagUi.configure({
@@ -3106,6 +3110,7 @@
             localStorage.removeItem('fasttag_video_hud_pos');
             localStorage.removeItem('fasttag_video_hud_size');
             localStorage.removeItem('fasttag_video_hud_open_state');
+            localStorage.removeItem('fasttag_cover_editor_open_state');
             localStorage.removeItem('fasttag_scraper_hud_pos');
             localStorage.removeItem('fasttag_scraper_hud_size');
             localStorage.removeItem('fasttag_scraper_hud_open_state');

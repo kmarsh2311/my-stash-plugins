@@ -79,7 +79,7 @@ assertBefore(sceneReload, 'popup.currentSceneId = sceneId;', 'attachScenePreview
 // Popup closure first allows the Cover Editor to veto data loss, then marks the
 // popup closed before destroying tables, aborting listeners, and closing HUDs.
 const popupClose = section('function closeActive(resetSequential = true)', 'function getSavedSize(', popupSource);
-assertBefore(popupClose, 'dependencies.coverEditor.closeActiveEditor?.() === false', 'isClosing = true;', 'unsaved cover confirmation must run before popup teardown');
+assertBefore(popupClose, 'dependencies.coverEditor.closeActiveEditor?.(false, true) === false', 'isClosing = true;', 'unsaved cover confirmation must run before popup teardown');
 assertBefore(popupClose, 'activePopup._fastTagClosed = true;', 'invalidateScraperRequests(activePopup);', 'popup closure must be visible before scraper invalidation');
 for (const expected of [
     'activePopup.tagsTable.destroy();',

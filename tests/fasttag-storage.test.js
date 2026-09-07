@@ -108,6 +108,7 @@ assert.equal(values.has('stash_fast_tag_scrub_cue_count_v6'), false);
 
 const persistedBooleanPairs = [
     ['isVideoHudPersistedOpen', 'setVideoHudPersistedOpen', 'fasttag_video_hud_open_state', false],
+    ['isCoverEditorPersistedOpen', 'setCoverEditorPersistedOpen', 'fasttag_cover_editor_open_state', false],
     ['isScraperHudPersistedOpen', 'setScraperHudPersistedOpen', 'fasttag_scraper_hud_open_state', false],
     ['getDetachScraper', 'setDetachScraper', 'fasttag_detach_scraper_v1', true],
     ['getFillMissingPerformerImages', 'setFillMissingPerformerImages', 'fasttag_fill_missing_performer_images_v1', true],

@@ -216,7 +216,7 @@
         signal.addEventListener('abort', up, { once: true });
     }
 
-    function closeActiveEditor(force = false) {
+    function closeActiveEditor(force = false, preserveOpenState = false) {
         if (!activeEditor) return true;
         const editor = activeEditor;
         if (!force && editor.hasUnsavedChanges?.()) {
@@ -224,6 +224,7 @@
             if (discard === false) return false;
         }
         activeEditor = null;
+        if (!preserveOpenState) dependencies?.setPersistedOpen?.(false);
         saveEditorSize(editor.element, editor.compactMode);
         editor.mediaController?.releaseFromCoverEditor?.();
         editor.abortController.abort();
@@ -250,7 +251,7 @@
     function closeForHost(hostElement) {
         if (activeEditor?.hostElement === hostElement) {
             if (activeEditor.awaitingNavigation) return true;
-            return closeActiveEditor();
+            return closeActiveEditor(false, true);
         }
         return true;
     }
@@ -687,6 +688,7 @@
             beginNavigation,
             rebindScene
         };
+        dependencies.setPersistedOpen?.(true);
         currentOptions.mediaController?.mountForCoverEditor?.(videoStage);
         currentOptions.mediaController?.switchToFullVideo?.();
         panel.focus({ preventScroll: true });
@@ -734,6 +736,10 @@
         if (activeEditor?.awaitingNavigation) {
             root.setTimeout(() => {
                 if (button.isConnected && activeEditor?.awaitingNavigation) activeEditor.rebindScene?.(options);
+            }, 0);
+        } else if (!activeEditor && dependencies?.isPersistedOpen?.()) {
+            root.setTimeout(() => {
+                if (button.isConnected && !activeEditor && dependencies?.isPersistedOpen?.()) openEditor(options);
             }, 0);
         }
         return button;

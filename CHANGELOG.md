@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 - **Optional Compact Cover Editor**: A Display setting removes routine guidance, tightens spacing, and combines Cancel, Upload, Paste, and Set Cover in one footer row without overlaying or reducing either cover preview. Errors and keyboard-paste instructions still appear when needed, and normal and compact layouts remember their resized dimensions separately.
+- **Remembered Cover Editor**: Reopening Edit Everything restores the Cover Editor when it was previously left open; explicitly closing the Cover Editor prevents restoration.
 
 ### Fixed
 - **Compact HTTP Paste Layout**: Waiting for a keyboard paste keeps the short Paste button label so its longer instruction cannot distort the compact footer.

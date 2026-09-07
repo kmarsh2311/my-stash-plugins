@@ -26,7 +26,7 @@
 
     function closeActive(resetSequential = true) {
         if (!dependencies) throw new Error('[FastTag] Popup integration is not configured');
-        if (dependencies.coverEditor.closeActiveEditor?.() === false) return false;
+        if (dependencies.coverEditor.closeActiveEditor?.(false, true) === false) return false;
         isClosing = true;
         try {
             const activePopup = dependencies.getActivePopup?.();

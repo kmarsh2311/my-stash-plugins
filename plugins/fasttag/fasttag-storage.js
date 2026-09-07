@@ -19,6 +19,7 @@
         scrubSpeeds: 'fasttag_scrub_speeds',
         scrubCueCount: 'stash_fast_tag_scrub_cue_count_v6',
         videoHudOpen: 'fasttag_video_hud_open_state',
+        coverEditorOpen: 'fasttag_cover_editor_open_state',
         detachScraper: 'fasttag_detach_scraper_v1',
         hideObviousFalsePositives: 'fasttag_hide_obvious_false_positives_v1',
         scraperMatching: 'fasttag_scraper_matching_settings_v1',
@@ -139,6 +140,12 @@
     }
     function setVideoHudPersistedOpen(enabled) {
         try { writeBoolean(KEYS.videoHudOpen, enabled); } catch (e) {}
+    }
+    function isCoverEditorPersistedOpen() {
+        try { return root.localStorage.getItem(KEYS.coverEditorOpen) === 'true'; } catch (e) { return false; }
+    }
+    function setCoverEditorPersistedOpen(enabled) {
+        try { writeBoolean(KEYS.coverEditorOpen, enabled); } catch (e) {}
     }
     function isScraperHudPersistedOpen() {
         try { return root.localStorage.getItem(KEYS.scraperHudOpen) === 'true'; } catch (e) { return false; }
@@ -365,6 +372,8 @@
         resetScrubCueCount,
         isVideoHudPersistedOpen,
         setVideoHudPersistedOpen,
+        isCoverEditorPersistedOpen,
+        setCoverEditorPersistedOpen,
         isScraperHudPersistedOpen,
         setScraperHudPersistedOpen,
         getDetachScraper,

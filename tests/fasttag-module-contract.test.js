@@ -185,7 +185,9 @@ assert.ok(coverEditorSource.includes("candidateBox.addEventListener('drop'"), 't
 assert.ok(coverEditorSource.includes('Capture, upload, paste or drop an image'), 'the empty new-cover target should advertise drag-and-drop support');
 assert.ok(coverEditorSource.includes('Cover saved to Stash. Continue editing or move to another scene.'), 'saving a cover should leave the editor open for continued navigation');
 assert.ok(previewSource.includes("if (!saveOptions?.keepEditorOpen && !signal.aborted)"), 'saving within the persistent editor should not rebuild the underlying scene preview');
-assert.ok(popupSource.includes('if (dependencies.coverEditor.closeActiveEditor?.() === false) return false;'), 'outside and parent-popup closure should respect the unsaved-cover warning');
+assert.ok(popupSource.includes('if (dependencies.coverEditor.closeActiveEditor?.(false, true) === false) return false;'), 'parent-popup closure should respect the unsaved-cover warning while remembering an open Cover Editor');
+assert.ok(coverEditorSource.includes("dependencies.setPersistedOpen?.(true);") && coverEditorSource.includes("dependencies?.setPersistedOpen?.(false);"), 'the Cover Editor should remember whether it was explicitly left open or closed');
+assert.ok(coverEditorSource.includes("button.isConnected && !activeEditor && dependencies?.isPersistedOpen?.()"), 'Edit Everything should restore a Cover Editor that was left open');
 assert.ok(previewSource.includes("hostContainer.style.height = 'auto';"), 'loading a new scene should restore a preview container collapsed by the cover editor');
 assert.ok(!previewSource.includes('if (signal.aborted || !hostContainer.isConnected) return;'), 'aborted scene previews should still restore their connected host before navigation');
 assert.ok((mainSource.match(/FastTagCoverEditor\.prepareForSceneNavigation\?\.\(\) === false/g) || []).length >= 4, 'all Edit Everything scene-navigation paths should hand the open cover editor to the next scene');
