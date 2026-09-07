@@ -203,5 +203,8 @@ assert.equal(customMenuOpenBlock.includes('closePopup();'), false, 'opening the 
 const singleEditorOpenBlock = mainSource.slice(mainSource.indexOf('async function openEntityPopup('), mainSource.indexOf('async function openEntityPopup(') + 900);
 assert.ok(singleEditorOpenBlock.includes('if (activePopup) closePopup(false);'), 'a direct card-icon click must not run empty popup cleanup and refresh every Refract card');
 assert.ok((mainSource.match(/Finished \$\{/g) || []).length >= 2, 'single and Everything sequential workflows should distinguish their final progress action from the ordinary Close button');
+assert.ok((mainSource.match(/cancelBtn\.style\.display = isLast \? 'none' : 'block';/g) || []).length >= 2, 'single and Everything workflows should hide the redundant Close button on the final sequential scene');
+assert.ok((mainSource.match(/classList\.toggle\('fasttag-btn-finished-pulse', isLast\)/g) || []).length >= 2, 'both final sequential actions should use the gentle completion pulse');
+assert.ok(mainSource.includes('@media (prefers-reduced-motion: reduce)'), 'the final-action pulse should respect reduced-motion preferences');
 
 console.log('fasttag-module-contract tests passed');

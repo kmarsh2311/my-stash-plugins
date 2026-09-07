@@ -1308,6 +1308,16 @@
         .fasttag-btn-pulse-calm {
             animation: fasttagSavePulseCalm 2.4s infinite ease-in-out !important;
         }
+        @keyframes fasttagFinishedPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(129, 140, 248, 0.35); filter: brightness(1); }
+            50% { box-shadow: 0 0 12px 3px rgba(129, 140, 248, 0.34); filter: brightness(1.07); }
+        }
+        .fasttag-btn-finished-pulse {
+            animation: fasttagFinishedPulse 2.6s infinite ease-in-out !important;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .fasttag-btn-finished-pulse { animation: none !important; }
+        }
         @keyframes fasttagRefreshPulse {
             0% {
                 box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.75);
@@ -2060,8 +2070,10 @@
             }
             if (saveBtn) {
                 saveBtn.style.display = 'none';
+                saveBtn.classList.remove('fasttag-btn-finished-pulse');
             }
             if (cancelBtn) {
+                cancelBtn.style.display = 'block';
                 cancelBtn.style.flex = '1';
                 cancelBtn.style.width = '100%';
                 cancelBtn.style.fontWeight = '600';
@@ -2086,6 +2098,7 @@
         }
 
         if (cancelBtn) {
+            cancelBtn.style.display = isLast ? 'none' : 'block';
             cancelBtn.style.flex = 'none';
             cancelBtn.style.width = 'auto';
             cancelBtn.style.fontWeight = '500';
@@ -2102,6 +2115,7 @@
                 : (isEasterEggActive() ? 'Next Scene 🍫 ►' : 'Next Scene ►');
             saveBtn.style.background = '#6366f1';
             saveBtn.classList.remove('fasttag-btn-pulse');
+            saveBtn.classList.toggle('fasttag-btn-finished-pulse', isLast);
         }
 
         if (prevBtn) {
@@ -6566,6 +6580,7 @@
             const updateSaveButton = () => {
                 if (popup._isRandomMode) {
                     if (popup.cancelBtn) {
+                        popup.cancelBtn.style.display = isLast ? 'none' : 'block';
                         popup.cancelBtn.style.flex = 'none';
                         popup.cancelBtn.style.width = 'auto';
                         popup.cancelBtn.style.fontWeight = '500';
@@ -6589,6 +6604,7 @@
                     const isLast = idx !== -1 && idx === cards.length - 1;
 
                     if (popup.cancelBtn) {
+                        popup.cancelBtn.style.display = 'block';
                         popup.cancelBtn.style.flex = 'none';
                         popup.cancelBtn.style.width = 'auto';
                         popup.cancelBtn.style.fontWeight = '500';
@@ -6608,6 +6624,7 @@
                             : (isEasterEggActive() ? 'Next Scene 🍫 ►' : 'Next Scene ►');
                         popup.saveBtn.style.background = '#6366f1';
                         popup.saveBtn.classList.remove('fasttag-btn-pulse-calm');
+                        popup.saveBtn.classList.toggle('fasttag-btn-finished-pulse', isLast);
                     }
                 } else {
                     if (popup.saveBtn) {
@@ -6615,6 +6632,7 @@
                         popup.saveBtn.style.display = 'none';
                     }
                     if (popup.cancelBtn) {
+                        popup.cancelBtn.style.display = 'block';
                         popup.cancelBtn.style.flex = '1';
                         popup.cancelBtn.style.width = '100%';
                         popup.cancelBtn.style.fontWeight = '600';
