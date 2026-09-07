@@ -122,9 +122,10 @@ smaller extraction is safer.
 - Dark and light themes
 - Desktop, tablet-width, and phone-width layouts
 
-## Next implementation target
+## Next validation target
 
-Add characterization and lifecycle coverage for the coordinator's DOM-heavy
-workflows before moving more implementation. The first subsequent extraction
-will separate diagnostics, GraphQL transport, and notifications without
-changing their user-visible behaviour.
+The planned code-extraction stages are complete. Do not continue moving editor
+DOM code merely to reduce the coordinator's size. The next step is to install
+this branch under a distinct test-plugin ID, keep it isolated from the live
+FastTag package, and run the complete manual regression checklist above in both
+standard Stash and Refract before considering a merge.

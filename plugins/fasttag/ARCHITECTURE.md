@@ -22,9 +22,12 @@ final `fasttag.js` file coordinates those APIs and owns browser lifecycle.
 - `fasttag-cover-editor.js`: cover image validation, resizing, frame capture, clipboard/upload handling, and the cover-editor HUD.
 - `fasttag-ui.js`: shared popup sizing and placement calculations.
 - `fasttag-popup.js`: shared popup shell, persisted geometry, input containment, drag/resize handling, and close/abort lifecycle.
-- `fasttag-editors.js`: reusable selection and bulk-edit calculations.
+- `fasttag-editors.js`: selection normalization, single-editor latest-save
+  ownership, shared bulk batching, and Edit Everything save snapshots/queue
+  ownership.
 - `fasttag-workflows.js`: reusable navigation and result-list state transitions.
-- `fasttag.js`: editor popup rendering, global event wiring, feature coordination, and startup.
+- `fasttag.js`: editor popup rendering, GraphQL/effect callbacks, global event
+  wiring, feature coordination, and startup.
 
 ## Change rules
 

@@ -7,16 +7,18 @@ passed.
 
 ## Current phase
 
-Step 8 is complete. `fasttag-popup.js` now owns saved popup dimensions,
-single/Edit Everything positioning, shared single-editor shell construction,
-outside-click and keyboard containment, wheel handling, dragging, eight-way
-resizing, abort-controller lifetime, and ordered popup teardown. Editor tables,
-selection state, navigation, and automatic saving remain in the coordinator.
-The extracted positioning and lifecycle have focused unit coverage, and source
-comparison confirmed the shell and listener implementations retained their
-previous behaviour at the new dependency boundaries. `fasttag.js` has moved
-from the 839,005-byte baseline to 556,208 bytes without an intentional
-behavioural change.
+Step 9 is complete. The three editor families now have independent workflow
+contracts. `fasttag-editors.js` owns normalized save snapshots, the
+single-editor latest-save gate, shared bounded bulk batching and result totals,
+and Edit Everything's serial/latest-save coordination. The coordinator still
+owns editor DOM rendering, GraphQL mutations, notifications, live-cache/card
+effects, and navigation wiring, supplied to the workflow module through narrow
+callbacks. This avoids coupling the distinct single, bulk, and Edit Everything
+views merely to reduce file size.
+
+The extracted workflows have focused concurrency, snapshot, delta, progress,
+and stale-result coverage. `fasttag.js` has moved from the 839,005-byte baseline
+to 556,733 bytes (11,046 lines) without an intentional user-visible change.
 
 ## Extracted modules
 
@@ -31,11 +33,12 @@ behavioural change.
 - `fasttag-preview.js`: media discovery, scrubbing calculations, and HUD layout
 - `fasttag-ui.js`: shared popup sizing and workstation positioning
 - `fasttag-popup.js`: shared shell, positioning, event containment, resizing, and close/abort lifecycle
-- `fasttag-editors.js`: selection normalization and bulk-selection deltas
+- `fasttag-editors.js`: selection normalization, single/Edit Everything save
+  ownership, bulk-selection deltas, and bounded bulk execution
 - `fasttag-workflows.js`: tested result-list and navigation state transitions
 
 `fasttag.js` remains the runtime coordinator and owns editor popup rendering,
-global event wiring, navigation, and editor save orchestration.
+global event wiring, navigation, mutation execution, and user-visible effects.
 
 See `ARCHITECTURE.md` for the permanent ownership rules used for future work.
 
@@ -53,9 +56,10 @@ suites.
 
 ## Next work
 
-Characterize editor-specific workflow ownership before moving editor rendering
-or state. Keep single, bulk, and Edit Everything behaviour separate until their
-selection, navigation, and automatic-save contracts are independently covered.
+Step 10 is manual validation. Create an isolated Stash test-plugin installation
+with a distinct plugin ID, then run the complete checklist in `REFACTOR_PLAN.md`
+against standard Stash and Refract. Do not merge or publish the refactor until
+that manual pass is complete.
 
 ## Still required before a merge or release
 
