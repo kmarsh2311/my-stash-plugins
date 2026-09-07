@@ -192,6 +192,7 @@ assert.ok(coverEditorSource.includes("button.isConnected && !activeEditor && dep
 assert.ok(previewSource.includes('FastTagCoverEditor.restoreForHost?.({'), 'a remembered Cover Editor shell should open before scene media lookup completes');
 assert.ok(coverEditorSource.includes("restoringOverlay.textContent = 'Preparing video…'"), 'the early restored shell should explain that its video is being prepared');
 assert.ok(mainSource.includes("{ opacity: 0, transform: 'scale(.985)' }") && mainSource.includes("{ duration: 160, easing: 'ease-out' }"), 'Edit Everything should animate only after its full-size positioning geometry is available');
+assert.ok(mainSource.includes("form.style.transformOrigin = 'top left'"), 'Edit Everything entrance scaling should keep its positioned top-left corner stationary');
 assert.ok(mainSource.includes("prefers-reduced-motion: reduce"), 'Edit Everything entrance motion should respect reduced-motion preferences');
 assert.ok(previewSource.includes('const animateHudEntrance = !window.matchMedia?.') && previewSource.includes('floatingHudElement.animate?.(['), 'the floating video HUD should use the subtle accessible entrance');
 assert.ok(scraperControllerSource.includes('const animateHudEntrance = !root.matchMedia?.') && scraperControllerSource.includes('hudElement.animate?.(['), 'the detached scraper HUD should use the subtle accessible entrance');

@@ -4886,6 +4886,7 @@
         const animateEntrance = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
         if (animateEntrance) {
             form.style.opacity = '0';
+            form.style.transformOrigin = 'top left';
         }
 
         form.innerHTML = `

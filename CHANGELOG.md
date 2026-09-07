@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Compact Size Persistence**: Closing Edit Everything while a temporary status message is visible no longer saves the expanded message height as the normal Cover Editor size.
 - **Graceful Cover Restoration**: A remembered Cover Editor now opens its shell immediately with Edit Everything and binds the video when ready instead of appearing abruptly after the media lookup.
 - **Stable Uniform HUD Entrances**: Edit Everything, the detached scraper, and the floating video HUD now share the Cover Editor's subtle accessible entrance. Edit Everything is positioned at full size before its visual scale begins, preventing repeated opening from drifting it upward and left.
+- **Stationary Edit Everything Entrance**: The popup's subtle scale is anchored to its positioned top-left corner so the window no longer appears to move as it opens.
 - **Unified Popup Entrance**: Edit Everything now uses the same subtle fade-and-scale entrance as a restored Cover Editor, while respecting the browser's reduced-motion preference.
 
 ## [4.3.0] - 2026-09-06
