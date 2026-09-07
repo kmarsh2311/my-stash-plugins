@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `fca4a95`
+- Runtime source commit: `86c9ae1`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -51,7 +51,7 @@ Never enable it while the live FastTag plugin is enabled.
 - [x] Scraper field checkboxes and acceptance
 - [x] Separate StashDB ID and cover saving
 - [x] Scraper performer image enrichment
-- [ ] Gemini bridge start, parse, timeout, and fallback behavior
+- [x] Gemini bridge connection, parse, timeout recovery, and subsequent requests
 - [x] Organized-state updates
 - [x] Preview/full-video switching and scrubbing
 - [x] Floating video and scraper HUD lifecycle
@@ -59,11 +59,11 @@ Never enable it while the live FastTag plugin is enabled.
 - [x] Standard Stash scene-card refresh
 - [x] Refract scene-card refresh
 - [x] Right-click metadata menu and native media context menu
-- [ ] Left-click entity-icon shortcuts
-- [ ] Dark and light themes
-- [ ] Desktop, tablet-width, and phone-width layouts
-- [ ] Browser console checked for new FastTag errors
-- [ ] Stash log checked for new FastTag errors
+- [x] Left-click entity-icon shortcuts
+- [x] Dark and light themes
+- [x] Desktop, tablet-width, and phone-width layouts
+- [x] Browser console checked for new FastTag errors
+- [ ] Stash server log checked for new FastTag errors
 
 ## Results and defects
 
@@ -127,6 +127,12 @@ switching back to the released live plugin.
   while retaining the existing request-generation ownership guard. Browser
   testing confirmed the previous result disappears immediately and the HUD
   remains stable while the next scene is scraped.
+- Refract visibly rebuilt every scene-card icon when FastTag handled card
+  interactions. Commits `fca4a95`, `5d86d4f`, and `86c9ae1` remove redundant
+  blanket cleanup/refresh calls from context-menu opening, direct entity-icon
+  opening, and popup closure respectively. Browser testing confirmed that
+  right-clicking, left-clicking entity icons, and closing FastTag no longer
+  flash the scene cards; targeted save updates continue to work.
 
 ### Post-validation polish
 
@@ -140,6 +146,24 @@ switching back to the released live plugin.
   saving, and moving to the next scene without closing the HUD all passed.
   Upload, clipboard paste, drag-and-drop, and saving each resulting cover also
   worked correctly.
+- The searchable offline User Guide initially inherited Refract layout rules,
+  separating its header, navigation, and content. Commits `af58a39` and
+  `69e2c99` isolate the guide in its own style scope and version the optional
+  help-module request. Browser testing confirmed the unified guide layout in
+  Refract.
+- FastTag light/dark switching updated correctly during the open settings
+  session, and the tested desktop, tablet-width, and phone-width layouts were
+  considered acceptable.
+- The final browser console contained no new FastTag errors. The attached
+  502-line FastTag debug log ended with successful saves, navigation, scraper
+  HUD use, and a successful Gemini parse. Older entries recorded controlled
+  external failures (Gemini 503/high demand, read timeouts, and no scraper
+  matches); later successful parses demonstrate recovery rather than a stuck
+  request path.
+- The optional destructive bridge-start check was not forced: it would require
+  stopping the working Gemini bridge. Successful live parsing confirmed the
+  connection and request path, while the historical timeout entries confirmed
+  that failures are surfaced and later requests remain usable.
 - Scraper search population and adjustment, false-positive/result-limit
   controls, candidate navigation, dismissal, and cross-scene loading behaviour
   worked without new functional errors. CSP messages for optional third-party
