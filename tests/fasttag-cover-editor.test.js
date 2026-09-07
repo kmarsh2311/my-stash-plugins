@@ -36,7 +36,7 @@ assert.deepEqual(coverEditor.resolveEditorSize(null, 1920, 1080), {
     maxWidth: 1896,
     maxHeight: 1056
 });
-assert.equal(coverEditor.resolveEditorSize(null, 1920, 1080, true).height, 580);
+assert.equal(coverEditor.resolveEditorSize(null, 1920, 1080, true).height, 545);
 assert.deepEqual(coverEditor.resolveEditorSize({ width: 700, height: 900 }, 600, 700), {
     width: 576,
     height: 676,

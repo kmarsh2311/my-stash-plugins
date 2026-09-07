@@ -6,9 +6,9 @@
     const DEFAULT_JPEG_QUALITY = 0.9;
     const DEFAULT_EDITOR_WIDTH = 450;
     const DEFAULT_EDITOR_HEIGHT = 740;
-    const DEFAULT_COMPACT_EDITOR_HEIGHT = 580;
+    const DEFAULT_COMPACT_EDITOR_HEIGHT = 545;
     const EDITOR_SIZE_STORAGE_KEY = 'fasttag_cover_editor_size';
-    const COMPACT_EDITOR_SIZE_STORAGE_KEY = 'fasttag_cover_editor_size_compact';
+    const COMPACT_EDITOR_SIZE_STORAGE_KEY = 'fasttag_cover_editor_size_compact_v2';
     let dependencies = null;
     let activeEditor = null;
 
@@ -345,6 +345,16 @@
         playbackControls.append(playPauseButton, stepBackButton, timeDisplay, stepForwardButton, captureButton);
         const cancelButton = createActionButton('Cancel');
         const saveButton = createActionButton('Set Cover', true);
+        if (isCompact) {
+            for (const button of [playPauseButton, stepBackButton, stepForwardButton, captureButton, cancelButton, uploadButton, pasteButton]) {
+                button.style.background = '#1e293b';
+                button.style.borderColor = '#475569';
+                button.style.color = '#e2e8f0';
+            }
+            saveButton.style.background = '#3730a3';
+            saveButton.style.borderColor = '#4f46e5';
+            saveButton.style.color = '#e0e7ff';
+        }
         saveButton.disabled = true;
         saveButton.style.opacity = '0.45';
         saveButton.style.flex = '1';
