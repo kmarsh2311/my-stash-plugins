@@ -461,6 +461,22 @@
         return typeof Tabulator !== 'undefined' || typeof window.Tabulator !== 'undefined';
     }
 
+    function findTableRowById(table, id) {
+        if (!table || typeof table.getRows !== 'function') return null;
+        const targetId = String(id);
+        return table.getRows().find(row => String(row.getData()?.id) === targetId) || null;
+    }
+
+    function selectTableRowsById(table, ids) {
+        if (!table || typeof table.getRows !== 'function' || typeof table.selectRow !== 'function') return;
+        const selectedIds = new Set(Array.from(ids || []).map(String));
+        table.getRows().forEach(row => {
+            if (selectedIds.has(String(row.getData()?.id))) {
+                table.selectRow(row);
+            }
+        });
+    }
+
     function loadScriptWithFallback(urls, id) {
         return new Promise((resolve, reject) => {
             if (isTabulatorLoaded()) {
@@ -4098,10 +4114,10 @@
                 const hasSearch = filterInput && filterInput.value.trim().length > 0;
                 if (hasSearch) {
                     filterInput.value = '';
-                    if (searchClear) searchClear.style.display = 'none';
+                    if (clearBtn) clearBtn.style.display = 'none';
                     if (form.querySelector(`#${type}-kbd-shortcut`)) form.querySelector(`#${type}-kbd-shortcut`).style.display = 'block';
                     await fetchData('', false);
-                    const r = activeTableInstance.getRow(id);
+                    const r = findTableRowById(activeTableInstance, id);
                     if (r) activeTableInstance.scrollToRow(r, "top", false);
                     singleNavIndex = -1;
                     updateSingleKeyboardHighlight();
@@ -4124,7 +4140,7 @@
                 const hasSearch = filterInput && filterInput.value.trim().length > 0;
                 if (hasSearch) {
                     filterInput.value = '';
-                    if (searchClear) searchClear.style.display = 'none';
+                    if (clearBtn) clearBtn.style.display = 'none';
                     if (form.querySelector(`#${type}-kbd-shortcut`)) form.querySelector(`#${type}-kbd-shortcut`).style.display = 'block';
                 }
                 await fetchData('', true);
@@ -4173,10 +4189,7 @@
                 if (typeof activeTableInstance.deselectRow === 'function') {
                     activeTableInstance.deselectRow();
                 }
-                selectedIds.forEach(id => {
-                    const r = activeTableInstance.getRow(id);
-                    if (r) activeTableInstance.selectRow(r);
-                });
+                selectTableRowsById(activeTableInstance, selectedIds);
                 refreshUI();
                 if (resetScroll && data.length > 0) {
                     const holder = activeTableInstance.element?.querySelector('.tabulator-tableholder') || activeTableInstance.element;
@@ -4447,7 +4460,7 @@
                             updateVisibility();
                             await fetchData("", true);
                             if (!wasSelected) {
-                                const r = activeTableInstance.getRow(rowData.id);
+                                const r = findTableRowById(activeTableInstance, rowData.id);
                                 if (r) activeTableInstance.scrollToRow(r, "top", false);
                             }
                             currentSingleSection = 'table';
@@ -6843,10 +6856,7 @@
                 isRestoring = true;
                 try {
                     await tableInstance.setData(data);
-                    selIds.forEach(id => {
-                        const r = tableInstance.getRow(id);
-                        if (r) tableInstance.selectRow(r);
-                    });
+                    selectTableRowsById(tableInstance, selIds);
 
                     const rawTerm = (popup.globalSearch?.value || '').trim();
                     const bottomCreateEl = popup[type]?.bottomCreateContainer;
@@ -6893,21 +6903,6 @@
                 refreshAllUI();
                 await savePromise;
             };
-
-            if (tagsTable) {
-                try {
-                    tagsTable.off("rowClick");
-                    tagsTable.off("rowSelected");
-                    tagsTable.off("rowDeselected");
-                } catch (e) {}
-            }
-            if (performersTable) {
-                try {
-                    performersTable.off("rowClick");
-                    performersTable.off("rowSelected");
-                    performersTable.off("rowDeselected");
-                } catch (e) {}
-            }
 
             tagsTable.on("rowClick", async (e, row) => {
                 const rowData = row.getData();
@@ -6960,7 +6955,7 @@
                     if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
                     await refreshGlobalSearch('');
                     if (!wasSelected) {
-                        const r = tagsTable.getRow(rowData.id);
+                        const r = findTableRowById(tagsTable, rowData.id);
                         if (r) tagsTable.scrollToRow(r, "top", false);
                     } else {
                         try {
@@ -7016,7 +7011,7 @@
                     if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
                     await refreshGlobalSearch('');
                     if (!wasSelected) {
-                        const r = performersTable.getRow(rowData.id);
+                        const r = findTableRowById(performersTable, rowData.id);
                         if (r) performersTable.scrollToRow(r, "top", false);
                     } else {
                         try {
@@ -7936,7 +7931,7 @@
                                 if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
                                 await refreshGlobalSearch('');
                                 if (!isSelected) {
-                                    const r = curTable.getRow(rowData.id);
+                                    const r = findTableRowById(curTable, rowData.id);
                                     if (r) curTable.scrollToRow(r, "top", false);
                                 } else {
                                     try {
@@ -8148,11 +8143,11 @@
                     initialGroupIds = new Set(selection.groupIds);
 
                     selection.tagIds.forEach(id => {
-                        const row = tagsTable.getRow(id);
+                        const row = findTableRowById(tagsTable, id);
                         if (row) addRecentEntry('tags', row.getData());
                     });
                     selection.performerIds.forEach(id => {
-                        const row = performersTable.getRow(id);
+                        const row = findTableRowById(performersTable, id);
                         if (row) addRecentEntry('performers', row.getData());
                     });
                     if (selection.studioId) {
@@ -8897,10 +8892,7 @@
                     if (typeof tableInstance.deselectRow === 'function') {
                         tableInstance.deselectRow();
                     }
-                    selIds.forEach(id => {
-                        const r = tableInstance.getRow(id);
-                        if (r) tableInstance.selectRow(r);
-                    });
+                    selectTableRowsById(tableInstance, selIds);
                     tableInstance.redraw(true);
 
                     const rawTerm = (popup.globalSearch?.value || '').trim();
@@ -8935,21 +8927,6 @@
                 renderGroupBar(popup.globalSearch ? popup.globalSearch.value : '');
             };
 
-            if (tagsTable) {
-                try {
-                    tagsTable.off("rowClick");
-                    tagsTable.off("rowSelected");
-                    tagsTable.off("rowDeselected");
-                } catch (e) {}
-            }
-            if (performersTable) {
-                try {
-                    performersTable.off("rowClick");
-                    performersTable.off("rowSelected");
-                    performersTable.off("rowDeselected");
-                } catch (e) {}
-            }
-
             tagsTable.on("rowClick", async (e, row) => {
                 const rowData = row.getData();
                 if (!rowData || !rowData.id) return;
@@ -8978,7 +8955,7 @@
                     if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
                     await refreshGlobalSearch('');
                     if (!wasSelected) {
-                        const r = tagsTable.getRow(rowData.id);
+                        const r = findTableRowById(tagsTable, rowData.id);
                         if (r) tagsTable.scrollToRow(r, "top", false);
                     } else {
                         try {
@@ -9028,7 +9005,7 @@
                     if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
                     await refreshGlobalSearch('');
                     if (!wasSelected) {
-                        const r = performersTable.getRow(rowData.id);
+                        const r = findTableRowById(performersTable, rowData.id);
                         if (r) performersTable.scrollToRow(r, "top", false);
                     } else {
                         try {
@@ -9933,7 +9910,7 @@
                                 popup.globalClear.style.display = 'none';
                                 if (popup.kbdShortcut) popup.kbdShortcut.style.display = 'block';
                                 await refreshGlobalSearch('');
-                                const r = curTable.getRow(rowData.id);
+                                const r = findTableRowById(curTable, rowData.id);
                                 if (r) curTable.scrollToRow(r, "top", false);
                                 activeNavIndex = -1;
                                 refreshAllUI();
@@ -10323,11 +10300,9 @@
             return singleEditorSaveWorkflow.save(sId, ids, { showToast });
         };
 
-        if (activeTableInstance) {
+        if (activeTableInstance?._fastTagSingleRowClickBound) {
             try {
                 activeTableInstance.off("rowClick");
-                activeTableInstance.off("rowSelected");
-                activeTableInstance.off("rowDeselected");
             } catch (e) {}
         }
 
@@ -10365,11 +10340,11 @@
             const hasSearch = filterInput && filterInput.value.trim().length > 0;
             if (hasSearch) {
                 filterInput.value = '';
-                if (searchClear) searchClear.style.display = 'none';
+                if (clearBtn) clearBtn.style.display = 'none';
                 if (form.querySelector(`#${type}-kbd-shortcut`)) form.querySelector(`#${type}-kbd-shortcut`).style.display = 'block';
                 await fetchData('', true);
                 if (!wasSelected) {
-                    const r = activeTableInstance.getRow(rowData.id);
+                    const r = findTableRowById(activeTableInstance, rowData.id);
                     if (r) activeTableInstance.scrollToRow(r, "top", false);
                 }
                 singleNavIndex = -1;
@@ -10388,6 +10363,7 @@
             }
             refreshUI();
         });
+        activeTableInstance._fastTagSingleRowClickBound = true;
 
         form.onclick = (e) => {
             if (!e.target.closest('input, textarea')) {
@@ -10435,10 +10411,7 @@
             isRestoringSelections = true;
             try {
                 await activeTableInstance.setData(data);
-                selectedIds.forEach(id => {
-                    const r = activeTableInstance.getRow(id);
-                    if (r) activeTableInstance.selectRow(r);
-                });
+                selectTableRowsById(activeTableInstance, selectedIds);
                 renderQuickActions(form, type, filterInput, selectedIds, onRecentChipSelect);
                 renderSmartSuggestions(form, type, filterInput, selectedIds, smartSuggestions, onRecentChipSelect);
                 updateSequentialEditUI(form, type, selectedIds);
@@ -10841,7 +10814,7 @@
                             saveWithoutReload(sceneId, selectedIds);
                             fetchData("", true).then(() => {
                                 if (!wasSelected) {
-                                    const r = activeTableInstance.getRow(rowData.id);
+                                    const r = findTableRowById(activeTableInstance, rowData.id);
                                     if (r) activeTableInstance.scrollToRow(r, "top", false);
                                 }
                                 currentSingleSection = 'table';

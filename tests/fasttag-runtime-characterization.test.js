@@ -143,6 +143,11 @@ assert.ok(singleEditorWorkflow.includes('createSingleEditorSaveWorkflow({'), 'si
 assert.ok(singleEditorWorkflow.includes('return singleEditorSaveWorkflow.save(sId, ids, { showToast });'), 'single-editor callers must await the extracted save result');
 assertBefore(singleEditorWorkflow, 'refreshUI();\n            saveWithoutReload(sceneId, selectedIds);', 'const hasSearch = filterInput', 'row selection must update the UI and start its automatic save before search cleanup');
 assert.ok(singleEditorWorkflow.includes('if (hasSelectionChanged(selectedIds))'), 'manual single-editor saves must avoid unchanged mutations');
+assert.equal(source.includes('if (searchClear)'), false, 'editor search cleanup must use its defined clear-button reference');
+assert.ok(source.includes('selectTableRowsById(activeTableInstance, selectedIds);'), 'selection restoration must avoid noisy Tabulator lookups for absent rows');
+assert.ok(source.includes('activeTableInstance?._fastTagSingleRowClickBound'), 'single-editor handler cleanup must only remove a previously bound event');
+assert.equal(source.includes('.off("rowSelected")'), false, 'editor setup must not remove Tabulator events it never registered');
+assert.equal(source.includes('.off("rowDeselected")'), false, 'editor setup must not remove Tabulator events it never registered');
 
 const singleEditorSave = section('function createSingleEditorSaveWorkflow(', 'root.FastTag = root.FastTag || {};', editorSource);
 assertBefore(singleEditorSave, 'const saveSequence = ++pendingSaveSequence;', 'const selectionSnapshot = normalizeIdSet(selectedIds);', 'single-editor saves must claim a sequence before snapshotting selections');
