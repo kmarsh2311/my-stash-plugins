@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `ce9a29c`
+- Runtime source commit: `e2574ef`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -50,7 +50,7 @@ Never enable it while the live FastTag plugin is enabled.
 - [x] Scraper search, filtering, navigation, and dismissal
 - [x] Scraper field checkboxes and acceptance
 - [x] Separate StashDB ID and cover saving
-- [ ] Scraper performer image enrichment
+- [x] Scraper performer image enrichment
 - [ ] Gemini bridge start, parse, timeout, and fallback behavior
 - [x] Organized-state updates
 - [ ] Preview/full-video switching and scrubbing
@@ -141,6 +141,12 @@ switching back to the released live plugin.
   source maps were classified as harmless developer-tool noise.
 - Scraper acceptance respected individual field selections: checked metadata
   saved and refreshed immediately, while unchecked fields remained unchanged.
+- Performer-image enrichment populated missing performer artwork successfully
+  during scraper acceptance and produced no console errors.
+- At narrow saved HUD widths, the fixed-width scraper header could place Accept
+  beyond the right edge. Commit `e2574ef` lets the action group wrap inside the
+  HUD while retaining a single row whenever sufficient width is available.
+  Browser retest pending.
 - Accepting a StashDB result stored the correct remote scene ID. With Cover
   selected it also saved the remote cover; with Cover cleared it retained the
   existing cover while still storing the ID. No warnings or console errors
