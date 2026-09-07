@@ -6,7 +6,7 @@
 - Runtime source commit: `d05c4fb`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
-- Live plugin ID: `mypluginrc`
+- Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
 
 The test package is listed under `plugins.disabled` in the Stash configuration.
 Never enable it while the live FastTag plugin is enabled.
@@ -24,11 +24,11 @@ Never enable it while the live FastTag plugin is enabled.
 
 ## Safe activation
 
-- [ ] Disable live **FastTag** (`mypluginrc`) in Stash
-- [ ] Confirm its button changes from **Disable** to **Enable**
-- [ ] Reload plugins or restart Stash if the test package is not yet listed
-- [ ] Enable **FastTag Refactor Test** (`fasttag-refactor-test`)
-- [ ] Hard-refresh the browser and confirm only one FastTag runtime initializes
+- [x] Disable live **FastTag** (`fasttag`) in Stash
+- [x] Confirm its button changes from **Disable** to **Enable**
+- [x] Reload plugins so the distinct test manifest is listed
+- [x] Enable **FastTag Refactor Test** (`fasttag-refactor-test`)
+- [x] Hard-refresh the browser and confirm the test plugin opens
 
 ## Manual regression checklist
 
@@ -70,4 +70,3 @@ Never enable it while the live FastTag plugin is enabled.
 Record each failure with the scene ID, editor/mode, exact action, expected
 result, actual result, browser-console message, and whether it reproduces after
 switching back to the released live plugin.
-

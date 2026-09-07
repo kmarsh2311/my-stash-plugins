@@ -57,8 +57,10 @@ suites.
 
 ## Next work
 
-The disabled `fasttag-refactor-test` package has been staged from runtime commit
-`d05c4fb` with a distinct display name, plugin task ID, and help-asset path.
+The `fasttag-refactor-test` package has been staged from runtime commit
+`d05c4fb` with a distinct manifest filename, display name, plugin task ID, and
+help-asset path. The released `fasttag` plugin is disabled and the isolated test
+build is now enabled for manual validation.
 Follow `STEP10_TEST_RESULTS.md` to switch safely from the live plugin and run the
 complete checklist against standard Stash and Refract. Do not merge or publish
 the refactor until that manual pass is complete.
