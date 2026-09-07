@@ -202,5 +202,6 @@ const customMenuOpenBlock = mainSource.slice(mainSource.indexOf('function showCu
 assert.equal(customMenuOpenBlock.includes('closePopup();'), false, 'opening the context menu must not trigger a Refract-wide card refresh');
 const singleEditorOpenBlock = mainSource.slice(mainSource.indexOf('async function openEntityPopup('), mainSource.indexOf('async function openEntityPopup(') + 900);
 assert.ok(singleEditorOpenBlock.includes('if (activePopup) closePopup(false);'), 'a direct card-icon click must not run empty popup cleanup and refresh every Refract card');
+assert.ok((mainSource.match(/Finished \$\{/g) || []).length >= 2, 'single and Everything sequential workflows should distinguish their final progress action from the ordinary Close button');
 
 console.log('fasttag-module-contract tests passed');

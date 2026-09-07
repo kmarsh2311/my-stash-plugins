@@ -2097,7 +2097,9 @@
             saveBtn.disabled = false;
             saveBtn.style.opacity = '1';
             saveBtn.style.cursor = 'pointer';
-            saveBtn.textContent = isLast ? (isEasterEggActive() ? 'Close 🍫' : 'Close') : (isEasterEggActive() ? 'Next Scene 🍫 ►' : 'Next Scene ►');
+            saveBtn.textContent = isLast
+                ? (isEasterEggActive() ? `Finished ${currentNum}/${totalNum} 🍫` : `Finished ${currentNum}/${totalNum}`)
+                : (isEasterEggActive() ? 'Next Scene 🍫 ►' : 'Next Scene ►');
             saveBtn.style.background = '#6366f1';
             saveBtn.classList.remove('fasttag-btn-pulse');
         }
@@ -6601,7 +6603,9 @@
                         popup.saveBtn.disabled = false;
                         popup.saveBtn.style.opacity = '1';
                         popup.saveBtn.style.cursor = 'pointer';
-                        popup.saveBtn.textContent = isLast ? (isEasterEggActive() ? 'Close 🍫' : 'Close') : (isEasterEggActive() ? 'Next Scene 🍫 ►' : 'Next Scene ►');
+                        popup.saveBtn.textContent = isLast
+                            ? (isEasterEggActive() ? `Finished ${idx + 1}/${cards.length} 🍫` : `Finished ${idx + 1}/${cards.length}`)
+                            : (isEasterEggActive() ? 'Next Scene 🍫 ►' : 'Next Scene ►');
                         popup.saveBtn.style.background = '#6366f1';
                         popup.saveBtn.classList.remove('fasttag-btn-pulse-calm');
                     }

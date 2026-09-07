@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Reduced the main `fasttag.js` coordinator from its 839 KB baseline to approximately 557 KB and added a complete automated verification runner covering 21 suites.
 
 ### Fixed
+- Labelled the final Sequential primary action with completed progress (for example, `Finished 1/1`) so it is no longer confused with the separate Close button.
 - Kept the detached scraper HUD draggable and resizable while a long-running scrape is still showing its loading state.
 - Prevented redundant full-card refreshes when opening context menus, using left-click entity shortcuts, or closing popups, eliminating Refract scene-card icon flashes without affecting targeted save updates.
 - Isolated the offline User Guide from host-theme CSS and versioned its lazy-loaded asset so updated guide code is not hidden by browser caching.
