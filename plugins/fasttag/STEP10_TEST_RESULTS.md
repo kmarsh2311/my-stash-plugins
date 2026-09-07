@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `4e76ddd`
+- Runtime source commit: `80aaa3b`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -172,6 +172,11 @@ switching back to the released live plugin.
   Commit `4e76ddd` locks each pill before its asynchronous work, treats an
   already-selected entity as complete, and renders one stable completion tick.
   Browser retest pending.
+- A dragged single-entity editor position was persisted across later popup
+  sessions, which could make a fresh Tag, Performer, Studio, or Gallery editor
+  open away from the scene card. Commit `80aaa3b` anchors every fresh single
+  editor beside its current card while retaining a user-moved position during
+  the active Sequential session only. Browser retest pending.
 - Accepting a StashDB result stored the correct remote scene ID. With Cover
   selected it also saved the remote cover; with Cover cleared it retained the
   existing cover while still storing the ID. No warnings or console errors
