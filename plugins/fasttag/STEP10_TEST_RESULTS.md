@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `ab02acf`
+- Runtime source commit: `1839674`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -88,4 +88,7 @@ switching back to the released live plugin.
 - Single Performer and Studio editing saved correctly. Closing either editor
   exposed two remaining Tabulator warnings from shared popup teardown. Commit
   `ab02acf` removes those redundant event-removal calls; table destruction
-  remains responsible for releasing all handlers. Browser retest pending.
+  remains responsible for releasing all handlers.
+- Initial Edit Everything table rendering could request redraws before Tabulator
+  emitted its `tableBuilt` event. Commit `1839674` guards every coordinator and
+  popup redraw against Tabulator's initialization state. Browser retest pending.
