@@ -42,7 +42,7 @@ Never enable it while the live FastTag plugin is enabled.
 - [x] Recent and pinned pills
 - [x] Suggestions and global search
 - [x] Edit Everything automatic save
-- [ ] Sequential navigation with dirty metadata
+- [x] Sequential navigation with dirty metadata
 - [ ] Random-scene navigation and history
 - [ ] Bulk single-entity editing
 - [ ] Bulk Edit Everything
@@ -108,3 +108,6 @@ switching back to the released live plugin.
   and remained available after reopening FastTag. Global search found and
   applied existing metadata correctly. Edit Everything changes saved
   automatically throughout these tests.
+- In sequential Edit Everything mode, metadata saved quickly enough to complete
+  before the immediate Next Scene action. Returning to the previous scene
+  confirmed that the change persisted and navigation loaded the correct scene.
