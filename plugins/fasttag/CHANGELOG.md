@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
-- Added a compact scraper-loading illustration with a scanning magnifying glass and moving video-file tiles, plus a static reduced-motion presentation for accessibility.
+- Added a compact static scraper-loading illustration with a magnifying glass inspecting the central video-file tile.
 
 ### Changed
 - Refactored the FastTag runtime into independently tested modules for API access, storage, integrations, Gemini, scraping, preview, popup lifecycle, editor workflows, notifications, and shared UI while preserving the existing Stash plugin loading model and stored settings.
