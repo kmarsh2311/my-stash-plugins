@@ -49,10 +49,15 @@ const scene = {
 };
 assert.equal(integrations.syncSceneToApolloCache(scene), true);
 assert.equal(modification.id, 'Scene:42');
-const toReference = value => ({ __ref: `${value.__typename}:${value.id}` });
+const referenceCalls = [];
+const toReference = (value, mergeIntoStore) => {
+    referenceCalls.push({ value, mergeIntoStore });
+    return { __ref: `${value.__typename}:${value.id}` };
+};
 assert.deepEqual(modification.fields.tags(null, { toReference }), [{ __ref: 'Tag:1' }]);
 assert.deepEqual(modification.fields.performers(null, { toReference }), [{ __ref: 'Performer:2' }]);
 assert.deepEqual(modification.fields.studio(null, { toReference }), { __ref: 'Studio:3' });
+assert.deepEqual(referenceCalls.map(call => call.mergeIntoStore), [true, true, true]);
 assert.equal(modification.fields.organized(), true);
 assert.equal(modification.fields.title(), 'Title');
 assert.equal(modification.fields.date(), '2026-09-04');

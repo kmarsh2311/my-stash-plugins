@@ -42,7 +42,7 @@
 
             if (sceneData.tags !== undefined) {
                 fieldsToUpdate.tags = (existing, { toReference }) => (sceneData.tags || []).map(tag => {
-                    const reference = typeof toReference === 'function' ? toReference({ __typename: 'Tag', id: String(tag.id), name: tag.name }) : null;
+                    const reference = typeof toReference === 'function' ? toReference({ __typename: 'Tag', id: String(tag.id), name: tag.name }, true) : null;
                     return reference || { __typename: 'Tag', id: String(tag.id), name: tag.name };
                 });
             }
@@ -56,7 +56,7 @@
                         gender: performer.gender || null,
                         image_path: performer.image_path || null
                     };
-                    const reference = typeof toReference === 'function' ? toReference(performerObject) : null;
+                    const reference = typeof toReference === 'function' ? toReference(performerObject, true) : null;
                     return reference || performerObject;
                 });
             }
@@ -69,7 +69,7 @@
                         name: sceneData.studio.name,
                         image_path: sceneData.studio.image_path || null
                     };
-                    const reference = typeof toReference === 'function' ? toReference(studioObject) : null;
+                    const reference = typeof toReference === 'function' ? toReference(studioObject, true) : null;
                     return reference || studioObject;
                 };
             }
