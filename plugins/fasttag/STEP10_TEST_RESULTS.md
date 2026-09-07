@@ -39,9 +39,9 @@ Never enable it while the live FastTag plugin is enabled.
 - [x] Single-editor automatic save and refresh
 - [x] Single-editor sequential previous/next navigation
 - [x] Edit Everything tags, performers, studio, and groups
-- [ ] Recent and pinned pills
-- [ ] Suggestions and global search
-- [ ] Edit Everything automatic save
+- [x] Recent and pinned pills
+- [x] Suggestions and global search
+- [x] Edit Everything automatic save
 - [ ] Sequential navigation with dirty metadata
 - [ ] Random-scene navigation and history
 - [ ] Bulk single-entity editing
@@ -104,5 +104,7 @@ switching back to the released live plugin.
   `javascript`, contain no warning/error severity, and are not emitted by any
   FastTag logging statement.
 - Recent tag pills and automatic suggestions appeared and applied correctly.
-  The combined checklist entries remain open pending pinned-pill persistence
-  and global-search testing.
+  Pinned tag and performer pills also applied correctly in every editor mode
+  and remained available after reopening FastTag. Global search found and
+  applied existing metadata correctly. Edit Everything changes saved
+  automatically throughout these tests.
