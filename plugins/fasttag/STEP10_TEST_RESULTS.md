@@ -71,6 +71,15 @@ Record each failure with the scene ID, editor/mode, exact action, expected
 result, actual result, browser-console message, and whether it reproduces after
 switching back to the released live plugin.
 
+### Final handoff
+
+- The validated branch was fast-forwarded into local `main` and copied into the
+  normal FastTag installation.
+- The isolated test installation was disabled and moved recoverably to the
+  Trash; only normal FastTag remains listed after the plugin reload.
+- Normal FastTag 4.3.0 enabled and opened successfully. GitHub publication was
+  deliberately held back.
+
 ### Fixed during testing
 
 - Single Tag add/remove and sequential navigation saved and refreshed correctly.

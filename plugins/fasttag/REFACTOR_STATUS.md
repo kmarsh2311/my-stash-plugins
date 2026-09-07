@@ -67,9 +67,10 @@ editing could not be exercised because the test library has no galleries; its
 shared single-editor path is covered by the other entity editors and automated
 tests.
 
-## Handoff
+## Handoff complete
 
-The branch is ready for a local merge into `main`. After merging, reinstall the
-normal package, ensure the isolated `fasttag-refactor-test` package is disabled
-or removed, enable only normal FastTag, and perform one short smoke test. GitHub
-publication remains a separate, explicit action.
+The refactor was fast-forwarded into local `main`, installed into the normal
+FastTag package, and enabled as the only FastTag runtime. The disposable
+`fasttag-refactor-test` installation was moved to the Trash. The normal plugin
+opened successfully after activation and retained version `4.3.0`; publishing
+the updated local `main` to GitHub remains a separate, explicit action.
