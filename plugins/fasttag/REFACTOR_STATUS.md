@@ -7,7 +7,8 @@ passed.
 
 ## Current phase
 
-Step 9 is complete. The three editor families now have independent workflow
+Step 9 is complete and Step 10 manual validation has begun. The three editor
+families now have independent workflow
 contracts. `fasttag-editors.js` owns normalized save snapshots, the
 single-editor latest-save gate, shared bounded bulk batching and result totals,
 and Edit Everything's serial/latest-save coordination. The coordinator still
@@ -56,17 +57,17 @@ suites.
 
 ## Next work
 
-Step 10 is manual validation. Create an isolated Stash test-plugin installation
-with a distinct plugin ID, then run the complete checklist in `REFACTOR_PLAN.md`
-against standard Stash and Refract. Do not merge or publish the refactor until
-that manual pass is complete.
+The disabled `fasttag-refactor-test` package has been staged from runtime commit
+`d05c4fb` with a distinct display name, plugin task ID, and help-asset path.
+Follow `STEP10_TEST_RESULTS.md` to switch safely from the live plugin and run the
+complete checklist against standard Stash and Refract. Do not merge or publish
+the refactor until that manual pass is complete.
 
 ## Still required before a merge or release
 
-1. Create an isolated Stash test-plugin directory with a distinct plugin ID.
-2. Keep it disabled whenever the production FastTag plugin is enabled.
-3. Run the complete manual regression checklist in `REFACTOR_PLAN.md` using both
+1. Keep the test package disabled whenever the production FastTag plugin is enabled.
+2. Run the complete manual regression checklist in `REFACTOR_PLAN.md` using both
    standard Stash and Refract.
-4. Compare browser-console errors and update latency with released v4.3.0.
-5. Only after successful testing, decide whether to merge, version, package, and
+3. Compare browser-console errors and update latency with released v4.3.0.
+4. Only after successful testing, decide whether to merge, version, package, and
    publish the refactor.
