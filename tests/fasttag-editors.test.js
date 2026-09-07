@@ -47,10 +47,51 @@ assert.deepEqual(pendingCommits.map(entry => entry.ids), [['1'], ['1', '2']], 'e
 pendingCommits[0].resolve(true);
 pendingCommits[1].resolve(true);
 
-Promise.all([firstSave, secondSave]).then(results => {
+Promise.all([firstSave, secondSave]).then(async results => {
     assert.deepEqual(results, [true, true]);
     assert.deepEqual(replacedBaselines, [['1', '2']], 'only the newest successful save should replace the clean baseline');
     assert.deepEqual(latestSuccesses, [{ sceneId: 'scene-1', ids: ['1', '2'], context: { showToast: true } }]);
+
+    await assert.rejects(
+        () => editors.runBatchedSceneUpdates([], null),
+        /requires an update function/,
+        'bulk workflows should require an explicit scene-update boundary'
+    );
+
+    const started = [];
+    const releases = [];
+    const progress = [];
+    const bulkRun = editors.runBatchedSceneUpdates(
+        [{ id: '1' }, { id: '2' }, { id: '3' }],
+        scene => new Promise(resolve => {
+            started.push(scene.id);
+            releases.push(() => resolve(scene.id !== '2'));
+        }),
+        {
+            concurrency: 2,
+            onProgress: state => progress.push({ ...state })
+        }
+    );
+
+    await Promise.resolve();
+    assert.deepEqual(started, ['1', '2'], 'bulk workflow should not start a later batch before the active batch completes');
+    releases[0]();
+    releases[1]();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(started, ['1', '2', '3'], 'bulk workflow should start the next batch after the active batch completes');
+    releases[2]();
+
+    const bulkResult = await bulkRun;
+    assert.deepEqual(bulkResult, {
+        processedCount: 3,
+        updatedCount: 2,
+        failedCount: 1,
+        totalCount: 3
+    });
+    assert.deepEqual(progress, [
+        { processedCount: 2, updatedCount: 1, failedCount: 1, totalCount: 3 },
+        { processedCount: 3, updatedCount: 2, failedCount: 1, totalCount: 3 }
+    ]);
     console.log('fasttag-editors tests passed');
 }).catch(error => {
     console.error(error);

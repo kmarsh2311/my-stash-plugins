@@ -163,8 +163,13 @@ assertBefore(bulkEntityWorkflow, 'let initialCommonIds = new Set();', 'const sel
 const bulkEntitySave = section('saveBtn.onclick = async () => {', 'setupPopupListeners(form, signal', bulkEntityWorkflow);
 assertBefore(bulkEntitySave, 'if (!confirmed) return;', 'calculateBulkSelectionDelta(initialCommonIds, selectedIds);', 'bulk deltas must only be computed after confirmation');
 assertBefore(bulkEntitySave, 'const existIds = (config.extractExisting(existRes?.data) || []).map(String);', 'targetIds = applyBulkSelectionDelta(existIds, removedIds, addedIds);', 'bulk editing must merge its delta with each scene\'s current values');
-assert.ok(bulkEntitySave.includes('const CONCURRENCY = 3;'), 'bulk mutations must retain their bounded concurrency');
+assert.ok(bulkEntitySave.includes('const bulkResult = await runBatchedSceneUpdates('), 'bulk mutations must delegate their batching and result totals');
+assert.ok(bulkEntitySave.includes('concurrency: 3,'), 'bulk mutations must retain their bounded concurrency');
 assertBefore(bulkEntitySave, 'await refreshSceneCards();', 'closePopup();', 'bulk editing must refresh scene cards before closing');
+
+const bulkBatchWorkflow = section('async function runBatchedSceneUpdates(', 'root.FastTag = root.FastTag || {};', editorSource);
+assertBefore(bulkBatchWorkflow, 'const results = await Promise.all(', 'updatedCount += results.filter(Boolean).length;', 'bulk result counts must be updated only after an entire batch settles');
+assertBefore(bulkBatchWorkflow, 'processedCount += batch.length;', 'await onProgress({', 'bulk progress must follow completed work');
 
 // Bulk Edit Everything independently tracks common values for every entity
 // kind, preserves non-common per-scene metadata, and remains open on failures.
@@ -181,6 +186,8 @@ assertBefore(bulkEverythingWorkflow, 'const addedTagIds =', 'const confirmed = a
 assertBefore(bulkEverythingWorkflow, 'const currentTags = (scene.tags || []).map', 'const targetTags = Array.from(new Set([', 'bulk tag changes must merge with each scene\'s current tags');
 assertBefore(bulkEverythingWorkflow, 'const currentPerfs = (scene.performers || []).map', 'const targetPerfs = Array.from(new Set([', 'bulk performer changes must merge with each scene\'s current performers');
 assertBefore(bulkEverythingWorkflow, 'const currentGroups = (scene.groups || []).map', 'const targetGroups = Array.from(new Set([', 'bulk group changes must merge with each scene\'s current groups');
+assert.ok(bulkEverythingWorkflow.includes('const bulkResult = await runBatchedSceneUpdates('), 'bulk Edit Everything must share tested batching and result totals');
+assert.ok(bulkEverythingWorkflow.includes('const { updatedCount, failedCount } = bulkResult;'), 'bulk Edit Everything must use the extracted completion summary');
 assert.ok(bulkEverythingWorkflow.includes("popup.saveBtn.textContent = 'Retry Changes';"), 'a partial bulk failure must leave the editor available for retry');
 assert.ok(bulkEverythingWorkflow.includes('The editor has stayed open so you can retry.'), 'partial bulk failure messaging must explain retained editor ownership');
 

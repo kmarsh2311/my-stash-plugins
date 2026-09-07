@@ -63,12 +63,52 @@
         return Object.freeze({ save });
     }
 
+    async function runBatchedSceneUpdates(scenes, updateScene, options = {}) {
+        if (typeof updateScene !== 'function') {
+            throw new TypeError('[FastTag] Bulk editor workflow requires an update function');
+        }
+
+        const sceneList = Array.from(scenes || []);
+        const requestedConcurrency = Number(options.concurrency);
+        const concurrency = Number.isFinite(requestedConcurrency) && requestedConcurrency > 0
+            ? Math.max(1, Math.floor(requestedConcurrency))
+            : 3;
+        const onProgress = typeof options.onProgress === 'function'
+            ? options.onProgress
+            : () => {};
+        let updatedCount = 0;
+        let processedCount = 0;
+
+        for (let index = 0; index < sceneList.length; index += concurrency) {
+            const batch = sceneList.slice(index, index + concurrency);
+            const results = await Promise.all(batch.map((scene, batchIndex) => (
+                updateScene(scene, index + batchIndex)
+            )));
+            updatedCount += results.filter(Boolean).length;
+            processedCount += batch.length;
+            await onProgress({
+                processedCount,
+                updatedCount,
+                failedCount: processedCount - updatedCount,
+                totalCount: sceneList.length
+            });
+        }
+
+        return {
+            processedCount,
+            updatedCount,
+            failedCount: sceneList.length - updatedCount,
+            totalCount: sceneList.length
+        };
+    }
+
     root.FastTag = root.FastTag || {};
     root.FastTag.editors = Object.freeze({
         normalizeIdSet,
         hasSelectionSetChanged,
         calculateBulkSelectionDelta,
         applyBulkSelectionDelta,
-        createSingleEditorSaveWorkflow
+        createSingleEditorSaveWorkflow,
+        runBatchedSceneUpdates
     });
 }(typeof window !== 'undefined' ? window : globalThis));

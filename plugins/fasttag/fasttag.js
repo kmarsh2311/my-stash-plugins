@@ -197,7 +197,8 @@
         hasSelectionSetChanged,
         calculateBulkSelectionDelta,
         applyBulkSelectionDelta,
-        createSingleEditorSaveWorkflow
+        createSingleEditorSaveWorkflow,
+        runBatchedSceneUpdates
     } = FastTagEditors;
 
     FastTagDiagnostics.configure({ getUsageCount: () => getUsageCount() });
@@ -4523,11 +4524,9 @@
             const { removedIds, addedIds } = calculateBulkSelectionDelta(initialCommonIds, selectedIds);
 
             saveBtn.disabled = true;
-            let updatedCount = 0;
-            const CONCURRENCY = 3;
-            for (let i = 0; i < bulkScenes.length; i += CONCURRENCY) {
-                const batch = bulkScenes.slice(i, i + CONCURRENCY);
-                await Promise.all(batch.map(async (scene) => {
+            const bulkResult = await runBatchedSceneUpdates(
+                bulkScenes,
+                async scene => {
                     let targetIds = chosenIds;
                     if (!config.isSingleSelect && config.fetchExistingQuery) {
                         try {
@@ -4536,18 +4535,22 @@
                             targetIds = applyBulkSelectionDelta(existIds, removedIds, addedIds);
                         } catch (e) {}
                     }
-                    const success = await updateEntityForScene(type, scene.id, targetIds);
-                    if (success) updatedCount++;
-                }));
-                if (saveBtn) {
-                    saveBtn.textContent = `Saving (${Math.min(i + CONCURRENCY, bulkScenes.length)}/${bulkScenes.length})...`;
+                    return updateEntityForScene(type, scene.id, targetIds);
+                },
+                {
+                    concurrency: 3,
+                    onProgress: ({ processedCount, totalCount }) => {
+                        if (saveBtn) {
+                            saveBtn.textContent = `Saving (${processedCount}/${totalCount})...`;
+                        }
+                    }
                 }
-            }
+            );
 
             await refreshSceneCards();
             recordSaveUsage();
             closePopup();
-            toastSuccess(`Applied ${config.title} to ${updatedCount} scenes`);
+            toastSuccess(`Applied ${config.title} to ${bulkResult.updatedCount} scenes`);
         };
 
         setupPopupListeners(form, signal, () => {});
@@ -9979,8 +9982,6 @@
 
                 popup.saveBtn.disabled = true;
                 popup.saveBtn.textContent = `Applying... 0/${bulkScenes.length}`;
-                let updatedCount = 0;
-                const CONCURRENCY = 3;
 
                 const sceneDetailQuery = `
                     query FindSceneDetailsForBulk($id: ID!) {
@@ -9994,13 +9995,13 @@
                     }
                 `;
 
-                for (let i = 0; i < bulkScenes.length; i += CONCURRENCY) {
-                    const batch = bulkScenes.slice(i, i + CONCURRENCY);
-                    await Promise.all(batch.map(async (s) => {
+                const bulkResult = await runBatchedSceneUpdates(
+                    bulkScenes,
+                    async s => {
                         try {
                             const res = await fetchGQL(sceneDetailQuery, { id: s.id });
                             const scene = res?.data?.findScene;
-                            if (!scene) return;
+                            if (!scene) return false;
 
                             // Merge Tags
                             const currentTags = (scene.tags || []).map(t => String(t.id));
@@ -10055,19 +10056,24 @@
                             });
 
                             if (updateRes?.data?.sceneUpdate?.id) {
-                                updatedCount++;
+                                return true;
                             }
                         } catch (err) {
                             console.error('[FastTag Bulk Everything] Error updating scene', s.id, err);
                         }
-                    }));
-
-                    if (popup.saveBtn) {
-                        popup.saveBtn.textContent = `Applying... ${Math.min(i + CONCURRENCY, bulkScenes.length)}/${bulkScenes.length}`;
+                        return false;
+                    },
+                    {
+                        concurrency: 3,
+                        onProgress: ({ processedCount, totalCount }) => {
+                            if (popup.saveBtn) {
+                                popup.saveBtn.textContent = `Applying... ${processedCount}/${totalCount}`;
+                            }
+                        }
                     }
-                }
+                );
 
-                const failedCount = bulkScenes.length - updatedCount;
+                const { updatedCount, failedCount } = bulkResult;
                 if (updatedCount === bulkScenes.length) {
                     toastSuccess(`Successfully updated all ${updatedCount} scenes!`);
                     recordSaveUsage();
