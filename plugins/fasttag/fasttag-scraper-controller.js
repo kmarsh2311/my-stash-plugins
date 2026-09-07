@@ -305,8 +305,31 @@
         const isDark = dependencies?.getEffectiveTheme?.() !== 'light';
         targetContainer.style.display = 'flex';
         targetContainer.innerHTML = `
-            <div data-fasttag-scrape-loading="true" style="box-sizing: border-box; width: 100%; min-height: 150px; flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; background: ${isDark ? '#1e293b' : '#ffffff'}; color: ${isDark ? '#cbd5e1' : '#475569'};">
-                <span style="font-size: 12px; font-weight: 650;">⏳ ${message}</span>
+            <style>
+                @keyframes fasttag-scrape-scan { 0%,100% { transform: translateX(-34px) rotate(-8deg); } 50% { transform: translateX(34px) rotate(8deg); } }
+                @keyframes fasttag-scrape-files { from { transform: translateX(-34px); } to { transform: translateX(34px); } }
+                @keyframes fasttag-scrape-glow { 0%,100% { opacity: .28; transform: scaleX(.72); } 50% { opacity: .62; transform: scaleX(1); } }
+                [data-fasttag-scrape-loading] .fasttag-scrape-lens { animation: fasttag-scrape-scan 2.5s ease-in-out infinite; }
+                [data-fasttag-scrape-loading] .fasttag-scrape-files { animation: fasttag-scrape-files 3.2s ease-in-out infinite alternate; }
+                [data-fasttag-scrape-loading] .fasttag-scrape-beam { animation: fasttag-scrape-glow 2.5s ease-in-out infinite; }
+                @media (prefers-reduced-motion: reduce) {
+                    [data-fasttag-scrape-loading] .fasttag-scrape-lens,
+                    [data-fasttag-scrape-loading] .fasttag-scrape-files,
+                    [data-fasttag-scrape-loading] .fasttag-scrape-beam { animation: none !important; }
+                }
+            </style>
+            <div data-fasttag-scrape-loading="true" role="status" aria-live="polite" style="box-sizing: border-box; width: 100%; min-height: 190px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 24px; overflow: hidden; background: ${isDark ? '#1e293b' : '#ffffff'}; color: ${isDark ? '#cbd5e1' : '#475569'};">
+                <div aria-hidden="true" style="position: relative; width: 190px; height: 75px; display: flex; align-items: flex-end; justify-content: center; overflow: hidden;">
+                    <div class="fasttag-scrape-lens" style="position: absolute; top: 0; left: calc(50% - 17px); z-index: 2; font-size: 31px; line-height: 1; transform-origin: 50% 100%; filter: drop-shadow(0 5px 8px rgba(15,23,42,.3));">🔍</div>
+                    <div class="fasttag-scrape-beam" style="position: absolute; left: 50%; bottom: 16px; width: 92px; height: 28px; margin-left: -46px; border-radius: 50%; background: radial-gradient(ellipse, rgba(129,140,248,.34), rgba(129,140,248,0) 70%); transform-origin: center;"></div>
+                    <div class="fasttag-scrape-files" style="position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; padding-bottom: 5px;">
+                        <span style="display:grid;place-items:center;width:31px;height:25px;border-radius:5px;background:${isDark ? '#334155' : '#e2e8f0'};box-shadow:0 3px 8px rgba(15,23,42,.18);font-size:15px;">🎞️</span>
+                        <span style="display:grid;place-items:center;width:35px;height:29px;border-radius:6px;background:${isDark ? '#312e81' : '#e0e7ff'};box-shadow:0 4px 10px rgba(79,70,229,.24);font-size:16px;">▶️</span>
+                        <span style="display:grid;place-items:center;width:31px;height:25px;border-radius:5px;background:${isDark ? '#334155' : '#e2e8f0'};box-shadow:0 3px 8px rgba(15,23,42,.18);font-size:15px;">📼</span>
+                    </div>
+                </div>
+                <span style="font-size: 13px; font-weight: 700; letter-spacing: .01em;">${message}</span>
+                <span style="max-width: 280px; text-align: center; font-size: 10.5px; line-height: 1.4; color: ${isDark ? '#94a3b8' : '#64748b'};">Checking fingerprints, titles and scene details for the strongest match.</span>
             </div>
         `;
         if (popup?.scrapeBtn) {

@@ -76,6 +76,10 @@ controller.configure({
 assert.equal(controller.showLoadingState(loadingPopup), true);
 assert.equal(loadingPopup.scraperCardContainer.style.display, 'flex');
 assert.match(loadingPopup.scraperCardContainer.innerHTML, /Scraping new scene/);
+assert.match(loadingPopup.scraperCardContainer.innerHTML, /fasttag-scrape-lens/);
+assert.match(loadingPopup.scraperCardContainer.innerHTML, /Checking fingerprints, titles and scene details/);
+assert.match(loadingPopup.scraperCardContainer.innerHTML, /prefers-reduced-motion: reduce/);
+assert.match(loadingPopup.scraperCardContainer.innerHTML, /role="status" aria-live="polite"/);
 assert.doesNotMatch(loadingPopup.scraperCardContainer.innerHTML, /Previous scene result/);
 assert.equal(loadingPopup.scrapeBtn.disabled, true);
 

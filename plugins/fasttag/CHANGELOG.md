@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- Added a compact scraper-loading illustration with a scanning magnifying glass and moving video-file tiles, plus a static reduced-motion presentation for accessibility.
+
 ### Changed
 - Refactored the FastTag runtime into independently tested modules for API access, storage, integrations, Gemini, scraping, preview, popup lifecycle, editor workflows, notifications, and shared UI while preserving the existing Stash plugin loading model and stored settings.
 - Reduced the main `fasttag.js` coordinator from its 839 KB baseline to approximately 557 KB and added a complete automated verification runner covering 21 suites.

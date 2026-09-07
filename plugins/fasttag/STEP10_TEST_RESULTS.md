@@ -145,8 +145,8 @@ switching back to the released live plugin.
 
 ### Post-validation polish
 
-- Consider a lightweight CSS-only scraper-loading illustration: a magnifying
-  glass scanning small moving video-file tiles, with reduced-motion support.
+- Added the deferred lightweight CSS-only scraper-loading illustration: a
+  magnifying glass scans moving video-file tiles, with reduced-motion support.
 
 ### Confirmed working
 
