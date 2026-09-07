@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `dd95e82`
+- Runtime source commit: `51b81eb`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -146,9 +146,10 @@ switching back to the released live plugin.
 - At narrow saved HUD widths, the fixed-width scraper header could place Accept
   beyond the right edge. The first wrapping adjustment kept it horizontally
   bounded but allowed its second line to sit behind the search row. Commit
-  `dd95e82` uses an explicit measured two-row layout below 370px, reserving the
-  action row's height while retaining one row at normal widths. Browser retest
-  pending.
+  `dd95e82` introduced a measured compact layout, but browser testing showed
+  that its flexible height could still overlap the search row. Commit `51b81eb`
+  uses two explicit grid rows and reserves 52px below 370px, while retaining one
+  row at normal widths. Browser retest pending.
 - Accepting a StashDB result stored the correct remote scene ID. With Cover
   selected it also saved the remote cover; with Cover cleared it retained the
   existing cover while still storing the ID. No warnings or console errors
