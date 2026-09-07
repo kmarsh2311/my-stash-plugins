@@ -3,7 +3,7 @@
 ## Test build
 
 - Source branch: `feature/runtime-refactor`
-- Runtime source commit: `9d54dd2`
+- Runtime source commit: `b16b4a3`
 - Test plugin ID: `fasttag-refactor-test`
 - Test installation: `~/.stash/plugins/fasttag-refactor-test`
 - Live plugin ID: `fasttag` (installed from package directory `mypluginrc`)
@@ -198,6 +198,10 @@ switching back to the released live plugin.
   its loading state inside Edit Everything and created the HUD only when results
   arrived. Commit `9d54dd2` creates and reuses the detached HUD before that first
   request, preventing the embedded loading flash. Browser retest pending.
+- Cover Editor status messages alternated between one and two lines while
+  scrubbing, moving the Upload, Paste, Cancel, and Set Cover controls vertically.
+  Commit `b16b4a3` reserves a stable two-line status area while allowing unusually
+  long errors to expand when necessary. Browser retest pending.
 - Accepting a StashDB result stored the correct remote scene ID. With Cover
   selected it also saved the remote cover; with Cover cleared it retained the
   existing cover while still storing the ID. No warnings or console errors
