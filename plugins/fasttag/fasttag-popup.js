@@ -78,7 +78,9 @@
                 dependencies.sessionScrapeCache.clear();
                 root._fastTagEverythingScraperOpen = false;
             }
-            dependencies.refreshSceneCardsDebounced(null, 50);
+            // Save workflows already synchronize the affected scene cards. A
+            // blanket refresh here rebuilds every Refract card (and visibly
+            // flashes its icons), while cancelling a popup has nothing to sync.
             return true;
         } finally {
             root.setTimeout(() => {

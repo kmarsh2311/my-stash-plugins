@@ -171,6 +171,7 @@ assert.equal(activeTable, null);
 assert.ok(closeEvents.indexOf('scraper:invalidate') < closeEvents.indexOf('popup:remove'));
 assert.ok(closeEvents.includes('video:close:false'));
 assert.ok(closeEvents.includes('scraper:close:false'));
+assert.equal(closeEvents.includes('cards:refresh'), false, 'closing a popup must not rebuild every scene card');
 assert.equal(closeEvents.includes('sequential:reset'), false, 'navigation state must survive a non-reset close');
 assert.equal(sessionCache.has('scene-1'), true, 'session results must survive a non-reset close');
 
