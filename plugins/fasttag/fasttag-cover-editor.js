@@ -369,11 +369,33 @@
         let statusLocked = false;
         let manualPastePending = false;
         let sceneGeneration = 0;
+        let compactStatusExpanded = false;
+        let compactBaseHeight = 0;
+        let compactBaseTop = 0;
+
+        const setCompactStatusExpanded = visible => {
+            if (!isCompact || visible === compactStatusExpanded) return;
+            const extraHeight = 34;
+            if (visible) {
+                compactBaseHeight = panel.offsetHeight;
+                compactBaseTop = Number.parseFloat(panel.style.top) || panel.getBoundingClientRect().top;
+                const expandedHeight = Math.min(root.innerHeight - 24, compactBaseHeight + extraHeight);
+                const overflow = Math.max(0, compactBaseTop + expandedHeight + 12 - root.innerHeight);
+                panel.style.top = `${Math.max(12, compactBaseTop - overflow)}px`;
+                panel.style.height = `${expandedHeight}px`;
+            } else if (compactBaseHeight) {
+                panel.style.top = `${compactBaseTop}px`;
+                panel.style.height = `${compactBaseHeight}px`;
+            }
+            compactStatusExpanded = visible;
+        };
 
         const setStatus = (message, error = false, lock = false, showInCompact = false) => {
             if (lock) statusLocked = true;
             status.textContent = message;
-            status.style.display = isCompact && !error && !showInCompact ? 'none' : 'flex';
+            const compactStatusVisible = error || showInCompact;
+            setCompactStatusExpanded(compactStatusVisible);
+            status.style.display = isCompact && !compactStatusVisible ? 'none' : 'flex';
             status.style.color = error ? '#fca5a5' : (isDark ? '#cbd5e1' : '#334155');
             status.style.border = error ? '1px solid rgba(239,68,68,.45)' : '1px solid transparent';
         };
@@ -673,6 +695,7 @@
         signal.addEventListener('abort', () => root.clearInterval(capturePoll), { once: true });
         let sizeSaveTimer = null;
         const queueSizeSave = () => {
+            if (compactStatusExpanded) return;
             root.clearTimeout(sizeSaveTimer);
             sizeSaveTimer = root.setTimeout(() => saveEditorSize(panel, isCompact), 180);
         };

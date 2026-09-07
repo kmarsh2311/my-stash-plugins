@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 - **Compact HTTP Paste Layout**: Waiting for a keyboard paste keeps the short Paste button label so its longer instruction cannot distort the compact footer.
+- **Compact Status Visibility**: The Cover Editor temporarily expands and moves upward when an actionable message appears, keeping its footer visible without permanently reserving empty space or changing the saved size.
 
 ## [4.3.0] - 2026-09-06
 

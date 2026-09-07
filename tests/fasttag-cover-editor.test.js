@@ -14,7 +14,8 @@ assert.ok(coverEditor, 'FastTag cover editor namespace should be installed');
 assert.ok(source.includes("dependencies.getCompactMode?.() === true"), 'Cover Editor should read the optional compact-layout preference');
 assert.ok(source.includes('? [cancelButton, uploadButton, pasteButton, saveButton]'), 'compact footer should contain Cancel, Upload, Paste and Set Cover in that order');
 assert.ok(source.includes("height:${isCompact ? '148px' : '165px'}") && !source.includes("height:${isCompact ? '112px' : '165px'}"), 'compact New Cover should retain the full Current Cover preview height');
-assert.ok(source.includes("status.style.display = isCompact && !error && !showInCompact ? 'none' : 'flex'"), 'compact mode should hide routine guidance while retaining actionable status messages');
+assert.ok(source.includes('setCompactStatusExpanded(compactStatusVisible)') && source.includes("status.style.display = isCompact && !compactStatusVisible ? 'none' : 'flex'"), 'compact mode should expand temporarily for actionable status messages and hide routine guidance');
+assert.ok(source.includes('if (compactStatusExpanded) return;'), 'temporary status expansion should not overwrite the saved compact size');
 
 assert.deepEqual(coverEditor.calculateImageSize(3840, 2160), { width: 1920, height: 1080 });
 assert.deepEqual(coverEditor.calculateImageSize(1080, 1920), { width: 1080, height: 1920 });
