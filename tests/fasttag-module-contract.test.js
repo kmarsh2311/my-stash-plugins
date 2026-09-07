@@ -116,6 +116,7 @@ assert.ok(scraperControllerSource.includes('const initialResultLimit = getScrape
 assert.ok(scraperControllerSource.includes('font-variant-numeric: tabular-nums'), 'scraper navigation counters should use stable-width numerals');
 assert.ok(scraperControllerSource.includes('const requiredWidth = scraperHeaderPrimary.scrollWidth + scraperHeaderActions.scrollWidth + 6;'), 'the scraper header should measure its current controls instead of using a fixed breakpoint');
 assert.ok(scraperControllerSource.includes('const compact = availableWidth > 0 && requiredWidth > availableWidth;'), 'the scraper header should stack only when its controls genuinely overflow');
+assert.ok(scraperControllerSource.includes("title=\"${escapeHtml(match._sourceName || 'StashDB')}\">${escapeHtml(match._sourceName || 'StashDB')}</span>"), 'the scraper header should identify its source without implying that the candidate is a confirmed match');
 assert.ok(scraperControllerSource.includes("scraperHeader.style.display = 'flex';"), 'each scraper header measurement should begin from its normal single-row layout');
 assert.ok(scraperControllerSource.includes('if (!compact) return;'), 'the scraper header should retain the single row when its controls fit');
 assert.ok(scraperControllerSource.includes("scraperHeader.style.display = 'grid';"), 'the narrow scraper header should use a measured grid instead of wrapping flex controls');
