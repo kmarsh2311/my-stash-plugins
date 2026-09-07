@@ -22,5 +22,7 @@ assert.equal(help.stripHtml('<p>Hello <strong>world</strong></p>'), 'Hello world
 assert.ok(source.includes('class="fasttag-help-header"'), 'the guide header should use a plugin-scoped element');
 assert.ok(source.includes('id="fasttag-help-nav" role="navigation"'), 'the guide navigation should avoid host-theme semantic nav rules');
 assert.ok(source.includes('id="fasttag-help-content" role="main"'), 'the guide content should avoid host-theme semantic main rules');
+assert.ok(source.includes("overlay.attachShadow({ mode: 'open' })"), 'the guide should isolate its layout from host-theme CSS');
+assert.ok(source.includes("event.composedPath()[0]"), 'shadow content clicks should not be mistaken for backdrop clicks');
 
 console.log('fasttag-help tests passed');
