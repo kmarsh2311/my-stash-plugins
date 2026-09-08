@@ -200,6 +200,7 @@
         `;
 
         root.document.body.appendChild(form);
+        dependencies.mountMomentaryPeekButton?.(form, form.querySelector('.popup-header'));
         return {
             element: form,
             previewContainer: form.querySelector(`#${type}-preview-container`),

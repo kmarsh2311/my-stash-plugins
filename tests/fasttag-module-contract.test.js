@@ -13,6 +13,7 @@ const settingsSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-setti
 const previewSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-preview.js'), 'utf8');
 const scraperControllerSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-scraper-controller.js'), 'utf8');
 const popupSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-popup.js'), 'utf8');
+const uiSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-ui.js'), 'utf8');
 const runnerSource = fs.readFileSync(path.join(__dirname, 'run-all.js'), 'utf8');
 const expectedOrder = [
     'tabulator.min.js',
@@ -147,6 +148,7 @@ assert.ok(scraperControllerSource.includes('data-scrape-performer-index='), 'scr
 assert.ok(mainSource.includes('schedulePerformerHoverCardHide(delay = 260)'), 'performer previews should remain reachable across the pointer gap');
 assert.ok(mainSource.includes("toastError(`AI Parse Error: ${err.message}`, undefined, 4500)"), 'AI Parse error notifications should use the shorter display duration');
 assert.ok(previewSource.includes('FastTagCoverEditor.mountLauncher({'), 'Edit Everything media controls should mount the cover editor launcher');
+assert.ok(previewSource.includes('code paths { preview screenshot webp stream }') && previewSource.includes('studioCode,'), 'the preview lookup should pass Stash Studio Code into the Cover Editor without another request');
 assert.ok(previewSource.includes('getCaptureState: () =>'), 'the active media preview should expose safe frame-capture availability');
 assert.ok(previewSource.includes('mountForCoverEditor: target =>'), 'the existing player should move into the cover editor rather than opening a second stream');
 assert.ok(previewSource.includes('releaseFromCoverEditor: (releaseOptions = {}) =>'), 'closing the cover editor should return the existing player to Edit Everything');
@@ -188,6 +190,12 @@ assert.ok(coverEditorSource.includes("root.confirm?.('Discard the new cover with
 assert.ok(coverEditorSource.includes("candidateBox.addEventListener('drop'"), 'the new-cover target should accept dragged image files');
 assert.ok(coverEditorSource.includes('Capture, upload, paste or drop an image'), 'the empty new-cover target should advertise drag-and-drop support');
 assert.ok(coverEditorSource.includes('Cover saved to Stash. Continue editing or move to another scene.'), 'saving a cover should leave the editor open for continued navigation');
+assert.ok(coverEditorSource.includes('fasttag-cover-studio-code') && coverEditorSource.includes('renderStudioCode(nextOptions.studioCode);'), 'the Cover Editor should show and update a saved Studio Code during navigation');
+assert.ok(mainSource.includes('mountMomentaryPeekButton(form, form.querySelector') && popupSource.includes("dependencies.mountMomentaryPeekButton?.(form, form.querySelector('.popup-header'))"), 'Everything and single-field editor popups should mount the shared eye control');
+assert.ok(coverEditorSource.includes('dependencies.mountMomentaryPeekButton?.(panel, header, closeButton);'), 'the Cover Editor should mount the shared eye control');
+assert.ok(scraperControllerSource.includes('dependencies.mountMomentaryPeekButton?.(targetContainer, scraperHeaderActions);'), 'the detached scraper HUD should mount the shared eye control');
+assert.ok(previewSource.includes('dependencies.mountMomentaryPeekButton?.(() => floatingHudElement, controlsRow)'), 'the floating video HUD should mount the shared eye control');
+assert.ok(uiSource.includes("activePanel.style.opacity = '0.12'") && uiSource.includes("root.addEventListener('pointerup', restore, true)"), 'the shared eye should remain momentary and restore on release anywhere');
 assert.ok(previewSource.includes("if (!saveOptions?.keepEditorOpen && !signal.aborted)"), 'saving within the persistent editor should not rebuild the underlying scene preview');
 assert.ok(popupSource.includes('if (dependencies.coverEditor.closeActiveEditor?.(false, true) === false) return false;'), 'parent-popup closure should respect the unsaved-cover warning while remembering an open Cover Editor');
 assert.ok(coverEditorSource.includes("dependencies.setPersistedOpen?.(true);") && coverEditorSource.includes("dependencies?.setPersistedOpen?.(false);"), 'the Cover Editor should remember whether it was explicitly left open or closed');

@@ -1122,6 +1122,7 @@
             const scraperHeader = targetContainer.querySelector('#fasttag-scrape-header');
             const scraperHeaderPrimary = targetContainer.querySelector('#fasttag-scrape-header-primary');
             const scraperHeaderActions = targetContainer.querySelector('#fasttag-scrape-header-actions');
+            if (isDetached) dependencies.mountMomentaryPeekButton?.(targetContainer, scraperHeaderActions);
             const updateScraperHeaderLayout = () => {
                 if (!scraperHeader || !scraperHeaderPrimary || !scraperHeaderActions) return;
                 // Always measure from the normal one-row layout. Measuring while the

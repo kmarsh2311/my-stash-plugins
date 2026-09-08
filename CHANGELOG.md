@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - **Optional Compact Cover Editor**: A Display setting removes routine guidance, tightens spacing, and combines Cancel, Upload, Paste, and Set Cover in one footer row without overlaying or reducing either cover preview. Errors and keyboard-paste instructions still appear when needed, and normal and compact layouts remember their resized dimensions separately.
 - **Remembered Cover Editor**: Reopening Edit Everything restores the Cover Editor when it was previously left open; explicitly closing the Cover Editor prevents restoration.
+- **Momentary Window Peek**: Major editor popups, the Cover Editor, detached scraper, and floating video HUD provide an eye-only press-and-hold control that temporarily reveals the page behind them.
+- **Cover Studio Code**: The Cover Editor header shows a scene's saved Stash Studio Code as a read-only reference and updates it during navigation.
 
 ### Fixed
 - **Stable Scraper Header**: Narrow scraper HUDs remeasure their header after rendering and after Accept changes to Saved, preventing late text sizing from placing header controls over the search row.

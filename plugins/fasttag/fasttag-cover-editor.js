@@ -292,14 +292,23 @@
 
         const header = document.createElement('header');
         header.style.cssText = `display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:20px;padding:5px 10px;border-bottom:1px solid ${isDark ? '#334155' : '#cbd5e1'};cursor:grab;user-select:none;position:sticky;top:0;background:${isDark ? '#111827' : '#f8fafc'};z-index:2;`;
-        header.innerHTML = '<strong style="font-size:13px;">🖼️ Cover Editor</strong><span style="font-size:9px;color:#94a3b8;margin-left:auto;">Drag header · Resize at bottom-right</span>';
+        header.innerHTML = '<strong style="font-size:13px;">🖼️ Cover Editor</strong><span class="fasttag-cover-studio-code" style="display:none;max-width:145px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:700;color:#c7d2fe;padding:1px 5px;border-radius:4px;background:rgba(99,102,241,.16);border:1px solid rgba(129,140,248,.3);"></span><span style="font-size:9px;color:#94a3b8;margin-left:auto;">Drag header · Resize at bottom-right</span>';
         const closeButton = document.createElement('button');
         closeButton.type = 'button';
         closeButton.textContent = '✕';
         closeButton.title = 'Close cover editor';
         closeButton.style.cssText = 'border:0;background:transparent;color:inherit;font-size:15px;cursor:pointer;padding:1px 4px;line-height:1;';
         header.appendChild(closeButton);
+        dependencies.mountMomentaryPeekButton?.(panel, header, closeButton);
         panel.appendChild(header);
+        const studioCodeLabel = header.querySelector('.fasttag-cover-studio-code');
+        const renderStudioCode = value => {
+            const code = String(value || '').trim();
+            studioCodeLabel.textContent = code ? `Code: ${code}` : '';
+            studioCodeLabel.title = code ? `Studio Code: ${code}` : '';
+            studioCodeLabel.style.display = code ? 'inline-block' : 'none';
+        };
+        renderStudioCode(currentOptions.studioCode);
 
         const body = document.createElement('div');
         body.style.cssText = `display:flex;flex-direction:column;gap:${isCompact ? '6px' : '10px'};padding:${isCompact ? '8px' : '11px'};`;
@@ -682,6 +691,7 @@
             activeEditor.awaitingNavigation = false;
             activeEditor.restoring = false;
             videoStage.querySelector('.fasttag-cover-restoring-overlay')?.remove();
+            renderStudioCode(nextOptions.studioCode);
             renderCurrentCover(nextOptions.currentCoverUrl || nextOptions.mediaController?.getCoverUrl?.());
             resetCandidate();
             setStatus('Opening the full video for frame capture…');

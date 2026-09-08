@@ -134,13 +134,14 @@
         let previewUrl = cardMedia.previewUrl;
         let coverUrl = cardMedia.coverUrl;
         let streamUrl = null;
+        let studioCode = '';
         let previewExplicitlyMissing = false;
         if (sceneId) {
             const queries = [
-                'query ($id: ID!) { findScene(id: $id) { paths { preview screenshot webp stream } } }',
-                'query ($id: ID!) { findScene(id: $id) { paths { preview screenshot stream } } }',
-                'query ($id: ID!) { findScene(id: $id) { paths { preview screenshot } } }',
-                'query ($id: ID!) { findScene(id: $id) { preview screenshot } }'
+                'query ($id: ID!) { findScene(id: $id) { code paths { preview screenshot webp stream } } }',
+                'query ($id: ID!) { findScene(id: $id) { code paths { preview screenshot stream } } }',
+                'query ($id: ID!) { findScene(id: $id) { code paths { preview screenshot } } }',
+                'query ($id: ID!) { findScene(id: $id) { code preview screenshot } }'
             ];
             for (const query of queries) {
                 try {
@@ -148,6 +149,7 @@
                     if (response.errors) continue;
                     const scene = response.data?.findScene;
                     if (!scene) continue;
+                    studioCode = String(scene.code || '').trim();
                     const gqlPreview = scene.paths?.preview || scene.preview || scene.paths?.webp || null;
                     const gqlScreenshot = scene.paths?.screenshot || scene.screenshot || null;
                     const gqlStream = scene.paths?.stream || null;
@@ -171,7 +173,8 @@
         return {
             previewUrl: toRelativeMediaUrl(previewUrl),
             coverUrl: toRelativeMediaUrl(coverUrl),
-            streamUrl: toRelativeMediaUrl(streamUrl)
+            streamUrl: toRelativeMediaUrl(streamUrl),
+            studioCode
         };
     }
 
@@ -317,7 +320,7 @@
         };
 
         const mediaUrls = await fetchSceneMediaUrls(sceneId, cardElement);
-        const { previewUrl, coverUrl, streamUrl } = mediaUrls;
+        const { previewUrl, coverUrl, streamUrl, studioCode } = mediaUrls;
         if (signal.aborted) return;
 
         if (!previewUrl && !coverUrl && !streamUrl) {
@@ -596,9 +599,12 @@
 
         controlsRow.appendChild(pillBtn);
         controlsRow.appendChild(popoutBtn);
+        const videoPeekButton = dependencies.mountMomentaryPeekButton?.(() => floatingHudElement, controlsRow);
+        if (videoPeekButton) videoPeekButton.style.display = 'none';
 
         const togglePopout = (enable) => {
             if (enable) {
+                if (videoPeekButton) videoPeekButton.style.display = 'inline-flex';
                 isVideoPoppedOut = true;
                 setVideoHudPersistedOpen(true);
                 ftLog('ACTION', 'HUD', 'Video HUD popped out');
@@ -795,6 +801,7 @@
                 hostContainer.style.maxHeight = '0';
                 hostContainer.onclick = null;
             } else {
+                if (videoPeekButton) videoPeekButton.style.display = 'none';
                 isVideoPoppedOut = false;
                 setVideoHudPersistedOpen(false);
                 ftLog('ACTION', 'HUD', 'Video HUD docked back into popup');
@@ -1326,6 +1333,7 @@
                 anchorElement: hostContainer.closest('form') || hostContainer,
                 sceneId,
                 currentCoverUrl: coverUrl,
+                studioCode,
                 mediaController,
                 onSaved: async saveOptions => {
                     if (!saveOptions?.keepEditorOpen && !signal.aborted) await attachScenePreview(hostContainer, sceneId, cardElement);

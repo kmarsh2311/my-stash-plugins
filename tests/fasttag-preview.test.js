@@ -111,13 +111,14 @@ async function testMediaLookup() {
         fetchGQL: async (query, variables) => {
             calls.push({ query, variables });
             if (calls.length === 1) return { errors: [{ message: 'webp unsupported' }] };
-            return { data: { findScene: { paths: { preview: '/generated-preview', screenshot: '/generated-cover', stream: '/generated-stream' } } } };
+            return { data: { findScene: { code: 'CODE-12', paths: { preview: '/generated-preview', screenshot: '/generated-cover', stream: '/generated-stream' } } } };
         }
     });
     assert.deepEqual(await preview.fetchSceneMediaUrls('12', card), {
         previewUrl: '/generated-preview',
         coverUrl: '/generated-cover',
-        streamUrl: '/generated-stream'
+        streamUrl: '/generated-stream',
+        studioCode: 'CODE-12'
     });
     assert.equal(calls.length, 2, 'schema compatibility queries should be tried in order');
 
@@ -125,7 +126,8 @@ async function testMediaLookup() {
     assert.deepEqual(await preview.fetchSceneMediaUrls('13', null), {
         previewUrl: null,
         coverUrl: '/scene/13/screenshot',
-        streamUrl: '/scene/13/stream'
+        streamUrl: '/scene/13/stream',
+        studioCode: ''
     }, 'an explicitly missing preview should not be replaced by a guessed URL');
 
     global.document = {

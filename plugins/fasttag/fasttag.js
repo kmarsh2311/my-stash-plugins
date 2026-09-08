@@ -181,7 +181,7 @@
         closeFloatingVideoHud,
         abortCurrentPreview
     } = FastTagPreview;
-    const { getOptimalPopupSize, getDefaultEverythingPosition } = FastTagUi;
+    const { getOptimalPopupSize, getDefaultEverythingPosition, mountMomentaryPeekButton } = FastTagUi;
     const {
         getSavedSize: getSavedPopupSize,
         setSavedSize: setSavedPopupSize,
@@ -281,7 +281,8 @@
         refreshSceneCards: (...args) => refreshSceneCards(...args),
         recordSaveUsage: () => recordSaveUsage(),
         toastError: (...args) => toastError(...args),
-        toastSuccess: (...args) => toastSuccess(...args)
+        toastSuccess: (...args) => toastSuccess(...args),
+        mountMomentaryPeekButton
     });
     FastTagPreview.configure({
         fetchGQL: (...args) => fetchGQL(...args),
@@ -298,7 +299,8 @@
         log: (...args) => ftLog(...args),
         getActivePopup: () => activePopup,
         getFloatingScraperHudElement: () => FastTagScraperController.getHudElement(),
-        getDefaultEverythingPosition: (...args) => getDefaultEverythingPosition(...args)
+        getDefaultEverythingPosition: (...args) => getDefaultEverythingPosition(...args),
+        mountMomentaryPeekButton
     });
     FastTagCoverEditor.configure({
         fetchGQL: (...args) => fetchGQL(...args),
@@ -308,6 +310,7 @@
         getCompactMode: () => getCompactCoverEditor(),
         isPersistedOpen: () => isCoverEditorPersistedOpen(),
         setPersistedOpen: enabled => setCoverEditorPersistedOpen(enabled),
+        mountMomentaryPeekButton,
         log: (...args) => ftLog(...args)
     });
     FastTagUi.configure({
@@ -335,7 +338,8 @@
         resetPreviewSessionCue: () => FastTagPreview.resetSessionCue(),
         resetSequentialEditState: () => resetSequentialEditState(),
         sessionScrapeCache,
-        refreshSceneCardsDebounced: (...args) => refreshSceneCardsDebounced(...args)
+        refreshSceneCardsDebounced: (...args) => refreshSceneCardsDebounced(...args),
+        mountMomentaryPeekButton
     });
 
     console.log('[FastTag v4.3.0] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
@@ -5042,6 +5046,7 @@
         `;
 
         document.body.appendChild(form);
+        mountMomentaryPeekButton(form, form.querySelector('#everything-popup-header'));
         if (animateEntrance) {
             window.requestAnimationFrame(() => {
                 form.style.opacity = '1';
