@@ -195,7 +195,7 @@ assert.ok(mainSource.includes('mountMomentaryPeekButton(form, form.querySelector
 assert.ok(coverEditorSource.includes('dependencies.mountMomentaryPeekButton?.(panel, header, closeButton);'), 'the Cover Editor should mount the shared eye control');
 assert.ok(scraperControllerSource.includes('dependencies.mountMomentaryPeekButton?.(targetContainer, scraperHeaderActions);'), 'the detached scraper HUD should mount the shared eye control');
 assert.ok(previewSource.includes('dependencies.mountMomentaryPeekButton?.(() => floatingHudElement, controlsRow)'), 'the floating video HUD should mount the shared eye control');
-assert.ok(uiSource.includes("activePanel.style.opacity = '0.20'") && uiSource.includes("root.addEventListener('pointerup', restore, true)"), 'the shared eye should use 20% opacity and restore on release anywhere');
+assert.ok(uiSource.includes("activePanel.style.opacity = '0.15'") && uiSource.includes("root.addEventListener('pointerup', restore, true)"), 'the shared eye should use 15% opacity and restore on release anywhere');
 assert.ok(previewSource.includes("if (!saveOptions?.keepEditorOpen && !signal.aborted)"), 'saving within the persistent editor should not rebuild the underlying scene preview');
 assert.ok(popupSource.includes('if (dependencies.coverEditor.closeActiveEditor?.(false, true) === false) return false;'), 'parent-popup closure should respect the unsaved-cover warning while remembering an open Cover Editor');
 assert.ok(coverEditorSource.includes("dependencies.setPersistedOpen?.(true);") && coverEditorSource.includes("dependencies?.setPersistedOpen?.(false);"), 'the Cover Editor should remember whether it was explicitly left open or closed');
