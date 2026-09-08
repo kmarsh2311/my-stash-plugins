@@ -89,7 +89,7 @@
             previousOpacity = activePanel.style.opacity;
             previousTransition = activePanel.style.transition;
             activePanel.style.transition = 'opacity .08s ease';
-            activePanel.style.opacity = '0.12';
+            activePanel.style.opacity = '0.20';
             root.addEventListener('pointerup', restore, true);
             root.addEventListener('pointercancel', restore, true);
             root.addEventListener('blur', restore, true);
