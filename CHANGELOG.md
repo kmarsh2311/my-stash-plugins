@@ -17,6 +17,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Momentary Window Peek**: Major editor popups, the Cover Editor, detached scraper, and floating video HUD provide an eye-only press-and-hold control that temporarily reveals the page behind them.
 - **Cover Studio Code**: The Cover Editor header shows a scene's saved Stash Studio Code as a read-only reference and updates it during navigation.
 
+### Changed
+- **Cleaner Download Package**: Internal refactor plans, status records, and browser-test results remain available in the source repository but are no longer included in the user-facing plugin ZIP.
+
 ### Fixed
 - **Sequential Completion Controls**: The final primary action displays completed progress, gently pulses, and replaces the redundant secondary Close action.
 - **Movable Loading Scraper**: The detached scraper remains draggable and resizable while a long-running scan is in progress.

@@ -41,7 +41,17 @@ buildPlugin()
     zipfile="$(cd "$outdir" && pwd)/$plugin_id.zip"
     
     pushd "$dir" > /dev/null
-    zip -r "$zipfile" . > /dev/null
+    if [ "$plugin_id" = "fasttag" ]; then
+        # Keep refactor records in source control without shipping internal
+        # planning and browser-test documents to plugin users.
+        zip -r "$zipfile" . \
+            -x 'REFACTOR_BASELINE.md' \
+               'REFACTOR_PLAN.md' \
+               'REFACTOR_STATUS.md' \
+               'STEP10_TEST_RESULTS.md' > /dev/null
+    else
+        zip -r "$zipfile" . > /dev/null
+    fi
     popd > /dev/null
 
     name=$(grep "^name:" "$f" | head -n 1 | cut -d' ' -f2- | sed -e 's/\r//' -e 's/^"\(.*\)"$/\1/')
