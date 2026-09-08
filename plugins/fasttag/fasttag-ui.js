@@ -60,9 +60,53 @@
     const momentaryPeekTargets = new Set();
     let activeMomentaryPeekPanels = [];
     let activeMomentaryPeekButtons = 0;
+    let suppressMomentaryPeekContextMenuWhileHeld = false;
+    let suppressMomentaryPeekContextMenuUntil = 0;
+    let momentaryPeekPrimaryPointerId = null;
+    let momentaryPeekContextMenuGuardMounted = false;
+    let momentaryPeekInputShield = null;
+
+    function armMomentaryPeekContextMenuGuard(event) {
+        if (event?.button === 2 || (event?.buttons & 2) || event?.type === 'contextmenu') {
+            suppressMomentaryPeekContextMenuWhileHeld = true;
+        }
+    }
+
+    function blockRecentMomentaryPeekContextMenu(event) {
+        if (!suppressMomentaryPeekContextMenuWhileHeld && Date.now() > suppressMomentaryPeekContextMenuUntil) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+    }
+
+    function releaseMomentaryPeekContextMenuGuard(event) {
+        if (event?.type === 'blur' || event?.type === 'pointercancel') {
+            suppressMomentaryPeekContextMenuWhileHeld = false;
+            suppressMomentaryPeekContextMenuUntil = 0;
+            momentaryPeekPrimaryPointerId = null;
+            return;
+        }
+        const releasedPrimaryPointer = event?.type === 'pointerup'
+            && event.button === 0
+            && (momentaryPeekPrimaryPointerId === null || event.pointerId === momentaryPeekPrimaryPointerId);
+        const mouseFallbackReleased = event?.type === 'mouseup'
+            && event.button === 0;
+        if (suppressMomentaryPeekContextMenuWhileHeld && (releasedPrimaryPointer || mouseFallbackReleased)) {
+            suppressMomentaryPeekContextMenuWhileHeld = false;
+            suppressMomentaryPeekContextMenuUntil = Date.now() + 500;
+            momentaryPeekPrimaryPointerId = null;
+        }
+    }
 
     function blockMomentaryPeekClick(event) {
         if (!activeMomentaryPeekPanels.length) return;
+        armMomentaryPeekContextMenuGuard(event);
+        event.preventDefault();
+        event.stopImmediatePropagation();
+    }
+
+    function blockMomentaryPeekMouseDown(event) {
+        if (!activeMomentaryPeekPanels.length || (event.button === 0 && event.buttons === 1)) return;
+        armMomentaryPeekContextMenuGuard(event);
         event.preventDefault();
         event.stopImmediatePropagation();
     }
@@ -102,13 +146,30 @@
     function cancelUnexpectedMomentaryPeekInput(event) {
         if (!activeMomentaryPeekPanels.length) return;
         if (event.type === 'pointermove' && (!activeMomentaryPeekButtons || event.buttons === activeMomentaryPeekButtons)) return;
+        armMomentaryPeekContextMenuGuard(event);
         event.preventDefault();
         event.stopImmediatePropagation();
-        restoreMomentaryPeek();
     }
 
     function restoreMomentaryPeek(event) {
         const wasActive = activeMomentaryPeekPanels.length > 0;
+        const isPointerRelease = event?.type === 'pointerup';
+        const releasedInitiatingPointer = isPointerRelease
+            && event.button === 0
+            && (momentaryPeekPrimaryPointerId === null || event.pointerId === momentaryPeekPrimaryPointerId);
+        if (wasActive && isPointerRelease && !releasedInitiatingPointer) {
+            armMomentaryPeekContextMenuGuard(event);
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            return;
+        }
+        if (wasActive && event?.type === 'mouseup' && momentaryPeekPrimaryPointerId !== null && event.button !== 0) {
+            armMomentaryPeekContextMenuGuard(event);
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            return;
+        }
+        if (wasActive) armMomentaryPeekContextMenuGuard(event);
         activeMomentaryPeekPanels.forEach(({ panel, opacity, transition, pointerEvents }) => {
             panel.style.opacity = opacity;
             panel.style.transition = transition;
@@ -116,6 +177,9 @@
         });
         activeMomentaryPeekPanels = [];
         activeMomentaryPeekButtons = 0;
+        momentaryPeekPrimaryPointerId = null;
+        momentaryPeekInputShield?.remove();
+        momentaryPeekInputShield = null;
         root.removeEventListener('pointerup', restoreMomentaryPeek, true);
         root.removeEventListener('pointercancel', restoreMomentaryPeek, true);
         root.removeEventListener('mouseup', restoreMomentaryPeek, true);
@@ -124,6 +188,7 @@
         root.removeEventListener('contextmenu', cancelUnexpectedMomentaryPeekInput, true);
         root.removeEventListener('auxclick', cancelUnexpectedMomentaryPeekInput, true);
         root.removeEventListener('pointerdown', blockMomentaryPeekClick, true);
+        root.removeEventListener('mousedown', blockMomentaryPeekMouseDown, true);
         root.removeEventListener('click', blockMomentaryPeekClick, true);
         root.removeEventListener('wheel', forwardMomentaryPeekWheel, true);
         if (wasActive && (event?.type === 'pointerup' || event?.type === 'mouseup')) {
@@ -134,6 +199,14 @@
 
     function mountMomentaryPeekButton(panelOrGetter, container, beforeElement = null) {
         if (!container || container.querySelector?.('.fasttag-momentary-peek')) return null;
+        if (!momentaryPeekContextMenuGuardMounted) {
+            root.addEventListener('contextmenu', blockRecentMomentaryPeekContextMenu, true);
+            root.addEventListener('pointerup', releaseMomentaryPeekContextMenuGuard, true);
+            root.addEventListener('mouseup', releaseMomentaryPeekContextMenuGuard, true);
+            root.addEventListener('pointercancel', releaseMomentaryPeekContextMenuGuard, true);
+            root.addEventListener('blur', releaseMomentaryPeekContextMenuGuard, true);
+            momentaryPeekContextMenuGuardMounted = true;
+        }
         const button = root.document.createElement('button');
         button.type = 'button';
         button.className = 'fasttag-momentary-peek';
@@ -173,6 +246,13 @@
             });
             if (!activeMomentaryPeekPanels.length) return;
             activeMomentaryPeekButtons = event.type === 'pointerdown' ? event.buttons : 0;
+            if (event.type === 'pointerdown') momentaryPeekPrimaryPointerId = event.pointerId;
+            momentaryPeekInputShield?.remove();
+            momentaryPeekInputShield = root.document.createElement('div');
+            momentaryPeekInputShield.setAttribute('aria-hidden', 'true');
+            momentaryPeekInputShield.style.cssText = 'position:fixed;inset:0;z-index:2147483646;background:transparent;cursor:default;';
+            momentaryPeekInputShield.addEventListener('mouseleave', restoreMomentaryPeek);
+            root.document.body.appendChild(momentaryPeekInputShield);
             root.addEventListener('pointerup', restoreMomentaryPeek, true);
             root.addEventListener('pointercancel', restoreMomentaryPeek, true);
             root.addEventListener('mouseup', restoreMomentaryPeek, true);
@@ -181,6 +261,7 @@
             root.addEventListener('contextmenu', cancelUnexpectedMomentaryPeekInput, true);
             root.addEventListener('auxclick', cancelUnexpectedMomentaryPeekInput, true);
             root.addEventListener('pointerdown', blockMomentaryPeekClick, true);
+            root.addEventListener('mousedown', blockMomentaryPeekMouseDown, true);
             root.addEventListener('click', blockMomentaryPeekClick, true);
             root.addEventListener('wheel', forwardMomentaryPeekWheel, { capture: true, passive: false });
         };

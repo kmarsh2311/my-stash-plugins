@@ -1,3 +1,12 @@
+## 4.4.3 - Safer Peek Input
+
+### Highlights
+- **No Click-Through**: A temporary input shield prevents secondary clicks from reaching links, images, or controls behind FastTag while peek is held.
+- **Context-Menu Protection**: Repeated and delayed right-click menus remain suppressed until the original peek button is released.
+- **Browser-Boundary Restore**: Moving the pointer from the webpage into browser or operating-system controls restores every FastTag window automatically.
+
+---
+
 ## 4.4.2 - Global Scrollable Window Peek
 
 ### Highlights

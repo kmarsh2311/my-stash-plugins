@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash FastTag
 // @namespace    http://tampermonkey.net/
-// @version      4.4.2
+// @version      4.4.3
 // @description  Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
@@ -344,7 +344,7 @@
         mountMomentaryPeekButton
     });
 
-    console.log('[FastTag v4.4.2] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
+    console.log('[FastTag v4.4.3] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
 
     let fastTagHelpLoadPromise = null;
     function loadFastTagHelpModule() {
@@ -365,7 +365,7 @@
                 const script = document.createElement('script');
                 script.id = 'fasttag-help-script';
                 const scriptUrl = new URL(assetPaths[index], window.location.origin);
-                scriptUrl.searchParams.set('v', '4.4.2-help-1');
+                scriptUrl.searchParams.set('v', '4.4.3-help-1');
                 script.src = scriptUrl.href;
                 script.async = true;
                 script.onload = () => {

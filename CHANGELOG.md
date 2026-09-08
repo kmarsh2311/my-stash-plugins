@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [4.4.3] - 2026-09-08
+
+### Fixed
+- **Safe Peek Input Boundaries**: Momentary peek now shields the underlying page from secondary clicks, suppresses browser context menus until the initiating button is released, and restores all FastTag windows when the pointer leaves the webpage for browser or operating-system controls.
+
 ## [4.4.2] - 2026-09-08
 
 ### Changed

@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [4.4.3] - 2026-09-08
+
+### Fixed
+- Shielded the Stash page from secondary clicks during momentary peek, suppressed delayed and repeated browser context menus until the initiating pointer is released, and restored all FastTag windows when the pointer leaves the webpage.
+
 ## [4.4.2] - 2026-09-08
 
 ### Changed
