@@ -686,7 +686,7 @@
                         sceneId,
                         null,
                         query,
-                        () => isRequestCurrent(popup, sceneId, scrapeRequestId)
+                        () => isRequestCurrent(popup, sceneId, manualRequestId)
                     );
                     if (!isRequestCurrent(popup, sceneId, manualRequestId)) return;
                     if (!manualResults?.length) {
@@ -1222,7 +1222,7 @@
                         sceneId,
                         null,
                         query,
-                        () => isRequestCurrent(popup, sceneId, scrapeRequestId)
+                        () => isRequestCurrent(popup, sceneId, manualRequestId)
                     );
                     if (!isRequestCurrent(popup, sceneId, manualRequestId)) return;
                     if (!manualResults?.length) {

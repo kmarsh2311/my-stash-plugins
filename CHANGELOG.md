@@ -8,8 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [4.4.3] - 2026-09-08
 
+### Added
+- **Copy Scene Filename**: Right-click the current scene name in Edit Everything to copy its full filename, with a manual fallback when browser clipboard access is unavailable.
+
 ### Fixed
 - **Safe Peek Input Boundaries**: Momentary peek now shields the underlying page from secondary clicks, suppresses browser context menus until the initiating button is released, and restores all FastTag windows when the pointer leaves the webpage for browser or operating-system controls.
+- **Current Manual Scraper Searches**: Manual searches remain attached to their active request, preventing stale scene/query state from producing an incorrect no-matches notification.
 
 ## [4.4.2] - 2026-09-08
 

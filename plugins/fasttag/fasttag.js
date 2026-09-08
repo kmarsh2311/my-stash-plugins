@@ -142,7 +142,7 @@
         attachGlobalErrorListeners
     } = FastTagDiagnostics;
     const { fetchGQL } = FastTagApi;
-    const { showToast, toastSuccess, toastError } = FastTagNotifications;
+    const { copyTextToClipboard, showToast, toastSuccess, toastError } = FastTagNotifications;
     const {
         resetRefractSceneCards,
         syncSceneToApolloCache,
@@ -1602,6 +1602,51 @@
             }
         }
         return `Scene #${sceneId || ''}`;
+    }
+
+    function getSceneFilename(sceneData) {
+        const filePath = sceneData?.files?.[0]?.path;
+        if (!filePath) return '';
+        const parts = String(filePath).replace(/\\/g, '/').split('/').filter(Boolean);
+        return parts[parts.length - 1] || '';
+    }
+
+    function updateEverythingFilenameCopyHint(popup) {
+        const titleSpan = popup?.titleSpan;
+        if (!titleSpan) return;
+        const filename = getSceneFilename(popup.sceneData);
+        if (!filename) {
+            titleSpan.removeAttribute('data-micro-tooltip');
+            return;
+        }
+        titleSpan.removeAttribute('title');
+        titleSpan.setAttribute('data-micro-tooltip', 'Right-click to copy filename');
+        titleSpan.querySelectorAll('[title]').forEach(element => element.removeAttribute('title'));
+    }
+
+    function mountEverythingFilenameCopy(popup) {
+        const titleSpan = popup?.titleSpan;
+        if (!titleSpan || titleSpan.dataset.fasttagFilenameCopyMounted === 'true') return;
+        titleSpan.dataset.fasttagFilenameCopyMounted = 'true';
+        titleSpan.addEventListener('mousedown', event => {
+            if (event.button === 2) event.stopPropagation();
+        });
+        titleSpan.addEventListener('contextmenu', async event => {
+            const filename = getSceneFilename(popup.sceneData);
+            if (!filename) return;
+            event.preventDefault();
+            event.stopPropagation();
+            hideMicroTooltip();
+            if (await copyTextToClipboard(filename)) {
+                showToast('Filename copied', 'success', 2000);
+                return;
+            }
+            if (typeof window.prompt === 'function') {
+                window.prompt('Copy filename with Ctrl+C or Cmd+C:', filename);
+            } else {
+                toastError(`Could not copy filename: ${filename}`);
+            }
+        });
     }
 
     function setLiveEverythingPopupTitle(popup, title) {
@@ -5695,6 +5740,7 @@
         const prevBtn = popup.prevBtn;
         const nextBtn = popup.nextBtn;
         const titleSpan = popup.titleSpan;
+        mountEverythingFilenameCopy(popup);
 
         const updateUI = () => {
             const isRandom = Boolean(popup._isRandomMode);
@@ -5710,6 +5756,7 @@
                 titleSpan.innerHTML = `<span style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; font-size: 13px; line-height: 1; flex-shrink: 0; margin-right: 4px; user-select: none; transform: translateY(1.5px);">⚡</span><span style="opacity: 0.95; font-size: 11px; background: rgba(99,102,241,0.25); border: 1px solid rgba(99,102,241,0.45); padding: 1px 6px; border-radius: 4px; margin-right: 7px; font-weight: 700; color: #a5b4fc; white-space: nowrap; flex-shrink: 0; line-height: 1.3;">🎲 [${historyPosition}] [${untaggedCount} untagged]</span><span class="fasttag-marquee-box" style="flex: 1; min-width: 0; overflow: hidden; display: inline-flex; align-items: center;"><span class="fasttag-marquee-track"><span class="fasttag-marquee-item" data-raw-title="${escapeHtml(sceneTitle)}" title="${escapeHtml(sceneTitle)}">${escapeHtml(sceneTitle)}</span></span></span>`;
                 titleSpan.title = `🎲 ${sceneTitle} [${untaggedCount} untagged]`;
                 applyMarqueeAnimation(titleSpan);
+                updateEverythingFilenameCopyHint(popup);
 
                 if (popup.seqContainer) popup.seqContainer.style.display = 'inline-flex';
                 const seqLabel = seqCheckbox?.closest('label');
@@ -5731,6 +5778,7 @@
                     titleSpan.innerHTML = `<span style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; font-size: 13px; line-height: 1; flex-shrink: 0; margin-right: 4px; user-select: none; transform: translateY(1.5px);">⚡</span><span style="opacity: 0.85; font-size: 11px; background: rgba(99,102,241,0.22); padding: 1px 6px; border-radius: 4px; margin-right: 7px; font-weight: 700; color: #a5b4fc; white-space: nowrap; flex-shrink: 0; line-height: 1.3;">[${idx + 1}/${cards.length}]</span><span class="fasttag-marquee-box" style="flex: 1; min-width: 0; overflow: hidden; display: inline-flex; align-items: center;"><span class="fasttag-marquee-track"><span class="fasttag-marquee-item" data-raw-title="${escapeHtml(sceneTitle)}" title="${escapeHtml(sceneTitle)}">${escapeHtml(sceneTitle)}</span></span></span>`;
                     titleSpan.title = `${sceneTitle} [${idx + 1}/${cards.length}]`;
                     applyMarqueeAnimation(titleSpan);
+                    updateEverythingFilenameCopyHint(popup);
                 }
             } else {
                 const seqLabel = seqCheckbox?.closest('label');
@@ -5741,6 +5789,7 @@
                 titleSpan.innerHTML = `<span style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; font-size: 13px; line-height: 1; flex-shrink: 0; margin-right: 7px; user-select: none; transform: translateY(1.5px);">⚡</span><span class="fasttag-marquee-box" style="flex: 1; min-width: 0; overflow: hidden; display: inline-flex; align-items: center;"><span class="fasttag-marquee-track"><span class="fasttag-marquee-item" data-raw-title="${escapeHtml(sceneTitle)}" title="${escapeHtml(sceneTitle)}">${escapeHtml(sceneTitle)}</span></span></span>`;
                 titleSpan.title = sceneTitle;
                 applyMarqueeAnimation(titleSpan);
+                updateEverythingFilenameCopyHint(popup);
             }
 
             const randomHistory = popup._randomHistoryState;

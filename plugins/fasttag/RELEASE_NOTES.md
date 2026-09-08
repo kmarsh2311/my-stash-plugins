@@ -4,6 +4,8 @@
 - **No Click-Through**: A temporary input shield prevents secondary clicks from reaching links, images, or controls behind FastTag while peek is held.
 - **Context-Menu Protection**: Repeated and delayed right-click menus remain suppressed until the original peek button is released.
 - **Browser-Boundary Restore**: Moving the pointer from the webpage into browser or operating-system controls restores every FastTag window automatically.
+- **Copy Scene Filename**: Right-click the current scene name in Edit Everything to copy its complete filename.
+- **Reliable Manual Scraper Search**: Manual searches stay tied to the active scene and query instead of reporting stale no-match results.
 
 ---
 

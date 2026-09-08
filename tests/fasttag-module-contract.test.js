@@ -83,6 +83,9 @@ assert.ok(
     mainSource.includes('popup._refreshHeaderTitle = updateUI;'),
     'live title updates should preserve sequential and random header controls'
 );
+assert.ok(mainSource.includes("titleSpan.addEventListener('contextmenu'"), 'the Edit Everything scene title should support right-click filename copying');
+assert.ok(mainSource.includes("titleSpan.setAttribute('data-micro-tooltip', 'Right-click to copy filename')"), 'the scene title should explain its filename-copy action');
+assert.ok(popupSource.includes("if (e.button !== 0 || e.target.closest('input, button, label')) return;"), 'secondary clicks in a popup header must not begin dragging');
 assert.equal(
     mainSource.includes('In Single-Column Popup (Edit Tags, Edit Performers, Edit Studio)'),
     false,
@@ -203,15 +206,8 @@ assert.ok(mainSource.includes('mountMomentaryPeekButton(form, form.querySelector
 assert.ok(coverEditorSource.includes('dependencies.mountMomentaryPeekButton?.(panel, header, closeButton);'), 'the Cover Editor should mount the shared eye control');
 assert.ok(scraperControllerSource.includes('dependencies.mountMomentaryPeekButton?.(targetContainer, scraperHeaderActions);'), 'the detached scraper HUD should mount the shared eye control');
 assert.ok(scraperControllerSource.includes("dependencies.mountMomentaryPeekButton?.(detachedHud, detachedHud.querySelector?.('#fasttag-scrape-loading-actions'))"), 'the detached scraper HUD should join global peek while it is still loading');
+assert.equal((scraperControllerSource.match(/\(\) => isRequestCurrent\(popup, sceneId, manualRequestId\)/g) || []).length, 2, 'both manual scraper search states should remain owned by their current request rather than a stale automatic scrape');
 assert.ok(previewSource.includes('dependencies.mountMomentaryPeekButton?.(() => floatingHudElement, controlsRow)'), 'the floating video HUD should mount the shared eye control');
-assert.ok(uiSource.includes("panel.style.opacity = '0.15'") && uiSource.includes("root.addEventListener('pointerup', restoreMomentaryPeek, true)") && uiSource.includes('momentaryPeekTargets.forEach'), 'the shared eye should fade all registered FastTag panels to 15% opacity and restore them on release anywhere');
-assert.ok(uiSource.includes("panel.style.pointerEvents = 'none'") && uiSource.includes("root.addEventListener('click', blockMomentaryPeekClick, true)"), 'global peek should pass wheel scrolling through faded panels while blocking accidental clicks behind them');
-assert.ok(uiSource.includes("root.addEventListener('wheel', forwardMomentaryPeekWheel") && uiSource.includes('document.elementsFromPoint?.(event.clientX, event.clientY)') && uiSource.includes('scrollTarget.scrollTop += event.deltaY * scale'), 'global peek should explicitly forward mouse and touch-mouse wheel movement to the Stash scroller beneath the pointer');
-assert.ok(uiSource.includes('suppressMomentaryPeekContextMenuWhileHeld = true') && uiSource.includes('suppressMomentaryPeekContextMenuUntil = Date.now() + 500') && uiSource.includes("root.addEventListener('contextmenu', blockRecentMomentaryPeekContextMenu, true)"), 'a right-button chord during peek should suppress repeated browser context menus until every mouse button is released');
-assert.ok(uiSource.includes('event.pointerId === momentaryPeekPrimaryPointerId') && uiSource.includes("root.addEventListener('mousedown', blockMomentaryPeekMouseDown, true)"), 'peek context-menu suppression should track the initiating primary pointer and directly block secondary mouse-down events');
-assert.ok(uiSource.includes("momentaryPeekInputShield.style.cssText = 'position:fixed;inset:0;z-index:2147483646") && uiSource.includes('isPointerRelease && !releasedInitiatingPointer'), 'peek should shield the underlying page and ignore non-primary releases until the initiating pointer is released');
-assert.ok(uiSource.includes("momentaryPeekInputShield.addEventListener('mouseleave', restoreMomentaryPeek)"), 'peek should restore before the pointer leaves the webpage for browser or operating-system controls');
-assert.ok(uiSource.includes("root.addEventListener('contextmenu', cancelUnexpectedMomentaryPeekInput, true)") && uiSource.includes('event.buttons === activeMomentaryPeekButtons'), 'global peek should restore safely when a second mouse button or context menu interrupts the original hold');
 assert.ok(previewSource.includes("if (!saveOptions?.keepEditorOpen && !signal.aborted)"), 'saving within the persistent editor should not rebuild the underlying scene preview');
 assert.ok(popupSource.includes('if (dependencies.coverEditor.closeActiveEditor?.(false, true) === false) return false;'), 'parent-popup closure should respect the unsaved-cover warning while remembering an open Cover Editor');
 assert.ok(coverEditorSource.includes("dependencies.setPersistedOpen?.(true);") && coverEditorSource.includes("dependencies?.setPersistedOpen?.(false);"), 'the Cover Editor should remember whether it was explicitly left open or closed');

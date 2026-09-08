@@ -58,61 +58,46 @@
     }
 
     const momentaryPeekTargets = new Set();
-    let activeMomentaryPeekPanels = [];
-    let activeMomentaryPeekButtons = 0;
-    let suppressMomentaryPeekContextMenuWhileHeld = false;
-    let suppressMomentaryPeekContextMenuUntil = 0;
-    let momentaryPeekPrimaryPointerId = null;
-    let momentaryPeekContextMenuGuardMounted = false;
-    let momentaryPeekInputShield = null;
+    const momentaryPeekState = {
+        panels: [],
+        pointerId: null,
+        shield: null,
+        suppressContextMenu: false,
+        suppressContextMenuUntil: 0,
+        contextMenuGuardMounted: false
+    };
 
-    function armMomentaryPeekContextMenuGuard(event) {
-        if (event?.button === 2 || (event?.buttons & 2) || event?.type === 'contextmenu') {
-            suppressMomentaryPeekContextMenuWhileHeld = true;
+    function isMomentaryPeekActive() {
+        return momentaryPeekState.panels.length > 0;
+    }
+
+    function stopMomentaryPeekEvent(event) {
+        event?.preventDefault?.();
+        event?.stopImmediatePropagation?.();
+    }
+
+    function isSecondaryPointerEvent(event) {
+        return event?.button === 2 || Boolean(event?.buttons & 2) || event?.type === 'contextmenu';
+    }
+
+    function blockMomentaryPeekContextMenu(event) {
+        if (isMomentaryPeekActive() && isSecondaryPointerEvent(event)) {
+            momentaryPeekState.suppressContextMenu = true;
         }
+        if (!isMomentaryPeekActive()
+            && !momentaryPeekState.suppressContextMenu
+            && Date.now() > momentaryPeekState.suppressContextMenuUntil) return;
+        stopMomentaryPeekEvent(event);
     }
 
-    function blockRecentMomentaryPeekContextMenu(event) {
-        if (!suppressMomentaryPeekContextMenuWhileHeld && Date.now() > suppressMomentaryPeekContextMenuUntil) return;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-    }
-
-    function releaseMomentaryPeekContextMenuGuard(event) {
-        if (event?.type === 'blur' || event?.type === 'pointercancel') {
-            suppressMomentaryPeekContextMenuWhileHeld = false;
-            suppressMomentaryPeekContextMenuUntil = 0;
-            momentaryPeekPrimaryPointerId = null;
-            return;
-        }
-        const releasedPrimaryPointer = event?.type === 'pointerup'
-            && event.button === 0
-            && (momentaryPeekPrimaryPointerId === null || event.pointerId === momentaryPeekPrimaryPointerId);
-        const mouseFallbackReleased = event?.type === 'mouseup'
-            && event.button === 0;
-        if (suppressMomentaryPeekContextMenuWhileHeld && (releasedPrimaryPointer || mouseFallbackReleased)) {
-            suppressMomentaryPeekContextMenuWhileHeld = false;
-            suppressMomentaryPeekContextMenuUntil = Date.now() + 500;
-            momentaryPeekPrimaryPointerId = null;
-        }
-    }
-
-    function blockMomentaryPeekClick(event) {
-        if (!activeMomentaryPeekPanels.length) return;
-        armMomentaryPeekContextMenuGuard(event);
-        event.preventDefault();
-        event.stopImmediatePropagation();
-    }
-
-    function blockMomentaryPeekMouseDown(event) {
-        if (!activeMomentaryPeekPanels.length || (event.button === 0 && event.buttons === 1)) return;
-        armMomentaryPeekContextMenuGuard(event);
-        event.preventDefault();
-        event.stopImmediatePropagation();
+    function blockMomentaryPeekInteraction(event) {
+        if (!isMomentaryPeekActive()) return;
+        if (isSecondaryPointerEvent(event)) momentaryPeekState.suppressContextMenu = true;
+        stopMomentaryPeekEvent(event);
     }
 
     function forwardMomentaryPeekWheel(event) {
-        if (!activeMomentaryPeekPanels.length) return;
+        if (!isMomentaryPeekActive()) return;
         const document = root.document;
         const elements = document.elementsFromPoint?.(event.clientX, event.clientY) || [];
         let scrollTarget = null;
@@ -143,70 +128,115 @@
         event.stopImmediatePropagation();
     }
 
-    function cancelUnexpectedMomentaryPeekInput(event) {
-        if (!activeMomentaryPeekPanels.length) return;
-        if (event.type === 'pointermove' && (!activeMomentaryPeekButtons || event.buttons === activeMomentaryPeekButtons)) return;
-        armMomentaryPeekContextMenuGuard(event);
-        event.preventDefault();
-        event.stopImmediatePropagation();
+    function trackMomentaryPeekButtons(event) {
+        if (!isMomentaryPeekActive() || !(event.buttons & 2)) return;
+        momentaryPeekState.suppressContextMenu = true;
+        stopMomentaryPeekEvent(event);
     }
 
-    function restoreMomentaryPeek(event) {
-        const wasActive = activeMomentaryPeekPanels.length > 0;
-        const isPointerRelease = event?.type === 'pointerup';
-        const releasedInitiatingPointer = isPointerRelease
-            && event.button === 0
-            && (momentaryPeekPrimaryPointerId === null || event.pointerId === momentaryPeekPrimaryPointerId);
-        if (wasActive && isPointerRelease && !releasedInitiatingPointer) {
-            armMomentaryPeekContextMenuGuard(event);
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            return;
+    function removeMomentaryPeekListeners() {
+        root.removeEventListener('pointerup', finishMomentaryPeek, true);
+        root.removeEventListener('pointercancel', finishMomentaryPeek, true);
+        root.removeEventListener('blur', finishMomentaryPeek, true);
+        root.removeEventListener('pointermove', trackMomentaryPeekButtons, true);
+        root.removeEventListener('pointerdown', blockMomentaryPeekInteraction, true);
+        root.removeEventListener('mousedown', blockMomentaryPeekInteraction, true);
+        root.removeEventListener('auxclick', blockMomentaryPeekInteraction, true);
+        root.removeEventListener('click', blockMomentaryPeekInteraction, true);
+        root.removeEventListener('wheel', forwardMomentaryPeekWheel, true);
+    }
+
+    function finishMomentaryPeek(event) {
+        if (!isMomentaryPeekActive()) return;
+        if (event?.type === 'pointerup') {
+            const releasedInitiatingPointer = event.button === 0
+                && momentaryPeekState.pointerId !== null
+                && event.pointerId === momentaryPeekState.pointerId;
+            if (!releasedInitiatingPointer) {
+                if (isSecondaryPointerEvent(event)) momentaryPeekState.suppressContextMenu = true;
+                stopMomentaryPeekEvent(event);
+                return;
+            }
         }
-        if (wasActive && event?.type === 'mouseup' && momentaryPeekPrimaryPointerId !== null && event.button !== 0) {
-            armMomentaryPeekContextMenuGuard(event);
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            return;
+        const normalPointerRelease = event?.type === 'pointerup';
+        if (normalPointerRelease && momentaryPeekState.suppressContextMenu) {
+            momentaryPeekState.suppressContextMenuUntil = Date.now() + 500;
+        } else if (!normalPointerRelease) {
+            momentaryPeekState.suppressContextMenuUntil = 0;
         }
-        if (wasActive) armMomentaryPeekContextMenuGuard(event);
-        activeMomentaryPeekPanels.forEach(({ panel, opacity, transition, pointerEvents }) => {
+        momentaryPeekState.suppressContextMenu = false;
+        momentaryPeekState.panels.forEach(({ panel, opacity, transition, pointerEvents }) => {
             panel.style.opacity = opacity;
             panel.style.transition = transition;
             panel.style.pointerEvents = pointerEvents;
         });
-        activeMomentaryPeekPanels = [];
-        activeMomentaryPeekButtons = 0;
-        momentaryPeekPrimaryPointerId = null;
-        momentaryPeekInputShield?.remove();
-        momentaryPeekInputShield = null;
-        root.removeEventListener('pointerup', restoreMomentaryPeek, true);
-        root.removeEventListener('pointercancel', restoreMomentaryPeek, true);
-        root.removeEventListener('mouseup', restoreMomentaryPeek, true);
-        root.removeEventListener('blur', restoreMomentaryPeek, true);
-        root.removeEventListener('pointermove', cancelUnexpectedMomentaryPeekInput, true);
-        root.removeEventListener('contextmenu', cancelUnexpectedMomentaryPeekInput, true);
-        root.removeEventListener('auxclick', cancelUnexpectedMomentaryPeekInput, true);
-        root.removeEventListener('pointerdown', blockMomentaryPeekClick, true);
-        root.removeEventListener('mousedown', blockMomentaryPeekMouseDown, true);
-        root.removeEventListener('click', blockMomentaryPeekClick, true);
-        root.removeEventListener('wheel', forwardMomentaryPeekWheel, true);
-        if (wasActive && (event?.type === 'pointerup' || event?.type === 'mouseup')) {
-            event.preventDefault();
-            event.stopImmediatePropagation();
-        }
+        momentaryPeekState.panels = [];
+        momentaryPeekState.pointerId = null;
+        momentaryPeekState.shield?.remove();
+        momentaryPeekState.shield = null;
+        removeMomentaryPeekListeners();
+        if (normalPointerRelease) stopMomentaryPeekEvent(event);
+    }
+
+    function startMomentaryPeek(event) {
+        if (event.type === 'pointerdown' && event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        finishMomentaryPeek();
+        const seenPanels = new Set();
+        momentaryPeekTargets.forEach(target => {
+            const panel = target.getPanel();
+            if (!panel || panel.isConnected === false) {
+                momentaryPeekTargets.delete(target);
+                return;
+            }
+            if (seenPanels.has(panel)) return;
+            seenPanels.add(panel);
+            momentaryPeekState.panels.push({
+                panel,
+                opacity: panel.style.opacity,
+                transition: panel.style.transition,
+                pointerEvents: panel.style.pointerEvents
+            });
+            panel.style.transition = 'opacity .08s ease';
+            panel.style.opacity = '0.15';
+            panel.style.pointerEvents = 'none';
+        });
+        if (!isMomentaryPeekActive()) return;
+        momentaryPeekState.pointerId = event.type === 'pointerdown' ? event.pointerId : null;
+        momentaryPeekState.shield = root.document.createElement('div');
+        momentaryPeekState.shield.setAttribute('aria-hidden', 'true');
+        momentaryPeekState.shield.style.cssText = 'position:fixed;inset:0;z-index:2147483646;background:transparent;cursor:default;';
+        momentaryPeekState.shield.addEventListener('mouseleave', finishMomentaryPeek);
+        root.document.body.appendChild(momentaryPeekState.shield);
+        root.addEventListener('pointerup', finishMomentaryPeek, true);
+        root.addEventListener('pointercancel', finishMomentaryPeek, true);
+        root.addEventListener('blur', finishMomentaryPeek, true);
+        root.addEventListener('pointermove', trackMomentaryPeekButtons, true);
+        root.addEventListener('pointerdown', blockMomentaryPeekInteraction, true);
+        root.addEventListener('mousedown', blockMomentaryPeekInteraction, true);
+        root.addEventListener('auxclick', blockMomentaryPeekInteraction, true);
+        root.addEventListener('click', blockMomentaryPeekInteraction, true);
+        root.addEventListener('wheel', forwardMomentaryPeekWheel, { capture: true, passive: false });
+    }
+
+    function ensureMomentaryPeekContextMenuGuard() {
+        if (momentaryPeekState.contextMenuGuardMounted) return;
+        root.addEventListener('contextmenu', blockMomentaryPeekContextMenu, true);
+        momentaryPeekState.contextMenuGuardMounted = true;
+    }
+
+    function registerMomentaryPeekTarget(getPanel) {
+        const initialPanel = getPanel();
+        const existingTarget = initialPanel
+            ? Array.from(momentaryPeekTargets).find(candidate => candidate.getPanel() === initialPanel)
+            : null;
+        momentaryPeekTargets.add(existingTarget || { getPanel });
     }
 
     function mountMomentaryPeekButton(panelOrGetter, container, beforeElement = null) {
         if (!container || container.querySelector?.('.fasttag-momentary-peek')) return null;
-        if (!momentaryPeekContextMenuGuardMounted) {
-            root.addEventListener('contextmenu', blockRecentMomentaryPeekContextMenu, true);
-            root.addEventListener('pointerup', releaseMomentaryPeekContextMenuGuard, true);
-            root.addEventListener('mouseup', releaseMomentaryPeekContextMenuGuard, true);
-            root.addEventListener('pointercancel', releaseMomentaryPeekContextMenuGuard, true);
-            root.addEventListener('blur', releaseMomentaryPeekContextMenuGuard, true);
-            momentaryPeekContextMenuGuardMounted = true;
-        }
+        ensureMomentaryPeekContextMenuGuard();
         const button = root.document.createElement('button');
         button.type = 'button';
         button.className = 'fasttag-momentary-peek';
@@ -215,62 +245,13 @@
         button.setAttribute('aria-label', 'Hold to make all open FastTag windows transparent and scroll behind them');
         button.style.cssText = 'border:1px solid rgba(148,163,184,.35);background:rgba(15,23,42,.55);color:#e2e8f0;border-radius:5px;padding:1px 5px;min-width:24px;height:20px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;line-height:1;flex-shrink:0;';
         const getPanel = () => typeof panelOrGetter === 'function' ? panelOrGetter() : panelOrGetter;
-        const initialPanel = getPanel();
-        const existingTarget = initialPanel
-            ? Array.from(momentaryPeekTargets).find(candidate => candidate.getPanel() === initialPanel)
-            : null;
-        momentaryPeekTargets.add(existingTarget || { getPanel });
-        const revealBehind = event => {
-            if (event.type === 'pointerdown' && event.button !== 0) return;
-            event.preventDefault();
-            event.stopPropagation();
-            restoreMomentaryPeek();
-            const seenPanels = new Set();
-            momentaryPeekTargets.forEach(candidate => {
-                const panel = candidate.getPanel();
-                if (!panel || panel.isConnected === false) {
-                    momentaryPeekTargets.delete(candidate);
-                    return;
-                }
-                if (seenPanels.has(panel)) return;
-                seenPanels.add(panel);
-                activeMomentaryPeekPanels.push({
-                    panel,
-                    opacity: panel.style.opacity,
-                    transition: panel.style.transition,
-                    pointerEvents: panel.style.pointerEvents
-                });
-                panel.style.transition = 'opacity .08s ease';
-                panel.style.opacity = '0.15';
-                panel.style.pointerEvents = 'none';
-            });
-            if (!activeMomentaryPeekPanels.length) return;
-            activeMomentaryPeekButtons = event.type === 'pointerdown' ? event.buttons : 0;
-            if (event.type === 'pointerdown') momentaryPeekPrimaryPointerId = event.pointerId;
-            momentaryPeekInputShield?.remove();
-            momentaryPeekInputShield = root.document.createElement('div');
-            momentaryPeekInputShield.setAttribute('aria-hidden', 'true');
-            momentaryPeekInputShield.style.cssText = 'position:fixed;inset:0;z-index:2147483646;background:transparent;cursor:default;';
-            momentaryPeekInputShield.addEventListener('mouseleave', restoreMomentaryPeek);
-            root.document.body.appendChild(momentaryPeekInputShield);
-            root.addEventListener('pointerup', restoreMomentaryPeek, true);
-            root.addEventListener('pointercancel', restoreMomentaryPeek, true);
-            root.addEventListener('mouseup', restoreMomentaryPeek, true);
-            root.addEventListener('blur', restoreMomentaryPeek, true);
-            root.addEventListener('pointermove', cancelUnexpectedMomentaryPeekInput, true);
-            root.addEventListener('contextmenu', cancelUnexpectedMomentaryPeekInput, true);
-            root.addEventListener('auxclick', cancelUnexpectedMomentaryPeekInput, true);
-            root.addEventListener('pointerdown', blockMomentaryPeekClick, true);
-            root.addEventListener('mousedown', blockMomentaryPeekMouseDown, true);
-            root.addEventListener('click', blockMomentaryPeekClick, true);
-            root.addEventListener('wheel', forwardMomentaryPeekWheel, { capture: true, passive: false });
-        };
-        button.addEventListener('pointerdown', revealBehind);
+        registerMomentaryPeekTarget(getPanel);
+        button.addEventListener('pointerdown', startMomentaryPeek);
         button.addEventListener('keydown', event => {
-            if ((event.key === ' ' || event.key === 'Enter') && !activeMomentaryPeekPanels.length) revealBehind(event);
+            if ((event.key === ' ' || event.key === 'Enter') && !isMomentaryPeekActive()) startMomentaryPeek(event);
         });
         button.addEventListener('keyup', event => {
-            if (event.key === ' ' || event.key === 'Enter') restoreMomentaryPeek();
+            if (event.key === ' ' || event.key === 'Enter') finishMomentaryPeek(event);
         });
         if (beforeElement?.parentNode === container) container.insertBefore(button, beforeElement);
         else container.appendChild(button);

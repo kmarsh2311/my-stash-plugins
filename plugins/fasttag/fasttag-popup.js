@@ -556,7 +556,7 @@
 
         if (header) {
             header.addEventListener('mousedown', (e) => {
-                if (e.target.closest('input, button, label')) return;
+                if (e.button !== 0 || e.target.closest('input, button, label')) return;
                 isDragging = true;
                 header.style.cursor = 'grabbing';
                 root.document.body.style.userSelect = 'none';

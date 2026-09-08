@@ -13,6 +13,37 @@
         if (typeof options.log === 'function') log = options.log;
     }
 
+    function fallbackCopyText(text) {
+        const textarea = root.document.createElement('textarea');
+        textarea.value = String(text ?? '');
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        textarea.style.top = '0';
+        root.document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        textarea.setSelectionRange(0, textarea.value.length);
+        let copied = false;
+        try {
+            copied = Boolean(root.document.execCommand?.('copy'));
+        } catch (error) {}
+        textarea.remove();
+        return copied;
+    }
+
+    async function copyTextToClipboard(text) {
+        const value = String(text ?? '');
+        if (!value) return false;
+        if (root.navigator.clipboard?.writeText) {
+            try {
+                await root.navigator.clipboard.writeText(value);
+                return true;
+            } catch (error) {}
+        }
+        return fallbackCopyText(value);
+    }
+
     function showToast(message, type = 'success', duration = 3000, debugPayload = null) {
         try {
             const isDebug = getDebugMode();
@@ -76,33 +107,9 @@
                         }
                     }
 
-                    const fallbackCopy = text => {
-                        const textarea = root.document.createElement('textarea');
-                        textarea.value = text;
-                        textarea.setAttribute('readonly', '');
-                        textarea.style.position = 'fixed';
-                        textarea.style.left = '-9999px';
-                        textarea.style.top = '0';
-                        root.document.body.appendChild(textarea);
-                        textarea.focus();
-                        textarea.select();
-                        textarea.setSelectionRange(0, textarea.value.length);
-                        try {
-                            root.document.execCommand('copy');
-                            copyBtn.textContent = '✓ Copied!';
-                        } catch (error) {
-                            copyBtn.textContent = '❌ Failed';
-                        }
-                        textarea.remove();
-                    };
-
-                    if (root.navigator.clipboard && root.navigator.clipboard.writeText) {
-                        root.navigator.clipboard.writeText(copyText).then(() => {
-                            copyBtn.textContent = '✓ Copied!';
-                        }).catch(() => fallbackCopy(copyText));
-                    } else {
-                        fallbackCopy(copyText);
-                    }
+                    copyTextToClipboard(copyText).then(copied => {
+                        copyBtn.textContent = copied ? '✓ Copied!' : '❌ Failed';
+                    });
                     root.setTimeout(() => { if (copyBtn) copyBtn.textContent = '📋 Copy'; }, 2500);
                 };
             }
@@ -152,5 +159,5 @@
         else root.console?.error?.(`[FastTag Error]: ${message}`);
     }
 
-    root.FastTag.notifications = Object.freeze({ configure, showToast, toastSuccess, toastError });
+    root.FastTag.notifications = Object.freeze({ configure, copyTextToClipboard, showToast, toastSuccess, toastError });
 }(typeof window !== 'undefined' ? window : globalThis));

@@ -16,6 +16,10 @@ class FakeElement {
         this.innerHTML = '';
     }
     addEventListener(type, listener) { this.listeners.set(type, listener); }
+    setAttribute(name, value) { this[name] = value; }
+    focus() {}
+    select() {}
+    setSelectionRange() {}
     querySelector() { return null; }
     remove() {
         if (this.parentNode) this.parentNode.children = this.parentNode.children.filter(child => child !== this);
@@ -84,4 +88,19 @@ assert.equal(logs.at(-1)[0], 'ERROR');
 debugToast.listeners.get('mouseleave')();
 assert.equal(timers.at(-1).delay, 5000, 'hover exit should use the capped redisplay duration');
 
-console.log('fasttag-notifications tests passed');
+(async () => {
+    let clipboardText = '';
+    root.navigator.clipboard = { writeText: async text => { clipboardText = text; } };
+    assert.equal(await notifications.copyTextToClipboard('scene-name.mp4'), true);
+    assert.equal(clipboardText, 'scene-name.mp4');
+
+    root.navigator.clipboard.writeText = async () => { throw new Error('clipboard denied'); };
+    root.document.execCommand = command => command === 'copy';
+    assert.equal(await notifications.copyTextToClipboard('fallback.mp4'), true, 'denied Clipboard API writes should use the legacy fallback');
+    assert.equal(await notifications.copyTextToClipboard(''), false, 'empty copy requests should be rejected');
+
+    console.log('fasttag-notifications tests passed');
+})().catch(error => {
+    console.error(error);
+    process.exitCode = 1;
+});
