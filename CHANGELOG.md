@@ -23,7 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Refract Card Stability**: Removed redundant full-card refreshes on context menus, entity shortcuts, and popup closure, preventing scene-card icon flashes without affecting targeted save updates.
 - **Theme-Safe User Guide**: Isolated the offline guide from host-theme CSS and versioned its lazy-loaded asset to avoid stale browser caching.
 - **Regression Hardening**: Strengthened table lifecycle, search state, Apollo synchronization, repeated AI actions, popup anchoring, media playback, scraper sizing and navigation, and Cover Editor layout.
-- **Stable Scraper Header**: Narrow scraper HUDs remeasure their header after rendering and after Accept changes to Saved, preventing late text sizing from placing header controls over the search row.
+- **Stable One-Row Scraper Header**: Scraper navigation and actions remain on one row across results and resizing; genuinely narrow HUDs reclaim space from nonessential text labels without moving controls over the search field.
 - **Seamless Cover Navigation**: Moving to the next scene retains the previous video frame while the replacement is prepared, without briefly flashing an unnecessary loading message.
 - **Compact HTTP Paste Layout**: Waiting for a keyboard paste keeps the short Paste button label so its longer instruction cannot distort the compact footer.
 - **Compact Status Visibility**: The Cover Editor temporarily expands and moves upward when an actionable message appears, keeping its footer visible without permanently reserving empty space or changing the saved size.

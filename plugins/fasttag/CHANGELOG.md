@@ -25,7 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Prevented redundant full-card refreshes when opening context menus, using left-click entity shortcuts, or closing popups, eliminating Refract scene-card icon flashes without affecting targeted save updates.
 - Isolated the offline User Guide from host-theme CSS and versioned its lazy-loaded asset so updated guide code is not hidden by browser caching.
 - Hardened table initialization and cleanup, single-editor search state, Apollo entity synchronization, repeated AI suggestion clicks, popup anchoring, media seeking/playback, scraper HUD sizing/navigation, and Cover Editor layout during the full regression pass.
-- Stabilized narrow scraper headers after loading and after Accept changes to Saved.
+- Kept scraper navigation and actions on one stable row across results and resizing, using compact icon labels only at genuinely narrow widths.
 - Kept compact HTTP paste guidance visible without distorting or permanently enlarging the Cover Editor.
 - Restored remembered Cover Editors gracefully alongside Edit Everything and preserved their true compact size.
 - Unified subtle, accessible entrances for Edit Everything, the detached scraper, floating video HUD, and Cover Editor without popup drift.

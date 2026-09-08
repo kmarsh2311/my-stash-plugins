@@ -9,6 +9,11 @@
     let floatingHudOwnerObserver = null;
     const sessionCache = new Map();
 
+    function getScraperHeaderDensity(availableWidth) {
+        const width = Number(availableWidth);
+        return Number.isFinite(width) && width > 0 && width < 410 ? 'tight' : 'normal';
+    }
+
     function configure(options) {
         dependencies = options;
     }
@@ -185,6 +190,10 @@
                     hudElement.style.right = 'auto';
                     floatingHudSize = { width: `${Math.round(newW)}px`, height: `${Math.round(newH)}px` };
                     floatingHudPosition = { top: `${Math.round(newT)}px`, left: `${Math.round(newL)}px` };
+                    // The result header has its own compact layout. Re-evaluate it
+                    // from the live HUD width instead of waiting for ResizeObserver,
+                    // which can miss intermediate sizes during a fast drag.
+                    hudElement._fastTagRecheckScraperHeaderLayout?.();
                 };
 
                 const onMouseUp = () => {
@@ -197,6 +206,7 @@
                         root.localStorage.setItem('fasttag_scraper_hud_pos', JSON.stringify(floatingHudPosition));
                         root.localStorage.setItem('fasttag_scraper_hud_size', JSON.stringify(floatingHudSize));
                     } catch (error) {}
+                    hudElement._fastTagRecheckScraperHeaderLayout?.();
                 };
                 document.addEventListener('mousemove', onMouseMove);
                 document.addEventListener('mouseup', onMouseUp);
@@ -326,6 +336,9 @@
 
         if (typeof root.ResizeObserver === 'function') {
             const scraperResizeObserver = new root.ResizeObserver(() => {
+                // This observer owns the actual floating shell, so it is the most
+                // reliable signal when host-theme or native resizing changes width.
+                hudElement._fastTagRecheckScraperHeaderLayout?.();
                 if (hudElement?.isConnected && !hudElement._isDragging
                     && hudElement.offsetWidth >= 300 && hudElement.offsetHeight >= 220) {
                     const currentSize = {
@@ -851,9 +864,9 @@
                     <div id="fasttag-scrape-header" style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 4px 6px; flex-wrap: nowrap; user-select: none; white-space: nowrap; overflow: visible; min-height: 26px; padding: 1px 0;">
                         <div id="fasttag-scrape-header-primary" style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: ${isDark ? '#e0e7ff' : '#312e81'}; min-width: 0; flex: 1 1 150px; overflow: hidden;">
                             <span style="font-size: 13px; line-height: 1; flex-shrink: 0;">⚡</span>
-                            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; max-width: 72px;" title="${escapeHtml(scraperSourceName)}">${escapeHtml(scraperSourceLabel)}</span>
+                            <span id="fasttag-scrape-source-label" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; max-width: 72px;" title="${escapeHtml(scraperSourceName)}">${escapeHtml(scraperSourceLabel)}</span>
                             ${results.length > 1 ? `
-                                <div class="fasttag-match-counter-pulse" style="display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 92px; box-sizing: border-box; font-size: 11px; font-weight: 700; color: ${isDark ? '#e0e7ff' : '#312e81'}; background: ${isDark ? 'rgba(99, 102, 241, 0.25)' : 'rgba(99, 102, 241, 0.12)'}; border: 1px solid ${isDark ? 'rgba(129, 140, 248, 0.75)' : '#818cf8'}; padding: 2px 5px; border-radius: 5px; margin-left: 2px; user-select: none; flex: 0 0 92px; white-space: nowrap; line-height: 1;">
+                                <div id="fasttag-scrape-match-counter" class="fasttag-match-counter-pulse" style="display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 92px; box-sizing: border-box; font-size: 11px; font-weight: 700; color: ${isDark ? '#e0e7ff' : '#312e81'}; background: ${isDark ? 'rgba(99, 102, 241, 0.25)' : 'rgba(99, 102, 241, 0.12)'}; border: 1px solid ${isDark ? 'rgba(129, 140, 248, 0.75)' : '#818cf8'}; padding: 2px 5px; border-radius: 5px; margin-left: 2px; user-select: none; flex: 0 0 92px; white-space: nowrap; line-height: 1;">
                                     <button type="button" id="fasttag-scrape-prev" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(148,163,184,0.4); border-radius: 3px; cursor: pointer; color: inherit; padding: 1px 5px; font-size: 9.5px; line-height: 1; transition: all 0.15s ease;" ${currentIndex === 0 ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''} title="Previous match (Left Arrow)">◀</button>
                                     <span style="min-width: 29px; text-align: center; font-variant-numeric: tabular-nums; letter-spacing: 0.2px; font-size: 11px; font-weight: 700; white-space: nowrap;">${currentIndex + 1}/${results.length}</span>
                                     <button type="button" id="fasttag-scrape-next" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(148,163,184,0.4); border-radius: 3px; cursor: pointer; color: inherit; padding: 1px 5px; font-size: 9.5px; line-height: 1; transition: all 0.15s ease;" ${currentIndex === results.length - 1 ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''} title="Next match (Right Arrow)">▶</button>
@@ -871,7 +884,7 @@
                                     <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" fill="none" stroke-width="2"></rect>
                                     <rect x="12" y="11" width="8" height="7" rx="1.5" fill="currentColor" stroke="none"></rect>
                                 </svg>
-                                <span>${isDetached ? 'Dock' : 'Pop Out'}</span>
+                                <span id="fasttag-scrape-dock-label">${isDetached ? 'Dock' : 'Pop Out'}</span>
                             </button>
                             <button type="button" id="fasttag-scrape-accept-btn" style="background: ${acceptPresentation.background}; border: 1px solid ${acceptPresentation.border}; color: #ffffff; padding: 2.5px 7px; border-radius: 4px; font-size: 10px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 2px; box-shadow: 0 1px 4px ${acceptPresentation.shadow}; line-height: 1.2; transition: all 0.15s ease; white-space: nowrap; flex-shrink: 0;" title="${acceptPresentation.title}">
                                 <span>${acceptPresentation.label}</span>
@@ -1122,46 +1135,55 @@
             const scraperHeader = targetContainer.querySelector('#fasttag-scrape-header');
             const scraperHeaderPrimary = targetContainer.querySelector('#fasttag-scrape-header-primary');
             const scraperHeaderActions = targetContainer.querySelector('#fasttag-scrape-header-actions');
+            const scraperSourceLabelElement = targetContainer.querySelector('#fasttag-scrape-source-label');
+            const scraperMatchCounterElement = targetContainer.querySelector('#fasttag-scrape-match-counter');
+            const scraperDockLabelElement = targetContainer.querySelector('#fasttag-scrape-dock-label');
             if (isDetached) dependencies.mountMomentaryPeekButton?.(targetContainer, scraperHeaderActions);
             const updateScraperHeaderLayout = () => {
                 if (!scraperHeader || !scraperHeaderPrimary || !scraperHeaderActions) return;
-                // Always measure from the normal one-row layout. Measuring while the
-                // compact grid is active would include its forced full-width primary
-                // row and could leave the header stuck in compact mode after widening.
+                // Keep navigation and actions on one row at every HUD width. At very
+                // small widths only redundant text is hidden; the controls themselves
+                // remain available through their icons and tooltips.
                 scraperHeader.style.display = 'flex';
                 scraperHeader.style.gridTemplateColumns = '';
                 scraperHeader.style.gridTemplateRows = '';
                 scraperHeader.style.height = 'auto';
+                scraperHeader.style.minHeight = '26px';
                 scraperHeader.style.alignItems = 'center';
                 scraperHeaderPrimary.style.flex = '1 1 150px';
                 scraperHeaderPrimary.style.width = 'auto';
                 scraperHeaderActions.style.alignSelf = 'auto';
                 scraperHeaderActions.style.justifySelf = 'auto';
                 const availableWidth = scraperHeader.clientWidth || targetContainer.getBoundingClientRect?.().width || targetContainer.clientWidth || 0;
-                const requiredWidth = scraperHeaderPrimary.scrollWidth + scraperHeaderActions.scrollWidth + 6;
-                const compact = availableWidth > 0 && requiredWidth > availableWidth;
-                if (!compact) return;
-                scraperHeader.style.display = 'grid';
-                scraperHeader.style.gridTemplateColumns = 'minmax(0, 1fr)';
-                scraperHeader.style.gridTemplateRows = '24px 24px';
-                scraperHeader.style.height = '52px';
-                scraperHeader.style.alignItems = 'stretch';
-                scraperHeaderPrimary.style.flex = '0 0 auto';
-                scraperHeaderPrimary.style.width = '100%';
-                scraperHeaderActions.style.alignSelf = 'flex-end';
-                scraperHeaderActions.style.justifySelf = 'end';
+                const tight = getScraperHeaderDensity(availableWidth) === 'tight';
+                if (scraperSourceLabelElement) scraperSourceLabelElement.style.display = tight ? 'none' : '';
+                if (scraperDockLabelElement) scraperDockLabelElement.style.display = tight ? 'none' : '';
+                if (scraperMatchCounterElement) {
+                    scraperMatchCounterElement.style.width = tight ? '82px' : '92px';
+                    scraperMatchCounterElement.style.flexBasis = tight ? '82px' : '92px';
+                }
             };
             targetContainer._fastTagScraperHeaderResizeObserver?.disconnect?.();
             updateScraperHeaderLayout();
+            let scraperHeaderLayoutFramePending = false;
             const recheckScraperHeaderLayout = () => {
-                if (typeof root.requestAnimationFrame === 'function') root.requestAnimationFrame(updateScraperHeaderLayout);
-                else root.setTimeout(updateScraperHeaderLayout, 0);
+                if (scraperHeaderLayoutFramePending) return;
+                scraperHeaderLayoutFramePending = true;
+                const runCheck = () => {
+                    scraperHeaderLayoutFramePending = false;
+                    if (scraperHeader?.isConnected === false) return;
+                    updateScraperHeaderLayout();
+                };
+                if (typeof root.requestAnimationFrame === 'function') root.requestAnimationFrame(runCheck);
+                else root.setTimeout(runCheck, 0);
             };
             targetContainer._fastTagRecheckScraperHeaderLayout = recheckScraperHeaderLayout;
             recheckScraperHeaderLayout();
             root.setTimeout(updateScraperHeaderLayout, 80);
+            root.setTimeout(updateScraperHeaderLayout, 240);
+            root.document?.fonts?.ready?.then?.(recheckScraperHeaderLayout).catch?.(() => {});
             if (typeof root.ResizeObserver === 'function') {
-                targetContainer._fastTagScraperHeaderResizeObserver = new root.ResizeObserver(updateScraperHeaderLayout);
+                targetContainer._fastTagScraperHeaderResizeObserver = new root.ResizeObserver(recheckScraperHeaderLayout);
                 targetContainer._fastTagScraperHeaderResizeObserver.observe(targetContainer);
             }
 
@@ -1721,8 +1743,8 @@
                 const acceptBtn = container ? container.querySelector('#fasttag-scrape-accept-btn') : null;
                 if (acceptBtn) {
                     acceptBtn.innerHTML = resolutionFailures.length > 0
-                        ? '<span>⚠ Saved with warnings</span>'
-                        : (coverSaved ? '<span>✓ Saved</span>' : '<span>✓ Saved (cover failed)</span>');
+                        ? '<span>⚠ Saved</span>'
+                        : (coverSaved ? '<span>✓ Saved</span>' : '<span>⚠ Saved</span>');
                     acceptBtn.disabled = true;
                     acceptBtn.style.opacity = '0.7';
                     acceptBtn.style.cursor = 'default';
@@ -1769,6 +1791,7 @@
         getHudOwnerPopup,
         isHudOpen,
         resetLayoutState,
+        getScraperHeaderDensity,
         showLoadingState,
         sessionCache,
         createTrigger,

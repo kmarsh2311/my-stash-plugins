@@ -7,6 +7,9 @@ require('../plugins/fasttag/fasttag-scraper-controller.js');
 const controller = global.FastTag.scraperController;
 
 assert.ok(controller, 'FastTag scraper controller namespace should be installed');
+assert.equal(controller.getScraperHeaderDensity(409), 'tight', 'very narrow scraper headers should use compact labels');
+assert.equal(controller.getScraperHeaderDensity(410), 'normal', 'ordinary scraper widths should keep all labels on one row');
+assert.equal(controller.getScraperHeaderDensity(640), 'normal');
 
 let activePopup = null;
 controller.configure({ getActivePopup: () => activePopup });
@@ -130,6 +133,10 @@ assert.match(detachedLoadingHud.innerHTML, /Drag to move/);
 assert.equal(loadingHudHeader.style.cursor, 'grab');
 assert.equal(typeof loadingHudHeader.onmousedown, 'function', 'the loading HUD header should remain draggable');
 assert.equal(loadingPopup.scraperCardContainer.style.display, 'none', 'detached loading should not flash inside the main popup');
+let headerLayoutRechecks = 0;
+detachedLoadingHud._fastTagRecheckScraperHeaderLayout = () => { headerLayoutRechecks += 1; };
+detachedLoadingHud._fastTagResizeObserver.callback();
+assert.equal(headerLayoutRechecks, 1, 'resizing the floating shell should always re-evaluate the scraper header layout');
 controller.closeHud();
 
 async function testTriggerRejectsLateResults() {
