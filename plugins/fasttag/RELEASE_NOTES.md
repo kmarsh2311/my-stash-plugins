@@ -1,3 +1,13 @@
+## 4.4.2 - Global Scrollable Window Peek
+
+### Highlights
+- **Peek From Any Window**: Hold the eye on any supported popup or HUD to fade every currently open FastTag window together.
+- **Scroll the Scene Page**: Mouse-wheel and Magic Mouse movement scrolls the underlying Stash page while peek is held.
+- **Safe Input Handling**: Underlying clicks remain blocked, and interrupted or multi-button input restores all windows immediately.
+- **Loading Scraper Support**: The detached scraper joins global peek while it is still searching, not only after results appear.
+
+---
+
 ## 4.4.1 - Creation, Scraping and Video Recovery
 
 ### Highlights

@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [4.4.2] - 2026-09-08
+
+### Changed
+- Made momentary peek global across all open FastTag windows, forwarded mouse-wheel and Magic Mouse scrolling to the underlying Stash page, blocked accidental click-through, hardened interrupted and multi-button restoration, and included the detached scraper while it is still loading.
+
 ## [4.4.1] - 2026-09-08
 
 ### Added

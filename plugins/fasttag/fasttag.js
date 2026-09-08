@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash FastTag
 // @namespace    http://tampermonkey.net/
-// @version      4.4.1
+// @version      4.4.2
 // @description  Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
@@ -344,7 +344,7 @@
         mountMomentaryPeekButton
     });
 
-    console.log('[FastTag v4.4.1] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
+    console.log('[FastTag v4.4.2] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
 
     let fastTagHelpLoadPromise = null;
     function loadFastTagHelpModule() {
@@ -365,7 +365,7 @@
                 const script = document.createElement('script');
                 script.id = 'fasttag-help-script';
                 const scriptUrl = new URL(assetPaths[index], window.location.origin);
-                scriptUrl.searchParams.set('v', '4.4.1-help-1');
+                scriptUrl.searchParams.set('v', '4.4.2-help-1');
                 script.src = scriptUrl.href;
                 script.async = true;
                 script.onload = () => {
@@ -3065,8 +3065,58 @@
         const supportLink = document.createElement('a');
         supportLink.href = 'https://buymeacoffee.com/kamarsh';
         supportLink.textContent = isEasterEggActive() ? 'Buy me a KitKat 🍫 (100+ Tagged!)' : 'Buy me a KitKat 🍫';
-        supportLink.style.color = '#d97706';
+        supportLink.title = 'Support continued FastTag development';
+        supportLink.setAttribute('aria-label', 'Support continued FastTag development');
+        supportLink.style.cssText = `
+            display: block;
+            position: relative;
+            overflow: hidden;
+            margin: 6px 4px 3px;
+            padding: 7px 10px;
+            border: 1px solid rgba(245, 158, 11, 0.42);
+            border-radius: 8px;
+            background: rgba(245, 158, 11, 0.09);
+            color: #fde7b0;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.35;
+            text-align: center;
+            text-decoration: none;
+            transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+        `;
         supportLink.target = '_blank';
+        supportLink.rel = 'noopener noreferrer';
+        const supportSparkle = document.createElement('span');
+        supportSparkle.textContent = '✦';
+        supportSparkle.setAttribute('aria-hidden', 'true');
+        supportSparkle.style.cssText = `
+            position: absolute;
+            top: 1px;
+            right: 7px;
+            color: #fde68a;
+            font-size: 10px;
+            line-height: 1;
+            opacity: 0;
+            pointer-events: none;
+        `;
+        supportLink.appendChild(supportSparkle);
+        supportLink.addEventListener('mouseenter', () => {
+            supportLink.style.background = 'rgba(245, 158, 11, 0.15)';
+            supportLink.style.borderColor = 'rgba(251, 191, 36, 0.62)';
+            supportLink.style.boxShadow = '0 0 10px rgba(245, 158, 11, 0.18)';
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                supportSparkle.animate([
+                    { opacity: 0, transform: 'scale(0.45) rotate(0deg)' },
+                    { opacity: 0.9, transform: 'scale(1.15) rotate(45deg)', offset: 0.45 },
+                    { opacity: 0, transform: 'scale(0.65) rotate(90deg)' }
+                ], { duration: 520, easing: 'ease-out' });
+            }
+        });
+        supportLink.addEventListener('mouseleave', () => {
+            supportLink.style.background = 'rgba(245, 158, 11, 0.09)';
+            supportLink.style.borderColor = 'rgba(245, 158, 11, 0.42)';
+            supportLink.style.boxShadow = 'none';
+        });
         supportLink.addEventListener('click', () => closeMenu());
         menu.appendChild(supportLink);
 

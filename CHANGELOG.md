@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [4.4.2] - 2026-09-08
+
+### Changed
+- **Global Scrollable Window Peek**: Holding the eye on any supported FastTag popup or HUD now fades every open FastTag window together and allows the underlying Stash page to scroll while blocking accidental clicks. The detached scraper participates throughout its loading state and all windows restore safely after interrupted or multi-button input.
+
 ## [4.4.1] - 2026-09-08
 
 ### Added

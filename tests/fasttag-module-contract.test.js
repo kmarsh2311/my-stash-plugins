@@ -65,7 +65,7 @@ assert.equal(javascriptSection.includes('fasttag-help.js'), false, 'optional hel
 assert.ok(yaml.includes('assets:\n    /: .'), 'FastTag should expose optional offline help through the Stash plugin asset route');
 assert.ok(mainSource.includes('/plugin/fasttag/assets/fasttag-help.js'), 'help loader should try the configuration-derived Stash plugin asset URL');
 assert.ok(mainSource.includes('/plugin/mypluginrc/assets/fasttag-help.js'), 'help loader should support the installed package ID asset URL');
-assert.ok(mainSource.includes("scriptUrl.searchParams.set('v', '4.4.1-help-1')"), 'optional help should use the current release cache key so updated guide code is loaded');
+assert.ok(mainSource.includes("scriptUrl.searchParams.set('v', '4.4.2-help-1')"), 'optional help should use the current release cache key so updated guide code is loaded');
 assert.ok(fs.existsSync(path.join(pluginDirectory, 'USER_GUIDE.md')), 'offline Markdown user guide should ship with FastTag');
 
 const scraperSaveMutation = scraperControllerSource.match(/mutation FastTagAcceptSave[\s\S]*?`, \{ input: updateInput \}\);/)?.[0] || '';
@@ -202,8 +202,12 @@ assert.ok(coverEditorSource.includes('fasttag-cover-studio-code') && coverEditor
 assert.ok(mainSource.includes('mountMomentaryPeekButton(form, form.querySelector') && popupSource.includes("dependencies.mountMomentaryPeekButton?.(form, form.querySelector('.popup-header'))"), 'Everything and single-field editor popups should mount the shared eye control');
 assert.ok(coverEditorSource.includes('dependencies.mountMomentaryPeekButton?.(panel, header, closeButton);'), 'the Cover Editor should mount the shared eye control');
 assert.ok(scraperControllerSource.includes('dependencies.mountMomentaryPeekButton?.(targetContainer, scraperHeaderActions);'), 'the detached scraper HUD should mount the shared eye control');
+assert.ok(scraperControllerSource.includes("dependencies.mountMomentaryPeekButton?.(detachedHud, detachedHud.querySelector?.('#fasttag-scrape-loading-actions'))"), 'the detached scraper HUD should join global peek while it is still loading');
 assert.ok(previewSource.includes('dependencies.mountMomentaryPeekButton?.(() => floatingHudElement, controlsRow)'), 'the floating video HUD should mount the shared eye control');
-assert.ok(uiSource.includes("activePanel.style.opacity = '0.15'") && uiSource.includes("root.addEventListener('pointerup', restore, true)"), 'the shared eye should use 15% opacity and restore on release anywhere');
+assert.ok(uiSource.includes("panel.style.opacity = '0.15'") && uiSource.includes("root.addEventListener('pointerup', restoreMomentaryPeek, true)") && uiSource.includes('momentaryPeekTargets.forEach'), 'the shared eye should fade all registered FastTag panels to 15% opacity and restore them on release anywhere');
+assert.ok(uiSource.includes("panel.style.pointerEvents = 'none'") && uiSource.includes("root.addEventListener('click', blockMomentaryPeekClick, true)"), 'global peek should pass wheel scrolling through faded panels while blocking accidental clicks behind them');
+assert.ok(uiSource.includes("root.addEventListener('wheel', forwardMomentaryPeekWheel") && uiSource.includes('document.elementsFromPoint?.(event.clientX, event.clientY)') && uiSource.includes('scrollTarget.scrollTop += event.deltaY * scale'), 'global peek should explicitly forward mouse and touch-mouse wheel movement to the Stash scroller beneath the pointer');
+assert.ok(uiSource.includes("root.addEventListener('contextmenu', cancelUnexpectedMomentaryPeekInput, true)") && uiSource.includes('event.buttons === activeMomentaryPeekButtons'), 'global peek should restore safely when a second mouse button or context menu interrupts the original hold');
 assert.ok(previewSource.includes("if (!saveOptions?.keepEditorOpen && !signal.aborted)"), 'saving within the persistent editor should not rebuild the underlying scene preview');
 assert.ok(popupSource.includes('if (dependencies.coverEditor.closeActiveEditor?.(false, true) === false) return false;'), 'parent-popup closure should respect the unsaved-cover warning while remembering an open Cover Editor');
 assert.ok(coverEditorSource.includes("dependencies.setPersistedOpen?.(true);") && coverEditorSource.includes("dependencies?.setPersistedOpen?.(false);"), 'the Cover Editor should remember whether it was explicitly left open or closed');

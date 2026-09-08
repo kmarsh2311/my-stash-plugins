@@ -374,7 +374,7 @@
         const isDark = dependencies?.getEffectiveTheme?.() !== 'light';
         targetContainer.style.display = 'flex';
         targetContainer.innerHTML = `
-            ${detachedHud ? `<div id="fasttag-scrape-loading-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-shrink:0;min-height:38px;padding:8px 12px;border-bottom:1px solid ${isDark ? '#334155' : '#e2e8f0'};background:${isDark ? '#0f172a' : '#f8fafc'};color:${isDark ? '#e0e7ff' : '#312e81'};font-size:11.5px;font-weight:700;user-select:none;"><span>⚡ Searching for a match…</span><span style="color:${isDark ? '#64748b' : '#94a3b8'};font-size:9.5px;font-weight:600;">Drag to move</span></div>` : ''}
+            ${detachedHud ? `<div id="fasttag-scrape-loading-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-shrink:0;min-height:38px;padding:8px 12px;border-bottom:1px solid ${isDark ? '#334155' : '#e2e8f0'};background:${isDark ? '#0f172a' : '#f8fafc'};color:${isDark ? '#e0e7ff' : '#312e81'};font-size:11.5px;font-weight:700;user-select:none;"><span>⚡ Searching for a match…</span><span id="fasttag-scrape-loading-actions" style="display:inline-flex;align-items:center;gap:7px;"><span style="color:${isDark ? '#64748b' : '#94a3b8'};font-size:9.5px;font-weight:600;">Drag to move</span></span></div>` : ''}
             <div data-fasttag-scrape-loading="true" role="status" aria-live="polite" style="box-sizing: border-box; width: 100%; min-height: 190px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 24px; overflow: hidden; background: ${isDark ? '#1e293b' : '#ffffff'}; color: ${isDark ? '#cbd5e1' : '#475569'};">
                 <div aria-hidden="true" style="position: relative; width: 190px; height: 75px; display: flex; align-items: flex-end; justify-content: center; overflow: hidden;">
                     <div class="fasttag-scrape-lens" style="position: absolute; top: 14px; left: calc(50% - 17px); z-index: 3; font-size: 31px; line-height: 1; filter: drop-shadow(0 5px 8px rgba(15,23,42,.3));">🔍</div>
@@ -389,6 +389,7 @@
             </div>
         `;
         if (detachedHud) {
+            dependencies.mountMomentaryPeekButton?.(detachedHud, detachedHud.querySelector?.('#fasttag-scrape-loading-actions'));
             attachHudDragging(detachedHud, detachedHud.querySelector?.('#fasttag-scrape-loading-header'));
             attachResizeHandles(detachedHud);
         }
