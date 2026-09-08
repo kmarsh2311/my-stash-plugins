@@ -1,3 +1,15 @@
+## 4.4.0 - Modular FastTag and Workflow Polish
+
+### Highlights
+- **Modular, Tested Runtime**: FastTag is now split into focused modules and covered by a 21-suite automated regression runner, making maintenance and future changes safer.
+- **Compact, Remembered Cover Editor**: An optional space-saving layout keeps both cover previews intact, remembers its own dimensions, and reopens with Edit Everything when left open.
+- **Window Peek**: Press and hold the eye control on major popups and floating HUDs to reveal the scene page temporarily without moving or closing the window.
+- **Studio Code Reference**: The Cover Editor displays the scene's saved Stash Studio Code for image filename and identification workflows.
+- **Scraper and Sequential Polish**: Loading HUDs remain movable, narrow headers stay stable, final-scene controls show completed progress, and scene navigation avoids unnecessary flashes.
+- **Theme and Lifecycle Hardening**: User Guide isolation, targeted card refreshes, popup positioning, media playback, AI actions, and table cleanup received a full regression pass.
+
+---
+
 ## 4.3.0 - Cover Editor
 
 ### Highlights

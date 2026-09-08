@@ -6,8 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [4.4.0] - 2026-09-08
+
 ### Added
 - Added a compact static scraper-loading illustration with a magnifying glass inspecting the central video-file tile.
+- Added an optional Compact Cover Editor with tighter spacing, separate remembered dimensions, and a single Cancel, Upload, Paste, and Set Cover footer row.
+- Restored the Cover Editor automatically with Edit Everything when it was previously left open.
+- Added an eye-only press-and-hold peek control to major editor popups and floating HUDs at 15% opacity.
+- Displayed the saved Stash Studio Code in the Cover Editor as a read-only reference.
 
 ### Changed
 - Refactored the FastTag runtime into independently tested modules for API access, storage, integrations, Gemini, scraping, preview, popup lifecycle, editor workflows, notifications, and shared UI while preserving the existing Stash plugin loading model and stored settings.
@@ -19,6 +25,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Prevented redundant full-card refreshes when opening context menus, using left-click entity shortcuts, or closing popups, eliminating Refract scene-card icon flashes without affecting targeted save updates.
 - Isolated the offline User Guide from host-theme CSS and versioned its lazy-loaded asset so updated guide code is not hidden by browser caching.
 - Hardened table initialization and cleanup, single-editor search state, Apollo entity synchronization, repeated AI suggestion clicks, popup anchoring, media seeking/playback, scraper HUD sizing/navigation, and Cover Editor layout during the full regression pass.
+- Stabilized narrow scraper headers after loading and after Accept changes to Saved.
+- Kept compact HTTP paste guidance visible without distorting or permanently enlarging the Cover Editor.
+- Restored remembered Cover Editors gracefully alongside Edit Everything and preserved their true compact size.
+- Unified subtle, accessible entrances for Edit Everything, the detached scraper, floating video HUD, and Cover Editor without popup drift.
+- Removed the unnecessary loading flash when navigating between scenes in the Cover Editor.
 
 ## [4.3.0] - 2026-09-06
 

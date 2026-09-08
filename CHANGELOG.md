@@ -6,13 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [4.4.0] - 2026-09-08
+
 ### Added
+- **Modular Runtime**: Split FastTag into independently tested modules for API access, storage, integrations, Gemini, scraping, preview, popup lifecycle, editor workflows, notifications, and shared UI while preserving the existing plugin loading model and settings.
+- **Automated Regression Coverage**: Added a complete verification runner covering 21 test suites and JavaScript and Python syntax checks.
+- **Static Scraper Illustration**: Added a compact magnifying-glass illustration for long-running scraper searches.
 - **Optional Compact Cover Editor**: A Display setting removes routine guidance, tightens spacing, and combines Cancel, Upload, Paste, and Set Cover in one footer row without overlaying or reducing either cover preview. Errors and keyboard-paste instructions still appear when needed, and normal and compact layouts remember their resized dimensions separately.
 - **Remembered Cover Editor**: Reopening Edit Everything restores the Cover Editor when it was previously left open; explicitly closing the Cover Editor prevents restoration.
 - **Momentary Window Peek**: Major editor popups, the Cover Editor, detached scraper, and floating video HUD provide an eye-only press-and-hold control that temporarily reveals the page behind them.
 - **Cover Studio Code**: The Cover Editor header shows a scene's saved Stash Studio Code as a read-only reference and updates it during navigation.
 
 ### Fixed
+- **Sequential Completion Controls**: The final primary action displays completed progress, gently pulses, and replaces the redundant secondary Close action.
+- **Movable Loading Scraper**: The detached scraper remains draggable and resizable while a long-running scan is in progress.
+- **Refract Card Stability**: Removed redundant full-card refreshes on context menus, entity shortcuts, and popup closure, preventing scene-card icon flashes without affecting targeted save updates.
+- **Theme-Safe User Guide**: Isolated the offline guide from host-theme CSS and versioned its lazy-loaded asset to avoid stale browser caching.
+- **Regression Hardening**: Strengthened table lifecycle, search state, Apollo synchronization, repeated AI actions, popup anchoring, media playback, scraper sizing and navigation, and Cover Editor layout.
 - **Stable Scraper Header**: Narrow scraper HUDs remeasure their header after rendering and after Accept changes to Saved, preventing late text sizing from placing header controls over the search row.
 - **Seamless Cover Navigation**: Moving to the next scene retains the previous video frame while the replacement is prepared, without briefly flashing an unnecessary loading message.
 - **Compact HTTP Paste Layout**: Waiting for a keyboard paste keeps the short Paste button label so its longer instruction cannot distort the compact footer.
