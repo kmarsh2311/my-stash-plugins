@@ -65,7 +65,7 @@ assert.equal(javascriptSection.includes('fasttag-help.js'), false, 'optional hel
 assert.ok(yaml.includes('assets:\n    /: .'), 'FastTag should expose optional offline help through the Stash plugin asset route');
 assert.ok(mainSource.includes('/plugin/fasttag/assets/fasttag-help.js'), 'help loader should try the configuration-derived Stash plugin asset URL');
 assert.ok(mainSource.includes('/plugin/mypluginrc/assets/fasttag-help.js'), 'help loader should support the installed package ID asset URL');
-assert.ok(mainSource.includes("scriptUrl.searchParams.set('v', '4.4.3-help-1')"), 'optional help should use the current release cache key so updated guide code is loaded');
+assert.ok(mainSource.includes("scriptUrl.searchParams.set('v', '4.4.4-help-1')"), 'optional help should use the current release cache key so updated guide code is loaded');
 assert.ok(fs.existsSync(path.join(pluginDirectory, 'USER_GUIDE.md')), 'offline Markdown user guide should ship with FastTag');
 
 const scraperSaveMutation = scraperControllerSource.match(/mutation FastTagAcceptSave[\s\S]*?`, \{ input: updateInput \}\);/)?.[0] || '';

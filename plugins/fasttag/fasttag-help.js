@@ -115,7 +115,7 @@
             <style>:host{color-scheme:${isDark ? 'dark' : 'light'}}*,*::before,*::after{box-sizing:border-box}</style>
             <div id="fasttag-help-dialog" role="dialog" aria-modal="true" aria-labelledby="fasttag-help-title" style="width:min(1080px,96vw);height:min(780px,92vh);display:flex;flex-direction:column;background:${colors.bg};color:${colors.text};border:1px solid ${colors.border};border-radius:12px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.65);">
                 <div class="fasttag-help-header" style="display:flex;align-items:center;gap:12px;padding:13px 16px;background:${colors.panel};border-bottom:1px solid ${colors.border};">
-                    <div style="min-width:0;flex:1"><div id="fasttag-help-title" style="font-size:16px;font-weight:800;">⚡ FastTag User Guide</div><div style="font-size:10.5px;color:${colors.muted};">Version ${options.version || '4.4.3'} · Available offline</div></div>
+                    <div style="min-width:0;flex:1"><div id="fasttag-help-title" style="font-size:16px;font-weight:800;">⚡ FastTag User Guide</div><div style="font-size:10.5px;color:${colors.muted};">Version ${options.version || '4.4.4'} · Available offline</div></div>
                     <input id="fasttag-help-search" type="search" placeholder="Search the guide…" aria-label="Search the FastTag guide" style="width:min(330px,42vw);padding:7px 10px;border-radius:7px;border:1px solid ${colors.border};background:${colors.card};color:${colors.text};outline:none;">
                     <button id="fasttag-help-close" type="button" aria-label="Close guide" style="border:0;background:transparent;color:${colors.muted};font-size:19px;cursor:pointer;padding:5px;">✕</button>
                 </div>
