@@ -33,6 +33,7 @@ jobs:
     - uses: actions/upload-pages-artifact@v3
 
   deploy:
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
