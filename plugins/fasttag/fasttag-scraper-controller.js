@@ -1152,6 +1152,13 @@
             };
             targetContainer._fastTagScraperHeaderResizeObserver?.disconnect?.();
             updateScraperHeaderLayout();
+            const recheckScraperHeaderLayout = () => {
+                if (typeof root.requestAnimationFrame === 'function') root.requestAnimationFrame(updateScraperHeaderLayout);
+                else root.setTimeout(updateScraperHeaderLayout, 0);
+            };
+            targetContainer._fastTagRecheckScraperHeaderLayout = recheckScraperHeaderLayout;
+            recheckScraperHeaderLayout();
+            root.setTimeout(updateScraperHeaderLayout, 80);
             if (typeof root.ResizeObserver === 'function') {
                 targetContainer._fastTagScraperHeaderResizeObserver = new root.ResizeObserver(updateScraperHeaderLayout);
                 targetContainer._fastTagScraperHeaderResizeObserver.observe(targetContainer);
@@ -1719,6 +1726,7 @@
                     acceptBtn.style.opacity = '0.7';
                     acceptBtn.style.cursor = 'default';
                     acceptBtn.style.background = '#059669';
+                    container._fastTagRecheckScraperHeaderLayout?.();
                 }
 
                 if (resolutionFailures.length > 0) {

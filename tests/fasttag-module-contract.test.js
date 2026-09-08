@@ -133,6 +133,9 @@ assert.ok(scraperControllerSource.includes('floatingHudElement._fastTagResizeObs
 assert.ok(scraperControllerSource.includes('hudElement?.isConnected'), 'a detached scraper HUD must never persist its post-removal zero size');
 assert.ok(scraperControllerSource.includes("dependencies?.getDetachScraper?.()\n            ? ensureHud(popup)"), 'remembered detached mode should create its HUD before rendering the first loading state');
 assert.ok(scraperControllerSource.includes('savedWidth >= 300') && scraperControllerSource.includes('savedHeight >= 220'), 'invalid saved scraper dimensions should fall back to safe defaults');
+assert.ok(scraperControllerSource.includes('const recheckScraperHeaderLayout = () =>') && scraperControllerSource.includes('root.setTimeout(updateScraperHeaderLayout, 80);'), 'scraper header wrapping should be rechecked after its final text and fonts settle');
+assert.ok(scraperControllerSource.includes('targetContainer._fastTagRecheckScraperHeaderLayout = recheckScraperHeaderLayout;'), 'each scraper HUD should expose its own responsive header recheck');
+assert.ok(scraperControllerSource.includes("acceptBtn.style.background = '#059669';\n                    container._fastTagRecheckScraperHeaderLayout?.();"), 'changing Accept to Saved should immediately recheck the responsive header layout');
 assert.ok(popupSource.includes('activePopup._fastTagClosed = true;'), 'popup closure should invalidate pending scraper work');
 assert.ok(scraperControllerSource.includes('function beginRequest(popup, sceneId)'), 'scrapes should receive a per-popup request generation');
 assert.ok(scraperControllerSource.includes('if (!isRequestCurrent(popup, activeSceneId, scrapeRequestId)) return null;'), 'late automatic scrape responses should be discarded');
