@@ -1,6 +1,12 @@
 (function initializeFastTagPreview(root) {
     'use strict';
 
+    const STREAM_FRAME_TIMEOUT_MS = 6000;
+
+    function hasRenderableVideoFrame(video) {
+        return Boolean(video && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0);
+    }
+
     let dependencies = null;
     function configure(options) { dependencies = options; }
 
@@ -334,6 +340,7 @@
         let wheelListenerAttached = false;
         let resumeTimer = null;
         let hudTimer = null;
+        let streamReadinessTimer = null;
         let scrubbing = false;
         let wasPlaying = false;
         let originalLoop = true;
@@ -947,6 +954,8 @@
             detachWheel();
             clearTimeout(resumeTimer);
             clearTimeout(progressBarTimer);
+            clearTimeout(streamReadinessTimer);
+            streamReadinessTimer = null;
 
             if (mode === 'stream') {
                 streamCaptureFailure = '';
@@ -986,6 +995,8 @@
                         }, 800);
                         return;
                     }
+                    clearTimeout(streamReadinessTimer);
+                    streamReadinessTimer = null;
                     const errCode = video.error ? video.error.code : 0;
                     const msg = errCode === 4
                         ? 'Full video format not supported by browser — showing preview'
@@ -998,6 +1009,13 @@
                 };
 
                 video.addEventListener('timeupdate', updateProgressBar);
+                const confirmRenderableFrame = () => {
+                    if (!hasRenderableVideoFrame(video)) return;
+                    clearTimeout(streamReadinessTimer);
+                    streamReadinessTimer = null;
+                };
+                video.addEventListener('loadeddata', confirmRenderableFrame);
+                video.addEventListener('canplay', confirmRenderableFrame);
                 video.onloadedmetadata = () => {
                     streamCaptureFailure = '';
                     showProgressBar();
@@ -1009,6 +1027,21 @@
                 progressBarBg.style.pointerEvents = 'auto';
                 video.load();
                 video.play().catch(() => {});
+                streamReadinessTimer = setTimeout(() => {
+                    streamReadinessTimer = null;
+                    if (signal.aborted || currentMedia !== video || currentMediaSource !== 'full-video') return;
+                    if (hasRenderableVideoFrame(video)) return;
+                    streamCaptureFailure = 'The full-video stream loaded without a renderable frame. Using the generated preview instead.';
+                    dependencies.log?.('WARN', 'PREVIEW', 'Full-video stream produced no renderable frame; falling back to preview', {
+                        sceneId: String(sceneId),
+                        readyState: Number(video.readyState || 0),
+                        videoWidth: Number(video.videoWidth || 0),
+                        videoHeight: Number(video.videoHeight || 0),
+                        duration: Number(video.duration || 0)
+                    });
+                    showToast('Full video could not display a frame — showing preview', 'info', 3500);
+                    renderMedia('preview');
+                }, STREAM_FRAME_TIMEOUT_MS);
                 if (isHovered) attachWheel();
             } else {
                 hideCueImmediate();
@@ -1196,6 +1229,8 @@
         };
 
         signal.addEventListener('abort', () => {
+            clearTimeout(streamReadinessTimer);
+            streamReadinessTimer = null;
             if (window._fastTagActiveToggleVideoMode) {
                 window._fastTagActiveToggleVideoMode = null;
             }
@@ -1365,6 +1400,8 @@
         selectScrubStep,
         calculateScrubTarget,
         calculateSeekTarget,
+        hasRenderableVideoFrame,
+        STREAM_FRAME_TIMEOUT_MS,
         shouldResumeAfterTimelineSeek,
         getDefaultPopoutSize,
         calculateVideoPopoutPosition,

@@ -140,6 +140,33 @@
         return fallbacks;
     }
 
+    function dedupeScrapeQueryWords(value) {
+        const seen = new Set();
+        return String(value || '').trim().split(/\s+/).filter(token => {
+            const key = normalizePerformerName(token);
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        }).join(' ');
+    }
+
+    function containsOpaqueScrapeToken(value) {
+        return String(value || '').split(/\s+/).some(token => {
+            const cleaned = token.replace(/[^a-z0-9]/gi, '');
+            return cleaned.length >= 16 && /[a-z]/i.test(cleaned) && /\d/.test(cleaned);
+        });
+    }
+
+    function retainOneOpaqueQueryWhenAlternatives(candidateQueries) {
+        const queries = Array.isArray(candidateQueries) ? candidateQueries : [];
+        const meaningfulQueries = queries.filter(query => !containsOpaqueScrapeToken(query));
+        if (meaningfulQueries.length === 0) return queries;
+        const retainedOpaqueQuery = queries
+            .filter(containsOpaqueScrapeToken)
+            .sort((left, right) => left.length - right.length)[0] || '';
+        return queries.filter(query => !containsOpaqueScrapeToken(query) || query === retainedOpaqueQuery);
+    }
+
     function mergeScraperMatchResults(...resultSets) {
         const merged = [];
         const seen = new Set();
@@ -795,9 +822,35 @@
         return (await resolveScrapedEntityIdsResult(type, items, selectedIndices)).ids;
     }
 
-    async function fetchScraperMatchesForScene(sceneId, cardElement, manualQuery = '') {
-        const { fetchGQL } = getDependencies();
-        const preferredSourcePromise = loadPreferredStashBox();
+    async function fetchScraperMatchesForScene(sceneId, cardElement, manualQuery = '', shouldContinue = null) {
+        const scraperDependencies = getDependencies();
+        const { fetchGQL } = scraperDependencies;
+        const startedAt = Date.now();
+        let attemptCount = 0;
+        const isStillCurrent = () => typeof shouldContinue !== 'function' || shouldContinue() !== false;
+        const debugTiming = (message, data = {}) => {
+            if (!scraperDependencies.getDebugMode?.()) return;
+            scraperDependencies.log?.('DEBUG', 'SCRAPE_TIMING', message, {
+                sceneId: String(sceneId),
+                elapsedMs: Date.now() - startedAt,
+                ...data
+            });
+        };
+        const finish = (outcome, matches, data = {}) => {
+            debugTiming('Scrape search completed', {
+                outcome,
+                attemptCount,
+                resultCount: Array.isArray(matches) ? matches.length : 0,
+                ...data
+            });
+            return matches;
+        };
+        debugTiming('Scrape search started', { manual: Boolean(manualQuery) });
+        const sourceLookupStartedAt = Date.now();
+        const preferredSourcePromise = loadPreferredStashBox().then(source => ({
+            source,
+            durationMs: Date.now() - sourceLookupStartedAt
+        }));
         let sceneTitle = '';
         let sceneFileName = '';
         let localDuration = null;
@@ -806,6 +859,7 @@
         let localStudio = null;
         let sceneContextLoaded = false;
 
+        const contextStartedAt = Date.now();
         try {
             const query = 'query ($id: ID!) { findScene(id: $id) { id title details studio { id name } performers { id name alias_list } files { path duration fingerprints { type value } } } }';
             const response = await fetchGQL(query, { id: sceneId });
@@ -823,9 +877,28 @@
                 linkedPerformers = scene.performers || [];
                 localStudio = scene.studio || null;
             }
-        } catch (e) {}
+            debugTiming('Scene context loaded', {
+                durationMs: Date.now() - contextStartedAt,
+                found: sceneContextLoaded,
+                fingerprintCount: localFingerprints.length,
+                performerCount: linkedPerformers.length,
+                hasStudio: Boolean(localStudio)
+            });
+        } catch (error) {
+            debugTiming('Scene context lookup failed', {
+                durationMs: Date.now() - contextStartedAt,
+                error: String(error?.message || error)
+            });
+        }
 
-        const preferredSource = await preferredSourcePromise;
+        const preferredSourceResult = await preferredSourcePromise;
+        const preferredSource = preferredSourceResult.source;
+        debugTiming('Preferred scraper source resolved', {
+            durationMs: preferredSourceResult.durationMs,
+            source: preferredSource.name,
+            endpoint: preferredSource.endpoint || null
+        });
+        if (!isStillCurrent()) return finish('superseded', []);
         const enrich = (matches, matchType, sourceName, sourceInfo = null) => enrichScraperMatches(
             matches, matchType, sourceName, localDuration, localFingerprints, linkedPerformers,
             { localStudio, localTitle: sceneTitle, localFileName: sceneFileName, sceneContextLoaded }, sourceInfo
@@ -833,15 +906,33 @@
 
         const cleanedManualQuery = manualQuery ? getDependencies().cleanTitleForScraping(manualQuery) : '';
         if (!cleanedManualQuery) {
+            const attemptStartedAt = Date.now();
+            attemptCount += 1;
             try {
                 const response = await fetchGQL(SCRAPE_QUERY, {
                     source: { stash_box_index: preferredSource.index },
                     input: { scene_id: String(sceneId) }
                 });
                 const matches = response?.data?.scrapeSingleScene;
-                if (Array.isArray(matches) && matches.length > 0) return enrich(matches, 'scene-id', preferredSource.name, preferredSource);
+                debugTiming('Direct scene lookup completed', {
+                    attempt: attemptCount,
+                    durationMs: Date.now() - attemptStartedAt,
+                    source: preferredSource.name,
+                    resultCount: Array.isArray(matches) ? matches.length : 0,
+                    errorCount: Array.isArray(response?.errors) ? response.errors.length : 0
+                });
+                if (!isStillCurrent()) return finish('superseded', []);
+                if (Array.isArray(matches) && matches.length > 0) {
+                    return finish('direct-match', enrich(matches, 'scene-id', preferredSource.name, preferredSource));
+                }
             } catch (error) {
                 console.log('[FastTag] Scrape by scene_id error/empty:', error);
+                debugTiming('Direct scene lookup failed', {
+                    attempt: attemptCount,
+                    durationMs: Date.now() - attemptStartedAt,
+                    source: preferredSource.name,
+                    error: String(error?.message || error)
+                });
             }
         }
 
@@ -861,7 +952,7 @@
             || contextualSearchQuery
             || primaryQueries[0]
             || '';
-        const candidateQueries = cleanedManualQuery
+        let candidateQueries = cleanedManualQuery
             ? primaryQueries
             : Array.from(new Set([
                 ...primaryQueries,
@@ -870,11 +961,23 @@
                 contextualSearchQuery,
                 ...buildLinkedPerformerFallbackQueries(linkedPerformers, primaryQueries)
             ].filter(Boolean)));
+        candidateQueries = Array.from(new Set(candidateQueries.map(dedupeScrapeQueryWords).filter(Boolean)));
+        if (!cleanedManualQuery && linkedPerformers.length > 0) {
+            candidateQueries = retainOneOpaqueQueryWhenAlternatives(candidateQueries);
+        }
+
+        debugTiming('Scrape fallback queries prepared', {
+            candidateCount: candidateQueries.length,
+            queries: candidateQueries
+        });
 
         let weakStashDbMatches = [];
 
         for (const queryTerm of candidateQueries) {
+            if (!isStillCurrent()) return finish('superseded', []);
             if (!queryTerm || queryTerm.length < 2) continue;
+            const attemptStartedAt = Date.now();
+            attemptCount += 1;
             try {
                 const response = await fetchGQL(SCRAPE_QUERY, {
                     source: { stash_box_index: preferredSource.index },
@@ -888,42 +991,106 @@
                         match._searchQuery = editableSearchQuery || queryTerm;
                     });
                     const combined = mergeScraperMatchResults(weakStashDbMatches, enriched);
-                    if (hasDecisiveScraperMatch(enriched)) return combined;
+                    const decisive = hasDecisiveScraperMatch(enriched);
+                    debugTiming('Scraper query completed', {
+                        attempt: attemptCount,
+                        durationMs: Date.now() - attemptStartedAt,
+                        source: preferredSource.name,
+                        query: queryTerm,
+                        resultCount: enriched.length,
+                        decisive
+                    });
+                    if (!isStillCurrent()) return finish('superseded', []);
+                    if (decisive) return finish('decisive-fallback-match', combined, { decisiveQuery: queryTerm });
                     weakStashDbMatches = combined;
+                } else {
+                    debugTiming('Scraper query completed', {
+                        attempt: attemptCount,
+                        durationMs: Date.now() - attemptStartedAt,
+                        source: preferredSource.name,
+                        query: queryTerm,
+                        resultCount: 0,
+                        errorCount: Array.isArray(response?.errors) ? response.errors.length : 0,
+                        decisive: false
+                    });
+                    if (!isStillCurrent()) return finish('superseded', []);
                 }
             } catch (error) {
                 console.log('[FastTag] Scrape query error:', error);
+                debugTiming('Scraper query failed', {
+                    attempt: attemptCount,
+                    durationMs: Date.now() - attemptStartedAt,
+                    source: preferredSource.name,
+                    query: queryTerm,
+                    error: String(error?.message || error)
+                });
             }
         }
 
-        if (weakStashDbMatches.length > 0) return weakStashDbMatches;
+        if (weakStashDbMatches.length > 0) return finish('weak-fallback-matches', weakStashDbMatches);
 
+        const scraperListStartedAt = Date.now();
+        if (!isStillCurrent()) return finish('superseded', []);
         try {
             const response = await fetchGQL('query { listScrapers(types: [SCENE]) { id name } }');
             const scrapers = response?.data?.listScrapers || [];
+            debugTiming('Installed scraper list loaded', {
+                durationMs: Date.now() - scraperListStartedAt,
+                scraperCount: scrapers.filter(scraper => scraper.id !== 'builtin_autotag').length,
+                errorCount: Array.isArray(response?.errors) ? response.errors.length : 0
+            });
+            if (!isStillCurrent()) return finish('superseded', []);
             for (const scraper of scrapers) {
                 if (scraper.id === 'builtin_autotag') continue;
                 for (const queryTerm of candidateQueries) {
+                    if (!isStillCurrent()) return finish('superseded', []);
                     if (!queryTerm || queryTerm.length < 2) continue;
+                    const attemptStartedAt = Date.now();
+                    attemptCount += 1;
                     try {
                         const scrapeResponse = await fetchGQL(SCRAPE_QUERY, {
                             source: { scraper_id: scraper.id },
                             input: { query: queryTerm }
                         });
                         const matches = scrapeResponse?.data?.scrapeSingleScene;
+                        debugTiming('Installed scraper query completed', {
+                            attempt: attemptCount,
+                            durationMs: Date.now() - attemptStartedAt,
+                            source: scraper.name || scraper.id,
+                            query: queryTerm,
+                            resultCount: Array.isArray(matches) ? matches.length : 0,
+                            errorCount: Array.isArray(scrapeResponse?.errors) ? scrapeResponse.errors.length : 0
+                        });
+                        if (!isStillCurrent()) return finish('superseded', []);
                         if (Array.isArray(matches) && matches.length > 0) {
                             const enriched = enrich(matches, 'scraper', scraper.name || 'Scraper');
                             enriched.forEach(match => {
                                 match._matchedSearchQuery = queryTerm;
                                 match._searchQuery = editableSearchQuery || queryTerm;
                             });
-                            return enriched;
+                            return finish('installed-scraper-match', enriched, {
+                                decisiveQuery: queryTerm,
+                                decisiveSource: scraper.name || scraper.id
+                            });
                         }
-                    } catch (e) {}
+                    } catch (error) {
+                        debugTiming('Installed scraper query failed', {
+                            attempt: attemptCount,
+                            durationMs: Date.now() - attemptStartedAt,
+                            source: scraper.name || scraper.id,
+                            query: queryTerm,
+                            error: String(error?.message || error)
+                        });
+                    }
                 }
             }
-        } catch (e) {}
-        return [];
+        } catch (error) {
+            debugTiming('Installed scraper list lookup failed', {
+                durationMs: Date.now() - scraperListStartedAt,
+                error: String(error?.message || error)
+            });
+        }
+        return finish('no-matches', []);
     }
 
     root.FastTag = root.FastTag || {};
@@ -934,6 +1101,9 @@
         buildStudioPerformerFallbackQueries,
         buildContextualSearchQuery,
         buildOpaqueRecoveryFallbackQueries,
+        dedupeScrapeQueryWords,
+        containsOpaqueScrapeToken,
+        retainOneOpaqueQueryWhenAlternatives,
         mergeScraperMatchResults,
         hasDecisiveScraperMatch,
         resolvePreferredStashBox,

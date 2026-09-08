@@ -31,6 +31,28 @@ assert.deepEqual(
     [],
     'plausible studio codes and shorter numbers should remain untouched'
 );
+assert.equal(
+    scraper.dedupeScrapeQueryWords('Danny Delano source source danny delano'),
+    'Danny Delano source',
+    'generated fallback searches should not repeat the same words'
+);
+assert.equal(scraper.containsOpaqueScrapeToken('0glkl8vjl39hw0ae385u9 Source'), true);
+assert.equal(scraper.containsOpaqueScrapeToken('ABP-123 Real Studio Code'), false, 'ordinary studio codes should not be treated as opaque identifiers');
+assert.deepEqual(
+    scraper.retainOneOpaqueQueryWhenAlternatives([
+        '0glkl8vjl39hw0ae385u9 Source',
+        '0glkl8vjl39hw0ae385u9 Source Danny Delano',
+        'Danny Delano',
+        'Danny Senpai'
+    ]),
+    ['0glkl8vjl39hw0ae385u9 Source', 'Danny Delano', 'Danny Senpai'],
+    'one concise opaque-code search should remain available for exact scraper matches'
+);
+assert.deepEqual(
+    scraper.retainOneOpaqueQueryWhenAlternatives(['0glkl8vjl39hw0ae385u9 Source']),
+    ['0glkl8vjl39hw0ae385u9 Source'],
+    'opaque searches must remain when no meaningful alternative exists'
+);
 assert.ok(
     scraper.buildLinkedPerformerFallbackQueries(
         [{ name: 'Example Performer' }],
@@ -480,9 +502,12 @@ async function testTitleThenInstalledScraperFallback() {
 
 async function testManualSearchSkipsHashLookup() {
     const calls = [];
+    const debugLogs = [];
     scraper.configure({
         cleanTitleForScraping,
         parseDurationSec,
+        getDebugMode: () => true,
+        log: (...args) => debugLogs.push(args),
         fetchGQL: async (query, variables) => {
             calls.push({ query, variables });
             if (query.includes('findScene')) {
@@ -497,6 +522,15 @@ async function testManualSearchSkipsHashLookup() {
     assert.equal(results[0]._matchedSearchQuery, 'correct search words');
     assert.equal(calls.some(call => call.variables?.input?.scene_id), false);
     assert.equal(calls.some(call => call.variables?.input?.query === 'correct search words'), true);
+    assert.ok(debugLogs.every(([, category]) => category === 'SCRAPE_TIMING'));
+    assert.ok(debugLogs.some(([, , message]) => message === 'Scrape search started'));
+    const queryLog = debugLogs.find(([, , message]) => message === 'Scraper query completed');
+    assert.equal(queryLog[3].query, 'correct search words');
+    assert.equal(queryLog[3].resultCount, 1);
+    assert.ok(queryLog[3].durationMs >= 0);
+    const completionLog = debugLogs.find(([, , message]) => message === 'Scrape search completed');
+    assert.ok(['decisive-fallback-match', 'weak-fallback-matches'].includes(completionLog[3].outcome));
+    assert.equal(completionLog[3].attemptCount, 1);
 }
 
 async function testLinkedPerformerFallbackRunsAfterFilenameQueries() {
@@ -575,6 +609,39 @@ async function testPossibleMatchContinuesToStudioPerformerFallback() {
     assert.ok(calls.some(call => call.variables?.input?.query === 'boynapped daniel hausser'));
     assert.ok(calls.filter(call => call.variables?.source?.stash_box_index !== undefined)
         .every(call => call.variables.source.stash_box_index === 1));
+}
+
+async function testSupersededSearchStopsBeforeFallbacks() {
+    const calls = [];
+    const timingLogs = [];
+    let current = true;
+    scraper.configure({
+        cleanTitleForScraping,
+        parseDurationSec,
+        getDebugMode: () => true,
+        log: (...args) => timingLogs.push(args),
+        fetchGQL: async (query, variables) => {
+            calls.push({ query, variables });
+            if (query.includes('FastTagScraperSources')) {
+                return { data: { configuration: { general: { stashBoxes: [{ name: 'StashDB', endpoint: 'https://stashdb.org/graphql' }] } } } };
+            }
+            if (query.includes('findScene')) {
+                return { data: { findScene: { title: 'Slow Scene', performers: [{ id: '1', name: 'Example Person' }], files: [{ path: 'slow-scene.mp4' }] } } };
+            }
+            if (variables?.input?.scene_id) {
+                current = false;
+                return { data: { scrapeSingleScene: [] } };
+            }
+            throw new Error('A superseded scrape must not start another fallback request');
+        }
+    });
+    const results = await scraper.fetchScraperMatchesForScene('superseded-scene', null, '', () => current);
+    assert.deepEqual(results, []);
+    assert.equal(calls.some(call => call.variables?.input?.query), false);
+    assert.equal(calls.some(call => call.query.includes('listScrapers')), false);
+    const completion = timingLogs.find(([, , message]) => message === 'Scrape search completed');
+    assert.equal(completion[3].outcome, 'superseded');
+    assert.equal(completion[3].attemptCount, 1);
 }
 
 async function testEntityResolution() {
@@ -751,6 +818,7 @@ Promise.resolve()
     .then(testManualSearchSkipsHashLookup)
     .then(testLinkedPerformerFallbackRunsAfterFilenameQueries)
     .then(testPossibleMatchContinuesToStudioPerformerFallback)
+    .then(testSupersededSearchStopsBeforeFallbacks)
     .then(testEntityResolution)
     .then(() => console.log('fasttag-scraper tests passed'))
     .catch(error => {

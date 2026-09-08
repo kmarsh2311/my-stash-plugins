@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash FastTag
 // @namespace    http://tampermonkey.net/
-// @version      4.4.0
+// @version      4.4.1
 // @description  Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
@@ -235,7 +235,9 @@
         getFillMissingPerformerImages,
         getEntityConfig: type => ENTITY_CONFIG[type],
         getCachedOrNull: type => getCachedOrNull(type),
-        setCache: (type, data) => setCache(type, data)
+        setCache: (type, data) => setCache(type, data),
+        getDebugMode: () => getDebugMode(),
+        log: (...args) => ftLog(...args)
     });
     FastTagScraperController.configure({
         getActivePopup: () => activePopup,
@@ -342,7 +344,7 @@
         mountMomentaryPeekButton
     });
 
-    console.log('[FastTag v4.4.0] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
+    console.log('[FastTag v4.4.1] Initialized with Targeted Apollo Cache Sync, IndexedDB Cache, and 0ms Scene Card Updates');
 
     let fastTagHelpLoadPromise = null;
     function loadFastTagHelpModule() {
@@ -363,7 +365,7 @@
                 const script = document.createElement('script');
                 script.id = 'fasttag-help-script';
                 const scriptUrl = new URL(assetPaths[index], window.location.origin);
-                scriptUrl.searchParams.set('v', '4.4.0-help-1');
+                scriptUrl.searchParams.set('v', '4.4.1-help-1');
                 script.src = scriptUrl.href;
                 script.async = true;
                 script.onload = () => {
@@ -1436,6 +1438,29 @@
             color: #ffffff !important;
             transform: translateY(-1px) !important;
             box-shadow: 0 2px 6px rgba(168, 85, 247, 0.35) !important;
+        }
+        #scenes-popup .fasttag-quick-chip.fasttag-create-studio-chip,
+        #scenes-popup .fasttag-quick-chip.fasttag-create-group-chip {
+            background: rgba(245, 158, 11, 0.2) !important;
+            border: 1px dashed #f59e0b !important;
+            color: #fde68a !important;
+            font-weight: 800 !important;
+        }
+        #scenes-popup.theme-light .fasttag-quick-chip.fasttag-create-studio-chip,
+        #scenes-popup.theme-light .fasttag-quick-chip.fasttag-create-group-chip {
+            background: rgba(251, 191, 36, 0.24) !important;
+            color: #92400e !important;
+        }
+        #scenes-popup .fasttag-quick-chip.fasttag-create-studio-chip:hover,
+        #scenes-popup .fasttag-quick-chip.fasttag-create-group-chip:hover {
+            background: rgba(245, 158, 11, 0.34) !important;
+            border-color: #fbbf24 !important;
+            color: #fff7d6 !important;
+            box-shadow: 0 2px 7px rgba(245, 158, 11, 0.38) !important;
+        }
+        #scenes-popup.theme-light .fasttag-quick-chip.fasttag-create-studio-chip:hover,
+        #scenes-popup.theme-light .fasttag-quick-chip.fasttag-create-group-chip:hover {
+            color: #78350f !important;
         }
         .fasttag-quick-chip:active {
             transform: translateY(0px) scale(0.97) !important;
@@ -6734,12 +6759,23 @@
                     })
                     .slice(0, 8);
 
-                if (!matchingStudios.length && !selectedStudioId) {
-                    const emptySpan = document.createElement('span');
-                    emptySpan.textContent = 'No matching studio';
-                    emptySpan.style.cssText = `font-size: 10px; opacity: 0.6; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'};`;
-                    studioBar.recentContainer.appendChild(emptySpan);
-                    return;
+                const exactStudioExists = allStudios.some(studio =>
+                    String(studio?.name || '').trim().toLowerCase() === term
+                );
+                if (!exactStudioExists) {
+                    const createButton = document.createElement('button');
+                    createButton.type = 'button';
+                    createButton.className = 'fasttag-quick-chip chip-studio fasttag-create-studio-chip';
+                    createButton.textContent = '＋ Studio';
+                    createButton.title = `Create Studio “${searchQuery.trim()}”`;
+                    createButton.setAttribute('aria-label', createButton.title);
+                    createButton.style.cssText = `padding: 1.5px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; cursor: pointer; flex-shrink: 0; line-height: 1.2; color: ${isDark ? '#fde68a' : '#92400e'}; background: ${isDark ? 'rgba(245,158,11,.2)' : 'rgba(251,191,36,.24)'}; border: 1px dashed #f59e0b;`;
+                    createButton.onclick = event => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        handleCreateEntity('studios');
+                    };
+                    studioBar.recentContainer.appendChild(createButton);
                 }
 
                 matchingStudios.forEach(st => {
@@ -6862,12 +6898,23 @@
                     })
                     .slice(0, 8);
 
-                if (!matchingGroups.length && selectedGroupIds.size === 0) {
-                    const emptySpan = document.createElement('span');
-                    emptySpan.textContent = 'No matching group';
-                    emptySpan.style.cssText = `font-size: 10px; opacity: 0.6; font-style: italic; color: ${isDark ? '#94a3b8' : '#64748b'};`;
-                    groupsBar.recentContainer.appendChild(emptySpan);
-                    return;
+                const exactGroupExists = allGroups.some(group =>
+                    String(group?.name || '').trim().toLowerCase() === term
+                );
+                if (!exactGroupExists) {
+                    const createButton = document.createElement('button');
+                    createButton.type = 'button';
+                    createButton.className = 'fasttag-quick-chip chip-group fasttag-create-group-chip';
+                    createButton.textContent = '＋ Group';
+                    createButton.title = `Create Group “${searchQuery.trim()}”`;
+                    createButton.setAttribute('aria-label', createButton.title);
+                    createButton.style.cssText = `padding: 1.5px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; cursor: pointer; flex-shrink: 0; line-height: 1.2; color: ${isDark ? '#fde68a' : '#92400e'}; background: ${isDark ? 'rgba(245,158,11,.2)' : 'rgba(251,191,36,.24)'}; border: 1px dashed #f59e0b;`;
+                    createButton.onclick = event => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        handleCreateEntity('groups');
+                    };
+                    groupsBar.recentContainer.appendChild(createButton);
                 }
 
                 matchingGroups.forEach(grp => {
@@ -8147,7 +8194,9 @@
                 if (newId) {
                     invalidateCache(type);
                     if (type === 'tags') selectedTagIds.add(String(newId));
-                    if (type === 'performers') selectedPerformerIds.add(String(newId));
+                    else if (type === 'performers') selectedPerformerIds.add(String(newId));
+                    else if (type === 'studios') selectedStudioId = String(newId);
+                    else if (type === 'groups') selectedGroupIds.add(String(newId));
                     addRecentEntry(type, { id: newId, [config.labelKey]: finalName });
                     popup.globalSearch.value = '';
                     popup.globalClear.style.display = 'none';

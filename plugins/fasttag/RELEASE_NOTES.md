@@ -1,3 +1,13 @@
+## 4.4.1 - Creation, Scraping and Video Recovery
+
+### Highlights
+- **Create Studios and Groups**: Edit Everything can create a missing Studio or Group directly from the global search, even when partial matches already exist.
+- **Faster Navigation During Scrapes**: Superseded scene scrapes stop before launching more fallback searches, while query generation avoids redundant terms without losing useful exact-code searches.
+- **Scrape Timing Diagnostics**: Debug Mode records timing and outcomes for every stage of a scrape to make slow sources and fallbacks easier to identify.
+- **Blank-Video Recovery**: The Cover Editor falls back to Stash's generated preview when a full-video stream loads without producing a usable frame.
+
+---
+
 ## 4.4.0 - Modular FastTag and Workflow Polish
 
 ### Highlights

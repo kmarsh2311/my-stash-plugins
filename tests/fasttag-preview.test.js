@@ -47,6 +47,10 @@ assert.equal(preview.shouldResumeAfterTimelineSeek(false, false, false, true), t
 assert.equal(preview.shouldResumeAfterTimelineSeek(true, true, false, true), true, 'a Cover Editor wheel-scrub pause should retain its pending resume through timeline seeking');
 assert.equal(preview.shouldResumeAfterTimelineSeek(true, true, true, true), false, 'Cover Editor Shift freeze should remain paused after timeline seeking');
 assert.equal(preview.shouldResumeAfterTimelineSeek(true, false, false, true), false, 'an intentionally paused Cover Editor video should remain paused');
+assert.equal(preview.STREAM_FRAME_TIMEOUT_MS, 6000);
+assert.equal(preview.hasRenderableVideoFrame({ readyState: 2, videoWidth: 1920, videoHeight: 1080 }), true);
+assert.equal(preview.hasRenderableVideoFrame({ readyState: 1, videoWidth: 1920, videoHeight: 1080 }), false, 'metadata alone is not a renderable frame');
+assert.equal(preview.hasRenderableVideoFrame({ readyState: 4, videoWidth: 0, videoHeight: 0 }), false, 'an audio-only or undecodable stream must fall back to its preview');
 
 for (const [screenWidth, expected] of [
     [2400, { width: '760px', height: '428px' }],

@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [4.4.1] - 2026-09-08
+
+### Added
+- **Studio and Group Creation**: When the unified search has no exact Studio or Group name, Edit Everything shows a distinct gold creation pill alongside partial matches and confirms the complete name before creating, selecting, and saving it.
+- **Scrape Timing Diagnostics**: Debug logs now record the duration and outcome of scene context loading, source resolution, direct lookup, every fallback query, installed-scraper discovery, and the complete scrape sequence.
+
+### Fixed
+- **Blank Full-Video Recovery**: If a stream loads metadata but produces no renderable video frame within six seconds, the Cover Editor falls back to Stash's generated preview instead of remaining blank with disabled capture controls.
+- **Cancelled Obsolete Scrapes**: Navigating away from a scene stops that abandoned scrape before it launches another fallback request, while generated contextual searches remove repeated words and redundant expanded opaque-code variants without discarding the concise code search that may provide an exact match.
+
 ## [4.4.0] - 2026-09-08
 
 ### Added

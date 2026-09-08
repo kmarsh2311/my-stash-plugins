@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [4.4.1] - 2026-09-08
+
+### Added
+- Added distinct gold Studio and Group creation pills alongside partial search matches in Edit Everything, suppressed only when the complete searched name already exists.
+- Added structured debug timing for each scraper stage and query, including source, search term, duration, result count, outcome, and total attempts.
+
+### Fixed
+- Added a six-second renderability check so metadata-only or undecodable full-video streams fall back to the generated Stash preview in the Cover Editor.
+- Stopped superseded scene scrapes from launching further fallback requests after navigation, removed repeated query words, and removed redundant expanded opaque-code variants while retaining one concise code search for exact matches.
+
 ## [4.4.0] - 2026-09-08
 
 ### Added

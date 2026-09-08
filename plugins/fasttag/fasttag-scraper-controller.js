@@ -471,7 +471,12 @@
             popup.scrapeBtn.innerHTML = '<span>⏳ Scraping...</span>';
 
             try {
-                const matches = await dependencies.fetchScraperMatchesForScene(activeSceneId, activeCardElement);
+                const matches = await dependencies.fetchScraperMatchesForScene(
+                    activeSceneId,
+                    activeCardElement,
+                    '',
+                    () => isRequestCurrent(popup, activeSceneId, scrapeRequestId)
+                );
                 if (!isRequestCurrent(popup, activeSceneId, scrapeRequestId)) return null;
                 if (!matches || matches.length === 0) {
                     if (mode !== 'everything') popup.scrapeBtn.innerHTML = '<span>✕ No Matches</span>';
@@ -676,7 +681,12 @@
                 button.disabled = true;
                 button.textContent = 'Searching…';
                 try {
-                    const manualResults = await fetchScraperMatchesForScene(sceneId, null, query);
+                    const manualResults = await fetchScraperMatchesForScene(
+                        sceneId,
+                        null,
+                        query,
+                        () => isRequestCurrent(popup, sceneId, scrapeRequestId)
+                    );
                     if (!isRequestCurrent(popup, sceneId, manualRequestId)) return;
                     if (!manualResults?.length) {
                         toastError(`No scraper matches found for “${query}”`);
@@ -1207,7 +1217,12 @@
                     searchBtn.textContent = 'Searching…';
                 }
                 try {
-                    const manualResults = await fetchScraperMatchesForScene(sceneId, null, query);
+                    const manualResults = await fetchScraperMatchesForScene(
+                        sceneId,
+                        null,
+                        query,
+                        () => isRequestCurrent(popup, sceneId, scrapeRequestId)
+                    );
                     if (!isRequestCurrent(popup, sceneId, manualRequestId)) return;
                     if (!manualResults?.length) {
                         toastError(`No scraper matches found for “${query}”`);

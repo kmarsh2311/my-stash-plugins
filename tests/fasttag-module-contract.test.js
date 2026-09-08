@@ -50,12 +50,22 @@ for (const namespace of ['Core', 'Entities', 'Storage', 'Diagnostics', 'Api', 'N
 assert.equal(mainSource.includes('LEGACY_'), false, 'legacy comparison declarations should be removed');
 assert.ok(runnerSource.includes('(?:-[a-z]+)*'), 'test runner should discover multi-hyphen FastTag modules');
 assert.ok(mainSource.includes('__fastTagRuntimeInitialized'), 'FastTag should guard duplicate runtime initialization');
+assert.ok(mainSource.includes("createButton.textContent = '＋ Studio';"), 'Edit Everything should offer compact studio creation when search has no match');
+assert.ok(mainSource.includes("createButton.textContent = '＋ Group';"), 'Edit Everything should offer compact group creation when search has no match');
+assert.ok(mainSource.includes("handleCreateEntity('studios');"), 'the compact Studio pill should use the confirmed entity-creation workflow');
+assert.ok(mainSource.includes("handleCreateEntity('groups');"), 'the compact Group pill should use the confirmed entity-creation workflow');
+assert.ok(mainSource.includes('const exactStudioExists = allStudios.some'), 'partial Studio matches must not hide the exact-name creation action');
+assert.ok(mainSource.includes('const exactGroupExists = allGroups.some'), 'partial Group matches must not hide the exact-name creation action');
+assert.ok(mainSource.includes('#scenes-popup .fasttag-quick-chip.fasttag-create-studio-chip'), 'Studio creation should have a specific gold rule that overrides generic quick-chip styling');
+assert.ok(mainSource.includes('#scenes-popup .fasttag-quick-chip.fasttag-create-group-chip'), 'Group creation should have a specific gold rule that overrides generic quick-chip styling');
+assert.ok(mainSource.includes("else if (type === 'studios') selectedStudioId = String(newId);"), 'a newly created Studio should replace the scene studio selection');
+assert.ok(mainSource.includes("else if (type === 'groups') selectedGroupIds.add(String(newId));"), 'a newly created Group should join the scene group selection');
 assert.ok(mainSource.includes('loadFastTagHelpModule'), 'Settings should lazy-load the standalone FastTag help module');
 assert.equal(javascriptSection.includes('fasttag-help.js'), false, 'optional help must not participate in critical plugin startup');
 assert.ok(yaml.includes('assets:\n    /: .'), 'FastTag should expose optional offline help through the Stash plugin asset route');
 assert.ok(mainSource.includes('/plugin/fasttag/assets/fasttag-help.js'), 'help loader should try the configuration-derived Stash plugin asset URL');
 assert.ok(mainSource.includes('/plugin/mypluginrc/assets/fasttag-help.js'), 'help loader should support the installed package ID asset URL');
-assert.ok(mainSource.includes("scriptUrl.searchParams.set('v', '4.4.0-help-1')"), 'optional help should use the current release cache key so updated guide code is loaded');
+assert.ok(mainSource.includes("scriptUrl.searchParams.set('v', '4.4.1-help-1')"), 'optional help should use the current release cache key so updated guide code is loaded');
 assert.ok(fs.existsSync(path.join(pluginDirectory, 'USER_GUIDE.md')), 'offline Markdown user guide should ship with FastTag');
 
 const scraperSaveMutation = scraperControllerSource.match(/mutation FastTagAcceptSave[\s\S]*?`, \{ input: updateInput \}\);/)?.[0] || '';
