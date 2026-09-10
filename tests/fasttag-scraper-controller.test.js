@@ -139,6 +139,43 @@ detachedLoadingHud._fastTagResizeObserver.callback();
 assert.equal(headerLayoutRechecks, 1, 'resizing the floating shell should always re-evaluate the scraper header layout');
 controller.closeHud();
 
+const idlePopup = {
+    currentSceneId: 'scene-idle',
+    element: { isConnected: true, getBoundingClientRect: () => ({ left: 300, right: 900, top: 80, bottom: 680, width: 600, height: 600 }) },
+    scraperCardContainer: { style: { display: 'none' }, innerHTML: '' },
+    scrapeBtn: { classList: { toggle() {}, remove() {} }, innerHTML: '', disabled: false }
+};
+activePopup = idlePopup;
+let animateCalls = 0;
+const testCardHeader = { style: {}, onmousedown: null };
+const prevCreateElement = global.document.createElement;
+global.document.createElement = () => {
+    const el = prevCreateElement();
+    el.animate = () => { animateCalls += 1; };
+    el.querySelector = selector => {
+        if (selector === '[data-fasttag-auto-scrape-off-header]') {
+            return el.innerHTML.includes('data-fasttag-auto-scrape-off-header') ? testCardHeader : null;
+        }
+        if (selector === '[data-fasttag-idle-dock-toggle]') return { addEventListener() {} };
+        return null;
+    };
+    return el;
+};
+assert.equal(controller.showAutoScrapeOffState(idlePopup), true);
+const idleHud = controller.getHudElement();
+assert.ok(idleHud && connectedHudElements.has(idleHud), 'auto-scrape off state should create the idle HUD');
+assert.match(idleHud.innerHTML, /fasttag-auto-scraping-off\.webp/);
+assert.equal(idlePopup._fastTagScraperIdle, true);
+const initialHtml = idleHud.innerHTML;
+
+// Simulate clicking Next:
+assert.equal(controller.showAutoScrapeOffState(idlePopup), true);
+assert.equal(idleHud.innerHTML, initialHtml, 'sequential navigation must preserve existing idle test card DOM');
+assert.equal(animateCalls, 0, 'sequential navigation must not trigger a flash entrance animation');
+controller.closeHud();
+global.document.createElement = prevCreateElement;
+
+
 async function testTriggerRejectsLateResults() {
     let resolveFetch;
     const lateResult = new Promise(resolve => { resolveFetch = resolve; });

@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [4.4.8] - 2026-09-10
+
+### Fixed
+- **Scraper HUD Navigation Stability**: Fixed an issue where the Scraper HUD vanished and reappeared (flashed off and on) when clicking Next/Previous with Auto-Scrape off. Sequential navigation now preserves the open HUD and reuses the test card DOM without re-triggering entrance animations.
+
 ## [4.4.7] - 2026-09-10
 
 ### Changed

@@ -433,9 +433,19 @@
             targetContainer.innerHTML = '';
             targetContainer.style.display = 'none';
         }
+        const hudWasAlreadyOpen = isHudOpen();
         targetContainer = ensureHud(popup);
         watchHudOwner(popup);
         if (!targetContainer) return false;
+        if (targetContainer.querySelector?.('[data-fasttag-auto-scrape-off-header]')) {
+            popup._fastTagScraperIdle = true;
+            if (popup.scrapeBtn) {
+                popup.scrapeBtn.classList.toggle('fasttag-dock-pulse', detached);
+                popup.scrapeBtn.innerHTML = dependencies.isEasterEggActive?.() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
+                popup.scrapeBtn.title = 'Search this scene manually';
+            }
+            return true;
+        }
         const isDark = dependencies.getEffectiveTheme?.() !== 'light';
         const border = isDark ? '#334155' : '#d8dee9';
         const headerBg = isDark ? '#0f172a' : '#f8fafc';
@@ -452,12 +462,12 @@
             </div>`;
         if (detached && !targetContainer._fastTagIdleSizing) {
             targetContainer._fastTagNormalHeight = targetContainer.style.height;
-            const width = targetContainer.getBoundingClientRect().width || targetContainer.offsetWidth || 390;
+            const width = targetContainer.getBoundingClientRect?.()?.width || targetContainer.offsetWidth || 390;
             const fittedHeight = Math.max(220, Math.min(root.innerHeight * 0.92, Math.round(width * 720 / 1279) + 40));
             targetContainer._fastTagIdleSizing = true;
             targetContainer.style.height = `${fittedHeight}px`;
         }
-        if (!targetContainer._fastTagEntrancePending && !root.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        if (!hudWasAlreadyOpen && !targetContainer._fastTagEntrancePending && !root.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
             targetContainer.animate?.([
                 { opacity: 0, transform: 'scale(.985)' },
                 { opacity: 1, transform: 'scale(1)' }

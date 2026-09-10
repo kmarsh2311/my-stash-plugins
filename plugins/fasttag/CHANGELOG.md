@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [4.4.8] - 2026-09-10
+
+### Fixed
+- Prevented the Scraper HUD from vanishing and reappearing when clicking Next/Previous with Auto-Scrape disabled by preserving the open HUD state during sequential navigation and reusing the existing idle test card DOM without re-triggering entrance animations.
+
 ## [4.4.7] - 2026-09-10
 
 ### Changed
