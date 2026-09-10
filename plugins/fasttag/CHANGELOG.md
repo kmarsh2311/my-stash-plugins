@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [4.4.7] - 2026-09-10
+
+### Changed
+- Kept an open Scraper HUD visible after sequential Next/Previous navigation with Auto-Scrape off, displaying a fitted custom test card with a circular colour chart without initiating a scraper request.
+- Preserved Dock/Pop out controls and manual Scrape operation while the Scraper HUD is showing the idle test-card state.
+
+## [4.4.6] - 2026-09-10
+
+### Fixed
+- Prevented scraper requests during sequential Next/Previous navigation when Auto-Scrape is disabled, even if the Scraper HUD was already open or remembered as open.
+- Removed the conflicting Detach Scraper Window setting so Dock/Pop out in the Scraper HUD serves as the single layout control while remembering the chosen layout.
+
 ## [4.4.5] - 2026-09-10
 
 ### Added

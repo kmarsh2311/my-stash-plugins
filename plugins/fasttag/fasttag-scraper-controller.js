@@ -319,6 +319,7 @@
 
         const isDarkTheme = dependencies.getEffectiveTheme() === 'dark';
         const animateHudEntrance = !root.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        hudElement._fastTagEntrancePending = animateHudEntrance;
         hudElement.style.cssText = `position: fixed; top: ${finalTop}; ${finalLeft ? `left: ${finalLeft};` : `right: ${finalRight};`} width: ${finalWidth}; height: ${finalHeight}; min-width: 300px; min-height: 220px; max-width: 92vw; max-height: 92vh; z-index: 1000000; background: ${isDarkTheme ? '#1e293b' : '#ffffff'}; border: 1.5px solid ${isDarkTheme ? '#4338ca' : '#a5b4fc'}; border-radius: 10px; box-shadow: 0 20px 50px rgba(0,0,0,0.85); overflow: visible; display: flex; flex-direction: column;${animateHudEntrance ? ' opacity:0;' : ''}`;
         document.body.appendChild(hudElement);
         if (animateHudEntrance) {
@@ -329,6 +330,7 @@
                     { opacity: 0, transform: 'scale(.985)' },
                     { opacity: 1, transform: 'scale(1)' }
                 ], { duration: 160, easing: 'ease-out' });
+                hudElement._fastTagEntrancePending = false;
             };
             if (typeof root.requestAnimationFrame === 'function') root.requestAnimationFrame(revealHud);
             else root.setTimeout(revealHud, 0);
@@ -339,7 +341,7 @@
                 // This observer owns the actual floating shell, so it is the most
                 // reliable signal when host-theme or native resizing changes width.
                 hudElement._fastTagRecheckScraperHeaderLayout?.();
-                if (hudElement?.isConnected && !hudElement._isDragging
+                if (hudElement?.isConnected && !hudElement._isDragging && !hudElement._fastTagIdleSizing
                     && hudElement.offsetWidth >= 300 && hudElement.offsetHeight >= 220) {
                     const currentSize = {
                         width: `${hudElement.offsetWidth}px`,
@@ -360,6 +362,14 @@
 
     function showLoadingState(popup, message = 'Scraping new scene…') {
         if (!isPopupActive(popup)) return false;
+        const existingHud = getHudElement();
+        if (existingHud?._fastTagIdleSizing) {
+            const savedHeight = getHudSize()?.height;
+            existingHud._fastTagIdleSizing = false;
+            existingHud.style.height = existingHud._fastTagNormalHeight || (typeof savedHeight === 'number' ? `${savedHeight}px` : savedHeight) || '480px';
+            delete existingHud._fastTagNormalHeight;
+        }
+        popup._fastTagScraperIdle = false;
         const detachedHud = dependencies?.getDetachScraper?.()
             ? ensureHud(popup)
             : (isHudOpen() ? getHudElement() : null);
@@ -400,6 +410,79 @@
         return true;
     }
 
+    function showAutoScrapeOffState(popup) {
+        if (!isPopupActive(popup) || !dependencies) return false;
+        invalidateRequests(popup);
+        const detached = dependencies.getDetachScraper();
+        let targetContainer = popup?.scraperCardContainer || null;
+        if (!detached) {
+            closeHud();
+            if (targetContainer) {
+                targetContainer.innerHTML = '';
+                targetContainer.style.display = 'none';
+            }
+            popup._fastTagScraperIdle = false;
+            if (popup.scrapeBtn) {
+                popup.scrapeBtn.classList.remove('fasttag-dock-pulse');
+                popup.scrapeBtn.innerHTML = dependencies.isEasterEggActive?.() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
+                popup.scrapeBtn.title = 'Search this scene manually';
+            }
+            return true;
+        }
+        if (targetContainer) {
+            targetContainer.innerHTML = '';
+            targetContainer.style.display = 'none';
+        }
+        targetContainer = ensureHud(popup);
+        watchHudOwner(popup);
+        if (!targetContainer) return false;
+        const isDark = dependencies.getEffectiveTheme?.() !== 'light';
+        const border = isDark ? '#334155' : '#d8dee9';
+        const headerBg = isDark ? '#0f172a' : '#f8fafc';
+        const text = isDark ? '#e2e8f0' : '#26344a';
+        targetContainer.style.display = 'flex';
+        targetContainer.style.flexDirection = 'column';
+        targetContainer.innerHTML = `
+            <div data-fasttag-auto-scrape-off-header="true" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-shrink:0;min-height:38px;padding:8px 12px;border-bottom:1px solid ${border};background:${headerBg};color:${text};font-size:11.5px;font-weight:700;user-select:none;">
+                <span>Scraper ready — automatic search is off</span>
+                <button type="button" data-fasttag-idle-dock-toggle="true" style="padding:3px 7px;border:1px solid ${border};border-radius:4px;background:transparent;color:${text};cursor:pointer;font-size:10px;font-weight:700;">${detached ? 'Dock' : 'Pop out'}</button>
+            </div>
+            <div style="display:flex;flex:1;min-height:0;align-items:center;justify-content:center;overflow:hidden;background:#111827;">
+                <img src="/plugin/fasttag/assets/fasttag-auto-scraping-off.webp" alt="Auto-Scraping Off test card" style="display:block;width:100%;height:100%;object-fit:contain;">
+            </div>`;
+        if (detached && !targetContainer._fastTagIdleSizing) {
+            targetContainer._fastTagNormalHeight = targetContainer.style.height;
+            const width = targetContainer.getBoundingClientRect().width || targetContainer.offsetWidth || 390;
+            const fittedHeight = Math.max(220, Math.min(root.innerHeight * 0.92, Math.round(width * 720 / 1279) + 40));
+            targetContainer._fastTagIdleSizing = true;
+            targetContainer.style.height = `${fittedHeight}px`;
+        }
+        if (!targetContainer._fastTagEntrancePending && !root.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+            targetContainer.animate?.([
+                { opacity: 0, transform: 'scale(.985)' },
+                { opacity: 1, transform: 'scale(1)' }
+            ], { duration: 160, easing: 'ease-out' });
+        }
+        targetContainer.querySelector('[data-fasttag-idle-dock-toggle]')?.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            dependencies.setDetachScraper(!detached);
+            showAutoScrapeOffState(popup);
+        });
+        if (detached) {
+            const header = targetContainer.querySelector('[data-fasttag-auto-scrape-off-header]');
+            attachHudDragging(targetContainer, header);
+            attachResizeHandles(targetContainer);
+        }
+        popup._fastTagScraperIdle = true;
+        if (popup.scrapeBtn) {
+            popup.scrapeBtn.classList.toggle('fasttag-dock-pulse', detached);
+            popup.scrapeBtn.innerHTML = dependencies.isEasterEggActive?.() ? '<span>⚡ Scrape 🍫</span>' : '<span>⚡ Scrape</span>';
+            popup.scrapeBtn.title = 'Search this scene manually';
+        }
+        return true;
+    }
+
     function createTrigger(options) {
         if (!dependencies) throw new Error('[FastTag] Scraper controller is not configured');
         const {
@@ -420,12 +503,13 @@
             const scrapeRequestId = beginRequest(popup, activeSceneId);
             if (scrapeRequestId == null) return null;
 
+            const idleState = popup._fastTagScraperIdle === true;
             const isScraperOpen = Boolean(
                 popup.scraperCardContainer
                 && popup.scraperCardContainer.style.display !== 'none'
                 && popup.scraperCardContainer.innerHTML.trim() !== ''
             ) || isHudOpen();
-            if (isScraperOpen && !forceOpen) {
+            if (isScraperOpen && !forceOpen && !idleState) {
                 if (mode === 'everything') {
                     root._fastTagEverythingScraperOpen = false;
                     dependencies.setScraperHudPersistedOpen(false);
@@ -443,6 +527,7 @@
                 dependencies.hideScrapeCoverTooltip();
                 return;
             }
+            popup._fastTagScraperIdle = false;
 
             if (mode === 'everything') {
                 root._fastTagEverythingScraperOpen = true;
@@ -565,6 +650,13 @@
         if (!isRequestCurrent(popup, sceneId, scrapeRequestId)) {
             if (!isPopupActive(popup) && getHudOwnerPopup() === popup) closeHud();
             return;
+        }
+        const existingHud = getHudElement();
+        if (existingHud?._fastTagIdleSizing) {
+            const savedHeight = getHudSize()?.height;
+            existingHud._fastTagIdleSizing = false;
+            existingHud.style.height = existingHud._fastTagNormalHeight || (typeof savedHeight === 'number' ? `${savedHeight}px` : savedHeight) || '480px';
+            delete existingHud._fastTagNormalHeight;
         }
         const initialResultLimit = getScraperMatchingSettings().initialResultLimit;
         const allResults = Array.isArray(incomingResults) ? incomingResults : [];
@@ -1573,6 +1665,7 @@
             syncSceneToApolloCache,
             setLiveEverythingPopupTitle,
             refreshSceneCards,
+            scheduleSceneCardRefreshAfterRename,
             recordSaveUsage,
             toastError,
             toastSuccess
@@ -1752,6 +1845,9 @@
                 if (typeof effectiveCtx.refreshAllUI === 'function') effectiveCtx.refreshAllUI();
 
                 await refreshSceneCards(sceneId);
+                if (scrapeSelection.title || scrapeSelection.studio || scrapeSelection.performers) {
+                    scheduleSceneCardRefreshAfterRename?.(sceneId, refreshSceneCards);
+                }
                 recordSaveUsage();
                 sessionCache.delete(sceneId);
 
@@ -1809,6 +1905,7 @@
         resetLayoutState,
         getScraperHeaderDensity,
         showLoadingState,
+        showAutoScrapeOffState,
         sessionCache,
         createTrigger,
         renderMatches,

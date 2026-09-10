@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash FastTag
 // @namespace    http://tampermonkey.net/
-// @version      4.4.5
+// @version      4.4.7
 // @description  Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
@@ -174,6 +174,7 @@
         invalidateRequests: invalidateScraperRequests,
         closeHud: closeFloatingScraperHud,
         showLoadingState: showScraperLoadingState,
+        showAutoScrapeOffState: showScraperAutoOffState,
         sessionCache: sessionScrapeCache,
         renderMatches: renderScraperMatchCard
     } = FastTagScraperController;
@@ -283,6 +284,7 @@
         syncSceneToApolloCache,
         setLiveEverythingPopupTitle: (...args) => setLiveEverythingPopupTitle(...args),
         refreshSceneCards: (...args) => refreshSceneCards(...args),
+        scheduleSceneCardRefreshAfterRename: (...args) => FastTagLibraryManager.scheduleSceneCardRefreshAfterRename(...args),
         recordSaveUsage: () => recordSaveUsage(),
         toastError: (...args) => toastError(...args),
         toastSuccess: (...args) => toastSuccess(...args),
@@ -367,7 +369,7 @@
                 const script = document.createElement('script');
                 script.id = 'fasttag-help-script';
                 const scriptUrl = new URL(assetPaths[index], window.location.origin);
-            scriptUrl.searchParams.set('v', '4.4.5-help-1');
+                scriptUrl.searchParams.set('v', '4.4.7-help-1');
                 script.src = scriptUrl.href;
                 script.async = true;
                 script.onload = () => {
@@ -5939,9 +5941,12 @@
             popup.currentSceneId = sceneId;
             popup.currentCardElement = cardElement;
 
-            const scraperShouldRemainOpen = Boolean(window._fastTagEverythingScraperOpen || isScraperHudPersistedOpen());
+            const scraperWasOpen = Boolean(window._fastTagEverythingScraperOpen || isScraperHudPersistedOpen());
+            const scraperShouldRemainOpen = Boolean(getAutoScrapeSequential() && sequentialEditState.enabled && scraperWasOpen);
             if (scraperShouldRemainOpen) {
                 showScraperLoadingState(popup);
+            } else if (scraperWasOpen && !getAutoScrapeSequential()) {
+                showScraperAutoOffState(popup);
             } else if (popup.scraperCardContainer) {
                 popup.scraperCardContainer.innerHTML = '';
                 popup.scraperCardContainer.style.display = 'none';
@@ -6031,7 +6036,8 @@
             ]);
             ctx.refreshAllUI();
 
-            const shouldAutoOpenScraper = (isScraperHudPersistedOpen() || (getAutoScrapeSequential() && sequentialEditState.enabled && window._fastTagEverythingScraperOpen));
+            const shouldAutoOpenScraper = Boolean(getAutoScrapeSequential() && sequentialEditState.enabled
+                && (isScraperHudPersistedOpen() || window._fastTagEverythingScraperOpen));
             if (shouldAutoOpenScraper) {
                 window._fastTagEverythingScraperOpen = true;
                 setTimeout(() => {
@@ -6304,6 +6310,7 @@
                     applyTitleBtn.style.color = '#fff';
                     toastSuccess(`Updated Scene Title to "${aiResult.clean_title}"`);
                     await refreshSceneCards(sceneId);
+                    FastTagLibraryManager.scheduleSceneCardRefreshAfterRename(sceneId, refreshSceneCards);
                 } catch (err) {
                     toastError(`Failed to update title: ${err.message}`);
                 }
@@ -6642,6 +6649,9 @@
                     applyAllBtn.innerHTML = '<span>✓ Applied All!</span>';
                     showToast('✓ Successfully applied Gemini AI metadata!', 'success');
                     await refreshSceneCards(sceneId);
+                    if (aiResult.clean_title || matchedStudio || matchedPerformers.length > 0) {
+                        FastTagLibraryManager.scheduleSceneCardRefreshAfterRename(sceneId, refreshSceneCards);
+                    }
                 } catch (err) {
                     applyAllBtn.disabled = false;
                     applyAllBtn.innerHTML = '<span>🚀 Apply All</span>';
@@ -8437,6 +8447,8 @@
                     return false;
                 },
                 onLatestSuccess: (selection, context) => {
+                    const namingMetadataChanged = hasSelectionSetChanged(initialPerformerIds, new Set(selection.performerIds))
+                        || String(initialStudioId || '') !== String(selection.studioId || '');
                     initialTagIds = new Set(selection.tagIds);
                     initialPerformerIds = new Set(selection.performerIds);
                     initialStudioId = selection.studioId;
@@ -8463,6 +8475,9 @@
 
                     resetRefractSceneCards(selection.sceneId);
                     refreshSceneCardsDebounced(selection.sceneId);
+                    if (namingMetadataChanged) {
+                        FastTagLibraryManager.scheduleSceneCardRefreshAfterRename(selection.sceneId, refreshSceneCards);
+                    }
                     recordSaveUsage();
                     toastSuccess(context.customSuccessMessage || 'Scene saved successfully');
                     updateSaveButton();
@@ -10591,6 +10606,9 @@
                     }
                 }
                 refreshSceneCardsDebounced(targetSceneId);
+                if (type === 'performers' || type === 'studios') {
+                    FastTagLibraryManager.scheduleSceneCardRefreshAfterRename(targetSceneId, refreshSceneCards);
+                }
                 recordSaveUsage();
                 if (context?.showToast) {
                     toastSuccess(`${config.pluralTitle} updated`);

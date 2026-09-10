@@ -67,7 +67,7 @@ assert.equal(javascriptSection.includes('fasttag-help.js'), false, 'optional hel
 assert.ok(yaml.includes('assets:\n    /: .'), 'FastTag should expose optional offline help through the Stash plugin asset route');
 assert.ok(mainSource.includes('/plugin/fasttag/assets/fasttag-help.js'), 'help loader should try the configuration-derived Stash plugin asset URL');
 assert.ok(mainSource.includes('/plugin/mypluginrc/assets/fasttag-help.js'), 'help loader should support the installed package ID asset URL');
-assert.ok(mainSource.includes("scriptUrl.searchParams.set('v', '4.4.5-help-1')"), 'optional help should use the current release cache key so updated guide code is loaded');
+assert.ok(mainSource.includes("scriptUrl.searchParams.set('v', '4.4.7-help-1')"), 'optional help should use the current release cache key so updated guide code is loaded');
 assert.ok(fs.existsSync(path.join(pluginDirectory, 'USER_GUIDE.md')), 'offline Markdown user guide should ship with FastTag');
 
 const scraperSaveMutation = scraperControllerSource.match(/mutation FastTagAcceptSave[\s\S]*?`, \{ input: updateInput \}\);/)?.[0] || '';
@@ -78,7 +78,9 @@ assert.ok(
     'scraper save should synchronize returned metadata to the live scene-card cache'
 );
 assert.ok(libraryManagerSource.includes("typeof candidate.openFilenameCorrection === 'function'"), 'Library Manager integration should be capability-detected');
+assert.ok(libraryManagerSource.includes('scheduleSceneCardRefreshAfterRename'), 'Library Manager integration should provide a delayed post-rename card refresh');
 assert.ok(mainSource.includes("FastTagLibraryManager.isAvailable()"), 'the correction menu item should be conditional');
+assert.ok(mainSource.includes("type === 'performers' || type === 'studios'"), 'performer and studio saves should schedule the delayed filename refresh');
 assert.ok(popupSource.includes("e.code === 'KeyA'") && popupSource.includes("e.code === 'KeyD'"), 'Alt+A and Alt+D should navigate while preserving arrow aliases');
 assert.ok(
     scraperControllerSource.includes('setLiveEverythingPopupTitle(popup, match.title);'),

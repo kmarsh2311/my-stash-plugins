@@ -39,6 +39,10 @@ assert.match(source, /resetScraperMatchingSettings\(\)/, 'matching defaults shou
 assert.match(source, /promptDebugModeWarningDialog\(\)/, 'enabling debug mode should retain its warning gate');
 assert.match(source, /await callGeminiAPI\(/, 'Gemini connection testing should remain asynchronous');
 assert.match(source, /setThemePreference\(e\.target\.value\);[\s\S]*closeModal\(\);[\s\S]*setTimeout\(\(\) => open\(options\), 0\)/, 'theme changes should rebuild the inline-coloured settings modal immediately');
+assert.doesNotMatch(source, /Detach Scraper Window|fasttag-setting-detach-scraper/,
+    'docking belongs to the Scraper HUD and should not have a conflicting settings checkbox');
+assert.match(source, /When off, close or docked scraper panels will not trigger a search/,
+    'auto-scrape help should make the disabled behaviour explicit');
 
 const falseGetter = () => false;
 const noOp = () => {};

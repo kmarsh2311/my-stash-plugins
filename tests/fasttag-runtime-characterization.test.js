@@ -211,6 +211,13 @@ assertBefore(sequentialNavigation, 'if (nextIndex < 0 || nextIndex >= cards.leng
 assertBefore(sequentialNavigation, 'FastTagCoverEditor.prepareForSceneNavigation?.() === false', 'sequentialEditState.currentIndex = nextIndex;', 'cover changes must be protected before advancing state');
 assert.ok(sequentialNavigation.includes('popup._isNavigatingSequential = true;'), 'navigation must expose its busy state');
 assert.ok(sequentialNavigation.includes('finally {\n            popup._isNavigatingSequential = false;'), 'navigation must clear its busy state after success or failure');
+const sequentialSceneLoader = section('async function loadEditEverythingDataIntoPopup(', 'function renderEverythingAIMatchCard(');
+assert.match(sequentialSceneLoader, /getAutoScrapeSequential\(\) && sequentialEditState\.enabled && scraperWasOpen/,
+    'Auto-Scrape must gate every transition request even when the Scraper HUD was persisted open');
+assert.match(sequentialSceneLoader, /scraperWasOpen && !getAutoScrapeSequential\(\)[\s\S]*showScraperAutoOffState\(popup\)/,
+    'a persisted Scraper HUD should show its idle test card instead of closing when Auto-Scrape is off');
+assert.match(scraperControllerSource, /function showAutoScrapeOffState\([\s\S]*fasttag-auto-scraping-off\.webp[\s\S]*_fastTagScraperIdle = true/,
+    'the scraper controller must provide a manual-search-capable Auto-Scrape Off HUD state');
 
 // Edit Everything snapshots each save and serializes mutations. Only the newest
 // completed save may become the editor's clean baseline.

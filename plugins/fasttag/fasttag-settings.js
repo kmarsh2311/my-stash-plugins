@@ -20,7 +20,6 @@
             getAlwaysPlayFullVideo,
             getOrganizedWord,
             getAutoMarkOrganized,
-            getDetachScraper,
             getFillMissingPerformerImages,
             getGeminiApiKey,
             getGeminiModel,
@@ -37,7 +36,6 @@
             setAlwaysPlayFullVideo,
             setAutoMarkOrganized,
             setAutoScrapeSequential,
-            setDetachScraper,
             setFillMissingPerformerImages,
             setScraperMatchingSettings,
             setScraperMatchingPreset,
@@ -278,21 +276,11 @@
                         <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
                             <div style="flex: 1;">
                                 <div style="font-weight: 600; font-size: 13px;">Auto-Scrape in Sequential Mode</div>
-                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Automatically fetch scraper matches on scene transitions when using Edit Everything in Sequential Mode.</div>
+                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Automatically fetch scraper matches after Next or Previous in Edit Everything. When off, close or docked scraper panels will not trigger a search; press Scrape when you want one.</div>
                             </div>
                             <input type="checkbox" id="fasttag-setting-auto-scrape" ${autoScrape ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
                         </div>
 
-                        <div style="height: 1px; background: ${border};"></div>
-
-                        <!-- Detach Scraper Window setting -->
-                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
-                            <div style="flex: 1;">
-                                <div style="font-weight: 600; font-size: 13px;">Detach Scraper Window</div>
-                                <div style="font-size: 11px; color: ${textMuted}; margin-top: 2px;">Open scraper matches in a floating sidecar window alongside the popup instead of embedding inside.</div>
-                            </div>
-                            <input type="checkbox" id="fasttag-setting-detach-scraper" ${getDetachScraper() ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px; accent-color: #6366f1; margin-top: 2px;">
-                        </div>
                     </div>
 
                     <!-- TAB 4: SCRAPER MATCHING -->
@@ -599,14 +587,6 @@
             autoScrapeToggle.addEventListener('change', (e) => {
                 setAutoScrapeSequential(e.target.checked);
                 showToast(`Auto-Scrape in Sequential Mode ${e.target.checked ? 'enabled' : 'disabled'}`, 'info');
-            });
-        }
-
-        const detachScraperToggle = modal.querySelector('#fasttag-setting-detach-scraper');
-        if (detachScraperToggle) {
-            detachScraperToggle.addEventListener('change', (e) => {
-                setDetachScraper(e.target.checked);
-                showToast(`Scraper sidecar ${e.target.checked ? 'detached' : 'embedded'}`, 'info');
             });
         }
 

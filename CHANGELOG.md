@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [4.4.7] - 2026-09-10
+
+### Changed
+- **Auto-Scrape Off HUD**: An open Scraper HUD now stays open after sequential Next/Previous navigation and shows a fitted custom test card with a circular colour chart, without making a scraper request.
+- **Manual Control Preserved**: The idle test-card state retains Dock/Pop out and the normal Scrape button starts a manual search for the current scene.
+
+## [4.4.6] - 2026-09-10
+
+### Fixed
+- **Sequential Auto-Scrape**: Turning Auto-Scrape off now prevents scraper requests after Next or Previous even when the Scraper HUD was already open or remembered as open.
+- **Scraper Layout Control**: Removed the conflicting Detach Scraper Window setting. Dock/Pop out in the Scraper HUD is now the single control and continues remembering the chosen layout.
+
 ## [4.4.5] - 2026-09-10
 
 ### Added

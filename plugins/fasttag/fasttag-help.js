@@ -29,7 +29,7 @@
         ` },
         { id: 'sequential', icon: '⏭️', title: 'Sequential and Random Workflows', html: `
             <p>Enable <strong>Sequential</strong> to work through the scene cards currently represented by the page. Next and previous controls retain the popup workflow while loading each scene’s own selections and metadata. Use <kbd>Option/Alt+A</kbd> for previous and <kbd>Option/Alt+D</kbd> for next; the existing Option/Alt+arrow shortcuts continue to work.</p>
-            <p>Random untagged mode selects from unorganised or untagged scenes and displays the remaining count. Auto-Scrape can run after moving to the next scene when enabled in Workflow Settings.</p>
+            <p>Random untagged mode selects from unorganised or untagged scenes and displays the remaining count. Auto-Scrape runs after moving to the next or previous scene only when enabled in Workflow Settings.</p>
             <div class="warning"><strong>Remember:</strong> Search filters, page contents, and Stash query results determine which scenes are available to a sequence.</div>
         ` },
         { id: 'bulk', icon: '🧰', title: 'Bulk Editing', html: `
@@ -62,7 +62,7 @@
             <p>Workflow Settings can automatically mark a scene organised whenever FastTag saves metadata. Disable that option if organisation is a separate review step in your library.</p>
         ` },
         { id: 'settings', icon: '⚙️', title: 'Settings Reference', html: `
-            <ul><li><strong>Display:</strong> theme, ID columns, smart suggestions, recent and pinned items, and card icon clicks.</li><li><strong>Video:</strong> default Full Video behaviour and all scrubbing speeds.</li><li><strong>Workflow:</strong> automatic organised status, sequential scraping, and scraper docking behaviour.</li><li><strong>AI:</strong> Gemini key, model, connection test, auto-parse, and AI suggestions.</li><li><strong>System:</strong> layout reset, persistent cache controls, debug mode, and diagnostic logs.</li></ul>
+            <ul><li><strong>Display:</strong> theme, ID columns, smart suggestions, recent and pinned items, and card icon clicks.</li><li><strong>Video:</strong> default Full Video behaviour and all scrubbing speeds.</li><li><strong>Workflow:</strong> automatic organised status and sequential scraping.</li><li><strong>AI:</strong> Gemini key, model, connection test, auto-parse, and AI suggestions.</li><li><strong>System:</strong> layout reset, persistent cache controls, debug mode, and diagnostic logs.</li></ul>
             <p>Settings and layout preferences are stored in the current browser profile. Different browsers or devices can therefore have different FastTag preferences.</p>
         ` },
         { id: 'cache', icon: '⚡', title: 'Cache and Performance', html: `
