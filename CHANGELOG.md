@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [4.4.5] - 2026-09-10
+
+### Added
+- **Open File Location**: On localhost, the initial scene-card context menu can open the primary file's folder and select the file in the system file manager.
+- **Library Manager Integration**: Show Correct Filename only when the companion Library Manager plugin is available.
+- **Navigation Aliases**: Option/Alt+A and Option/Alt+D move to the previous and next scenes while the existing arrow shortcuts remain available.
+
 ## [4.4.4] - 2026-09-08
 
 ### Added

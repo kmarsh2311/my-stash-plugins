@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [4.4.5] - 2026-09-10
+
+### Added
+- Added a localhost-only Open File Location action to the scene-card context menu, using Stash's native file-manager reveal operation.
+- Added optional Library Manager filename correction to the scene-card menu when that plugin is available.
+- Added Option/Alt+A and Option/Alt+D as previous/next aliases while retaining the arrow shortcuts.
+
 ## [4.4.4] - 2026-09-08
 
 ### Added

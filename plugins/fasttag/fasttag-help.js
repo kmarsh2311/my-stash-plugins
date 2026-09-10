@@ -28,7 +28,7 @@
             <p>Keyboard actions avoid capturing keystrokes while you are actively typing into text fields.</p>
         ` },
         { id: 'sequential', icon: '⏭️', title: 'Sequential and Random Workflows', html: `
-            <p>Enable <strong>Sequential</strong> to work through the scene cards currently represented by the page. Next and previous controls retain the popup workflow while loading each scene’s own selections and metadata.</p>
+            <p>Enable <strong>Sequential</strong> to work through the scene cards currently represented by the page. Next and previous controls retain the popup workflow while loading each scene’s own selections and metadata. Use <kbd>Option/Alt+A</kbd> for previous and <kbd>Option/Alt+D</kbd> for next; the existing Option/Alt+arrow shortcuts continue to work.</p>
             <p>Random untagged mode selects from unorganised or untagged scenes and displays the remaining count. Auto-Scrape can run after moving to the next scene when enabled in Workflow Settings.</p>
             <div class="warning"><strong>Remember:</strong> Search filters, page contents, and Stash query results determine which scenes are available to a sequence.</div>
         ` },

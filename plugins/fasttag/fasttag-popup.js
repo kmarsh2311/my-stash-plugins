@@ -158,8 +158,8 @@
                         Sequential
                     </label>
                     <div id="${type}-nav-group" style="display: inline-flex; align-items: center; gap: 4px; overflow: hidden; max-width: 0; opacity: 0; transition: max-width 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease; vertical-align: middle;">
-                        <button type="button" id="${type}-prev-btn" class="popup-nav-btn" title="Previous scene (Alt+Left)" style="padding: 2px 7px; height: 22px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; box-sizing: border-box;">◄</button>
-                        <button type="button" id="${type}-next-btn" class="popup-nav-btn" title="Next scene (Alt+Right)" style="padding: 2px 7px; height: 22px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; box-sizing: border-box;">►</button>
+                        <button type="button" id="${type}-prev-btn" class="popup-nav-btn" title="Previous scene (Alt+A or Alt+Left)" style="padding: 2px 7px; height: 22px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; box-sizing: border-box;">◄</button>
+                        <button type="button" id="${type}-next-btn" class="popup-nav-btn" title="Next scene (Alt+D or Alt+Right)" style="padding: 2px 7px; height: 22px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; box-sizing: border-box;">►</button>
                     </div>
                 </div>
             </div>
@@ -491,15 +491,15 @@
                 }
             }
 
-            // Alt+Left / Alt+Right for Sequential
+            // Alt+A / Alt+D and Alt+Left / Alt+Right for Sequential or Random navigation.
             if ((sequentialEditState.enabled || dependencies.getActivePopup?.()?._isRandomMode) && e.altKey) {
-                if (e.key === 'ArrowRight') {
+                if (e.key === 'ArrowRight' || e.code === 'KeyD') {
                     e.preventDefault();
                     e.stopPropagation();
                     const nextBtn = form.querySelector('button[id$="-next-btn"]');
                     if (nextBtn && !nextBtn.disabled) nextBtn.click();
                     return;
-                } else if (e.key === 'ArrowLeft') {
+                } else if (e.key === 'ArrowLeft' || e.code === 'KeyA') {
                     e.preventDefault();
                     e.stopPropagation();
                     const prevBtn = form.querySelector('button[id$="-prev-btn"]');

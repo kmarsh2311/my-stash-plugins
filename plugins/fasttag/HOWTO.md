@@ -39,6 +39,8 @@ When you right-click a scene card, FastTag displays a streamlined context menu:
 | **`Edit Studio...`** | Opens dedicated Studio selector with parent hierarchy support. |
 | **`Edit Galleries...`** | Opens dedicated Gallery assigner. |
 | **`Edit Scene`** | Navigates directly to the full Stash scene edit page. |
+| **`📂 Open File Location`** | On localhost, opens the primary file's folder and selects the file in Finder or the system file manager. |
+| **`✏️ Correct Filename`** | Opens safe single-scene filename correction when Library Manager is installed and active. |
 | **`⚡ Edit Everything...`** | Opens the all-in-one dual-table popup (Tags + Performers + Studio). |
 | **`⚙️ FastTag Settings`** | Opens dedicated settings to toggle ID columns, suggestions, and themes. |
 | **`Buy me a KitKat 🍫`** | Optional support link to sponsor the developer. |

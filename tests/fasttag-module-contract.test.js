@@ -13,6 +13,7 @@ const settingsSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-setti
 const previewSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-preview.js'), 'utf8');
 const scraperControllerSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-scraper-controller.js'), 'utf8');
 const popupSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-popup.js'), 'utf8');
+const libraryManagerSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-library-manager.js'), 'utf8');
 const uiSource = fs.readFileSync(path.join(pluginDirectory, 'fasttag-ui.js'), 'utf8');
 const runnerSource = fs.readFileSync(path.join(__dirname, 'run-all.js'), 'utf8');
 const expectedOrder = [
@@ -25,6 +26,7 @@ const expectedOrder = [
     'fasttag-notifications.js',
     'fasttag-settings.js',
     'fasttag-integrations.js',
+    'fasttag-library-manager.js',
     'fasttag-gemini.js',
     'fasttag-scraper.js',
     'fasttag-scraper-ui.js',
@@ -44,7 +46,7 @@ assert.deepEqual(configuredOrder, expectedOrder, 'Stash must load FastTag module
 for (const file of expectedOrder) {
     assert.ok(fs.existsSync(path.join(pluginDirectory, file)), `${file} should exist`);
 }
-for (const namespace of ['Core', 'Entities', 'Storage', 'Diagnostics', 'Api', 'Notifications', 'Settings', 'Integrations', 'Gemini', 'Scraper', 'ScraperUi', 'ScraperController', 'Preview', 'CoverEditor', 'Ui', 'Popup', 'Editors', 'Workflows']) {
+for (const namespace of ['Core', 'Entities', 'Storage', 'Diagnostics', 'Api', 'Notifications', 'Settings', 'Integrations', 'LibraryManager', 'Gemini', 'Scraper', 'ScraperUi', 'ScraperController', 'Preview', 'CoverEditor', 'Ui', 'Popup', 'Editors', 'Workflows']) {
     assert.ok(mainSource.includes(`FastTag${namespace}`), `main entry point should require FastTag${namespace}`);
 }
 assert.equal(mainSource.includes('LEGACY_'), false, 'legacy comparison declarations should be removed');
@@ -65,7 +67,7 @@ assert.equal(javascriptSection.includes('fasttag-help.js'), false, 'optional hel
 assert.ok(yaml.includes('assets:\n    /: .'), 'FastTag should expose optional offline help through the Stash plugin asset route');
 assert.ok(mainSource.includes('/plugin/fasttag/assets/fasttag-help.js'), 'help loader should try the configuration-derived Stash plugin asset URL');
 assert.ok(mainSource.includes('/plugin/mypluginrc/assets/fasttag-help.js'), 'help loader should support the installed package ID asset URL');
-assert.ok(mainSource.includes("scriptUrl.searchParams.set('v', '4.4.4-help-1')"), 'optional help should use the current release cache key so updated guide code is loaded');
+assert.ok(mainSource.includes("scriptUrl.searchParams.set('v', '4.4.5-help-1')"), 'optional help should use the current release cache key so updated guide code is loaded');
 assert.ok(fs.existsSync(path.join(pluginDirectory, 'USER_GUIDE.md')), 'offline Markdown user guide should ship with FastTag');
 
 const scraperSaveMutation = scraperControllerSource.match(/mutation FastTagAcceptSave[\s\S]*?`, \{ input: updateInput \}\);/)?.[0] || '';
@@ -75,6 +77,9 @@ assert.ok(
     scraperControllerSource.includes('syncSceneToApolloCache(saveRes.data.sceneUpdate);'),
     'scraper save should synchronize returned metadata to the live scene-card cache'
 );
+assert.ok(libraryManagerSource.includes("typeof candidate.openFilenameCorrection === 'function'"), 'Library Manager integration should be capability-detected');
+assert.ok(mainSource.includes("FastTagLibraryManager.isAvailable()"), 'the correction menu item should be conditional');
+assert.ok(popupSource.includes("e.code === 'KeyA'") && popupSource.includes("e.code === 'KeyD'"), 'Alt+A and Alt+D should navigate while preserving arrow aliases');
 assert.ok(
     scraperControllerSource.includes('setLiveEverythingPopupTitle(popup, match.title);'),
     'scraper acceptance should update the open popup title immediately'
@@ -85,6 +90,12 @@ assert.ok(
 );
 assert.ok(mainSource.includes("titleSpan.addEventListener('contextmenu'"), 'the Edit Everything scene title should support right-click filename copying');
 assert.ok(mainSource.includes("titleSpan.setAttribute('data-micro-tooltip', 'Right-click to copy filename')"), 'the scene title should explain its filename-copy action');
+assert.ok(mainSource.includes("createMenuItem('📂 Open File Location'"), 'the scene context menu should expose local file-manager reveal');
+assert.ok(mainSource.includes('revealFileInFileManager(id: $id)'), 'Open File Location should use Stash\'s native reveal mutation');
+assert.ok(
+    mainSource.includes("hostname === 'localhost'") && mainSource.includes("hostname === '127.0.0.1'"),
+    'file-manager reveal should only be offered on loopback addresses'
+);
 assert.ok(popupSource.includes("if (e.button !== 0 || e.target.closest('input, button, label')) return;"), 'secondary clicks in a popup header must not begin dragging');
 assert.equal(
     mainSource.includes('In Single-Column Popup (Edit Tags, Edit Performers, Edit Studio)'),

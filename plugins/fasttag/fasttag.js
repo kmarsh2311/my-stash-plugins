@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash FastTag
 // @namespace    http://tampermonkey.net/
-// @version      4.4.4
+// @version      4.4.5
 // @description  Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
@@ -31,6 +31,8 @@
     if (!FastTagSettings) throw new Error('[FastTag] fasttag-settings.js must load before fasttag.js');
     const FastTagIntegrations = window.FastTag?.integrations;
     if (!FastTagIntegrations) throw new Error('[FastTag] fasttag-integrations.js must load before fasttag.js');
+    const FastTagLibraryManager = window.FastTag?.libraryManager;
+    if (!FastTagLibraryManager) throw new Error('[FastTag] fasttag-library-manager.js must load before fasttag.js');
     const FastTagGemini = window.FastTag?.gemini;
     if (!FastTagGemini) throw new Error('[FastTag] fasttag-gemini.js must load before fasttag.js');
     const FastTagScraper = window.FastTag?.scraper;
@@ -365,7 +367,7 @@
                 const script = document.createElement('script');
                 script.id = 'fasttag-help-script';
                 const scriptUrl = new URL(assetPaths[index], window.location.origin);
-                scriptUrl.searchParams.set('v', '4.4.4-help-1');
+            scriptUrl.searchParams.set('v', '4.4.5-help-1');
                 script.src = scriptUrl.href;
                 script.async = true;
                 script.onload = () => {
@@ -3053,6 +3055,43 @@
         }
     }
 
+    function isLocalStashAddress() {
+        const hostname = String(window.location?.hostname || '').toLowerCase();
+        return hostname === 'localhost'
+            || hostname === '127.0.0.1'
+            || hostname === '::1'
+            || hostname === '[::1]';
+    }
+
+    async function revealSceneFileInFileManager(sceneId) {
+        try {
+            const sceneResponse = await fetchGQL(`
+                query FastTagRevealSceneFile($id: ID!) {
+                    findScene(id: $id) { files { id } }
+                }
+            `, { id: String(sceneId) });
+            const fileId = sceneResponse?.data?.findScene?.files?.[0]?.id;
+            if (!fileId) {
+                toastError('Open File Location failed: this scene has no primary file');
+                return false;
+            }
+            const revealResponse = await fetchGQL(`
+                mutation FastTagRevealFile($id: ID!) {
+                    revealFileInFileManager(id: $id)
+                }
+            `, { id: String(fileId) });
+            if (revealResponse?.data?.revealFileInFileManager === true) {
+                showToast('File location opened', 'success', 2000);
+                return true;
+            }
+            const reason = revealResponse?.errors?.[0]?.message;
+            toastError(reason ? `Open File Location failed: ${reason}` : 'Stash could not open the file location');
+        } catch (error) {
+            toastError(`Open File Location failed: ${error?.message || error}`);
+        }
+        return false;
+    }
+
     function createCustomMenu(clickEvent, sceneId, cardElement) {
         const theme = getEffectiveTheme();
         const menu = document.createElement('div');
@@ -3078,6 +3117,12 @@
         createMenuItem('🏢 Edit Studio', () => openEntityPopup('studios', sceneId, cardElement));
         createMenuItem('🖼️ Edit Galleries', () => openEntityPopup('galleries', sceneId, cardElement));
         createMenuItem('🎬 Edit Scene', () => openEditScenePage(sceneId));
+        if (isLocalStashAddress()) {
+            createMenuItem('📂 Open File Location', () => revealSceneFileInFileManager(sceneId));
+        }
+        if (FastTagLibraryManager.isAvailable()) {
+            createMenuItem('✏️ Correct Filename', () => FastTagLibraryManager.openFilenameCorrection(sceneId));
+        }
         createMenuItem('⚡ Edit Everything', () => openEditEverythingPopup(sceneId, cardElement));
         createMenuItem('🎲 Random Untagged Scene', () => rollNextRandomUntaggedScene());
 
@@ -5025,8 +5070,8 @@
                             Sequential
                         </label>
                         <div id="everything-nav-group" style="display: inline-flex; align-items: center; gap: 4px; overflow: hidden; max-width: 0; opacity: 0; transition: max-width 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease; vertical-align: middle;">
-                            <button type="button" id="everything-prev-btn" class="popup-nav-btn" title="Previous scene (Alt+Left)" style="padding: 2px 7px; height: 22px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; box-sizing: border-box;">◄</button>
-                            <button type="button" id="everything-next-btn" class="popup-nav-btn" title="Next scene (Alt+Right)" style="padding: 2px 7px; height: 22px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; box-sizing: border-box;">►</button>
+                            <button type="button" id="everything-prev-btn" class="popup-nav-btn" title="Previous scene (Alt+A or Alt+Left)" style="padding: 2px 7px; height: 22px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; box-sizing: border-box;">◄</button>
+                            <button type="button" id="everything-next-btn" class="popup-nav-btn" title="Next scene (Alt+D or Alt+Right)" style="padding: 2px 7px; height: 22px; cursor: pointer; font-size: 10px; font-weight: 600; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; box-sizing: border-box;">►</button>
                         </div>
                     </div>
                 </div>
@@ -5801,8 +5846,8 @@
             nextBtn.style.opacity = nextBtn.disabled ? '0.4' : '1';
             prevBtn.style.cursor = prevBtn.disabled ? 'not-allowed' : 'pointer';
             nextBtn.style.cursor = nextBtn.disabled ? 'not-allowed' : 'pointer';
-            prevBtn.title = isRandom ? 'Previous random scene (Alt+Left)' : 'Previous scene (Alt+Left)';
-            nextBtn.title = isRandom ? 'Next scene in random history (Alt+Right)' : 'Next scene (Alt+Right)';
+            prevBtn.title = isRandom ? 'Previous random scene (Alt+A or Alt+Left)' : 'Previous scene (Alt+A or Alt+Left)';
+            nextBtn.title = isRandom ? 'Next scene in random history (Alt+D or Alt+Right)' : 'Next scene (Alt+D or Alt+Right)';
 
             if (popup.navGroup) {
                 popup.navGroup.style.maxWidth = (isSeq || isRandom) ? '60px' : '0';
