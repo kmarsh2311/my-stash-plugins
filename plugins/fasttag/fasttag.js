@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash FastTag
 // @namespace    http://tampermonkey.net/
-// @version      4.4.8
+// @version      4.4.9
 // @description  Fast scene tagging workflow for Stash: edit tags, performers, studios, and galleries from scene cards with smart suggestions, bulk tagging, and sequential navigation
 // @match        http://localhost:*/*
 // @match        http://127.0.0.1:*/*
@@ -232,6 +232,7 @@
     });
     FastTagScraper.configure({
         fetchGQL: (...args) => fetchGQL(...args),
+        fetchEntityListSafely: (...args) => fetchEntityListSafely(...args),
         cleanTitleForScraping,
         parseDurationSec,
         getScraperMatchingSettings,
@@ -248,6 +249,7 @@
         isVideoPoppedOut: () => FastTagPreview.isPoppedOut(),
         getDefaultEverythingPosition: (...args) => getDefaultEverythingPosition(...args),
         entityConfig: ENTITY_CONFIG,
+        fetchEntityListSafely: (...args) => fetchEntityListSafely(...args),
         getScraperMatchingSettings,
         getHideObviousFalsePositives,
         partitionObviousFalsePositiveMatches,
@@ -369,7 +371,7 @@
                 const script = document.createElement('script');
                 script.id = 'fasttag-help-script';
                 const scriptUrl = new URL(assetPaths[index], window.location.origin);
-                scriptUrl.searchParams.set('v', '4.4.8-help-1');
+                scriptUrl.searchParams.set('v', '4.4.9-help-1');
                 script.src = scriptUrl.href;
                 script.async = true;
                 script.onload = () => {
@@ -2018,13 +2020,94 @@
         }
     }
 
+    const safeModeNotifiedTypes = new Set();
+
+    async function fetchEntityListSafely(type) {
+        const config = ENTITY_CONFIG[type];
+        if (!config || !config.fetchQuery) return null;
+
+        try {
+            const res = await fetchGQL(config.fetchQuery);
+            let list = config.extractList(res?.data);
+            if (Array.isArray(list) && list.length > 0) {
+                return list;
+            }
+
+            // If empty and GraphQL returned errors, try fallback query (omits created_at/updated_at timestamps)
+            const hasErrors = Boolean(res?.errors && res.errors.length > 0);
+            if (hasErrors && config.fallbackQuery) {
+                const errSummary = (res.errors || []).map(e => e.message).join('; ');
+                ftLog('WARN', 'GQL', `Primary fetch for ${type} failed (${errSummary}). Attempting resilient fallback query...`, {
+                    type,
+                    errors: res.errors
+                });
+
+                try {
+                    const fallbackRes = await fetchGQL(config.fallbackQuery);
+                    const fallbackList = config.extractList(fallbackRes?.data);
+                    if (Array.isArray(fallbackList) && fallbackList.length > 0) {
+                        ftLog('INFO', 'GQL', `Resilient fallback query recovered ${type} (${fallbackList.length} items loaded).`, {
+                            type,
+                            count: fallbackList.length
+                        });
+
+                        if (!safeModeNotifiedTypes.has(type)) {
+                            safeModeNotifiedTypes.add(type);
+                            const label = config.pluralTitle || type;
+                            showToast(`Loaded ${label} in Safe Mode (timestamps skipped due to a database date error).`, 'info', 6000);
+                        }
+
+                        return fallbackList;
+                    }
+                } catch (fallbackErr) {
+                    ftLog('ERROR', 'GQL', `Fallback fetch for ${type} failed: ${fallbackErr.message || fallbackErr}`, {
+                        type,
+                        error: String(fallbackErr)
+                    });
+                }
+            }
+
+            // Fallback for older Stash versions where groups were called movies
+            if (type === 'groups' && (!list || !list.length)) {
+                const legacyMovies = res?.data?.findMovies?.movies || [];
+                if (legacyMovies.length > 0) return legacyMovies;
+                try {
+                    const movieRes = await fetchGQL(`query { findMovies(filter: { per_page: -1 }) { movies { id name } } }`);
+                    const moviesList = movieRes?.data?.findMovies?.movies || [];
+                    if (moviesList.length > 0) return moviesList;
+                } catch (e) {}
+            }
+
+            return list || [];
+        } catch (err) {
+            ftLog('ERROR', 'GQL', `Exception while fetching ${type}: ${err.message || err}`, {
+                type,
+                error: String(err)
+            });
+            if (config.fallbackQuery) {
+                try {
+                    const fallbackRes = await fetchGQL(config.fallbackQuery);
+                    const fallbackList = config.extractList(fallbackRes?.data);
+                    if (Array.isArray(fallbackList) && fallbackList.length > 0) {
+                        if (!safeModeNotifiedTypes.has(type)) {
+                            safeModeNotifiedTypes.add(type);
+                            const label = config.pluralTitle || type;
+                            showToast(`Loaded ${label} in Safe Mode (timestamps skipped due to a database date error).`, 'info', 6000);
+                        }
+                        return fallbackList;
+                    }
+                } catch (e2) {}
+            }
+            return [];
+        }
+    }
+
     async function revalidateCacheInBackground(type) {
         const config = ENTITY_CONFIG[type];
         if (!config || !config.fetchQuery) return;
         if (cacheStore[type]) cacheStore[type]._isRevalidating = true;
         try {
-            const res = await fetchGQL(config.fetchQuery);
-            const freshList = config.extractList(res?.data);
+            const freshList = await fetchEntityListSafely(type);
             if (freshList && freshList.length) {
                 setCache(type, freshList);
             }
@@ -4366,9 +4449,8 @@
         async function fetchData(query, resetScroll = true) {
             let cachedData = getCachedOrNull(type);
             if (!cachedData) {
-                const res = await fetchGQL(config.fetchQuery);
-                cachedData = config.extractList(res.data);
-                setCache(type, cachedData);
+                cachedData = await fetchEntityListSafely(type);
+                if (cachedData) setCache(type, cachedData);
             }
             if (!cachedData) return;
 
@@ -5438,11 +5520,7 @@
             }
             if (!cached) {
                 try {
-                    const res = await fetchGQL(config.fetchQuery);
-                    cached = config.extractList(res.data);
-                    if ((!cached || !cached.length) && type === 'groups') {
-                        cached = res?.data?.findGroups?.groups || res?.data?.findMovies?.movies || [];
-                    }
+                    cached = await fetchEntityListSafely(type);
                     if (cached) setCache(type, cached);
                 } catch (e) {
                     cached = [];
@@ -6856,9 +6934,8 @@
 
                 let allStudios = getCachedOrNull('studios');
                 if (!allStudios) {
-                    const res = await fetchGQL(ENTITY_CONFIG.studios.fetchQuery);
-                    allStudios = ENTITY_CONFIG.studios.extractList(res.data);
-                    setCache('studios', allStudios);
+                    allStudios = await fetchEntityListSafely('studios');
+                    if (allStudios) setCache('studios', allStudios);
                 }
                 if (!allStudios) return;
 
@@ -6976,15 +7053,11 @@
                 let allGroups = getCachedOrNull('groups');
                 if (!allGroups) {
                     try {
-                        const res = await fetchGQL(ENTITY_CONFIG.groups.fetchQuery);
-                        allGroups = ENTITY_CONFIG.groups.extractList(res?.data);
-                        if (!allGroups || !allGroups.length) {
-                            allGroups = res?.data?.findGroups?.groups || res?.data?.findMovies?.movies || [];
-                        }
+                        allGroups = await fetchEntityListSafely('groups');
                     } catch (e) {
                         allGroups = [];
                     }
-                    setCache('groups', allGroups);
+                    if (allGroups) setCache('groups', allGroups);
                 }
                 if (!allGroups) return;
 
@@ -7128,9 +7201,8 @@
                 const config = ENTITY_CONFIG[type];
                 let cached = getCachedOrNull(type);
                 if (!cached) {
-                    const res = await fetchGQL(config.fetchQuery);
-                    cached = config.extractList(res.data);
-                    setCache(type, cached);
+                    cached = await fetchEntityListSafely(type);
+                    if (cached) setCache(type, cached);
                 }
                 if (!cached) return;
 
@@ -8933,9 +9005,8 @@
 
                 let allStudios = getCachedOrNull('studios');
                 if (!allStudios) {
-                    const res = await fetchGQL(ENTITY_CONFIG.studios.fetchQuery);
-                    allStudios = ENTITY_CONFIG.studios.extractList(res.data);
-                    setCache('studios', allStudios);
+                    allStudios = await fetchEntityListSafely('studios');
+                    if (allStudios) setCache('studios', allStudios);
                 }
                 if (!allStudios) return;
 
@@ -9033,18 +9104,9 @@
                 let allGroups = getCachedOrNull('groups');
                 if (!allGroups) {
                     try {
-                        const res = await fetchGQL(ENTITY_CONFIG.groups.fetchQuery);
-                        allGroups = ENTITY_CONFIG.groups.extractList(res?.data);
-                        if (!allGroups || !allGroups.length) {
-                            allGroups = res?.data?.findGroups?.groups || res?.data?.findMovies?.movies || [];
-                        }
+                        allGroups = await fetchEntityListSafely('groups');
                     } catch (e) {
-                        try {
-                            const fallbackRes = await fetchGQL(`query { findMovies(filter: { per_page: -1 }) { movies { id name } } }`);
-                            allGroups = fallbackRes?.data?.findMovies?.movies || [];
-                        } catch (e2) {
-                            console.error('[FastTag Bulk Everything] Failed to fetch groups:', e, e2);
-                        }
+                        allGroups = [];
                     }
                     if (allGroups && allGroups.length) setCache('groups', allGroups);
                 }
@@ -9177,9 +9239,8 @@
                 const config = ENTITY_CONFIG[type];
                 let cached = getCachedOrNull(type);
                 if (!cached) {
-                    const res = await fetchGQL(config.fetchQuery);
-                    cached = config.extractList(res.data);
-                    setCache(type, cached);
+                    cached = await fetchEntityListSafely(type);
+                    if (cached) setCache(type, cached);
                 }
                 if (!cached) return;
 
@@ -10696,9 +10757,8 @@
         async function fetchData(query, resetScroll = true) {
             let cachedData = getCachedOrNull(type);
             if (!cachedData) {
-                const res = await fetchGQL(config.fetchQuery);
-                cachedData = config.extractList(res.data);
-                setCache(type, cachedData);
+                cachedData = await fetchEntityListSafely(type);
+                if (cachedData) setCache(type, cachedData);
             }
             if (!cachedData) return;
 
@@ -11321,15 +11381,9 @@
         for (const type of types) {
             if (!getCachedOrNull(type)) {
                 try {
-                    const config = ENTITY_CONFIG[type];
-                    if (config?.fetchQuery) {
-                        const res = await fetchGQL(config.fetchQuery);
-                        if (res?.data) {
-                            const data = config.extractList(res.data);
-                            if (Array.isArray(data) && data.length > 0) {
-                                setCache(type, data);
-                            }
-                        }
+                    const data = await fetchEntityListSafely(type);
+                    if (Array.isArray(data) && data.length > 0) {
+                        setCache(type, data);
                     }
                 } catch (e) {}
             }

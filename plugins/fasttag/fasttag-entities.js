@@ -15,6 +15,7 @@
             icon: '🏷️', title: 'Tag', pluralTitle: 'Tags', labelKey: 'name', searchFields: ['name', 'id'],
             columns: [{ ...commonIdColumn }, { title: 'Name', field: 'name', resizable: false, headerSort: false }],
             fetchQuery: 'query { findTags(filter: { per_page: -1 }) { tags { id name sort_name scene_count created_at updated_at } } }',
+            fallbackQuery: 'query { findTags(filter: { per_page: -1 }) { tags { id name sort_name scene_count } } }',
             extractList: data => data?.findTags?.tags || [],
             fetchExistingQuery: 'query ($id: ID!) { findScene(id: $id) { id title organized files { path } tags { id } } }',
             extractExisting: data => data?.findScene?.tags?.map(tag => tag.id) || [],
@@ -28,6 +29,7 @@
             icon: '⭐', title: 'Performer', pluralTitle: 'Performers', labelKey: 'name', searchFields: ['name', 'disambiguation', 'id'],
             columns: [{ ...commonIdColumn }, { title: 'Name', field: 'name', widthGrow: 2, resizable: true, headerSort: false }, { title: 'Details', field: 'disambiguation', widthGrow: 1, resizable: false, headerSort: false }],
             fetchQuery: 'query { findPerformers(filter: { per_page: -1 }) { performers { id name disambiguation scene_count birthdate rating100 created_at updated_at image_path country gender alias_list stash_ids { endpoint stash_id } } } }',
+            fallbackQuery: 'query { findPerformers(filter: { per_page: -1 }) { performers { id name disambiguation scene_count birthdate rating100 image_path country gender alias_list stash_ids { endpoint stash_id } } } }',
             extractList: data => data?.findPerformers?.performers || [],
             fetchExistingQuery: 'query ($id: ID!) { findScene(id: $id) { id title organized files { path } performers { id } } }',
             extractExisting: data => data?.findScene?.performers?.map(performer => performer.id) || [],
@@ -41,6 +43,7 @@
             icon: '🖼️', title: 'Gallery', pluralTitle: 'Galleries', labelKey: 'title', searchFields: ['title', 'id'],
             columns: [{ ...commonIdColumn }, { title: 'Title', field: 'title', resizable: false, headerSort: false }],
             fetchQuery: 'query { findGalleries(filter: { per_page: -1 }) { galleries { id title folder { path } files { path } created_at updated_at } } }',
+            fallbackQuery: 'query { findGalleries(filter: { per_page: -1 }) { galleries { id title folder { path } files { path } } } }',
             extractList: data => (data?.findGalleries?.galleries || []).map(gallery => {
                 let displayTitle = gallery.title?.trim() || '';
                 if (!displayTitle) {
@@ -64,6 +67,7 @@
             icon: '🏢', title: 'Studio', pluralTitle: 'Studios', labelKey: 'name', searchFields: ['name', 'parent_name', 'id'], isSingleSelect: true,
             columns: [{ ...commonIdColumn }, { title: 'Name', field: 'name', widthGrow: 2, resizable: true, headerSort: false }, { title: 'Parent Studio', field: 'parent_name', widthGrow: 1, resizable: false, headerSort: false }],
             fetchQuery: 'query { findStudios(filter: { per_page: -1 }) { studios { id name parent_studio { id name } scene_count image_path created_at updated_at } } }',
+            fallbackQuery: 'query { findStudios(filter: { per_page: -1 }) { studios { id name parent_studio { id name } scene_count image_path } } }',
             extractList: data => (data?.findStudios?.studios || []).map(studio => ({ id: studio.id, name: studio.name, parent_name: studio.parent_studio ? studio.parent_studio.name : '', scene_count: studio.scene_count || 0, created_at: studio.created_at || '', updated_at: studio.updated_at || '' })),
             fetchExistingQuery: 'query ($id: ID!) { findScene(id: $id) { id title organized files { path } studio { id name } } }',
             extractExisting: data => data?.findScene?.studio?.id ? [data.findScene.studio.id] : [],
@@ -77,7 +81,8 @@
             icon: '🎬', title: 'Group', pluralTitle: 'Groups', labelKey: 'name', searchFields: ['name', 'id'],
             columns: [{ ...commonIdColumn }, { title: 'Name', field: 'name', resizable: false, headerSort: false }],
             fetchQuery: 'query { findGroups(filter: { per_page: -1 }) { groups { id name scene_count created_at updated_at } } }',
-            extractList: data => data?.findGroups?.groups || [],
+            fallbackQuery: 'query { findGroups(filter: { per_page: -1 }) { groups { id name scene_count } } }',
+            extractList: data => data?.findGroups?.groups || data?.findMovies?.movies || [],
             fetchExistingQuery: 'query ($id: ID!) { findScene(id: $id) { id title organized files { path } groups { group { id name } scene_index } } }',
             extractExisting: data => (data?.findScene?.groups || []).map(group => group.group?.id).filter(Boolean),
             createQuery: 'mutation ($name: String!) { groupCreate(input: { name: $name }) { id name } }',

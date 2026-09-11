@@ -717,9 +717,10 @@
         if (typesToLoad.length > 0) {
             await Promise.all(typesToLoad.map(async (type) => {
                 try {
-                    const res = await fetchGQL(ENTITY_CONFIG[type].fetchQuery);
-                    const list = ENTITY_CONFIG[type].extractList(res.data);
-                    setCache(type, list);
+                    const list = typeof dependencies?.fetchEntityListSafely === 'function'
+                        ? await dependencies.fetchEntityListSafely(type)
+                        : ENTITY_CONFIG[type].extractList((await fetchGQL(ENTITY_CONFIG[type].fetchQuery))?.data);
+                    if (list) setCache(type, list);
                 } catch (e) {
                     console.log('[FastTag] Error pre-caching ' + type, e);
                 }

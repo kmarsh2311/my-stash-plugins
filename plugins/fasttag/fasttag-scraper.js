@@ -629,9 +629,13 @@
         const config = deps.getEntityConfig(type);
         let cachedEntities = deps.getCachedOrNull(type);
         if (!cachedEntities) {
-            const response = await deps.fetchGQL(config.fetchQuery);
-            cachedEntities = config.extractList(response.data);
-            deps.setCache(type, cachedEntities);
+            if (typeof deps.fetchEntityListSafely === 'function') {
+                cachedEntities = await deps.fetchEntityListSafely(type);
+            } else {
+                const response = await deps.fetchGQL(config.fetchQuery);
+                cachedEntities = config.extractList(response.data);
+            }
+            if (cachedEntities) deps.setCache(type, cachedEntities);
         }
         return { cachedEntities, config };
     }

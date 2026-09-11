@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [4.4.9] - 2026-09-11
+
+### Added
+- **Resilient Entity Queries (Safe Mode)**: Added resilient fallback GraphQL queries for tags, performers, studios, galleries, and groups that automatically omit `created_at` and `updated_at` timestamps if Stash's GraphQL schema validation fails on corrupt or legacy zero-date records (`0001-01-01T00:00:00Z`).
+- **Safe Mode Notification**: FastTag now displays a gentle, one-time-per-session info toast notifying the user if an entity collection had to be loaded in Safe Mode due to database date validation errors, along with detailed diagnostic logs in debug mode.
+
 ## [4.4.8] - 2026-09-10
 
 ### Fixed
