@@ -28,8 +28,8 @@ jobs:
         fetch-depth: '0'
     - run: |
         mkdir -p _site/${{ github.ref_name }}
-        cp index.yml fasttag.zip _site/ 2>/dev/null || true
-        cp index.yml fasttag.zip _site/${{ github.ref_name }}/ 2>/dev/null || true
+        cp index.yml *.zip _site/ 2>/dev/null || true
+        cp index.yml *.zip _site/${{ github.ref_name }}/ 2>/dev/null || true
     - uses: actions/upload-pages-artifact@v3
 
   deploy:
