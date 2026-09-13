@@ -113,6 +113,53 @@ def find_scene_for_companion(con, companion_name: str):
             return row, ""
 
     return None, None
+
+
+def relocate_companions_transactionally(database_path: Path, source_path: str, destination_path: str):
+    """Move every matching companion or restore all completed moves on failure."""
+    source = Path(source_path)
+    destination = Path(destination_path)
+    if not source.parent.is_dir() or not destination.parent.is_dir():
+        return []
+    planned = []
+    for candidate in sorted(source.parent.iterdir(), key=lambda item: item.name.casefold()):
+        if not candidate.is_file() or candidate == source or candidate.suffix.lower() not in COMPANION_EXTENSIONS:
+            continue
+        matched, remainder = match_companion_to_video(candidate, source)
+        if not matched:
+            continue
+        if candidate.name.lower().startswith(source.name.lower()):
+            target_name = destination.name + candidate.suffix
+        elif remainder:
+            target_name = destination.stem + remainder + candidate.suffix
+        else:
+            target_name = destination.stem + candidate.suffix
+        target = destination.parent / target_name
+        if target.exists() and target != candidate:
+            raise FileExistsError(f"Companion destination already exists: {target}")
+        if target != candidate:
+            planned.append((candidate, target))
+
+    moved = []
+    try:
+        for source_companion, target_companion in planned:
+            expect_filesystem_move(database_path, str(source_companion), str(target_companion))
+            source_companion.rename(target_companion)
+            moved.append((source_companion, target_companion))
+    except Exception as move_error:
+        rollback_errors = []
+        for source_companion, target_companion in reversed(moved):
+            try:
+                if target_companion.exists() and not source_companion.exists():
+                    expect_filesystem_move(database_path, str(target_companion), str(source_companion))
+                    target_companion.rename(source_companion)
+            except Exception as rollback_error:
+                rollback_errors.append(f"{target_companion.name}: {rollback_error}")
+        detail = f"Companion relocation failed and completed moves were restored: {move_error}"
+        if rollback_errors:
+            detail += f"; rollback also failed for {', '.join(rollback_errors)}"
+        raise RuntimeError(detail) from move_error
+    return moved
 INCOMING_SCAN_FLAGS = {
     "scanGenerateCovers": True,
     "scanGeneratePreviews": True,
@@ -251,33 +298,22 @@ class MoveWorker(threading.Thread):
                     resolve_filesystem_event(self.database_path, "moved", source, destination)
                     notify(self.notifications, f"Stash updated: {Path(destination).name}")
 
-                    # Automatically move companion files alongside the video
-                    source_p = Path(source)
-                    dest_p = Path(destination)
-                    if source_p.parent.is_dir() and dest_p.parent.is_dir():
-                        try:
-                            for c in list(source_p.parent.iterdir()):
-                                if not c.is_file() or c == source_p:
-                                    continue
-                                if c.suffix.lower() not in COMPANION_EXTENSIONS:
-                                    continue
-                                matched, rem = match_companion_to_video(c, source_p)
-                                if matched:
-                                    if c.name.lower().startswith(source_p.name.lower()):
-                                        target_name = dest_p.name + c.suffix
-                                    elif rem:
-                                        target_name = dest_p.stem + rem + c.suffix
-                                    else:
-                                        target_name = dest_p.stem + c.suffix
-                                    target_c = dest_p.parent / target_name
-                                    if not target_c.exists():
-                                        expect_filesystem_move(self.database_path, str(c), str(target_c))
-                                        c.rename(target_c)
-                                        record_activity(self.database_path, "companion", "moved companion", "recorded",
-                                                        scene_id=row["scene_id"], old_path=str(c), new_path=str(target_c),
-                                                        detail=f"Moved companion file alongside {dest_p.name}")
-                        except OSError:
-                            pass
+                    # Companion relocation is all-or-nothing: a partial failure restores
+                    # every companion already moved and leaves a clear review warning.
+                    try:
+                        moved_companions = relocate_companions_transactionally(
+                            self.database_path, source, destination
+                        )
+                        for old_companion, new_companion in moved_companions:
+                            record_activity(self.database_path, "companion", "moved companion", "recorded",
+                                            scene_id=row["scene_id"], old_path=str(old_companion),
+                                            new_path=str(new_companion),
+                                            detail=f"Moved companion file alongside {Path(destination).name}")
+                    except Exception as companion_error:
+                        record_activity(self.database_path, "companion", "external move companions", "review",
+                                        severity="warning", scene_id=row["scene_id"], old_path=source,
+                                        new_path=destination, detail=str(companion_error))
+                        notify(self.notifications, f"Companion files need review: {Path(destination).name}")
                 else:
                     detail = f"Stash scan job {job_id} did not attach the destination to the original scene"
                     record_activity(self.database_path, "reconciliation", "targeted Stash scan", "review",
@@ -324,6 +360,7 @@ class CompletedDownloadWorker(threading.Thread):
         self.contact_sheet_banner = True
         self.contact_sheet_adjust_vertical = True
         self.contact_sheet_script = ""
+        self.allow_custom_contact_sheet_script = False
         self.track_temporary_downloads = False
         if self.enabled:
             self._restore_candidates()
@@ -617,7 +654,8 @@ class CompletedDownloadWorker(threading.Thread):
                         grid=self.contact_sheet_grid,
                         include_banner=self.contact_sheet_banner,
                         adjust_vertical=self.contact_sheet_adjust_vertical,
-                        custom_script=self.contact_sheet_script
+                        custom_script=self.contact_sheet_script,
+                        allow_custom_script=self.allow_custom_contact_sheet_script
                     )
                     if csm_res.get("status") == "generated":
                         sheet_p = csm_res.get("path") or sheet_p
@@ -1023,6 +1061,7 @@ def main():
     incoming_worker.contact_sheet_banner = runtime.get("contact_sheet_banner") is not False
     incoming_worker.contact_sheet_adjust_vertical = runtime.get("contact_sheet_adjust_vertical") is not False
     incoming_worker.contact_sheet_script = runtime.get("contact_sheet_script") or ""
+    incoming_worker.allow_custom_contact_sheet_script = runtime.get("allow_custom_contact_sheet_script") is True
     observer = Observer()
     handler = LibraryEventHandler(database_path, worker, runtime.get("mac_notifications") is True, incoming_worker)
     for root in available:
@@ -1071,6 +1110,9 @@ def main():
                             incoming_worker.contact_sheet_banner = new_cfg.get("contact_sheet_banner", incoming_worker.contact_sheet_banner)
                             incoming_worker.contact_sheet_adjust_vertical = new_cfg.get("contact_sheet_adjust_vertical", incoming_worker.contact_sheet_adjust_vertical)
                             incoming_worker.contact_sheet_script = new_cfg.get("contact_sheet_script", incoming_worker.contact_sheet_script)
+                            incoming_worker.allow_custom_contact_sheet_script = bool(new_cfg.get(
+                                "allow_custom_contact_sheet_script", incoming_worker.allow_custom_contact_sheet_script
+                            ))
                         except Exception as reload_err:
                             logger.debug("Failed to apply reload configuration: %s", reload_err)
                         finally:

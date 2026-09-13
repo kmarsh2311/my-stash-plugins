@@ -281,6 +281,19 @@ def refresh_scene(stash, database_path, scene_id):
     refresh_scene_inventory(database_path, scene)
 
 
+def recover_local_rename_cache(stash, database_path, scene_id, result):
+    """Re-read Stash after a confirmed rename whose local cache update failed."""
+    if not result.get("action_performed") or result.get("local_cache_updated") is not False:
+        return result
+    try:
+        refresh_scene(stash, database_path, scene_id)
+        return {**result, "status": "renamed", "local_cache_updated": True,
+                "reason": "Stash confirmed the rename and Watchtower refreshed its local record"}
+    except Exception as recovery_error:
+        return {**result, "status": "renamed_with_warning", "local_cache_updated": False,
+                "reason": f"{result.get('reason', 'The local record needs refreshing')}; recovery failed: {recovery_error}"}
+
+
 def automatic_scene_allowed(config, scene_id):
     """A configured test scene acts as a hard scope lock for automatic hooks."""
     test_scene_id = str((config or {}).get("testSceneId") or "").strip()
@@ -506,6 +519,7 @@ def start_filesystem_monitor(stash, database_path, server_connection=None):
         "contact_sheet_banner": config.get("contactSheetBanner") is not False,
         "contact_sheet_adjust_vertical": config.get("contactSheetAdjustVertical") is not False,
         "contact_sheet_script": config.get("contactSheetScript") or "",
+        "allow_custom_contact_sheet_script": config.get("allowCustomContactSheetScript") is True,
     }), encoding="utf-8")
     runtime_path.chmod(0o600)
     log_handle = open(log_path, "ab", buffering=0)
@@ -551,6 +565,7 @@ def reload_monitor_runtime(stash, database_path):
                 "contact_sheet_banner": config.get("contactSheetBanner") is not False,
                 "contact_sheet_adjust_vertical": config.get("contactSheetAdjustVertical") is not False,
                 "contact_sheet_script": config.get("contactSheetScript") or "",
+                "allow_custom_contact_sheet_script": config.get("allowCustomContactSheetScript") is True,
             }
         }), encoding="utf-8")
         # Poll until the daemon consumes the control file (it deletes it after processing).
@@ -626,6 +641,7 @@ def refresh_scene_contact_sheet(database_path: Path, video_path: str, scene_id: 
             include_banner=config.get("contactSheetBanner") is not False,
             adjust_vertical=config.get("contactSheetAdjustVertical") is not False,
             custom_script=config.get("contactSheetScript") or "",
+            allow_custom_script=config.get("allowCustomContactSheetScript") is True,
             overwrite=True
         )
         if csm_res.get("status") == "generated":
@@ -708,6 +724,7 @@ def process_rename_queue(stash, database_path):
                         "destination_folder": folder, "destination_basename": basename}),
                     config,
                 )
+                result = recover_local_rename_cache(stash, database_path, scene_id, result)
                 finish_queued_rename(database_path, scene_id, result.get("status", "unknown"), result.get("reason", ""))
                 audit(database_path, "rename", "automatic rename", result.get("status", "unknown"),
                       scene_id=scene_id, file_id=result.get("file_id"), old_path=result.get("current_path"),
@@ -827,6 +844,7 @@ def main():
             banner = config.get("contactSheetBanner") is not False
             adjust_vert = config.get("contactSheetAdjustVertical") is not False
             custom_script = config.get("contactSheetScript") or ""
+            allow_custom_script = config.get("allowCustomContactSheetScript") is True
             video_extensions = {".mp4", ".m4v", ".mov", ".mkv", ".avi", ".webm", ".wmv"}
             candidates = []
             for inc_dir in valid_paths:
@@ -877,7 +895,8 @@ def main():
                     grid=grid,
                     include_banner=banner,
                     adjust_vertical=adjust_vert,
-                    custom_script=custom_script
+                    custom_script=custom_script,
+                    allow_custom_script=allow_custom_script
                 )
                 try:
                     con = connect(database_path)
@@ -1360,6 +1379,7 @@ def main():
                 lambda file_id, folder, basename: stash.move_files({"ids": [file_id], "destination_folder": folder,
                                                                     "destination_basename": basename}),
             )
+            result = recover_local_rename_cache(stash, database_path, scene_id, result)
             audit(database_path, "rename", "manual filename correction", result.get("status", "unknown"),
                   scene_id=scene_id, file_id=result.get("file_id"), old_path=result.get("current_path"),
                   new_path=result.get("proposed_path"), detail=result.get("reason", ""))
@@ -1386,6 +1406,7 @@ def main():
                                                                     "destination_basename": basename}),
                 active_config,
             )
+            result = recover_local_rename_cache(stash, database_path, scene_id, result)
             audit(database_path, "rename", "test scene rename", result.get("status", "unknown"),
                   scene_id=scene_id, file_id=result.get("file_id"), old_path=result.get("current_path"),
                   new_path=result.get("proposed_path"), detail=result.get("reason", ""))

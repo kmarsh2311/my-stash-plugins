@@ -12,6 +12,7 @@ import tempfile
 import subprocess
 import shutil
 import glob
+import sys
 import time
 import threading
 from contextlib import contextmanager
@@ -130,6 +131,7 @@ CREATE TABLE IF NOT EXISTS rename_queue (
     available_at REAL NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
     attempts INTEGER NOT NULL DEFAULT 0,
+    processing_started_at REAL,
     last_error TEXT
 );
 CREATE TABLE IF NOT EXISTS rename_worker_state (
@@ -351,6 +353,8 @@ def _ensure_schema(connection: "sqlite3.Connection", database_path: Path) -> Non
                     "ALTER TABLE incoming_files ADD COLUMN settle_seconds INTEGER NOT NULL DEFAULT 300")
         _safe_alter(connection, "inventory_runs", "stash_scene_count",
                     "ALTER TABLE inventory_runs ADD COLUMN stash_scene_count INTEGER NOT NULL DEFAULT 0")
+        _safe_alter(connection, "rename_queue", "processing_started_at",
+                    "ALTER TABLE rename_queue ADD COLUMN processing_started_at REAL")
         connection.execute(
             """UPDATE inventory_runs SET stash_scene_count=(SELECT COUNT(DISTINCT scene_id) FROM files)
                WHERE status='complete' AND stash_scene_count=0"""
@@ -362,6 +366,8 @@ def _ensure_schema(connection: "sqlite3.Connection", database_path: Path) -> Non
 def connect(database_path: Path) -> sqlite3.Connection:
     connection = sqlite3.connect(database_path, timeout=30)
     connection.row_factory = sqlite3.Row
+    # SQLite does not persist this per-connection setting.
+    connection.execute("PRAGMA foreign_keys=ON")
     _ensure_schema(connection, database_path)
     return connection
 
@@ -795,10 +801,10 @@ def enqueue_rename(database_path: Path, scene_id: str, now_timestamp: float, deb
     try:
         connection.execute("BEGIN IMMEDIATE")
         connection.execute(
-            """INSERT INTO rename_queue(scene_id,enqueued_at,available_at,status,attempts,last_error)
-               VALUES (?,?,?,'pending',0,NULL)
+            """INSERT INTO rename_queue(scene_id,enqueued_at,available_at,status,attempts,processing_started_at,last_error)
+               VALUES (?,?,?,'pending',0,NULL,NULL)
                ON CONFLICT(scene_id) DO UPDATE SET enqueued_at=excluded.enqueued_at,
-                   available_at=excluded.available_at,status='pending',last_error=NULL""",
+               available_at=excluded.available_at,status='pending',processing_started_at=NULL,last_error=NULL""",
             (str(scene_id), now_timestamp, now_timestamp + debounce_seconds),
         )
         scheduled = connection.execute("SELECT scheduled FROM rename_worker_state WHERE id=1").fetchone()[0]
@@ -862,8 +868,8 @@ def claim_due_rename(database_path: Path, now_timestamp: float):
         # Recover any renames stranded in 'processing' by a previously crashed worker.
         stale_cutoff = now_timestamp - _STALE_PROCESSING_SECONDS
         connection.execute(
-            """UPDATE rename_queue SET status='pending'
-               WHERE status='processing' AND enqueued_at <= ?""",
+            """UPDATE rename_queue SET status='pending',processing_started_at=NULL
+               WHERE status='processing' AND COALESCE(processing_started_at,enqueued_at) <= ?""",
             (stale_cutoff,),
         )
         row = connection.execute(
@@ -878,7 +884,8 @@ def claim_due_rename(database_path: Path, now_timestamp: float):
             return None, next_row["next_at"], next_row["pending"]
         scene_id = row["scene_id"]
         connection.execute(
-            "UPDATE rename_queue SET status='processing',attempts=attempts+1 WHERE scene_id=?", (scene_id,)
+            "UPDATE rename_queue SET status='processing',processing_started_at=?,attempts=attempts+1 WHERE scene_id=?",
+            (now_timestamp, scene_id)
         )
         connection.commit()
         return scene_id, None, None
@@ -955,6 +962,34 @@ def resolve_filesystem_event(database_path: Path, event_type: str, source_path: 
 def _is_pid_alive(pid: int | None) -> bool:
     if not pid or pid <= 0:
         return False
+
+
+def _pid_matches_monitor(pid: int | None, token: str | None):
+    """Return True/False when process identity can be checked, otherwise None."""
+    if not pid or not token:
+        return False
+    try:
+        proc_cmdline = Path(f"/proc/{int(pid)}/cmdline")
+        if proc_cmdline.is_file():
+            command = proc_cmdline.read_bytes().replace(b"\0", b" ").decode("utf-8", "replace")
+        elif sys.platform == "win32":
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                 f"(Get-CimInstance Win32_Process -Filter 'ProcessId = {int(pid)}').CommandLine"],
+                capture_output=True, text=True, timeout=3, check=False,
+            )
+            if result.returncode:
+                return None
+            command = result.stdout
+        else:
+            result = subprocess.run(["ps", "-ww", "-p", str(int(pid)), "-o", "command="],
+                                    capture_output=True, text=True, timeout=3, check=False)
+            if result.returncode:
+                return None
+            command = result.stdout
+        return "librarymanager_monitor.py" in command and str(token) in command
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
     try:
         os.kill(int(pid), 0)
         return True
@@ -968,7 +1003,8 @@ def filesystem_monitor_summary(database_path: Path) -> dict:
         status = connection.execute("SELECT * FROM filesystem_monitor_status WHERE id=1").fetchone()
         if not status:
             return {"state": "stopped", "raw_state": "stopped", "is_stale": False, "heartbeat_age_seconds": None,
-                    "pid": None, "pid_alive": False, "started_at": None, "token": None, "heartbeat_at": None,
+                    "pid": None, "pid_alive": False, "pid_matches_monitor": False,
+                    "started_at": None, "token": None, "heartbeat_at": None,
                     "roots": [], "unavailable_roots": [], "pending_events": 0, "event_types": {}}
         counts = {row["event_type"]: row["count"] for row in connection.execute(
             "SELECT event_type,COUNT(*) AS count FROM filesystem_events WHERE status='pending' GROUP BY event_type"
@@ -987,6 +1023,7 @@ def filesystem_monitor_summary(database_path: Path) -> dict:
 
         pid = status["pid"]
         pid_alive = _is_pid_alive(pid) if pid else False
+        pid_matches_monitor = _pid_matches_monitor(pid, status["token"]) if pid_alive else False
         raw_state = status["state"] or "stopped"
         effective_state = raw_state
         is_stale = False
@@ -997,6 +1034,10 @@ def filesystem_monitor_summary(database_path: Path) -> dict:
                 is_stale = True
                 effective_state = "stale"
                 stale_reason = f"Process (PID {pid}) terminated unexpectedly"
+            elif pid_matches_monitor is False:
+                is_stale = True
+                effective_state = "stale"
+                stale_reason = f"Process (PID {pid}) is not this Watchtower monitor"
             elif heartbeat_age is not None and heartbeat_age > 30.0:
                 is_stale = True
                 effective_state = "stale"
@@ -1014,6 +1055,7 @@ def filesystem_monitor_summary(database_path: Path) -> dict:
             "heartbeat_age_seconds": round(heartbeat_age, 1) if heartbeat_age is not None else None,
             "pid": pid,
             "pid_alive": pid_alive,
+            "pid_matches_monitor": pid_matches_monitor,
             "started_at": status["started_at"],
             "token": status["token"],
             "heartbeat_at": heartbeat_at,
@@ -1530,7 +1572,7 @@ def _should_strip_metadata_from_title(filename_options: dict | None, row=None, t
                 pass
         if check_title:
             has_delimiters = bool(re.search(r"\s*-\s*", check_title) or re.search(r"\[.*?\]|\(.*?\)", check_title))
-            is_pairing = bool(re.search(r"(?i)(?:and|with|meets|vs|&)", check_title))
+            is_pairing = bool(re.search(r"(?i)(?:\b(?:and|with|meets|vs)\b|&)", check_title))
             if is_pairing and not has_delimiters:
                 return False
 
@@ -1897,6 +1939,7 @@ def apply_scene_filename(database_path: Path, scene_id: str, move_file, filename
         if preview.get("status") != "ready":
             return preview
         moved_sidecars = []
+        video_renamed = False
         try:
             for item in preview["associated_files"]:
                 source, target = Path(item["source"]), Path(item["target"])
@@ -1909,8 +1952,10 @@ def apply_scene_filename(database_path: Path, scene_id: str, move_file, filename
             result = move_file(preview["file_id"], str(current.parent), proposed.name)
             if result is False or result is None:
                 raise RuntimeError("Stash did not confirm the file rename")
-            connection = connect(database_path)
+            video_renamed = True
+            connection = None
             try:
+                connection = connect(database_path)
                 connection.execute(
                     "UPDATE filename_state SET last_generated_stem=?,updated_at=? WHERE file_id=?",
                     (proposed.stem, utc_now(), preview["file_id"]),
@@ -1925,8 +1970,16 @@ def apply_scene_filename(database_path: Path, scene_id: str, move_file, filename
                         (str(target), utc_now(), str(source))
                     )
                 connection.commit()
+            except Exception as database_error:
+                if connection is not None:
+                    connection.rollback()
+                return {**preview, "status": "renamed_with_warning",
+                        "reason": f"Stash renamed the video, but Watchtower must refresh its local record: {database_error}",
+                        "renamed_sidecars": [{"source": str(source), "target": str(target)} for source, target in moved_sidecars],
+                        "action_performed": True, "local_cache_updated": False}
             finally:
-                connection.close()
+                if connection is not None:
+                    connection.close()
             # Sidecars are part of the same successful rename transaction, but make
             # them visible in Recent Activity as separate informational entries.
             # Logging is deliberately best-effort so a log write can never turn a
@@ -1949,12 +2002,13 @@ def apply_scene_filename(database_path: Path, scene_id: str, move_file, filename
                     pass
             return {**preview, "status": "renamed", "reason": "Stash confirmed the rename",
                     "renamed_sidecars": [{"source": str(source), "target": str(target)} for source, target in moved_sidecars],
-                    "action_performed": True}
+                    "action_performed": True, "local_cache_updated": True}
         except Exception:
-            for source, target in reversed(moved_sidecars):
-                if target.exists() and not source.exists():
-                    expect_filesystem_move(database_path, str(target), str(source))
-                    target.rename(source)
+            if not video_renamed:
+                for source, target in reversed(moved_sidecars):
+                    if target.exists() and not source.exists():
+                        expect_filesystem_move(database_path, str(target), str(source))
+                        target.rename(source)
             raise
 
 
@@ -2016,6 +2070,7 @@ def apply_manual_filename(database_path: Path, scene_id: str, requested_name: st
         if preview.get("status") != "ready":
             return preview
         moved_sidecars = []
+        video_renamed = False
         try:
             for item in preview["associated_files"]:
                 source, target = Path(item["source"]), Path(item["target"])
@@ -2027,8 +2082,10 @@ def apply_manual_filename(database_path: Path, scene_id: str, requested_name: st
             result = move_file(preview["file_id"], str(current.parent), proposed.name)
             if result is False or result is None:
                 raise RuntimeError("Stash did not confirm the file rename")
-            connection = connect(database_path)
+            video_renamed = True
+            connection = None
             try:
+                connection = connect(database_path)
                 connection.execute("UPDATE files SET path=?,basename=?,exists_on_disk=1,last_seen_at=? WHERE file_id=?",
                                    (str(proposed), proposed.name, utc_now(), preview["file_id"]))
                 connection.execute(
@@ -2042,8 +2099,16 @@ def apply_manual_filename(database_path: Path, scene_id: str, requested_name: st
                      json.dumps(preview.get("metadata_performers") or [], ensure_ascii=False), utc_now(), utc_now()),
                 )
                 connection.commit()
+            except Exception as database_error:
+                if connection is not None:
+                    connection.rollback()
+                return {**preview, "status": "renamed_with_warning",
+                        "reason": f"Stash renamed the video, but Watchtower must refresh its local record: {database_error}",
+                        "renamed_sidecars": [{"source": str(source), "target": str(target)} for source, target in moved_sidecars],
+                        "action_performed": True, "local_cache_updated": False}
             finally:
-                connection.close()
+                if connection is not None:
+                    connection.close()
             # Log successful companion-file renames separately so manual filename
             # corrections show their JPG/other sidecar updates in Recent Activity.
             # Keep this best-effort: logging must never undo a completed rename.
@@ -2065,12 +2130,13 @@ def apply_manual_filename(database_path: Path, scene_id: str, requested_name: st
                     pass
             return {**preview, "status": "renamed", "reason": "Stash confirmed the manual correction",
                     "renamed_sidecars": [{"source": str(source), "target": str(target)} for source, target in moved_sidecars],
-                    "action_performed": True}
+                    "action_performed": True, "local_cache_updated": True}
         except Exception:
-            for source, target in reversed(moved_sidecars):
-                if target.exists() and not source.exists():
-                    expect_filesystem_move(database_path, str(target), str(source))
-                    target.rename(source)
+            if not video_renamed:
+                for source, target in reversed(moved_sidecars):
+                    if target.exists() and not source.exists():
+                        expect_filesystem_move(database_path, str(target), str(source))
+                        target.rename(source)
             raise
 
 
@@ -2104,6 +2170,7 @@ def generate_video_contact_sheet(
     include_banner=True,
     adjust_vertical=True,
     custom_script=None,
+    allow_custom_script=False,
     overwrite=False,
     logger=None
 ):
@@ -2116,16 +2183,25 @@ def generate_video_contact_sheet(
     if dest_path.exists() and not overwrite:
         return {"status": "skipped", "message": "Contact sheet already exists", "path": str(dest_path)}
 
-    # If custom script is specified
-    if custom_script and Path(custom_script).is_file():
-        cmd = [str(custom_script), str(video_file)]
+    # Custom scripts are trusted local executable code and require an explicit switch.
+    if custom_script and allow_custom_script:
+        script_path = Path(custom_script).expanduser().resolve()
+        if not script_path.is_file():
+            return {"status": "error", "error": f"Custom script is not a regular file: {script_path}"}
+        if os.name != "nt" and not os.access(script_path, os.X_OK):
+            return {"status": "error", "error": f"Custom script is not executable: {script_path}"}
+        cmd = [str(script_path), str(video_file)]
         if shutil.which("taskpolicy") or os.path.exists("/usr/sbin/taskpolicy"):
             cmd = ["/usr/sbin/taskpolicy", "-b"] + cmd
         try:
-            subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            completed = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            if completed.returncode:
+                return {"status": "error", "error":
+                        f"Custom script exited with code {completed.returncode}: {(completed.stderr or '').strip()}"}
             if dest_path.exists() or Path(f"{video_file.stem}.jpg").exists():
                 actual = dest_path if dest_path.exists() else Path(f"{video_file.stem}.jpg")
                 return {"status": "generated", "path": str(actual), "custom_script": True}
+            return {"status": "error", "error": "Custom script completed but did not create the expected contact sheet"}
         except Exception as e:
             return {"status": "error", "error": f"Custom script error: {e}"}
 
