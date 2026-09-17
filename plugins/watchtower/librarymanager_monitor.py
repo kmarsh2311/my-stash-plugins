@@ -3,10 +3,163 @@
 
 import argparse
 import base64
+import concurrent.futures
+import errno
+from pathlib import Path
+NETWORK_DISCONNECT_ERRNOS = {
+    getattr(errno, "ENOTCONN", 57),       # Socket is not connected
+    getattr(errno, "ETIMEDOUT", 60),      # Operation timed out
+    getattr(errno, "EHOSTDOWN", 64),      # Host is down
+    getattr(errno, "EHOSTUNREACH", 65),   # No route to host
+    getattr(errno, "ECONNRESET", 54),     # Connection reset by peer
+    getattr(errno, "ECONNABORTED", 53),   # Software caused connection abort
+    getattr(errno, "ENETDOWN", 50),       # Network is down
+    getattr(errno, "ENETUNREACH", 51),    # Network is unreachable
+    getattr(errno, "EIO", 5),             # Input/output error
+    getattr(errno, "ESTALE", 70),         # Stale NFS file handle
+}
+
+
+def is_network_disconnect_error(err: BaseException, path=None) -> bool:
+    if isinstance(err, OSError):
+        if err.errno in NETWORK_DISCONNECT_ERRNOS:
+            return True
+        err_msg = str(err).lower()
+        if any(msg in err_msg for msg in ("socket is not connected", "timed out", "host is down", "no route to host", "network is down", "stale file handle", "input/output error")):
+            return True
+    return False
+
+
+def is_path_available(path) -> bool:
+    try:
+        p = Path(path)
+        if not p.is_dir():
+            return False
+        try:
+            with os.scandir(p) as it:
+                pass
+        except OSError as e:
+            if is_network_disconnect_error(e, path=p):
+                return False
+        return True
+    except OSError:
+        return False
+
+
+
+
+class RootAvailabilityTracker:
+    """Tracks availability of monitored roots asynchronously without blocking the caller."""
+    def __init__(self, roots, probe_timeout=5.0):
+        self.roots = list(roots or [])
+        self.probe_timeout = float(probe_timeout)
+        self.lock = threading.Lock()
+        self._states = {}
+        for r in self.roots:
+            self._states[r] = {
+                "status": "available",
+                "in_flight": False,
+                "started_at": 0.0,
+                "last_probed_at": 0.0,
+            }
+        self._recovered_batch = []
+        self._lost_batch = []
+
+    def update_roots(self, roots):
+        with self.lock:
+            self.roots = list(roots or [])
+            for r in self.roots:
+                if r not in self._states:
+                    self._states[r] = {
+                        "status": "available",
+                        "in_flight": False,
+                        "started_at": 0.0,
+                        "last_probed_at": 0.0,
+                    }
+
+    def get_unavailable_roots(self) -> list[str]:
+        with self.lock:
+            return [r for r, s in self._states.items() if s.get("status") != "available"]
+
+    def poll(self):
+        """Non-blocking call by the main monitor loop.
+        Returns (available_roots, unavailable_roots, recovered_roots, lost_roots).
+        NEVER performs filesystem operations on the calling thread.
+        """
+        mono_now = time.monotonic()
+        recovered = []
+        lost = []
+        available = []
+        unavailable = []
+
+        with self.lock:
+            for root in self.roots:
+                state = self._states.get(root)
+                if not state:
+                    continue
+                if state["in_flight"]:
+                    if mono_now - state["started_at"] > self.probe_timeout:
+                        if state["status"] == "available":
+                            state["status"] = "unavailable"
+                            lost.append(root)
+                else:
+                    if mono_now - state["last_probed_at"] >= 5.0 or state["last_probed_at"] == 0.0:
+                        self._launch_probe_unlocked(root, mono_now)
+
+                if state["status"] == "available":
+                    available.append(root)
+                else:
+                    unavailable.append(root)
+
+            recovered_batch = self._recovered_batch
+            lost_batch = self._lost_batch
+            self._recovered_batch = []
+            self._lost_batch = []
+
+        all_recovered = list(dict.fromkeys(recovered + recovered_batch))
+        all_lost = list(dict.fromkeys(lost + lost_batch))
+        return available, unavailable, all_recovered, all_lost
+
+    def _launch_probe_unlocked(self, root, mono_now):
+        state = self._states[root]
+        state["in_flight"] = True
+        state["started_at"] = mono_now
+
+        def probe_worker():
+            success = False
+            try:
+                p = Path(root)
+                if p.is_dir():
+                    try:
+                        with os.scandir(p) as it:
+                            pass
+                        success = True
+                    except OSError as e:
+                        if not is_network_disconnect_error(e):
+                            success = True
+            except (OSError, Exception):
+                success = False
+
+            with self.lock:
+                state["in_flight"] = False
+                state["last_probed_at"] = time.monotonic()
+                prev_status = state["status"]
+                new_status = "available" if success else "unavailable"
+                state["status"] = new_status
+                if prev_status != new_status:
+                    if new_status == "available":
+                        self._recovered_batch.append(root)
+                    else:
+                        self._lost_batch.append(root)
+
+        t = threading.Thread(target=probe_worker, name=f"probe_{Path(root).name}", daemon=True)
+        t.start()
+
 import hashlib
 import logging
 import json
 import os
+import posixpath
 import sys
 import signal
 import sqlite3
@@ -26,6 +179,7 @@ import unicodedata
 from librarymanager_core import (
     generate_video_contact_sheet, connect, consume_expected_create, consume_expected_move,
     expect_filesystem_create, expect_filesystem_move, fingerprint_value,
+    is_file_on_unavailable_root,
                                  opensubtitles_hash, record_activity, record_filesystem_event,
                                  resolve_filesystem_event, refresh_scene_inventory, utc_now)
 
@@ -93,6 +247,96 @@ COMPANION_EXTENSIONS = {
 WATCHED_EXTENSIONS = VIDEO_EXTENSIONS | COMPANION_EXTENSIONS | TEMPORARY_DOWNLOAD_EXTENSIONS
 
 
+def is_temporary_download(path) -> bool:
+    if not path:
+        return False
+    p = Path(path)
+    name = p.name.lower()
+    suffix = p.suffix.lower()
+    if suffix in TEMPORARY_DOWNLOAD_EXTENSIONS:
+        return True
+    if name.startswith(".com.google.chrome.") or name.startswith("com.google.chrome."):
+        return True
+    if name.startswith("unconfirmed ") and (name.endswith(".crdownload") or ".crdownload" in name):
+        return True
+    if name.endswith(".crdownload"):
+        return True
+    return False
+
+
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+GENERIC_ARTWORK_STEMS = {"cover", "poster", "fanart", "folder", "thumb"}
+
+
+def is_image_companion(path) -> bool:
+    try:
+        return Path(path).suffix.lower() in IMAGE_EXTENSIONS
+    except Exception:
+        return False
+
+
+def is_generic_artwork(path) -> bool:
+    try:
+        p = Path(path)
+        return p.suffix.lower() in IMAGE_EXTENSIONS and p.stem.lower() in GENERIC_ARTWORK_STEMS
+    except Exception:
+        return False
+
+
+def find_eligible_videos_in_folder(folder: Path, database_path: Path = None, candidates: dict = None) -> set:
+    eligible = set()
+    try:
+        f_resolved = folder.resolve()
+    except OSError:
+        return eligible
+
+    # 1. On disk in folder
+    try:
+        if folder.is_dir():
+            for item in folder.iterdir():
+                if item.is_file() and item.suffix.lower() in VIDEO_EXTENSIONS:
+                    if not is_temporary_download(item):
+                        try:
+                            eligible.add(item.resolve())
+                        except OSError:
+                            pass
+    except OSError:
+        pass
+
+    # 2. In candidates (in-memory)
+    if candidates:
+        for c_p, c_cand in candidates.items():
+            if not c_cand.get("is_companion") and not c_cand.get("is_temporary"):
+                p = Path(c_p)
+                if p.suffix.lower() in VIDEO_EXTENSIONS:
+                    try:
+                        if p.parent.resolve() == f_resolved:
+                            eligible.add(p.resolve())
+                    except OSError:
+                        pass
+
+    # 3. In database files table (existing scenes)
+    if database_path:
+        try:
+            con = connect(database_path)
+            try:
+                rows = con.execute("SELECT path FROM files WHERE exists_on_disk=1").fetchall()
+                for r in rows:
+                    p = Path(r["path"])
+                    if p.suffix.lower() in VIDEO_EXTENSIONS:
+                        try:
+                            if p.parent.resolve() == f_resolved:
+                                eligible.add(p.resolve())
+                        except OSError:
+                            pass
+            finally:
+                con.close()
+        except Exception:
+            pass
+
+    return eligible
+
+
 def _sidecar_match_key(name: str) -> str:
     nfkd = unicodedata.normalize("NFKD", str(name or ""))
     no_accents = "".join(c for c in nfkd if not unicodedata.combining(c))
@@ -142,13 +386,20 @@ def _compound_video_name(companion_name: str):
 
 def find_scene_for_companion(con, companion_path_or_name):
     """Resolve companions conservatively: local exact matches or unique compound names only."""
-    c_path = Path(companion_path_or_name)
+    c_raw = str(companion_path_or_name)
+    c_path = Path(c_raw.replace("\\", "/"))
     c_name = c_path.name
     c_stem = c_path.stem
-    c_dir = str(c_path.parent.resolve()) if len(c_path.parts) > 1 else None
+    c_dir = str(c_path.parent) if len(c_path.parts) > 1 and str(c_path.parent) not in (".", "") else None
 
     if c_path.suffix.lower() not in COMPANION_EXTENSIONS:
         return None, ""
+
+    def _normalize_dir_key(p: str) -> str:
+        return os.path.normcase(posixpath.normpath(str(p).replace("\\", "/")))
+
+    def _dir_of(p: str) -> str:
+        return posixpath.dirname(str(p).replace("\\", "/"))
 
     # Strong cross-directory form only: Movie.m4v.jpg -> Movie.m4v.
     compound_name = _compound_video_name(c_name)
@@ -160,7 +411,8 @@ def find_scene_for_companion(con, companion_path_or_name):
         if len(rows) == 1:
             return rows[0], ""
         if len(rows) > 1 and c_dir:
-            local = [r for r in rows if str(Path(r["path"]).parent.resolve()) == c_dir]
+            target_key = _normalize_dir_key(c_dir)
+            local = [r for r in rows if _normalize_dir_key(_dir_of(r["path"])) == target_key]
             if len(local) == 1:
                 return local[0], ""
         return None, ""
@@ -169,10 +421,38 @@ def find_scene_for_companion(con, companion_path_or_name):
     if not c_dir:
         return None, ""
 
-    rows = con.execute(
-        "SELECT file_id, scene_id, path, basename FROM files WHERE exists_on_disk=1"
-    ).fetchall()
-    local_rows = [r for r in rows if str(Path(r["path"]).parent.resolve()) == c_dir]
+    c_dir_norm = str(c_dir).rstrip("/\\")
+    p1 = c_dir_norm.replace("\\", "/") + "/"
+    u1 = p1[:-1] + "0"
+    p2 = c_dir_norm.replace("/", "\\") + "\\"
+    u2 = p2[:-1] + "]"
+
+    if p1 == p2:
+        rows = con.execute(
+            "SELECT file_id, scene_id, path, basename FROM files WHERE exists_on_disk=1 AND path >= ? AND path < ?",
+            (p1, u1),
+        ).fetchall()
+    else:
+        rows = con.execute(
+            "SELECT file_id, scene_id, path, basename FROM files WHERE exists_on_disk=1 AND ((path >= ? AND path < ?) OR (path >= ? AND path < ?))",
+            (p1, u1, p2, u2),
+        ).fetchall()
+
+    target_dir_key = _normalize_dir_key(c_dir)
+    local_rows = [
+        r for r in rows
+        if _normalize_dir_key(_dir_of(r["path"])) == target_dir_key
+    ]
+
+    # Generic artwork matching: only associate when exactly one video is in that folder
+    if is_generic_artwork(c_path):
+        eligible = find_eligible_videos_in_folder(c_path.parent)
+        all_vid_paths = {_normalize_dir_key(p) for p in eligible}
+        for r in local_rows:
+            all_vid_paths.add(_normalize_dir_key(r["path"]))
+        if len(all_vid_paths) == 1 and len(local_rows) == 1:
+            return local_rows[0], f".{c_stem.lower()}" if c_stem.lower() != "cover" else ""
+        return None, ""
     matches = []
     for row in local_rows:
         video = Path(row["basename"])
@@ -676,7 +956,7 @@ class MoveWorker(threading.Thread):
 class CompletedDownloadWorker(threading.Thread):
     """Wait for new incoming videos to settle, then request one targeted Stash scan."""
     def __init__(self, database_path, stash, incoming_folder, enabled, settle_seconds, notifications,
-                 fallback_seconds=60, max_attempts=3, incoming_folders=None):
+                 fallback_seconds=60, max_attempts=3, incoming_folders=None, track_temporary_downloads=False):
         super().__init__(daemon=True)
         self.database_path, self.stash = database_path, stash
         raw_folders = incoming_folders if incoming_folders is not None else ([incoming_folder] if incoming_folder else [])
@@ -700,6 +980,7 @@ class CompletedDownloadWorker(threading.Thread):
         self.lock = threading.RLock()
         self.stopping = False
         self.wake = threading.Event()
+        self.companion_retry_interval = 300.0
         self.started_at = time.time()
         self.last_fallback = self.started_at
         self.generate_contact_sheets = False
@@ -708,7 +989,13 @@ class CompletedDownloadWorker(threading.Thread):
         self.contact_sheet_adjust_vertical = True
         self.contact_sheet_script = ""
         self.allow_custom_contact_sheet_script = False
-        self.track_temporary_downloads = False
+        self.track_temporary_downloads = track_temporary_downloads
+        self._scanning_folders = set()
+        self._scanning_lock = threading.Lock()
+        self._scan_pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=max(1, min(4, len(self.incoming_folders) or 1)),
+            thread_name_prefix="incoming_scan"
+        )
         if self.enabled:
             self._restore_candidates()
             self._recover_recent_files()
@@ -732,11 +1019,11 @@ class CompletedDownloadWorker(threading.Thread):
         if not self.enabled or not path:
             return False
         candidate = Path(path)
-        suffix = candidate.suffix.lower()
-        if suffix in TEMPORARY_DOWNLOAD_EXTENSIONS:
+        if is_temporary_download(candidate):
             if not getattr(self, "track_temporary_downloads", False):
                 return False
             return self._is_inside_incoming(candidate)
+        suffix = candidate.suffix.lower()
         if suffix not in (VIDEO_EXTENSIONS | COMPANION_EXTENSIONS):
             return False
         return self._is_inside_incoming(candidate)
@@ -749,16 +1036,26 @@ class CompletedDownloadWorker(threading.Thread):
             valid = valid | TEMPORARY_DOWNLOAD_EXTENSIONS
         found = set()
         for folder in self.incoming_folders:
-            if folder.is_dir():
-                try:
-                    for path in folder.rglob("*"):
-                        if path.is_file() and path.suffix.lower() in valid:
+            try:
+                if not folder.is_dir():
+                    continue
+                for path in folder.rglob("*"):
+                    try:
+                        if not path.is_file():
+                            continue
+                        if path.suffix.lower() in valid or (getattr(self, "track_temporary_downloads", False) and is_temporary_download(path)):
                             found.add(str(path.resolve()))
-                except Exception as exc:
-                    logger.debug("Failed scanning incoming folder %s: %s", folder, exc)
+                    except OSError as err:
+                        if is_network_disconnect_error(err, path):
+                            break
+                        continue
+            except OSError as exc:
+                logger.debug("Failed scanning incoming folder %s: %s", folder, exc)
         return found
 
     def _current_video_paths(self):
+        """Alias for _current_incoming_paths. Retained for test contracts and backwards compatibility.
+        Returns all monitored incoming paths (including companions) required for fallback rediscovery."""
         return self._current_incoming_paths()
 
     def _is_in_inventory(self, path):
@@ -772,7 +1069,7 @@ class CompletedDownloadWorker(threading.Thread):
         connection = connect(self.database_path)
         try:
             row = connection.execute("SELECT status FROM incoming_files WHERE path=?", (path,)).fetchone()
-            return bool(row and row["status"] in ("imported", "paired", "dismissed"))
+            return bool(row and row["status"] in ("imported", "paired", "dismissed", "unmatched", "ignored"))
         finally:
             connection.close()
 
@@ -792,7 +1089,7 @@ class CompletedDownloadWorker(threading.Thread):
         connection = connect(self.database_path)
         try:
             rows = connection.execute(
-                "SELECT path,size,modified_ns,stable_since,attempts FROM incoming_files WHERE status IN ('waiting','scanning','downloading')"
+                "SELECT path,size,modified_ns,stable_since,attempts,status,detail,first_seen_at FROM incoming_files WHERE status IN ('waiting','scanning','downloading')"
             ).fetchall()
         finally:
             connection.close()
@@ -802,9 +1099,8 @@ class CompletedDownloadWorker(threading.Thread):
                 continue
             stat = Path(path).stat()
             unchanged = row["size"] == stat.st_size and row["modified_ns"] == stat.st_mtime_ns
-            suffix = Path(path).suffix.lower()
-            is_temporary = suffix in TEMPORARY_DOWNLOAD_EXTENSIONS
-            is_companion = (not is_temporary) and (suffix in COMPANION_EXTENSIONS)
+            is_temporary = is_temporary_download(path)
+            is_companion = (not is_temporary) and (Path(path).suffix.lower() in COMPANION_EXTENSIONS)
             with self.lock:
                 self.candidates[path] = {
                     "size": stat.st_size,
@@ -813,13 +1109,18 @@ class CompletedDownloadWorker(threading.Thread):
                     "attempts": int(row["attempts"] or 0),
                     "is_companion": is_companion,
                     "is_temporary": is_temporary,
+                    "last_saved_status": row["status"],
+                    "last_saved_detail": row["detail"],
+                    "first_seen_at": row["first_seen_at"],
+                    "check_after": 0.0,
                 }
 
-    def _save_state(self, path, status, *, stat=None, stable_since=None, job_id=None, detail=None, attempts=None):
+    def _save_state(self, path, status, *, stat=None, stable_since=None, job_id=None, detail=None, attempts=None, first_seen_at=None):
         connection = connect(self.database_path)
         try:
-            existing = connection.execute("SELECT attempts FROM incoming_files WHERE path=?", (path,)).fetchone()
+            existing = connection.execute("SELECT attempts, first_seen_at FROM incoming_files WHERE path=?", (path,)).fetchone()
             attempt_count = int(existing["attempts"] if existing else 0) if attempts is None else int(attempts)
+            initial_seen = (existing["first_seen_at"] if existing and existing["first_seen_at"] else None) or first_seen_at or utc_now()
             connection.execute(
                 """INSERT INTO incoming_files(path,first_seen_at,last_checked_at,size,modified_ns,stable_since,settle_seconds,status,attempts,scan_job_id,detail)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?)
@@ -829,7 +1130,7 @@ class CompletedDownloadWorker(threading.Thread):
                      stable_since=COALESCE(excluded.stable_since,incoming_files.stable_since),
                      settle_seconds=excluded.settle_seconds,status=excluded.status,
                      attempts=excluded.attempts,scan_job_id=excluded.scan_job_id,detail=excluded.detail""",
-                (path, utc_now(), utc_now(), stat.st_size if stat else None,
+                (path, initial_seen, utc_now(), stat.st_size if stat else None,
                  stat.st_mtime_ns if stat else None, stable_since, self.settle_seconds, status, attempt_count,
                  str(job_id) if job_id is not None else None, detail),
             )
@@ -852,21 +1153,11 @@ class CompletedDownloadWorker(threading.Thread):
         with self.lock:
             current = self.candidates.get(normalized)
         stable_since = time.time()
+        first_seen = current.get("first_seen_at") if current else utc_now()
         if current and current["size"] == stat.st_size and current["modified_ns"] == stat.st_mtime_ns:
             stable_since = current["stable_since"]
-        suffix = Path(normalized).suffix.lower()
-        is_temporary = suffix in TEMPORARY_DOWNLOAD_EXTENSIONS
-        is_companion = (not is_temporary) and (suffix in COMPANION_EXTENSIONS)
-        candidate = {
-            "size": stat.st_size,
-            "modified_ns": stat.st_mtime_ns,
-            "stable_since": stable_since,
-            "attempts": current["attempts"] if current else 0,
-            "is_companion": is_companion,
-            "is_temporary": is_temporary,
-        }
-        with self.lock:
-            self.candidates[normalized] = candidate
+        is_temporary = is_temporary_download(normalized)
+        is_companion = (not is_temporary) and (Path(normalized).suffix.lower() in COMPANION_EXTENSIONS)
         if is_temporary:
             status = "downloading"
             detail = "Incoming download in progress"
@@ -876,17 +1167,49 @@ class CompletedDownloadWorker(threading.Thread):
         else:
             status = "waiting"
             detail = f"Waiting for video to remain unchanged for {self.settle_seconds // 60} minute(s)"
+        candidate = {
+            "size": stat.st_size,
+            "modified_ns": stat.st_mtime_ns,
+            "stable_since": stable_since,
+            "attempts": current["attempts"] if current else 0,
+            "is_companion": is_companion,
+            "is_temporary": is_temporary,
+            "last_saved_status": status,
+            "last_saved_detail": detail,
+            "first_seen_at": first_seen,
+            "check_after": 0.0,
+        }
+        with self.lock:
+            self.candidates[normalized] = candidate
+            if not is_companion and not is_temporary:
+                video_p = Path(normalized)
+                for c_path, c_info in self.candidates.items():
+                    if c_info.get("is_companion"):
+                        cand_p = Path(c_path)
+                        try:
+                            if cand_p.parent.resolve() == video_p.parent.resolve():
+                                matched, _ = match_companion_to_video(cand_p, video_p)
+                                if matched or is_generic_artwork(cand_p):
+                                    c_info["check_after"] = 0.0
+                        except OSError:
+                            pass
         self._save_state(normalized, status, stat=stat, stable_since=stable_since,
-                         attempts=candidate["attempts"], detail=detail)
+                         attempts=candidate["attempts"], detail=detail, first_seen_at=first_seen)
         self.wake.set()
         return True
 
     def submit_tree(self, path):
         """Discover videos inside a newly-created or newly-moved download directory."""
         root = Path(path)
-        if not self.enabled or not root.is_dir():
+        if not self.enabled:
             return 0
-        return sum(1 for child in root.rglob("*") if child.is_file() and self.submit(child))
+        try:
+            if not root.is_dir():
+                return 0
+            return sum(1 for child in root.rglob("*") if child.is_file() and self.submit(child))
+        except OSError as exc:
+            logger.debug("submit_tree failed on %s: %s", path, exc)
+            return 0
 
     def _resolve_relocation(self, path):
         with self.lock:
@@ -900,15 +1223,19 @@ class CompletedDownloadWorker(threading.Thread):
         """Carry an unimported download's wait/scan state to its new path."""
         source = str(Path(source).resolve())
         destination = str(Path(destination).resolve())
-        if not self.enabled or Path(destination).suffix.lower() not in VIDEO_EXTENSIONS:
+        is_dest_video = Path(destination).suffix.lower() in VIDEO_EXTENSIONS
+        is_dest_temp = is_temporary_download(destination)
+        if not self.enabled or (not is_dest_video and not is_dest_temp):
             return False
         with self.lock:
+            if self.relocations.get(source) == destination and destination in self.candidates:
+                return True
             candidate = self.candidates.pop(source, None)
         if candidate is None:
             connection = connect(self.database_path)
             try:
                 row = connection.execute(
-                    "SELECT size,modified_ns,stable_since,attempts,status FROM incoming_files WHERE path=?", (source,)
+                    "SELECT size,modified_ns,stable_since,attempts,status,first_seen_at FROM incoming_files WHERE path=?", (source,)
                 ).fetchone()
             finally:
                 connection.close()
@@ -916,24 +1243,41 @@ class CompletedDownloadWorker(threading.Thread):
                 return False
             candidate = {"size": row["size"], "modified_ns": row["modified_ns"],
                          "stable_since": float(row["stable_since"] or time.time()),
-                         "attempts": int(row["attempts"] or 0)}
+                         "attempts": int(row["attempts"] or 0),
+                         "is_temporary": row["status"] == "downloading",
+                         "first_seen_at": row["first_seen_at"]}
         try:
             stat = Path(destination).stat()
         except OSError:
             return False
-        if candidate.get("is_temporary"):
-            candidate["is_temporary"] = False
-            candidate["stable_since"] = time.time()
-        if candidate["size"] != stat.st_size or candidate["modified_ns"] != stat.st_mtime_ns:
-            candidate.update(size=stat.st_size, modified_ns=stat.st_mtime_ns, stable_since=time.time())
-        with self.lock:
-            self.relocations[source] = destination
-            self.candidates[destination] = candidate
-        self._save_state(source, "moved", detail=f"Download completed and renamed to {destination}")
-        self._save_state(destination, "waiting", stat=stat, stable_since=candidate["stable_since"],
-                         attempts=candidate["attempts"], detail=f"Waiting for video to remain unchanged for {self.settle_seconds // 60} minute(s)")
-        self.wake.set()
-        return True
+        if is_dest_temp:
+            candidate["is_temporary"] = True
+            if candidate.get("size") != stat.st_size or candidate.get("modified_ns") != stat.st_mtime_ns:
+                candidate.update(size=stat.st_size, modified_ns=stat.st_mtime_ns, stable_since=time.time())
+            with self.lock:
+                self.relocations[source] = destination
+                self.candidates[destination] = candidate
+            self._save_state(source, "moved", detail=f"Download state transferred to {destination}")
+            self._save_state(destination, "downloading", stat=stat, stable_since=candidate["stable_since"],
+                             attempts=candidate.get("attempts", 0), detail="Incoming download in progress",
+                             first_seen_at=candidate.get("first_seen_at"))
+            self.wake.set()
+            return True
+        else:
+            if candidate.get("is_temporary"):
+                candidate["is_temporary"] = False
+                candidate["stable_since"] = time.time()
+            if candidate.get("size") != stat.st_size or candidate.get("modified_ns") != stat.st_mtime_ns:
+                candidate.update(size=stat.st_size, modified_ns=stat.st_mtime_ns, stable_since=time.time())
+            with self.lock:
+                self.relocations[source] = destination
+                self.candidates[destination] = candidate
+            self._save_state(source, "moved", detail=f"Download completed and renamed to {destination}")
+            self._save_state(destination, "waiting", stat=stat, stable_since=candidate["stable_since"],
+                             attempts=candidate.get("attempts", 0), detail=f"Waiting for video to remain unchanged for {self.settle_seconds // 60} minute(s)",
+                             first_seen_at=candidate.get("first_seen_at"))
+            self.wake.set()
+            return True
 
     def relocate_tree(self, source, destination):
         """Transfer active children when an entire download directory is moved."""
@@ -1074,6 +1418,11 @@ class CompletedDownloadWorker(threading.Thread):
         with self.lock:
             candidates_list = list(self.candidates.items())
 
+        eligible_videos = find_eligible_videos_in_folder(
+            video_p.parent, self.database_path, dict(candidates_list)
+        )
+        single_video_in_folder = (len(eligible_videos) <= 1)
+
         for c_path, c_info in candidates_list:
             cand = Path(c_path)
             if cand.suffix.lower() not in COMPANION_EXTENSIONS or not cand.is_file():
@@ -1081,7 +1430,45 @@ class CompletedDownloadWorker(threading.Thread):
             # Never pair pending companions across incoming directories.
             if cand.parent.resolve() != video_p.parent.resolve():
                 continue
+
             matched, remainder = match_companion_to_video(cand, video_p)
+            generic = is_generic_artwork(cand)
+            is_img = is_image_companion(cand)
+
+            if not matched and generic:
+                if single_video_in_folder:
+                    matched = True
+                    exact_target = actual_path.parent / f"{actual_path.stem}{cand.suffix}"
+                    if cand.stem.lower() == "cover" and not exact_target.exists():
+                        remainder = ""
+                    else:
+                        remainder = f".{cand.stem.lower()}"
+                else:
+                    with self.lock:
+                        self.candidates.pop(c_path, None)
+                    self._save_state(c_path, "unmatched", detail="Ambiguous generic artwork: multiple videos in folder")
+                    record_activity(self.database_path, "companion", "ambiguous artwork skipped", "review",
+                                    old_path=c_path, detail="Generic artwork not paired because folder contains multiple videos")
+                    continue
+
+            if not matched and is_img:
+                matches_other_video = False
+                for other_vid in eligible_videos:
+                    if other_vid.resolve() != video_p.resolve():
+                        other_m, _ = match_companion_to_video(cand, other_vid)
+                        if other_m:
+                            matches_other_video = True
+                            break
+                if matches_other_video:
+                    continue
+
+                with self.lock:
+                    self.candidates.pop(c_path, None)
+                self._save_state(c_path, "unmatched", detail="Unrelated image: filename does not match any video in folder")
+                record_activity(self.database_path, "companion", "unrelated image skipped", "recorded",
+                                old_path=c_path, detail="Image filename does not match any video in folder")
+                continue
+
             if matched:
                 if cand.name.lower().startswith(actual_path.name.lower()):
                     target_name = actual_path.name + cand.suffix
@@ -1093,6 +1480,10 @@ class CompletedDownloadWorker(threading.Thread):
 
                 if target_path != cand:
                     if target_path.exists():
+                        if generic and remainder == "":
+                            target_name = actual_path.stem + f".{cand.stem.lower()}" + cand.suffix
+                            target_path = actual_path.parent / target_name
+                    if target_path.exists() and target_path != cand:
                         self._save_state(c_path, "waiting", detail=f"Companion destination already exists: {target_path}")
                         record_activity(self.database_path, "companion", "companion collision", "review",
                                         severity="warning", old_path=str(cand), new_path=str(target_path),
@@ -1119,6 +1510,39 @@ class CompletedDownloadWorker(threading.Thread):
                 resolve_filesystem_event(self.database_path, "created", c_path)
                 notify(self.notifications, f"Companion paired: {cand.name} → Scene {scene['id']}")
 
+    def _save_unmatched_companion(self, path, candidate, detail, activity_action=None, activity_detail=None):
+        try:
+            self._save_state(path, "unmatched", detail=detail)
+            with self.lock:
+                self.candidates.pop(path, None)
+            if activity_action:
+                record_activity(self.database_path, "companion", activity_action, "recorded",
+                                old_path=path, detail=activity_detail or detail)
+        except Exception as exc:
+            logger.warning("Failed saving unmatched companion state for %s: %s", path, exc)
+            with self.lock:
+                candidate["check_after"] = time.monotonic() + 5.0
+
+    def _save_companion_waiting(self, path, candidate, detail):
+        with self.lock:
+            needs_save = (
+                candidate.get("last_saved_status") != "waiting"
+                or candidate.get("last_saved_detail") != detail
+            )
+        if needs_save:
+            try:
+                self._save_state(path, "waiting", detail=detail)
+                with self.lock:
+                    candidate["last_saved_status"] = "waiting"
+                    candidate["last_saved_detail"] = detail
+            except Exception as exc:
+                logger.warning("Failed saving companion state for %s: %s", path, exc)
+                with self.lock:
+                    candidate["check_after"] = time.monotonic() + 5.0
+                return
+        with self.lock:
+            candidate["check_after"] = time.monotonic() + self.companion_retry_interval
+
     def _process_companion(self, path, candidate):
         cand_path = Path(path)
         if not cand_path.is_file():
@@ -1133,7 +1557,7 @@ class CompletedDownloadWorker(threading.Thread):
             if Path(other).suffix.lower() in VIDEO_EXTENSIONS:
                 matched, _ = match_companion_to_video(cand_path, Path(other))
                 if matched:
-                    self._save_state(path, "waiting", detail=f"Waiting for video {Path(other).name} to finish downloading")
+                    self._save_companion_waiting(path, candidate, f"Waiting for video {Path(other).name} to finish downloading")
                     return
 
         connection = connect(self.database_path)
@@ -1155,7 +1579,7 @@ class CompletedDownloadWorker(threading.Thread):
 
                 if target_path != cand_path:
                     if target_path.exists():
-                        self._save_state(path, "waiting", detail=f"Companion destination already exists: {target_path}")
+                        self._save_companion_waiting(path, candidate, f"Companion destination already exists: {target_path}")
                         record_activity(self.database_path, "companion", "companion collision", "review",
                                         severity="warning", scene_id=row["scene_id"], old_path=str(cand_path),
                                         new_path=str(target_path),
@@ -1165,7 +1589,7 @@ class CompletedDownloadWorker(threading.Thread):
                         expect_filesystem_move(self.database_path, str(cand_path), str(target_path))
                         cand_path.rename(target_path)
                     except OSError as err:
-                        self._save_state(path, "waiting", detail=f"Could not relocate to {target_path}: {err}")
+                        self._save_companion_waiting(path, candidate, f"Could not relocate to {target_path}: {err}")
                         return
 
                 with self.lock:
@@ -1184,16 +1608,63 @@ class CompletedDownloadWorker(threading.Thread):
                 notify(self.notifications, f"Companion paired: {cand_path.name} → Scene {row['scene_id']}")
                 return
 
-        self._save_state(path, "waiting", detail="Waiting for matching video to arrive")
+        # Check image companion matching rules if no match was found above
+        if is_image_companion(cand_path):
+            with self.lock:
+                cand_map = dict(self.candidates)
+            eligible_videos = find_eligible_videos_in_folder(cand_path.parent, self.database_path, cand_map)
 
-    def evaluate_once(self, now=None):
+            if is_generic_artwork(cand_path):
+                if len(eligible_videos) > 1:
+                    self._save_unmatched_companion(path, candidate, "Ambiguous generic artwork: multiple videos in folder",
+                                                   activity_action="ambiguous artwork skipped",
+                                                   activity_detail="Generic artwork not paired because folder contains multiple videos")
+                    return
+                elif len(eligible_videos) == 1:
+                    vid = next(iter(eligible_videos))
+                    self._save_companion_waiting(path, candidate, f"Waiting for video {vid.name} to finish downloading")
+                    return
+                else:
+                    self._save_companion_waiting(path, candidate, "Waiting for matching video to arrive")
+                    return
+            else:
+                matching_vid = None
+                for vid in eligible_videos:
+                    m, _ = match_companion_to_video(cand_path, vid)
+                    if m:
+                        matching_vid = vid
+                        break
+
+                if matching_vid:
+                    self._save_companion_waiting(path, candidate, f"Waiting for video {matching_vid.name} to finish downloading")
+                    return
+                elif len(eligible_videos) >= 1:
+                    self._save_unmatched_companion(path, candidate, "Unrelated image: filename does not match any video in folder",
+                                                   activity_action="unrelated image skipped",
+                                                   activity_detail="Image filename does not match any video in folder")
+                    return
+                else:
+                    self._save_companion_waiting(path, candidate, "Waiting for matching video to arrive")
+                    return
+
+        self._save_companion_waiting(path, candidate, "Waiting for matching video to arrive")
+
+    def evaluate_once(self, now=None, mono_now=None):
         now = time.time() if now is None else float(now)
+        mono_now = time.monotonic() if mono_now is None else float(mono_now)
         with self.lock:
             pending = list(self.candidates.items())
         for path, candidate in pending:
+            if self._was_imported(path):
+                with self.lock:
+                    self.candidates.pop(path, None)
+                continue
             try:
                 stat = Path(path).stat()
-            except OSError:
+            except OSError as err:
+                if is_network_disconnect_error(err, path):
+                    candidate["check_after"] = mono_now + 5.0
+                    continue
                 with self.lock:
                     self.candidates.pop(path, None)
                 self._save_state(path, "gone", detail="File disappeared before it finished")
@@ -1213,6 +1684,10 @@ class CompletedDownloadWorker(threading.Thread):
             settle_needed = min(3, self.settle_seconds) if is_comp else self.settle_seconds
             if now - candidate["stable_since"] >= settle_needed:
                 if is_comp:
+                    with self.lock:
+                        check_after = candidate.get("check_after", 0.0)
+                    if mono_now < check_after:
+                        continue
                     self._process_companion(path, candidate)
                 else:
                     with self.lock:
@@ -1220,21 +1695,71 @@ class CompletedDownloadWorker(threading.Thread):
                     self._scan(path, candidate)
 
     def _fallback_check(self):
-        for path in self._current_video_paths():
-            with self.lock:
-                pending = path in self.candidates
-            if pending or self._is_in_inventory(path) or self._was_imported(path):
-                continue
-            try:
-                created_during_this_run = Path(path).stat().st_mtime >= self.started_at
-            except OSError:
-                continue
-            if created_during_this_run:
-                self.submit(path)
+        try:
+            for path in self._current_video_paths():
+                with self.lock:
+                    pending = path in self.candidates
+                if pending or self._is_in_inventory(path) or self._was_imported(path):
+                    continue
+                try:
+                    created_during_this_run = Path(path).stat().st_mtime >= self.started_at
+                except OSError:
+                    continue
+                if created_during_this_run:
+                    self.submit(path)
+        except Exception as exc:
+            logger.debug("Error in _fallback_check: %s", exc)
+
+    def trigger_recovery_scan(self, root):
+        """Discovers files that arrived while a network share was offline."""
+        try:
+            if not self.enabled:
+                return
+            root_path = Path(root).resolve()
+            valid = VIDEO_EXTENSIONS | COMPANION_EXTENSIONS
+            if getattr(self, "track_temporary_downloads", False):
+                valid = valid | TEMPORARY_DOWNLOAD_EXTENSIONS
+            for folder in self.incoming_folders:
+                matched = False
+                try:
+                    folder.resolve().relative_to(root_path)
+                    matched = True
+                except (ValueError, OSError):
+                    if root_path == folder.resolve():
+                        matched = True
+                if matched:
+                    try:
+                        if not folder.is_dir():
+                            continue
+                        for path in folder.rglob("*"):
+                            try:
+                                if path.is_file() and (path.suffix.lower() in valid or (getattr(self, "track_temporary_downloads", False) and is_temporary_download(path))):
+                                    resolved = str(path.resolve())
+                                    with self.lock:
+                                        pending = resolved in self.candidates
+                                    if pending or self._is_in_inventory(resolved) or self._was_imported(resolved):
+                                        continue
+                                    try:
+                                        if path.stat().st_mtime >= self.started_at:
+                                            self.submit(resolved)
+                                    except OSError:
+                                        continue
+                            except OSError as err:
+                                if is_network_disconnect_error(err, path):
+                                    break
+                                continue
+                    except OSError as exc:
+                        logger.debug("Failed recovery scan for folder %s: %s", folder, exc)
+        except Exception as exc:
+            logger.debug("Error triggering recovery scan for %s: %s", root, exc)
 
     def stop(self):
         self.stopping = True
         self.wake.set()
+        try:
+            self._scan_pool.shutdown(wait=False)
+        except Exception:
+            pass
 
     def run(self):
         while not self.stopping:
@@ -1248,11 +1773,12 @@ class CompletedDownloadWorker(threading.Thread):
 
 
 class LibraryEventHandler(FileSystemEventHandler):
-    def __init__(self, database_path, worker, notifications, incoming_worker=None):
+    def __init__(self, database_path, worker, notifications, incoming_worker=None, availability_tracker=None):
         self.database_path = database_path
         self.worker = worker
         self.notifications = notifications
         self.incoming_worker = incoming_worker
+        self.availability_tracker = availability_tracker
         # Track when each path last had a 'created' event so the delayed
         # "still missing?" check can tell the difference between a genuine
         # deletion and a rapid delete-then-recreate (e.g. atomic download swap).
@@ -1262,6 +1788,11 @@ class LibraryEventHandler(FileSystemEventHandler):
         self._recent_video_candidates: dict[str, float] = {}
         self._transcoder_decision_timers: dict[str, threading.Timer] = {}
         self._recent_creates_lock = threading.Lock()
+        # Bounded centralized deletion scheduler
+        self._pending_deletions: dict[str, float] = {}
+        self._deletion_scheduler_lock = threading.Lock()
+        self._deletion_timer: threading.Timer | None = None
+        self._deletion_in_flight_roots: set[str] = set()
 
     def restore_transcoder_candidates(self):
         """Restore persistent candidate decisions after a watcher or Stash restart."""
@@ -1310,7 +1841,11 @@ class LibraryEventHandler(FileSystemEventHandler):
             timer.start()
 
     def _relevant(self, path, is_directory):
-        return is_directory or Path(path).suffix.lower() in WATCHED_EXTENSIONS
+        if is_directory:
+            return True
+        if is_temporary_download(path):
+            return True
+        return Path(path).suffix.lower() in WATCHED_EXTENSIONS
 
     def on_created(self, event):
         if event.is_directory and self.incoming_worker:
@@ -1321,7 +1856,11 @@ class LibraryEventHandler(FileSystemEventHandler):
         resolve_filesystem_event(self.database_path, "deleted", event.src_path)
         if consume_expected_create(self.database_path, event.src_path):
             return
+        is_temp = is_temporary_download(event.src_path)
         incoming_candidate = bool(not event.is_directory and self.incoming_worker and self.incoming_worker.submit(event.src_path))
+        if is_temp:
+            # Browser and downloader temporary files must never generate unverified pending filesystem events
+            return
         if self._relevant(event.src_path, event.is_directory) and not incoming_candidate:
             if self.incoming_worker and self.incoming_worker._is_inside_incoming(event.src_path):
                 return
@@ -1366,7 +1905,7 @@ class LibraryEventHandler(FileSystemEventHandler):
                 with self.incoming_worker.lock:
                     self.incoming_worker.candidates.pop(event.src_path, None)
                 self.incoming_worker._save_state(event.src_path, "gone", detail="File removed from disk")
-            if Path(event.src_path).suffix.lower() not in TEMPORARY_DOWNLOAD_EXTENSIONS:
+            if not is_temporary_download(event.src_path):
                 if Path(event.src_path).suffix.lower() in VIDEO_EXTENSIONS:
                     with self._recent_creates_lock:
                         now = time.monotonic()
@@ -1391,7 +1930,113 @@ class LibraryEventHandler(FileSystemEventHandler):
                     self._schedule_transcoder_decision(event.src_path)
                 if (not should_decide and not event.is_directory
                         and Path(event.src_path).suffix.lower() in WATCHED_EXTENSIONS):
-                    threading.Timer(3, self._notify_if_still_missing, args=(event.src_path,)).start()
+                    # Single-flight centralized scheduling replaces per-event Timer(3, self._notify_if_still_missing)
+                    self._schedule_deletion_check(event.src_path)
+
+    def _schedule_deletion_check(self, path: str):
+        with self._deletion_scheduler_lock:
+            self._pending_deletions[str(path)] = time.monotonic() + 3.0
+            if self._deletion_timer is None:
+                self._deletion_timer = threading.Timer(0.5, self._drain_pending_deletions)
+                self._deletion_timer.daemon = True
+                self._deletion_timer.start()
+
+    def _is_path_offline(self, path: str) -> bool:
+        unavail = []
+        if self.availability_tracker:
+            unavail = self.availability_tracker.get_unavailable_roots()
+        else:
+            try:
+                con = connect(self.database_path)
+                try:
+                    row = con.execute("SELECT unavailable_roots_json FROM filesystem_monitor_status WHERE id=1").fetchone()
+                    if row and row["unavailable_roots_json"]:
+                        unavail = json.loads(row["unavailable_roots_json"])
+                finally:
+                    con.close()
+            except Exception:
+                pass
+        if unavail and is_file_on_unavailable_root(path, unavail):
+            return True
+        return False
+
+    def _root_for_path(self, path: str) -> str:
+        norm_p = os.path.normcase(os.path.normpath(str(path))).replace("\\", "/")
+        all_roots = []
+        if self.availability_tracker:
+            all_roots = self.availability_tracker.roots
+        for r in sorted(all_roots, key=len, reverse=True):
+            norm_r = os.path.normcase(os.path.normpath(str(r))).replace("\\", "/")
+            if norm_p == norm_r or norm_p.startswith(norm_r.rstrip("/") + "/"):
+                return r
+        return os.path.dirname(norm_p)
+
+    def _drain_pending_deletions(self):
+        with self._deletion_scheduler_lock:
+            self._deletion_timer = None
+            now = time.monotonic()
+
+            # Only prune stale queued entries whose root is NOT actively in-flight
+            expired = [
+                p for p, t in self._pending_deletions.items()
+                if now - t > 120.0 and self._root_for_path(p) not in self._deletion_in_flight_roots
+            ]
+            for p in expired:
+                self._pending_deletions.pop(p, None)
+
+            ready_paths = [p for p, t in self._pending_deletions.items() if now >= t]
+            work_by_root: dict[str, list[str]] = {}
+            for path in ready_paths:
+                if self._is_path_offline(path):
+                    self._pending_deletions.pop(path, None)
+                    continue
+                root_key = self._root_for_path(path)
+                if root_key in self._deletion_in_flight_roots:
+                    continue
+                self._pending_deletions.pop(path, None)
+                work_by_root.setdefault(root_key, []).append(path)
+
+            for root_key, paths in work_by_root.items():
+                self._deletion_in_flight_roots.add(root_key)
+                t = threading.Thread(
+                    target=self._verify_deletions_for_root,
+                    args=(root_key, paths),
+                    name=f"del_verify_{Path(root_key).name if root_key else 'default'}",
+                    daemon=True,
+                )
+                t.start()
+
+            if self._pending_deletions:
+                earliest = min(self._pending_deletions.values())
+                delay = max(0.1, min(1.0, earliest - now))
+                self._deletion_timer = threading.Timer(delay, self._drain_pending_deletions)
+                self._deletion_timer.daemon = True
+                self._deletion_timer.start()
+
+    def _verify_deletions_for_root(self, root_key: str, paths: list[str]):
+        try:
+            for path in paths:
+                with self._recent_creates_lock:
+                    created_at = self._recent_creates.get(path, 0)
+                if time.monotonic() - created_at < 5.0:
+                    continue
+                if self._is_path_offline(path):
+                    continue
+                try:
+                    exists = Path(path).exists()
+                except OSError as err:
+                    if is_network_disconnect_error(err, path):
+                        continue
+                    exists = False
+                if not exists:
+                    if self._is_path_offline(path) or is_network_disconnect_error(OSError(errno.ENOENT, "No such file"), path):
+                        continue
+                    record_activity(self.database_path, "filesystem", "external deletion", "review", severity="warning",
+                                    old_path=path, detail="File remained absent after the notification delay")
+                    notify(self.notifications, f"File deleted or moved without a paired event: {Path(path).name}")
+        finally:
+            with self._deletion_scheduler_lock:
+                self._deletion_in_flight_roots.discard(root_key)
 
     def _notify_if_still_missing(self, path):
         # Suppress the warning if the file was recreated within 5 s of this check
@@ -1400,7 +2045,17 @@ class LibraryEventHandler(FileSystemEventHandler):
             created_at = self._recent_creates.get(path, 0)
         if time.monotonic() - created_at < 5.0:
             return
-        if not Path(path).exists():
+        if self._is_path_offline(path):
+            return
+        try:
+            exists = Path(path).exists()
+        except OSError as err:
+            if is_network_disconnect_error(err, path):
+                return
+            exists = False
+        if not exists:
+            if self._is_path_offline(path) or is_network_disconnect_error(OSError(errno.ENOENT, "No such file"), path):
+                return
             record_activity(self.database_path, "filesystem", "external deletion", "review", severity="warning",
                             old_path=path, detail="File remained absent after the notification delay")
             notify(self.notifications, f"File deleted or moved without a paired event: {Path(path).name}")
@@ -1440,12 +2095,23 @@ class LibraryEventHandler(FileSystemEventHandler):
                                 severity="warning", old_path=event.src_path, new_path=event.dest_path,
                                 detail="Video was renamed to a temporary .delete path during deletion; confirm the Stash scene no longer points to it")
                 return
-            incoming_candidate = bool(self.incoming_worker and self.incoming_worker.submit(event.dest_path))
-            if incoming_candidate and Path(event.src_path).suffix.lower() not in VIDEO_EXTENSIONS:
+
+            src_is_temp = is_temporary_download(event.src_path)
+            dest_is_temp = is_temporary_download(event.dest_path)
+            dest_is_video = Path(event.dest_path).suffix.lower() in VIDEO_EXTENSIONS
+            dest_is_companion = Path(event.dest_path).suffix.lower() in COMPANION_EXTENSIONS
+
+            # Transitions between temporary download stages must never be treated as problem moves or companion moves
+            if src_is_temp and dest_is_temp:
                 return
+
+            incoming_candidate = bool(self.incoming_worker and self.incoming_worker.submit(event.dest_path))
+            if incoming_candidate and not (Path(event.src_path).suffix.lower() in VIDEO_EXTENSIONS and not src_is_temp):
+                return
+
             candidate_source = None
             if (getattr(self.worker, "transcoder_compatibility", False) is True
-                    and Path(event.dest_path).suffix.lower() in VIDEO_EXTENSIONS):
+                    and dest_is_video):
                 remove_transcoder_candidate(self.database_path, event.src_path)
                 candidate_source = register_transcoder_candidate(self.database_path, event.dest_path)
             if candidate_source:
@@ -1454,13 +2120,20 @@ class LibraryEventHandler(FileSystemEventHandler):
                     is_directory=False, initial_status="waiting"
                 )
                 return
-            record_filesystem_event(self.database_path, "moved", event.src_path, event.dest_path, event.is_directory, initial_status="pending")
-            if not event.is_directory and Path(event.dest_path).suffix.lower() in VIDEO_EXTENSIONS:
-                self.worker.submit(event.src_path, event.dest_path)
-            elif not event.is_directory:
-                record_activity(self.database_path, "companion", "external companion move", "recorded",
-                                old_path=event.src_path, new_path=event.dest_path,
-                                detail="Companion move recorded; Stash does not maintain a separate path for this file")
+
+            # A temporary download completing outside incoming folders is a newly created video, not an inventory move
+            if src_is_temp and dest_is_video:
+                record_filesystem_event(self.database_path, "created", event.dest_path, is_directory=False, initial_status="pending")
+                return
+
+            if dest_is_video or dest_is_companion:
+                record_filesystem_event(self.database_path, "moved", event.src_path, event.dest_path, event.is_directory, initial_status="pending")
+                if dest_is_video:
+                    self.worker.submit(event.src_path, event.dest_path)
+                elif dest_is_companion:
+                    record_activity(self.database_path, "companion", "external companion move", "recorded",
+                                    old_path=event.src_path, new_path=event.dest_path,
+                                    detail="Companion move recorded; Stash does not maintain a separate path for this file")
 
 
 def update_status(database_path, token, pid, state, roots, unavailable):
@@ -1546,7 +2219,7 @@ def main():
     database_path = Path(args.database)
     control_path = Path(args.control)
     roots = json.loads(args.roots_json)
-    available = [root for root in roots if Path(root).is_dir()]
+    available = [root for root in roots if is_path_available(root)]
     unavailable = [root for root in roots if root not in available]
     if not claim_monitor_ownership(database_path, args.token, os.getpid(), available, unavailable):
         logger.warning("Another Watchtower monitor already owns this database; exiting duplicate startup")
@@ -1579,8 +2252,13 @@ def main():
     incoming_worker.allow_custom_contact_sheet_script = runtime.get("allow_custom_contact_sheet_script") is True
     observer = Observer()
     handler = LibraryEventHandler(database_path, worker, runtime.get("mac_notifications") is True, incoming_worker)
+    watched_roots = {}
     for root in available:
-        observer.schedule(handler, root, recursive=True)
+        try:
+            watch = observer.schedule(handler, root, recursive=True)
+            watched_roots[root] = watch
+        except Exception as exc:
+            logger.warning("Failed scheduling observer on %s: %s", root, exc)
     update_status(database_path, args.token, os.getpid(), "running", available, unavailable)
     for root in unavailable:
         record_activity(database_path, "monitor", "library root unavailable", "warning", severity="warning",
@@ -1595,8 +2273,43 @@ def main():
     observer.start()
     if worker.transcoder_compatibility:
         handler.restore_transcoder_candidates()
+    tracker = RootAvailabilityTracker(roots, probe_timeout=5.0)
+    handler.availability_tracker = tracker
+    for r in unavailable:
+        if r in tracker._states:
+            tracker._states[r]["status"] = "unavailable"
     try:
         while True:
+            available, unavailable, recovered, lost = tracker.poll()
+
+            for root in lost:
+                logger.warning("Library root became unavailable: %s", root)
+                record_activity(database_path, "monitor", "library root unavailable", "warning",
+                                severity="warning", old_path=root,
+                                detail="Network share disconnected or became unresponsive")
+                notify(runtime.get("mac_notifications") is True, f"Library root unavailable: {Path(root).name}")
+                watch = watched_roots.pop(root, None)
+                if watch:
+                    try:
+                        observer.unschedule(watch)
+                    except Exception:
+                        pass
+
+            for root in recovered:
+                logger.info("Library root reconnected: %s", root)
+                record_activity(database_path, "monitor", "library root recovered", "running",
+                                severity="info", new_path=root,
+                                detail="Network share reconnected; monitoring resumed")
+                notify(runtime.get("mac_notifications") is True, f"Library root reconnected: {Path(root).name}")
+                if root not in watched_roots:
+                    try:
+                        watch = observer.schedule(handler, root, recursive=True)
+                        watched_roots[root] = watch
+                    except Exception as exc:
+                        logger.warning("Failed scheduling observer on reconnected root %s: %s", root, exc)
+                if incoming_worker:
+                    incoming_worker.trigger_recovery_scan(root)
+
             reload_monitor_if_code_changed(
                 loaded_code_signature, runtime_path, runtime, worker,
                 incoming_worker, database_path
@@ -1614,7 +2327,15 @@ def main():
                             new_cfg = request.get("config") or {}
                             worker.enabled = bool(new_cfg.get("automatic_move_reconciliation", worker.enabled))
                             worker.transcoder_compatibility = bool(new_cfg.get("transcoder_replacement_compatibility", worker.transcoder_compatibility))
-                            worker.notifications = bool(new_cfg.get("mac_notifications", worker.notifications))
+                            if "mac_notifications" in new_cfg:
+                                new_notif = bool(new_cfg["mac_notifications"])
+                                worker.notifications = new_notif
+                                if incoming_worker:
+                                    incoming_worker.notifications = new_notif
+                                if handler:
+                                    handler.notifications = new_notif
+                            else:
+                                worker.notifications = bool(new_cfg.get("mac_notifications", worker.notifications))
                             _new_folders = new_cfg.get("incoming_folders")
                             _new_folder_str = new_cfg.get("incoming_folder")
                             if _new_folders is not None:
