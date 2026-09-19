@@ -26,7 +26,7 @@ from librarymanager_core import (
                                  release_worker_schedule, scene_naming_signature, filesystem_monitor_summary,
                                  reconcile_filesystem_events, pending_filesystem_events,
                                  pending_transcoder_candidates, promote_transcoder_candidate, utc_now)
-from librarymanager_core import dashboard_data, incoming_summary, record_activity, recent_activity, cancel_pending_rename, make_pending_rename_due
+from librarymanager_core import dashboard_data, incoming_summary, annotate_pending_events_processing_state, record_activity, record_monitor_lifecycle, recent_activity, cancel_pending_rename, make_pending_rename_due
 
 
 QUERY = """
@@ -617,6 +617,11 @@ def stop_filesystem_monitor(database_path):
             connection.commit()
         finally:
             connection.close()
+        record_monitor_lifecycle(
+            database_path, "MONITOR STOPPED", "stopped",
+            detail=f"MONITOR STOPPED — stale monitor process (PID {status.get('pid')}) reset to stopped",
+            metadata={"pid": status.get("pid")}
+        )
         return {**status, "state": "stopped", "raw_state": "stopped", "is_stale": False, "message": "Filesystem monitor was dead and is now reset to stopped"}
     control_path = Path(__file__).with_name("monitor-control.json")
     control_path.write_text(json.dumps({"action": "stop", "token": status["token"]}), encoding="utf-8")
@@ -624,6 +629,19 @@ def stop_filesystem_monitor(database_path):
         time.sleep(0.15)
         status = filesystem_monitor_summary(database_path)
         if status.get("state") == "stopped":
+            connection = connect(database_path)
+            try:
+                last = connection.execute(
+                    "SELECT action FROM activity_log WHERE category='monitor' ORDER BY id DESC LIMIT 1"
+                ).fetchone()
+                if not last or last["action"] != "MONITOR STOPPED":
+                    record_monitor_lifecycle(
+                        database_path, "MONITOR STOPPED", "stopped",
+                        detail=f"MONITOR STOPPED — filesystem watcher stopped (PID {status.get('pid')})",
+                        metadata={"pid": status.get("pid")}
+                    )
+            finally:
+                connection.close()
             return {**status, "message": "Filesystem monitor stopped"}
     return {**status, "message": "Stop requested; monitor is still shutting down"}
 
@@ -1107,9 +1125,6 @@ def main():
         result = start_filesystem_monitor(stash, database_path, plugin_input["server_connection"])
         message = f"{result['message']}: {len(result.get('roots', []))} roots, {len(result.get('unavailable_roots', []))} unavailable."
         unavailable = result.get("unavailable_roots", [])
-        audit(database_path, "monitor", "start", "warning" if unavailable else "running",
-              severity="warning" if unavailable else "info", detail=message,
-              metadata={"roots": result.get("roots", []), "unavailable_roots": unavailable})
         if unavailable:
             try:
                 maybe_notify(config, f"{len(unavailable)} library root(s) are unavailable")
@@ -1119,12 +1134,6 @@ def main():
         stash = StashInterface(plugin_input["server_connection"])
         config = stash.find_plugin_config("librarymanager") or {}
         result = start_filesystem_monitor(stash, database_path, plugin_input["server_connection"])
-        if result.get("message") == "Read-only filesystem monitor started":
-            unavailable = result.get("unavailable_roots", [])
-            detail = f"Filesystem watcher started: {len(result.get('roots', []))} roots active" + (f", {len(unavailable)} unavailable" if unavailable else "")
-            audit(database_path, "monitor", "start", "warning" if unavailable else "running",
-                  severity="warning" if unavailable else "info", detail=detail,
-                  metadata={"roots": result.get("roots", []), "unavailable_roots": unavailable})
         message = result["message"]
     elif mode == "record_config_change":
         changes = plugin_input.get("args", {}).get("changes") or {}
@@ -1194,7 +1203,6 @@ def main():
     elif mode == "stop_monitor":
         result = stop_filesystem_monitor(database_path)
         message = result["message"]
-        audit(database_path, "monitor", "stop", result.get("state", "stopped"), detail="Filesystem watcher was stopped by user")
     elif mode == "monitor_status":
         result = filesystem_monitor_summary(database_path)
         message = (f"Filesystem monitor: {result['state']}; PID {result.get('pid')}; "
@@ -1244,12 +1252,17 @@ def main():
             finally:
                 connection.close()
 
+        monitor_summary = filesystem_monitor_summary(database_path)
+        pending = pending_filesystem_events(database_path)
+        is_running = monitor_summary.get("state") == "running" and not monitor_summary.get("is_stale") and monitor_summary.get("pid_alive")
+        annotate_pending_events_processing_state(pending, monitor_summary.get("active_moves", []), monitor_running=is_running, database_path=database_path)
+
         result = {
-            "monitor": filesystem_monitor_summary(database_path),
+            "monitor": monitor_summary,
             "incoming": incoming_summary(database_path),
             "active_jobs": active_jobs,
             "activity": recent_activity(database_path, 250),
-            "pending_events": pending_filesystem_events(database_path),
+            "pending_events": pending,
             "transcoder_candidates": pending_transcoder_candidates(database_path),
             "server_time": time.time(),
             "current_scene_count": current_scene_count(stash),

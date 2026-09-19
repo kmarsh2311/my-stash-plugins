@@ -4,6 +4,9 @@
 import argparse
 import base64
 import errno
+import stat
+import threading
+import time
 from pathlib import Path
 NETWORK_DISCONNECT_ERRNOS = {
     getattr(errno, "ENOTCONN", 57),       # Socket is not connected
@@ -29,29 +32,187 @@ def is_network_disconnect_error(err: BaseException, path=None) -> bool:
     return False
 
 
-def is_path_available(path) -> bool:
-    try:
-        p = Path(path)
-        if not p.is_dir():
-            return False
-        try:
-            with os.scandir(p) as it:
-                pass
-        except OSError as e:
-            if is_network_disconnect_error(e, path=p):
-                return False
-        return True
-    except OSError:
+TRANSIENT_FS_ERRNOS = {
+    getattr(errno, "EPERM", 1),         # Operation not permitted
+    getattr(errno, "EACCES", 13),       # Permission denied
+    getattr(errno, "EBUSY", 16),        # Resource busy
+    getattr(errno, "ETXTBSY", 26),      # Text file busy
+}
+
+
+def is_transient_fs_error(err: BaseException) -> bool:
+    if isinstance(err, OSError):
+        if err.errno in TRANSIENT_FS_ERRNOS:
+            return True
+        winerror = getattr(err, "winerror", None)
+        if winerror in (32, 33):  # ERROR_SHARING_VIOLATION, ERROR_LOCK_VIOLATION
+            return True
+        err_msg = str(err).lower()
+        if any(msg in err_msg for msg in ("operation not permitted", "permission denied", "resource busy", "sharing violation", "lock violation")):
+            return True
+    return False
+
+
+def is_path_available(path, timeout=2.0) -> bool:
+    if not path:
         return False
+    result = [False]
+
+    def _check():
+        try:
+            p = Path(path)
+            if not p.is_dir():
+                return
+            try:
+                with os.scandir(p) as it:
+                    pass
+            except OSError as e:
+                if is_network_disconnect_error(e, path=p):
+                    return
+            result[0] = True
+        except (OSError, Exception):
+            result[0] = False
+
+    t = threading.Thread(target=_check, name=f"check_{Path(path).name}", daemon=True)
+    t.start()
+    t.join(timeout=float(timeout))
+    if t.is_alive():
+        logger.warning("Availability probe for %s timed out after %.1fs (unresponsive mount)", path, timeout)
+        return False
+    return result[0]
+
+
+class BoundedFSOperation:
+    """Executes filesystem operations with bounded timeout and per-root concurrency limits.
+    Prevents repeated events from accumulating unlimited blocked threads on unresponsive mounts."""
+    def __init__(self, max_workers_per_root=2):
+        self.max_workers_per_root = int(max_workers_per_root)
+        self._lock = threading.Lock()
+        self._active_workers: dict[str, list[dict]] = {}
+        self._exhausted_logged: set[str] = set()
+
+    def run(self, root_key, func, args=(), timeout=1.5):
+        root_key = str(root_key or "")
+        timeout = float(timeout)
+        now = time.monotonic()
+        res = [None]
+        err = [None]
+        entry = None
+
+        with self._lock:
+            # 1. Prune dead threads & detect hung threads
+            active = []
+            for w in self._active_workers.get(root_key, []):
+                t = w["thread"]
+                if t.is_alive():
+                    if not w["timed_out"] and (now - w["started_at"] > w["timeout"]):
+                        w["timed_out"] = True
+                    active.append(w)
+            self._active_workers[root_key] = active
+
+            # 2. Check for confirmed outage (active hung thread) vs busy
+            has_hung_thread = any(w["timed_out"] for w in active)
+            if len(active) >= self.max_workers_per_root:
+                if has_hung_thread:
+                    if root_key not in self._exhausted_logged:
+                        self._exhausted_logged.add(root_key)
+                        logger.warning(
+                            "Root %s in confirmed outage (%d active hung worker(s)); rejecting operations",
+                            root_key, len([w for w in active if w["timed_out"]])
+                        )
+                    return None, "outage"
+                else:
+                    # Workers are busy processing concurrent requests normally; do NOT treat as outage
+                    return None, "busy"
+
+            self._exhausted_logged.discard(root_key)
+
+            def _target():
+                try:
+                    res[0] = func(*args)
+                except Exception as e:
+                    err[0] = e
+
+            t = threading.Thread(
+                target=_target,
+                name=f"fs_op_{Path(root_key).name if root_key else 'default'}",
+                daemon=True,
+            )
+            entry = {
+                "thread": t,
+                "started_at": now,
+                "timeout": timeout,
+                "timed_out": False,
+            }
+            self._active_workers.setdefault(root_key, []).append(entry)
+            # Concurrency-safe: start the thread while holding the lock so it is never
+            # pruned prematurely before is_alive() becomes True
+            t.start()
+
+        t.join(timeout=timeout)
+        if t.is_alive():
+            with self._lock:
+                entry["timed_out"] = True
+            logger.warning("Filesystem operation on root %s timed out after %.1fs", root_key, timeout)
+            return None, "timeout"
+
+        if err[0]:
+            raise err[0]
+        return res[0], "ok"
+
+
+default_fs_limiter = BoundedFSOperation(max_workers_per_root=2)
+
+
+def probe_roots_startup(roots, timeout=2.0, max_workers=4):
+    """Probes root availability at startup with a bounded worker pool and global deadline,
+    avoiding nested thread-per-root explosion."""
+    if not roots:
+        return [], []
+
+    results = {}
+    pending = list(roots)
+    deadline = time.monotonic() + float(timeout)
+
+    def _worker(r):
+        try:
+            p = Path(r)
+            if not p.is_dir():
+                results[r] = False
+                return
+            try:
+                with os.scandir(p) as it:
+                    pass
+                results[r] = True
+            except OSError as e:
+                results[r] = not is_network_disconnect_error(e, path=p)
+        except (OSError, Exception):
+            results[r] = False
+
+    active_threads = []
+    while (pending or active_threads) and time.monotonic() < deadline:
+        while pending and len(active_threads) < max_workers:
+            r = pending.pop(0)
+            t = threading.Thread(target=_worker, args=(r,), name=f"startup_probe_{Path(r).name}", daemon=True)
+            t.start()
+            active_threads.append(t)
+
+        time.sleep(0.02)
+        active_threads = [t for t in active_threads if t.is_alive()]
+
+    available = [r for r in roots if results.get(r) is True]
+    unavailable = [r for r in roots if r not in available]
+    return available, unavailable
 
 
 
 
 class RootAvailabilityTracker:
     """Tracks availability of monitored roots asynchronously without blocking the caller."""
-    def __init__(self, roots, probe_timeout=5.0):
+    def __init__(self, roots, probe_timeout=5.0, max_hung_probes=2):
         self.roots = list(roots or [])
         self.probe_timeout = float(probe_timeout)
+        self.max_hung_probes = int(max_hung_probes)
         self.lock = threading.Lock()
         self._states = {}
         for r in self.roots:
@@ -60,6 +221,9 @@ class RootAvailabilityTracker:
                 "in_flight": False,
                 "started_at": 0.0,
                 "last_probed_at": 0.0,
+                "probe_id": 0,
+                "active_threads": [],
+                "exhausted_logged": False,
             }
         self._recovered_batch = []
         self._lost_batch = []
@@ -74,11 +238,21 @@ class RootAvailabilityTracker:
                         "in_flight": False,
                         "started_at": 0.0,
                         "last_probed_at": 0.0,
+                        "probe_id": 0,
+                        "active_threads": [],
+                        "exhausted_logged": False,
                     }
 
     def get_unavailable_roots(self) -> list[str]:
         with self.lock:
             return [r for r, s in self._states.items() if s.get("status") != "available"]
+
+    def mark_root_unavailable(self, root):
+        with self.lock:
+            state = self._states.get(root)
+            if state and state["status"] == "available":
+                state["status"] = "unavailable"
+                self._lost_batch.append(root)
 
     def poll(self):
         """Non-blocking call by the main monitor loop.
@@ -96,14 +270,34 @@ class RootAvailabilityTracker:
                 state = self._states.get(root)
                 if not state:
                     continue
+
+                state["active_threads"] = [t for t in state["active_threads"] if t.is_alive()]
+                alive_count = len(state["active_threads"])
+
                 if state["in_flight"]:
                     if mono_now - state["started_at"] > self.probe_timeout:
+                        state["in_flight"] = False
+                        state["last_probed_at"] = mono_now
                         if state["status"] == "available":
                             state["status"] = "unavailable"
                             lost.append(root)
                 else:
-                    if mono_now - state["last_probed_at"] >= 5.0 or state["last_probed_at"] == 0.0:
-                        self._launch_probe_unlocked(root, mono_now)
+                    if alive_count >= self.max_hung_probes:
+                        if state["status"] == "available":
+                            state["status"] = "unavailable"
+                            lost.append(root)
+                        if not state.get("exhausted_logged"):
+                            logger.warning(
+                                "Root %s exhausted probe worker allowance (%d active blocked thread(s)); "
+                                "automatic recovery paused until thread capacity becomes available",
+                                root, alive_count
+                            )
+                            state["exhausted_logged"] = True
+                    else:
+                        state["exhausted_logged"] = False
+                        interval = 15.0 if alive_count > 0 else 5.0
+                        if mono_now - state["last_probed_at"] >= interval or state["last_probed_at"] == 0.0:
+                            self._launch_probe_unlocked(root, mono_now)
 
                 if state["status"] == "available":
                     available.append(root)
@@ -123,8 +317,10 @@ class RootAvailabilityTracker:
         state = self._states[root]
         state["in_flight"] = True
         state["started_at"] = mono_now
+        state["probe_id"] += 1
+        current_probe_id = state["probe_id"]
 
-        def probe_worker():
+        def probe_worker(p_id):
             success = False
             try:
                 p = Path(root)
@@ -140,6 +336,8 @@ class RootAvailabilityTracker:
                 success = False
 
             with self.lock:
+                if p_id != state["probe_id"]:
+                    return
                 state["in_flight"] = False
                 state["last_probed_at"] = time.monotonic()
                 prev_status = state["status"]
@@ -151,7 +349,8 @@ class RootAvailabilityTracker:
                     else:
                         self._lost_batch.append(root)
 
-        t = threading.Thread(target=probe_worker, name=f"probe_{Path(root).name}", daemon=True)
+        t = threading.Thread(target=probe_worker, args=(current_probe_id,), name=f"probe_{Path(root).name}", daemon=True)
+        state["active_threads"].append(t)
         t.start()
 
 import hashlib
@@ -177,9 +376,10 @@ import re
 import unicodedata
 from librarymanager_core import (
     generate_video_contact_sheet, connect, consume_expected_create, consume_expected_move,
+    is_verified_companion_destination,
     expect_filesystem_create, expect_filesystem_move, fingerprint_value,
     is_file_on_unavailable_root,
-                                 opensubtitles_hash, record_activity, record_filesystem_event,
+                                 opensubtitles_hash, record_activity, record_filesystem_event, record_monitor_lifecycle,
                                  resolve_filesystem_event, refresh_scene_inventory, utc_now)
 
 
@@ -623,7 +823,7 @@ def destination_inventory_conflict(database_path, destination, source_row, conne
         conflicts = [row for row in rows
                      if _normalized_path(row["path"]) == destination_key
                      and (str(row["file_id"]) != str(source_row["file_id"])
-                          or str(row["scene_id"]) != str(source_row["scene_id"]))]
+                          or str(row['scene_id']) != str(source_row['scene_id']))]
         if not conflicts:
             return None
         owners = ", ".join(
@@ -778,11 +978,33 @@ def inventoried_source(database_path, source):
 def tracked_move(database_path, source, destination):
     """Verify a move from the exact inventoried path without changing any record."""
     target = Path(destination)
-    if not target.is_file():
+    try:
+        st = target.stat()
+        if not stat.S_ISREG(st.st_mode):
+            return None, "Destination is not a file"
+    except OSError as err:
+        if is_transient_fs_error(err) or is_network_disconnect_error(err, destination):
+            raise
         return None, "Destination is not a file"
     connection = connect(database_path)
     try:
         row = connection.execute("SELECT * FROM files WHERE path=?", (source,)).fetchone()
+        if not row:
+            curr = source
+            visited = {curr}
+            while curr:
+                parent = connection.execute(
+                    "SELECT source_path FROM filesystem_events WHERE destination_path=? AND event_type='moved' ORDER BY rowid DESC",
+                    (curr,)
+                ).fetchone()
+                if not parent or not parent["source_path"] or parent["source_path"] in visited:
+                    break
+                curr = parent["source_path"]
+                visited.add(curr)
+                cand = connection.execute("SELECT * FROM files WHERE path=?", (curr,)).fetchone()
+                if cand:
+                    row = cand
+                    break
         if not row:
             return None, "Source path is not in the inventory"
         if row["size"] is not None and target.stat().st_size != int(row["size"]):
@@ -790,19 +1012,217 @@ def tracked_move(database_path, source, destination):
         expected = fingerprint_value(row["fingerprints_json"], "oshash")
         if expected and opensubtitles_hash(target) != expected:
             return None, "Destination oshash differs from the inventory"
-        return dict(row), "Exact source move verified by size" + (" and oshash" if expected else "")
+        origin = row["path"]
+        detail = "Exact source move verified by size" + (" and oshash" if expected else "")
+        if origin != source:
+            detail = f"Chained move from {Path(origin).name} verified by size" + (" and oshash" if expected else "")
+        return dict(row), detail
+    finally:
+        connection.close()
+
+
+def correlate_created_destination(database_path, destination, candidate_sources=None):
+    """Find the unambiguous inventoried source for a created file, or None if ambiguous / no match."""
+    target = Path(destination)
+    try:
+        if not target.is_file():
+            return None, "Destination is not a file"
+        dest_size = target.stat().st_size
+    except OSError:
+        return None, "Could not stat destination"
+    if dest_size <= 0:
+        return None, "Destination file is empty"
+    dest_hash = opensubtitles_hash(target)
+    if not dest_hash:
+        return None, "Could not compute destination hash"
+
+    connection = connect(database_path)
+    try:
+        if candidate_sources:
+            placeholders = ",".join("?" for _ in candidate_sources)
+            rows = connection.execute(
+                f"SELECT * FROM files WHERE path IN ({placeholders}) AND size = ?",
+                (*candidate_sources, dest_size)
+            ).fetchall()
+        else:
+            rows = connection.execute(
+                "SELECT * FROM files WHERE size = ?",
+                (dest_size,)
+            ).fetchall()
+
+        matched = []
+        for r in rows:
+            src_p = r["path"]
+            if src_p == destination:
+                continue
+            try:
+                if Path(src_p).exists():
+                    continue
+            except OSError:
+                pass
+            expected_hash = fingerprint_value(r["fingerprints_json"], "oshash")
+            if expected_hash and expected_hash == dest_hash:
+                matched.append(dict(r))
+
+        if len(matched) == 1:
+            return matched[0], "Unambiguous source match verified by size and oshash"
+        elif len(matched) > 1:
+            return None, f"Ambiguous match: {len(matched)} candidate sources matched size and oshash"
+        return None, "No matching source found"
+    finally:
+        connection.close()
+
+
+def correlate_deleted_source(database_path, source, candidate_destinations):
+    """Find the unambiguous destination for a deleted file from candidate destinations."""
+    if not candidate_destinations:
+        return None, "No candidate destinations"
+    connection = connect(database_path)
+    try:
+        row = connection.execute("SELECT * FROM files WHERE path=?", (source,)).fetchone()
+        if not row:
+            return None, "Source not in inventory"
+        source_size = row["size"]
+        if not source_size or source_size <= 0:
+            return None, "Source size unknown or 0"
+        expected_hash = fingerprint_value(row["fingerprints_json"], "oshash")
+        if not expected_hash:
+            return None, "Source oshash unknown"
+
+        matched = []
+        for dest in candidate_destinations:
+            if dest == source:
+                continue
+            t = Path(dest)
+            try:
+                if not t.is_file() or t.stat().st_size != source_size:
+                    continue
+                if opensubtitles_hash(t) == expected_hash:
+                    matched.append(dest)
+            except OSError:
+                continue
+
+        if len(matched) == 1:
+            return matched[0], "Unambiguous destination match verified by size and oshash"
+        elif len(matched) > 1:
+            return None, f"Ambiguous match: {len(matched)} candidate destinations matched size and oshash"
+        return None, "No matching destination found"
+    finally:
+        connection.close()
+
+
+def resolve_associated_companion_moves(database_path: Path, video_destination: str, video_source: str = None) -> list[str]:
+    """After a video is successfully reconnected, verify and resolve any associated pending companion moves."""
+    connection = connect(database_path)
+    resolved = []
+    try:
+        dest_video = Path(video_destination)
+        parent_dir = str(dest_video.parent)
+        rows = connection.execute(
+            "SELECT event_key, source_path, destination_path FROM filesystem_events WHERE event_type='moved' AND status='pending'"
+        ).fetchall()
+        for r in rows:
+            dest_p = r["destination_path"]
+            src_p = r["source_path"]
+            if not dest_p:
+                continue
+            cand_p = Path(dest_p)
+            if str(cand_p.parent) != parent_dir:
+                continue
+            cand_suffix = cand_p.suffix.lower()
+            if cand_suffix not in COMPANION_EXTENSIONS:
+                continue
+
+            matched, _ = match_companion_to_video(cand_p, dest_video)
+            if matched and is_verified_companion_destination(connection, dest_p, src_p):
+                connection.execute(
+                    "UPDATE filesystem_events SET status='resolved' WHERE event_key=?",
+                    (r["event_key"],)
+                )
+                resolved.append((r["event_key"], src_p, dest_p))
+        connection.commit()
+    finally:
+        connection.close()
+
+    for event_key, src_p, dest_p in resolved:
+        record_activity(
+            database_path, "companion", "external companion move", "resolved",
+            old_path=src_p, new_path=dest_p,
+            detail=f"Companion move verified and resolved alongside reconnected video {Path(video_destination).name}"
+        )
+    return [r[0] for r in resolved]
+
+
+def resolve_chained_move_events(database_path: Path, origin_source: str, intermediate_source: str, final_destination: str) -> list[str]:
+    """Resolve intermediate pending moved events between origin_source and final_destination."""
+    connection = connect(database_path)
+    resolved_keys = []
+    try:
+        curr_dest = intermediate_source
+        visited = set()
+        chain_steps = [(intermediate_source, final_destination)]
+        while curr_dest and curr_dest not in visited:
+            visited.add(curr_dest)
+            rows = connection.execute(
+                "SELECT event_key, source_path, destination_path FROM filesystem_events "
+                "WHERE destination_path=? AND event_type='moved'",
+                (curr_dest,)
+            ).fetchall()
+            if not rows:
+                break
+            for r in rows:
+                connection.execute(
+                    "UPDATE filesystem_events SET status='resolved' WHERE event_key=?",
+                    (r["event_key"],)
+                )
+                resolved_keys.append(r["event_key"])
+                chain_steps.append((r["source_path"], r["destination_path"]))
+                curr_dest = r["source_path"]
+                if curr_dest == origin_source:
+                    break
+
+        for step_src, step_dst in chain_steps:
+            src_stem = str(Path(step_src).with_suffix(''))
+            dst_stem = str(Path(step_dst).with_suffix(''))
+            comp_rows = connection.execute(
+                "SELECT event_key, source_path, destination_path FROM filesystem_events "
+                "WHERE event_type='moved' AND status='pending'"
+            ).fetchall()
+            for cr in comp_rows:
+                cs = cr["source_path"]
+                cd = cr["destination_path"]
+                if cs and cd and cs.startswith(src_stem) and cd.startswith(dst_stem):
+                    connection.execute(
+                        "UPDATE filesystem_events SET status='resolved' WHERE event_key=?",
+                        (cr["event_key"],)
+                    )
+                    resolved_keys.append(cr["event_key"])
+        connection.commit()
+        return resolved_keys
     finally:
         connection.close()
 
 
 class MoveWorker(threading.Thread):
-    def __init__(self, database_path, stash, enabled, notifications, transcoder_compatibility=False):
+    def __init__(self, database_path, stash, enabled, notifications, transcoder_compatibility=False,
+                 max_immediate_retries=3, immediate_retry_delays=(0.1, 0.25, 0.5),
+                 max_deferred_attempts=5, initial_deferred_delay=2.0, max_deferred_backoff=30.0):
         super().__init__(daemon=True)
         self.database_path, self.stash = database_path, stash
         self.enabled, self.notifications = enabled, notifications
         self.transcoder_compatibility = bool(transcoder_compatibility)
         self.items = queue.Queue()
         self.stopping = False
+        self.lock = threading.RLock()
+        self.deferred_moves = {}
+        self.max_immediate_retries = int(max_immediate_retries)
+        self.immediate_retry_delays = list(immediate_retry_delays)
+        self.max_deferred_attempts = int(max_deferred_attempts)
+        self.initial_deferred_delay = float(initial_deferred_delay)
+        self.max_deferred_backoff = float(max_deferred_backoff)
+        self.queued_pairs = set()
+        self.active_move = None
+        self.recover_pending_moves()
 
     @property
     def automatic_move_reconciliation(self):
@@ -812,163 +1232,373 @@ class MoveWorker(threading.Thread):
     def automatic_move_reconciliation(self, value):
         self.enabled = bool(value)
 
+    def active_moves_summary(self):
+        with self.lock:
+            results = []
+            if self.active_move:
+                src, dst = self.active_move
+                results.append({
+                    "source_path": src,
+                    "destination_path": dst,
+                    "status": "reconnecting",
+                })
+            for (src, dst), info in self.deferred_moves.items():
+                results.append({
+                    "source_path": src,
+                    "destination_path": dst,
+                    "status": "deferred",
+                    "attempts": info.get("attempts", 1),
+                    "last_error": info.get("last_error", ""),
+                })
+            for src, dst in self.queued_pairs:
+                if (src, dst) != self.active_move and (src, dst) not in self.deferred_moves:
+                    results.append({
+                        "source_path": src,
+                        "destination_path": dst,
+                        "status": "queued",
+                    })
+            return results
+
+    def _sync_active_moves(self):
+        try:
+            summary = self.active_moves_summary()
+            connection = connect(self.database_path)
+            try:
+                connection.execute(
+                    "UPDATE filesystem_monitor_status SET active_moves_json=? WHERE id=1",
+                    (json.dumps(summary),),
+                )
+                connection.commit()
+            finally:
+                connection.close()
+        except Exception as exc:
+            logger.debug("_sync_active_moves failed: %s", exc)
+
     def submit(self, source, destination):
+        with self.lock:
+            if (source, destination) in self.queued_pairs:
+                return
+            self.queued_pairs.add((source, destination))
         self.items.put((source, destination))
+        self._sync_active_moves()
 
     def stop(self):
         self.stopping = True
         self.items.put((None, None))
 
+    def _next_timeout(self):
+        with self.lock:
+            if not self.deferred_moves:
+                return 1.0
+            mono = time.monotonic()
+            earliest = min(info["next_retry_mono"] for info in self.deferred_moves.values())
+            return max(0.05, min(1.0, earliest - mono))
+
+    def _evaluate_deferred_moves(self, force=False):
+        mono = time.monotonic()
+        with self.lock:
+            due = [
+                (src, dst) for (src, dst), info in list(self.deferred_moves.items())
+                if force or mono >= info["next_retry_mono"]
+            ]
+        for src, dst in due:
+            self._process_move(src, dst)
+
+    def evaluate_deferred(self, force=True):
+        self._evaluate_deferred_moves(force=force)
+
+    def on_root_recovered(self, root=None):
+        """When a library root reconnects, evaluate deferred moves and recover any pending moves."""
+        self.recover_pending_moves()
+        self.evaluate_deferred(force=True)
+
+    def recover_pending_moves(self):
+        """Recover pending unverified/deferred moves from persistent database records on startup/restart."""
+        connection = connect(self.database_path)
+        try:
+            rows = connection.execute(
+                "SELECT source_path, destination_path FROM filesystem_events WHERE event_type='moved' AND status='pending'"
+            ).fetchall()
+            for r in rows:
+                src, dst = r["source_path"], r["destination_path"]
+                if src and dst and Path(dst).suffix.lower() in VIDEO_EXTENSIONS:
+                    with self.lock:
+                        already = (src, dst) in self.deferred_moves or (src, dst) in self.queued_pairs
+                    if not already:
+                        self.submit(src, dst)
+        except Exception as exc:
+            logger.debug("recover_pending_moves failed: %s", exc)
+        finally:
+            connection.close()
+
     def run(self):
         while not self.stopping:
-            source, destination = self.items.get()
-            if source is None:
-                break
-            compatibility_candidate = False
+            timeout = self._next_timeout()
             try:
-                row, reason = tracked_move(self.database_path, source, destination)
-                transcode_replacement = False
-                if not row and self.transcoder_compatibility and likely_transcoder_replacement(source, destination):
-                    row = inventoried_source(self.database_path, source)
-                    if row:
-                        transcode_replacement = True
-                        reason = "Likely same-folder transcoder replacement accepted by explicit compatibility setting"
-                if not row:
-                    record_activity(self.database_path, "filesystem", "external move", "review",
-                                    severity="warning", old_path=source, new_path=destination, detail=reason)
-                    notify(self.notifications, f"File move needs review: {Path(destination).name}")
-                    continue
-                compatibility_candidate = (self.transcoder_compatibility
-                                           and likely_transcoder_replacement(source, destination))
+                item = self.items.get(timeout=timeout)
+                if item is not None:
+                    source, destination = item
+                    if source is None and destination is None:
+                        break
+                    self._process_move(source, destination)
+            except queue.Empty:
+                pass
+            self._evaluate_deferred_moves()
+
+    def _process_move(self, source, destination):
+        with self.lock:
+            self.queued_pairs.discard((source, destination))
+            self.active_move = (source, destination)
+        self._sync_active_moves()
+        compatibility_candidate = False
+        try:
+            row = None
+            reason = None
+            last_transient_error = None
+
+            # Bounded retries with backoff for transient filesystem errors (EPERM, EACCES, EBUSY)
+            for attempt in range(self.max_immediate_retries + 1):
+                try:
+                    row, reason = tracked_move(self.database_path, source, destination)
+                    last_transient_error = None
+                    break
+                except OSError as err:
+                    if is_transient_fs_error(err) or is_network_disconnect_error(err, destination):
+                        last_transient_error = err
+                        if attempt < self.max_immediate_retries:
+                            delay = self.immediate_retry_delays[min(attempt, len(self.immediate_retry_delays) - 1)]
+                            time.sleep(delay)
+                            continue
+                    else:
+                        raise
+
+            if last_transient_error is not None:
+                with self.lock:
+                    current = self.deferred_moves.get((source, destination), {})
+                    attempts = current.get("attempts", 0) + 1
+                    if attempts < self.max_deferred_attempts:
+                        delay = min(self.max_deferred_backoff, self.initial_deferred_delay * (2 ** (attempts - 1)))
+                        self.deferred_moves[(source, destination)] = {
+                            "attempts": attempts,
+                            "next_retry_mono": time.monotonic() + delay,
+                            "last_error": str(last_transient_error),
+                        }
+                        logger.info(
+                            "Transient filesystem error verifying %s -> %s: %s; scheduled retry in %.1fs (attempt %d/%d)",
+                            source, destination, last_transient_error, delay, attempts, self.max_deferred_attempts
+                        )
+                        record_activity(
+                            self.database_path, "reconciliation", "external move", "waiting",
+                            severity="warning", old_path=source, new_path=destination,
+                            detail=f"File temporarily locked ({last_transient_error}); retained for retry"
+                        )
+                        return
+                    else:
+                        self.deferred_moves.pop((source, destination), None)
+                        record_activity(
+                            self.database_path, "reconciliation", "external move", "failed",
+                            severity="error", old_path=source, new_path=destination,
+                            detail=f"Verification failed after {attempts} attempts: {last_transient_error}"
+                        )
+                        notify(self.notifications, f"Move reconciliation failed: {Path(destination).name}")
+                        return
+
+            with self.lock:
+                self.deferred_moves.pop((source, destination), None)
+
+            transcode_replacement = False
+            if not row and self.transcoder_compatibility and likely_transcoder_replacement(source, destination):
+                row = inventoried_source(self.database_path, source)
+                if row:
+                    transcode_replacement = True
+                    reason = "Likely same-folder transcoder replacement accepted by explicit compatibility setting"
+            if not row:
+                if reason == "Destination is not a file":
+                    conn = connect(self.database_path)
+                    try:
+                        has_next = conn.execute(
+                            "SELECT 1 FROM filesystem_events WHERE source_path=? AND event_type='moved' AND status='pending'",
+                            (destination,)
+                        ).fetchone()
+                    finally:
+                        conn.close()
+                    if has_next:
+                        logger.debug("Move %s -> %s destination not on disk but has subsequent move; awaiting chain resolution", source, destination)
+                        return
+                record_activity(self.database_path, "filesystem", "external move", "review",
+                                severity="warning", old_path=source, new_path=destination, detail=reason)
+                notify(self.notifications, f"File move needs review: {Path(destination).name}")
+                return
+            conflict = destination_inventory_conflict(self.database_path, destination, row)
+            if conflict:
+                record_activity(self.database_path, "reconciliation", "external move", "review",
+                                severity="warning", scene_id=row['scene_id'], file_id=row["file_id"],
+                                old_path=source, new_path=destination, detail=conflict)
+                notify(self.notifications, f"Destination conflict: {Path(destination).name}")
+                return
+
+            compatibility_candidate = (self.transcoder_compatibility
+                                       and likely_transcoder_replacement(source, destination))
+            if compatibility_candidate:
+                selected, safety_reason = transcoder_replacement_decision(
+                    self.database_path, source, row
+                )
+                if not selected or _normalized_path(selected) != _normalized_path(destination):
+                    detail = safety_reason if not selected else (
+                        f"Queued destination is no longer the sole safe replacement; selected {selected}"
+                    )
+                    record_activity(self.database_path, "filesystem", "transcoder replacement", "review",
+                                    severity="warning", scene_id=row['scene_id'], file_id=row["file_id"],
+                                    old_path=source, new_path=destination, detail=detail)
+                    notify(self.notifications, f"Transcoder replacement needs review: {Path(destination).name}")
+                    promote_transcoder_review(self.database_path, source, detail)
+                    return
+            record_activity(self.database_path, "filesystem",
+                            "transcoder replacement" if transcode_replacement else "external move",
+                            "accepted" if transcode_replacement else "verified",
+                            scene_id=row['scene_id'], file_id=row["file_id"], old_path=source,
+                            new_path=destination, detail=reason)
+            notify(self.notifications, f"File moved: {Path(source).name} → {Path(destination).parent.name}")
+            if not self.enabled:
+                return
+            job_id = self.stash.metadata_scan(paths=[destination])
+            completed = self.stash.wait_for_job(job_id, timeout=180)
+            result = self.stash.call_GQL(
+                "query SceneFiles($id: ID!) { findScene(id: $id) { files { id path basename } } }",
+                {"id": str(row['scene_id'])})
+            paths = {item.get("path") for item in ((result or {}).get("findScene") or {}).get("files") or []}
+            if completed and destination in paths:
                 if compatibility_candidate:
                     selected, safety_reason = transcoder_replacement_decision(
                         self.database_path, source, row
                     )
-                    if not selected or _normalized_path(selected) != _normalized_path(destination):
-                        detail = safety_reason if not selected else (
-                            f"Queued destination is no longer the sole safe replacement; selected {selected}"
-                        )
-                        record_activity(self.database_path, "filesystem", "transcoder replacement", "review",
-                                        severity="warning", scene_id=row["scene_id"], file_id=row["file_id"],
+                    stash_safe, stash_reason = stash_destination_is_exclusive(
+                        self.stash, destination, row['scene_id']
+                    )
+                    if (not selected or _normalized_path(selected) != _normalized_path(destination)
+                            or not stash_safe):
+                        detail = safety_reason if not selected else stash_reason
+                        record_activity(self.database_path, "reconciliation", "transcoder replacement", "review",
+                                        severity="warning", scene_id=row['scene_id'], file_id=row["file_id"],
                                         old_path=source, new_path=destination, detail=detail)
-                        notify(self.notifications, f"Transcoder replacement needs review: {Path(destination).name}")
+                        notify(self.notifications, f"Transcoder replacement changed during scan; review scene {row['scene_id']}")
                         promote_transcoder_review(self.database_path, source, detail)
-                        continue
-                record_activity(self.database_path, "filesystem",
-                                "transcoder replacement" if transcode_replacement else "external move",
-                                "accepted" if transcode_replacement else "verified",
-                                scene_id=row["scene_id"], file_id=row["file_id"], old_path=source,
-                                new_path=destination, detail=reason)
-                notify(self.notifications, f"File moved: {Path(source).name} → {Path(destination).parent.name}")
-                if not self.enabled:
-                    continue
-                job_id = self.stash.metadata_scan(paths=[destination])
-                completed = self.stash.wait_for_job(job_id, timeout=180)
-                result = self.stash.call_GQL(
-                    "query SceneFiles($id: ID!) { findScene(id: $id) { files { id path basename } } }",
-                    {"id": str(row["scene_id"])})
-                paths = {item.get("path") for item in ((result or {}).get("findScene") or {}).get("files") or []}
-                if completed and destination in paths:
+                        return
+                connection = connect(self.database_path)
+                try:
+                    conflict = None
                     if compatibility_candidate:
-                        selected, safety_reason = transcoder_replacement_decision(
-                            self.database_path, source, row
+                        connection.execute("BEGIN IMMEDIATE")
+                        conflict = destination_inventory_conflict(
+                            self.database_path, destination, row, connection=connection
                         )
-                        stash_safe, stash_reason = stash_destination_is_exclusive(
-                            self.stash, destination, row["scene_id"]
-                        )
-                        if (not selected or _normalized_path(selected) != _normalized_path(destination)
-                                or not stash_safe):
-                            detail = safety_reason if not selected else stash_reason
-                            record_activity(self.database_path, "reconciliation", "transcoder replacement", "review",
-                                            severity="warning", scene_id=row["scene_id"], file_id=row["file_id"],
-                                            old_path=source, new_path=destination, detail=detail)
-                            notify(self.notifications, f"Transcoder replacement changed during scan; review scene {row['scene_id']}")
-                            promote_transcoder_review(self.database_path, source, detail)
-                            continue
-                    connection = connect(self.database_path)
-                    try:
-                        conflict = None
-                        if compatibility_candidate:
-                            connection.execute("BEGIN IMMEDIATE")
-                            conflict = destination_inventory_conflict(
-                                self.database_path, destination, row, connection=connection
-                            )
-                        if conflict:
-                            connection.rollback()
-                            record_activity(self.database_path, "reconciliation", "transcoder replacement", "review",
-                                            severity="warning", scene_id=row["scene_id"], file_id=row["file_id"],
-                                            old_path=source, new_path=destination, detail=conflict)
-                            notify(self.notifications, f"Transcoder replacement ownership changed; review scene {row['scene_id']}")
-                            promote_transcoder_review(self.database_path, source, conflict)
-                            continue
-                        connection.execute("UPDATE files SET path=?,basename=?,exists_on_disk=1,last_seen_at=?,missing_since=NULL WHERE file_id=?",
-                                           (destination, Path(destination).name, utc_now(), row["file_id"]))
-                        connection.commit()
-                    finally:
-                        connection.close()
-                    record_activity(self.database_path, "reconciliation", "targeted Stash scan", "updated",
-                                    scene_id=row["scene_id"], file_id=row["file_id"], old_path=source,
-                                    new_path=destination, detail=f"Stash scan job {job_id} confirmed the new path")
-                    if transcode_replacement:
-                        resolve_filesystem_event(self.database_path, "deleted", source)
-                        resolve_filesystem_event(self.database_path, "created", destination)
-                    else:
-                        resolve_filesystem_event(self.database_path, "moved", source, destination)
-                    if compatibility_candidate:
-                        resolve_filesystem_event(self.database_path, "deleted", source)
-                        resolve_filesystem_event(self.database_path, "created", destination)
-                        clear_transcoder_candidates(self.database_path, source)
-                    notify(self.notifications, f"Stash updated: {Path(destination).name}")
-
-                    # Companion relocation is all-or-nothing: a partial failure restores
-                    # every companion already moved and leaves a clear review warning.
-                    try:
-                        moved_companions = relocate_companions_transactionally(
-                            self.database_path, source, destination
-                        )
-                        for old_companion, new_companion in moved_companions:
-                            record_activity(self.database_path, "companion", "moved companion", "recorded",
-                                            scene_id=row["scene_id"], old_path=str(old_companion),
-                                            new_path=str(new_companion),
-                                            detail=f"Moved companion file alongside {Path(destination).name}")
-                    except Exception as companion_error:
-                        record_activity(self.database_path, "companion", "external move companions", "review",
-                                        severity="warning", scene_id=row["scene_id"], old_path=source,
-                                        new_path=destination, detail=str(companion_error))
-                        notify(self.notifications, f"Companion files need review: {Path(destination).name}")
+                    if conflict:
+                        connection.rollback()
+                        record_activity(self.database_path, "reconciliation", "transcoder replacement", "review",
+                                        severity="warning", scene_id=row['scene_id'], file_id=row["file_id"],
+                                        old_path=source, new_path=destination, detail=conflict)
+                        notify(self.notifications, f"Transcoder replacement ownership changed; review scene {row['scene_id']}")
+                        promote_transcoder_review(self.database_path, source, conflict)
+                        return
+                    connection.execute("UPDATE files SET path=?,basename=?,exists_on_disk=1,last_seen_at=?,missing_since=NULL WHERE file_id=?",
+                                       (destination, Path(destination).name, utc_now(), row["file_id"]))
+                    connection.commit()
+                finally:
+                    connection.close()
+                record_activity(self.database_path, "reconciliation", "targeted Stash scan", "updated",
+                                scene_id=row['scene_id'], file_id=row["file_id"], old_path=source,
+                                new_path=destination, detail=f"Stash scan job {job_id} confirmed the new path")
+                if transcode_replacement:
+                    resolve_filesystem_event(self.database_path, "deleted", source)
+                    resolve_filesystem_event(self.database_path, "created", destination)
                 else:
-                    detail = f"Stash scan job {job_id} did not attach the destination to the original scene"
-                    record_activity(self.database_path, "reconciliation", "targeted Stash scan", "review",
-                                    severity="warning", scene_id=row["scene_id"], file_id=row["file_id"],
-                                    old_path=source, new_path=destination, detail=detail)
-                    notify(self.notifications, f"Stash did not adopt moved file; review scene {row['scene_id']}")
-                    if compatibility_candidate:
-                        promote_transcoder_review(self.database_path, source, detail)
-            except Exception as error:
-                record_activity(self.database_path, "reconciliation", "external move", "failed",
-                                severity="error", old_path=source, new_path=destination, detail=str(error))
-                notify(self.notifications, f"Move reconciliation failed: {Path(destination).name}")
+                    resolve_filesystem_event(self.database_path, "moved", source, destination)
+                    resolve_filesystem_event(self.database_path, "deleted", source)
+                    resolve_filesystem_event(self.database_path, "created", destination)
+                    if row["path"] != source:
+                        resolve_chained_move_events(self.database_path, row["path"], source, destination)
                 if compatibility_candidate:
-                    promote_transcoder_review(self.database_path, source, str(error))
+                    resolve_filesystem_event(self.database_path, "deleted", source)
+                    resolve_filesystem_event(self.database_path, "created", destination)
+                    clear_transcoder_candidates(self.database_path, source)
+                notify(self.notifications, f"Stash updated: {Path(destination).name}")
+
+                # Companion relocation is all-or-nothing: a partial failure restores
+                # every companion already moved and leaves a clear review warning.
+                try:
+                    moved_companions = relocate_companions_transactionally(
+                        self.database_path, source, destination
+                    )
+                    for old_companion, new_companion in moved_companions:
+                        record_activity(self.database_path, "companion", "moved companion", "recorded",
+                                        scene_id=row['scene_id'], old_path=str(old_companion),
+                                        new_path=str(new_companion),
+                                        detail=f"Moved companion file alongside {Path(destination).name}")
+                except Exception as companion_error:
+                    record_activity(self.database_path, "companion", "external move companions", "review",
+                                    severity="warning", scene_id=row['scene_id'], old_path=source,
+                                    new_path=destination, detail=str(companion_error))
+                    notify(self.notifications, f"Companion files need review: {Path(destination).name}")
+
+                # Automatically verify and resolve associated companion JPG warnings
+                try:
+                    resolve_associated_companion_moves(self.database_path, destination, row["path"])
+                except Exception as comp_res_err:
+                    logger.debug("Failed to resolve associated companion moves for %s: %s", destination, comp_res_err)
+            else:
+                detail = f"Stash scan job {job_id} did not attach the destination to the original scene"
+                record_activity(self.database_path, "reconciliation", "targeted Stash scan", "review",
+                                severity="warning", scene_id=row['scene_id'], file_id=row["file_id"],
+                                old_path=source, new_path=destination, detail=detail)
+                notify(self.notifications, f"Stash did not adopt moved file; review scene {row['scene_id']}")
+                if compatibility_candidate:
+                    promote_transcoder_review(self.database_path, source, detail)
+        except Exception as error:
+            with self.lock:
+                self.deferred_moves.pop((source, destination), None)
+            record_activity(self.database_path, "reconciliation", "external move", "failed",
+                            severity="error", old_path=source, new_path=destination, detail=str(error))
+            notify(self.notifications, f"Move reconciliation failed: {Path(destination).name}")
+            if compatibility_candidate:
+                promote_transcoder_review(self.database_path, source, str(error))
+        finally:
+            with self.lock:
+                if self.active_move == (source, destination):
+                    self.active_move = None
+            self._sync_active_moves()
 
 
 class CompletedDownloadWorker(threading.Thread):
     """Wait for new incoming videos to settle, then request one targeted Stash scan."""
+    def _set_incoming_folders(self, raw_folders):
+        self.incoming_folders = []
+        self._folder_variants_map = {}
+        for f in raw_folders:
+            if f:
+                try:
+                    p = Path(f)
+                    try:
+                        canonical = p.resolve()
+                    except OSError:
+                        canonical = p
+                    if canonical not in self.incoming_folders:
+                        self.incoming_folders.append(canonical)
+                    variants = self._folder_variants_map.setdefault(canonical, set())
+                    variants.add(os.path.normpath(str(p)))
+                    variants.add(os.path.normpath(str(canonical)))
+                    if os.name == "nt":
+                        variants.add(os.path.normcase(os.path.normpath(str(p))))
+                        variants.add(os.path.normcase(os.path.normpath(str(canonical))))
+                except Exception:
+                    pass
+        self.incoming_folder = self.incoming_folders[0] if self.incoming_folders else None
+
     def __init__(self, database_path, stash, incoming_folder, enabled, settle_seconds, notifications,
                  fallback_seconds=60, max_attempts=3, incoming_folders=None, track_temporary_downloads=False):
         super().__init__(daemon=True)
         self.database_path, self.stash = database_path, stash
         raw_folders = incoming_folders if incoming_folders is not None else ([incoming_folder] if incoming_folder else [])
-        self.incoming_folders = []
-        for f in raw_folders:
-            if f:
-                try:
-                    p = Path(f).resolve()
-                    if p not in self.incoming_folders:
-                        self.incoming_folders.append(p)
-                except Exception:
-                    pass
-        self.incoming_folder = self.incoming_folders[0] if self.incoming_folders else None
+        self._set_incoming_folders(raw_folders)
         self.enabled = bool(enabled and self.incoming_folders)
         self.settle_seconds = max(60, int(settle_seconds or 300))
         self.notifications = notifications
@@ -990,7 +1620,17 @@ class CompletedDownloadWorker(threading.Thread):
         self.allow_custom_contact_sheet_script = False
         self.track_temporary_downloads = track_temporary_downloads
         self._active_scans = {}
+        self._all_scan_threads = set()
+        self._pending_scans = {}
+        self._max_consecutive_passes = 5
         self._scan_lock = threading.Lock()
+        self._recovery_lock = threading.Lock()
+        self._active_recovery_scans = {}
+        self._pending_recovery_scans = set()
+        self._deferred_lock = threading.Lock()
+        self._deferred_busy_submissions = set()
+        self._deferred_busy_relocations = []
+        self.availability_tracker = None
         if self.enabled:
             self._restore_candidates()
             self._recover_recent_files()
@@ -998,17 +1638,7 @@ class CompletedDownloadWorker(threading.Thread):
     def _is_inside_incoming(self, candidate_path):
         if not self.incoming_folders or not candidate_path:
             return False
-        try:
-            resolved = Path(candidate_path).resolve()
-            for root in self.incoming_folders:
-                try:
-                    resolved.relative_to(root)
-                    return True
-                except (OSError, ValueError):
-                    continue
-        except (OSError, ValueError):
-            return False
-        return False
+        return self._owning_incoming_folder(candidate_path) is not None
 
     def accepts(self, path):
         if not self.enabled or not path:
@@ -1076,17 +1706,23 @@ class CompletedDownloadWorker(threading.Thread):
         if not folder:
             return ""
         try:
-            return os.path.normpath(str(folder))
+            norm = os.path.normpath(str(folder))
+            if os.name == "nt":
+                norm = os.path.normcase(norm)
+            return norm
         except Exception:
             return str(folder)
 
     def _normalize_prefixes(self, p):
         s = os.path.normpath(os.path.abspath(str(p)))
+        if os.name == "nt":
+            s = os.path.normcase(s)
         variants = [s]
-        if s.startswith("/private/"):
-            variants.append(s[len("/private"):])
-        elif s.startswith("/var/") or s.startswith("/tmp/") or s.startswith("/etc/"):
-            variants.append("/private" + s)
+        if os.name != "nt":
+            if s.startswith("/private/"):
+                variants.append(s[len("/private"):])
+            elif s.startswith("/var/") or s.startswith("/tmp/") or s.startswith("/etc/"):
+                variants.append("/private" + s)
         return variants
 
     def _owning_incoming_folder(self, path):
@@ -1095,7 +1731,9 @@ class CompletedDownloadWorker(threading.Thread):
         path_variants = self._normalize_prefixes(path)
         best_match = None
         for folder in self.incoming_folders:
-            folder_variants = self._normalize_prefixes(folder)
+            folder_variants = set(self._normalize_prefixes(folder))
+            if hasattr(self, "_folder_variants_map") and folder in self._folder_variants_map:
+                folder_variants.update(self._folder_variants_map[folder])
             matched = any(
                 pv == fv or pv.startswith(fv + os.sep)
                 for fv in folder_variants
@@ -1107,6 +1745,33 @@ class CompletedDownloadWorker(threading.Thread):
                     best_match = folder
         return best_match
 
+    def _enqueue_pending_scan(self, key, folder, cutoff=None, tree=None):
+        pending = self._pending_scans.setdefault(key, {
+            "folder": Path(folder),
+            "cutoff": cutoff,
+            "trees": set(),
+            "full_scan": False,
+        })
+        if cutoff is not None:
+            if pending["cutoff"] is None:
+                pending["cutoff"] = cutoff
+            else:
+                pending["cutoff"] = min(pending["cutoff"], cutoff)
+        if tree is not None:
+            tree_p = Path(tree)
+            try:
+                if tree_p.resolve() == Path(folder).resolve():
+                    pending["full_scan"] = True
+                    pending["trees"].clear()
+                elif not pending["full_scan"]:
+                    pending["trees"].add(tree_p)
+                    if len(pending["trees"]) > 50:
+                        pending["full_scan"] = True
+                        pending["cutoff"] = 0.0
+                        pending["trees"].clear()
+            except OSError:
+                pass
+
     def _dispatch_folder_scan(self, folder, cutoff):
         if not self.enabled or self.stopping:
             return None
@@ -1116,22 +1781,103 @@ class CompletedDownloadWorker(threading.Thread):
             existing = self._active_scans.get(key)
             if existing is not None:
                 if existing.is_alive():
+                    self._enqueue_pending_scan(key, folder_path, cutoff=cutoff)
                     return None
                 else:
                     self._active_scans.pop(key, None)
             thread = threading.Thread(
-                target=self._scan_incoming_folder,
-                args=(folder_path, cutoff),
+                target=self._run_folder_scan,
+                args=(key, folder_path),
+                kwargs={"initial_cutoff": cutoff},
                 name=f"incoming-scan-{folder_path.name or 'folder'}",
                 daemon=True,
             )
             self._active_scans[key] = thread
+            self._all_scan_threads.add(thread)
             thread.start()
             return thread
 
+    def _run_folder_scan(self, key, folder, initial_cutoff=None, initial_tree=None, result=None, prev_thread=None):
+        if prev_thread is not None:
+            try:
+                prev_thread.join()
+            except Exception:
+                pass
+
+        pass_count = 0
+        max_passes = getattr(self, "_max_consecutive_passes", 5)
+        current_cutoff = initial_cutoff
+        current_tree = initial_tree
+        is_initial = (current_tree is not None or current_cutoff is not None)
+
+        try:
+            while not self.stopping and pass_count < max_passes:
+                if not is_initial:
+                    with self._scan_lock:
+                        if self.stopping:
+                            break
+                        pending = self._pending_scans.pop(key, None)
+                        if not pending:
+                            break
+
+                    pass_count += 1
+                    trees = list(pending.get("trees") or [])
+                    cutoff = pending.get("cutoff")
+                    full_scan = pending.get("full_scan")
+
+                    for t_path in trees:
+                        if self.stopping:
+                            break
+                        try:
+                            self._scan_tree_worker(t_path)
+                        except Exception as exc:
+                            logger.debug("Error scanning deferred tree %s: %s", t_path, exc)
+
+                    if self.stopping:
+                        break
+
+                    if full_scan:
+                        try:
+                            self._scan_incoming_folder(folder, 0.0)
+                        except Exception as exc:
+                            logger.debug("Error during full scan for %s: %s", folder, exc)
+                    elif cutoff is not None:
+                        try:
+                            self._scan_incoming_folder(folder, cutoff)
+                        except Exception as exc:
+                            logger.debug("Error during cutoff scan for %s: %s", folder, exc)
+                else:
+                    pass_count += 1
+                    is_initial = False
+                    try:
+                        if current_tree is not None:
+                            count = self._scan_tree_worker(current_tree)
+                            if result is not None and pass_count == 1:
+                                result[0] = count
+                        elif current_cutoff is not None:
+                            self._scan_incoming_folder(folder, current_cutoff)
+                    except Exception as exc:
+                        logger.debug("Error during initial scan for %s: %s", folder, exc)
+        finally:
+            with self._scan_lock:
+                if key in self._pending_scans and not self.stopping:
+                    curr_thread = threading.current_thread()
+                    next_thread = threading.Thread(
+                        target=self._run_folder_scan,
+                        args=(key, folder),
+                        kwargs={"prev_thread": curr_thread},
+                        name=f"incoming-continuation-{Path(folder).name or 'folder'}",
+                        daemon=True,
+                    )
+                    self._active_scans[key] = next_thread
+                    self._all_scan_threads.add(next_thread)
+                    next_thread.start()
+                else:
+                    if self._active_scans.get(key) is threading.current_thread():
+                        self._active_scans.pop(key, None)
+
     def _scan_incoming_folder(self, folder, cutoff):
         folder_path = Path(folder)
-        key = self._folder_key(folder_path)
         try:
             try:
                 if not folder_path.is_dir():
@@ -1170,10 +1916,6 @@ class CompletedDownloadWorker(threading.Thread):
                 logger.debug("Failed scanning incoming folder %s: %s", folder_path, exc)
         except Exception as exc:
             logger.debug("Unexpected error scanning incoming folder %s: %s", folder_path, exc)
-        finally:
-            with self._scan_lock:
-                if self._active_scans.get(key) is threading.current_thread():
-                    self._active_scans.pop(key, None)
 
     def _wait_scans(self, threads, max_wait=0.05):
         deadline = time.monotonic() + max_wait
@@ -1205,9 +1947,14 @@ class CompletedDownloadWorker(threading.Thread):
             connection.close()
         for row in rows:
             path = row["path"]
-            if not self.accepts(path) or not Path(path).is_file() or self._is_in_inventory(path):
+            try:
+                p = Path(path)
+                if not self.accepts(path) or not p.is_file() or self._is_in_inventory(path):
+                    continue
+                stat = p.stat()
+            except OSError as err:
+                logger.debug("Candidate file %s inaccessible or removed during restore: %s", path, err)
                 continue
-            stat = Path(path).stat()
             unchanged = row["size"] == stat.st_size and row["modified_ns"] == stat.st_mtime_ns
             is_temporary = is_temporary_download(path)
             is_companion = (not is_temporary) and (Path(path).suffix.lower() in COMPANION_EXTENSIONS)
@@ -1229,6 +1976,8 @@ class CompletedDownloadWorker(threading.Thread):
         connection = connect(self.database_path)
         try:
             existing = connection.execute("SELECT attempts, first_seen_at FROM incoming_files WHERE path=?", (path,)).fetchone()
+            if status == "gone" and not existing:
+                return
             attempt_count = int(existing["attempts"] if existing else 0) if attempts is None else int(attempts)
             initial_seen = (existing["first_seen_at"] if existing and existing["first_seen_at"] else None) or first_seen_at or utc_now()
             connection.execute(
@@ -1251,15 +2000,42 @@ class CompletedDownloadWorker(threading.Thread):
     def submit(self, path):
         if not self.accepts(path):
             return False
-        normalized = str(Path(path).resolve())
+        root_key = self._owning_incoming_folder(path) or str(path)
+
+        def _resolve_and_stat():
+            try:
+                norm = str(Path(path).resolve())
+            except OSError:
+                norm = os.path.normpath(os.path.abspath(str(path)))
+            st = Path(norm).stat()
+            return norm, st
+
+        try:
+            res, status = default_fs_limiter.run(root_key, _resolve_and_stat, timeout=1.5)
+            if status in ("timeout", "outage"):
+                if getattr(self, "availability_tracker", None):
+                    self.availability_tracker.mark_root_unavailable(root_key)
+                return False
+            elif status == "busy":
+                with self._deferred_lock:
+                    self._deferred_busy_submissions.add(str(path))
+                self.wake.set()
+                return False
+            if not res:
+                return False
+            normalized, stat = res
+        except OSError:
+            return False
+
         if consume_expected_create(self.database_path, normalized) or consume_expected_create(self.database_path, str(path)):
             return False
         if self._is_in_inventory(normalized) or self._was_imported(normalized):
             return False
-        try:
-            stat = Path(normalized).stat()
-        except OSError:
-            return False
+        if Path(normalized).suffix.lower() in VIDEO_EXTENSIONS:
+            source_row, _ = correlate_created_destination(self.database_path, normalized)
+            if source_row:
+                # Positively verified as an existing library video relocated to this incoming folder
+                return False
         with self.lock:
             current = self.candidates.get(normalized)
         stable_since = time.time()
@@ -1297,7 +2073,7 @@ class CompletedDownloadWorker(threading.Thread):
                     if c_info.get("is_companion"):
                         cand_p = Path(c_path)
                         try:
-                            if cand_p.parent.resolve() == video_p.parent.resolve():
+                            if cand_p.parent == video_p.parent:
                                 matched, _ = match_companion_to_video(cand_p, video_p)
                                 if matched or is_generic_artwork(cand_p):
                                     c_info["check_after"] = 0.0
@@ -1308,7 +2084,7 @@ class CompletedDownloadWorker(threading.Thread):
         self.wake.set()
         return True
 
-    def submit_tree(self, path):
+    def submit_tree(self, path, max_wait=0.05):
         """Discover videos inside a newly-created or newly-moved download directory."""
         if not self.enabled or not path:
             return 0
@@ -1322,27 +2098,30 @@ class CompletedDownloadWorker(threading.Thread):
         with self._scan_lock:
             existing = self._active_scans.get(key)
             if existing is not None and existing.is_alive():
+                self._enqueue_pending_scan(key, owning_folder, tree=root)
                 return 0
             thread = threading.Thread(
-                target=self._scan_tree_worker,
-                args=(root, key, result),
+                target=self._run_folder_scan,
+                args=(key, owning_folder),
+                kwargs={"initial_tree": root, "result": result},
                 name=f"incoming-tree-{root.name or 'tree'}",
                 daemon=True,
             )
             self._active_scans[key] = thread
+            self._all_scan_threads.add(thread)
             thread.start()
 
-        self._wait_scans([thread], max_wait=0.05)
+        self._wait_scans([thread], max_wait=float(max_wait))
         return result[0]
 
-    def _scan_tree_worker(self, root, key, result):
+    def _scan_tree_worker(self, root, key=None, result=None):
         try:
             try:
                 if not root.is_dir():
-                    return
+                    return 0
             except OSError as err:
                 logger.debug("submit_tree cannot access %s: %s", root, err)
-                return
+                return 0
 
             count = 0
             for child in root.rglob("*"):
@@ -1355,13 +2134,12 @@ class CompletedDownloadWorker(threading.Thread):
                     if is_network_disconnect_error(err, child):
                         break
                     continue
-            result[0] = count
+            if result is not None:
+                result[0] = count
+            return count
         except OSError as exc:
             logger.debug("submit_tree scan failed on %s: %s", root, exc)
-        finally:
-            with self._scan_lock:
-                if self._active_scans.get(key) is threading.current_thread():
-                    self._active_scans.pop(key, None)
+            return 0
 
     def _resolve_relocation(self, path):
         with self.lock:
@@ -1373,63 +2151,134 @@ class CompletedDownloadWorker(threading.Thread):
 
     def relocate(self, source, destination):
         """Carry an unimported download's wait/scan state to its new path."""
-        source = str(Path(source).resolve())
-        destination = str(Path(destination).resolve())
+        root_key = self._owning_incoming_folder(destination) or self._owning_incoming_folder(source) or str(destination)
+
+        def _resolve_both():
+            try:
+                s = str(Path(source).resolve())
+            except OSError:
+                s = os.path.normpath(os.path.abspath(str(source)))
+            try:
+                d = str(Path(destination).resolve())
+            except OSError:
+                d = os.path.normpath(os.path.abspath(str(destination)))
+            return s, d
+
+        try:
+            res, status = default_fs_limiter.run(root_key, _resolve_both, timeout=1.5)
+            if status in ("timeout", "outage"):
+                if getattr(self, "availability_tracker", None):
+                    self.availability_tracker.mark_root_unavailable(root_key)
+                return False
+            elif status == "busy":
+                with self._deferred_lock:
+                    self._deferred_busy_relocations.append((str(source), str(destination)))
+                self.wake.set()
+                return False
+            if not res:
+                return False
+            source, destination = res
+        except OSError:
+            return False
+
         is_dest_video = Path(destination).suffix.lower() in VIDEO_EXTENSIONS
         is_dest_temp = is_temporary_download(destination)
         if not self.enabled or (not is_dest_video and not is_dest_temp):
             return False
+        if self._is_in_inventory(destination) or self._was_imported(destination):
+            return False
+
         with self.lock:
             if self.relocations.get(source) == destination and destination in self.candidates:
                 return True
-            candidate = self.candidates.pop(source, None)
-        if candidate is None:
+            in_candidates = source in self.candidates
+
+        if not in_candidates:
+            if self._is_in_inventory(source) or self._was_imported(source):
+                return False
             connection = connect(self.database_path)
             try:
                 row = connection.execute(
-                    "SELECT size,modified_ns,stable_since,attempts,status,first_seen_at FROM incoming_files WHERE path=?", (source,)
+                    "SELECT size,modified_ns,stable_since,attempts,status,first_seen_at FROM incoming_files WHERE path=? AND status IN ('waiting','scanning','downloading')",
+                    (source,)
                 ).fetchone()
             finally:
                 connection.close()
-            if not row or row["status"] not in ("waiting", "scanning", "downloading"):
+            if not row:
                 return False
-            candidate = {"size": row["size"], "modified_ns": row["modified_ns"],
-                         "stable_since": float(row["stable_since"] or time.time()),
-                         "attempts": int(row["attempts"] or 0),
-                         "is_temporary": row["status"] == "downloading",
-                         "first_seen_at": row["first_seen_at"]}
+
         try:
-            stat = Path(destination).stat()
+            stat, status = default_fs_limiter.run(root_key, lambda: Path(destination).stat(), timeout=1.5)
+            if status in ("timeout", "outage"):
+                if getattr(self, "availability_tracker", None):
+                    self.availability_tracker.mark_root_unavailable(root_key)
+                return False
+            elif status == "busy":
+                with self._deferred_lock:
+                    self._deferred_busy_relocations.append((str(source), str(destination)))
+                self.wake.set()
+                return False
+            if not stat:
+                return False
         except OSError:
             return False
-        if is_dest_temp:
-            candidate["is_temporary"] = True
-            if candidate.get("size") != stat.st_size or candidate.get("modified_ns") != stat.st_mtime_ns:
-                candidate.update(size=stat.st_size, modified_ns=stat.st_mtime_ns, stable_since=time.time())
-            with self.lock:
+
+        with self.lock:
+            if in_candidates:
+                candidate = self.candidates.pop(source, None)
+                if candidate is None:
+                    return False
+            else:
+                if source in self.candidates:
+                    candidate = self.candidates.pop(source, None)
+                else:
+                    if self._is_in_inventory(source) or self._was_imported(source):
+                        return False
+                    connection = connect(self.database_path)
+                    try:
+                        row = connection.execute(
+                            "SELECT size,modified_ns,stable_since,attempts,status,first_seen_at FROM incoming_files WHERE path=? AND status IN ('waiting','scanning','downloading')",
+                            (source,)
+                        ).fetchone()
+                    finally:
+                        connection.close()
+                    if not row:
+                        return False
+                    candidate = {
+                        "size": row["size"],
+                        "modified_ns": row["modified_ns"],
+                        "stable_since": float(row["stable_since"] or time.time()),
+                        "attempts": int(row["attempts"] or 0),
+                        "is_temporary": row["status"] == "downloading",
+                        "first_seen_at": row["first_seen_at"],
+                    }
+
+            if is_dest_temp:
+                candidate["is_temporary"] = True
+                if candidate.get("size") != stat.st_size or candidate.get("modified_ns") != stat.st_mtime_ns:
+                    candidate.update(size=stat.st_size, modified_ns=stat.st_mtime_ns, stable_since=time.time())
                 self.relocations[source] = destination
                 self.candidates[destination] = candidate
-            self._save_state(source, "moved", detail=f"Download state transferred to {destination}")
-            self._save_state(destination, "downloading", stat=stat, stable_since=candidate["stable_since"],
-                             attempts=candidate.get("attempts", 0), detail="Incoming download in progress",
-                             first_seen_at=candidate.get("first_seen_at"))
-            self.wake.set()
-            return True
-        else:
-            if candidate.get("is_temporary"):
-                candidate["is_temporary"] = False
-                candidate["stable_since"] = time.time()
-            if candidate.get("size") != stat.st_size or candidate.get("modified_ns") != stat.st_mtime_ns:
-                candidate.update(size=stat.st_size, modified_ns=stat.st_mtime_ns, stable_since=time.time())
-            with self.lock:
+                self._save_state(source, "moved", detail=f"Download state transferred to {destination}")
+                self._save_state(destination, "downloading", stat=stat, stable_since=candidate["stable_since"],
+                                 attempts=candidate.get("attempts", 0), detail="Incoming download in progress",
+                                 first_seen_at=candidate.get("first_seen_at"))
+                self.wake.set()
+                return True
+            else:
+                if candidate.get("is_temporary"):
+                    candidate["is_temporary"] = False
+                    candidate["stable_since"] = time.time()
+                if candidate.get("size") != stat.st_size or candidate.get("modified_ns") != stat.st_mtime_ns:
+                    candidate.update(size=stat.st_size, modified_ns=stat.st_mtime_ns, stable_since=time.time())
                 self.relocations[source] = destination
                 self.candidates[destination] = candidate
-            self._save_state(source, "moved", detail=f"Download completed and renamed to {destination}")
-            self._save_state(destination, "waiting", stat=stat, stable_since=candidate["stable_since"],
-                             attempts=candidate.get("attempts", 0), detail=f"Waiting for video to remain unchanged for {self.settle_seconds // 60} minute(s)",
-                             first_seen_at=candidate.get("first_seen_at"))
-            self.wake.set()
-            return True
+                self._save_state(source, "moved", detail=f"Download completed and renamed to {destination}")
+                self._save_state(destination, "waiting", stat=stat, stable_since=candidate["stable_since"],
+                                 attempts=candidate.get("attempts", 0), detail=f"Waiting for video to remain unchanged for {self.settle_seconds // 60} minute(s)",
+                                 first_seen_at=candidate.get("first_seen_at"))
+                self.wake.set()
+                return True
 
     def relocate_tree(self, source, destination):
         """Transfer active children when an entire download directory is moved."""
@@ -1456,9 +2305,9 @@ class CompletedDownloadWorker(threading.Thread):
 
     def _scan(self, path, candidate):
         attempts = candidate["attempts"] + 1
-        self._save_state(path, "scanning", stable_since=candidate["stable_since"], attempts=attempts,
-                         detail="Stash is adding the video and generating its thumbnail and previews")
         try:
+            self._save_state(path, "scanning", stable_since=candidate["stable_since"], attempts=attempts,
+                             detail="Stash is adding the video and generating its thumbnail and previews")
             while True:
                 job_id = self.stash.metadata_scan(paths=[path], flags=INCOMING_SCAN_FLAGS)
                 self._save_state(path, "scanning", stable_since=candidate["stable_since"], attempts=attempts,
@@ -1544,17 +2393,56 @@ class CompletedDownloadWorker(threading.Thread):
 
             return True
         except Exception as error:
-            if attempts < self.max_attempts and Path(path).is_file():
-                retry_at = time.time()
+            is_db_error = isinstance(error, sqlite3.Error)
+            if is_db_error:
+                # Safeguard 2: Database lock/error is not a scan failure; do not exhaust normal scan attempts
+                original_stable = candidate.get("stable_since", time.time())
                 with self.lock:
-                    self.candidates[path] = {**candidate, "stable_since": retry_at, "attempts": attempts}
-                self._save_state(path, "waiting", stable_since=retry_at, attempts=attempts,
-                                 detail=f"Scan attempt {attempts} failed; it will retry: {error}")
+                    self.candidates[path] = {
+                        **candidate,
+                        "stable_since": original_stable,
+                        "check_after": time.monotonic() + 10.0,
+                    }
+                logger.warning(
+                    "Database error during incoming scan for %s; scheduled retry in 10s (attempt count preserved at %d): %s",
+                    path, candidate.get("attempts", 0), error
+                )
+                try:
+                    self._save_state(path, "waiting", stable_since=original_stable, attempts=candidate.get("attempts", 0),
+                                     detail=f"Database busy during scan; will retry: {error}")
+                except Exception as save_err:
+                    logger.debug("Could not update state for %s after database error: %s", path, save_err)
             else:
-                self._save_state(path, "failed", attempts=attempts, detail=str(error))
-                record_activity(self.database_path, "incoming", "completed video scan", "failed",
-                                severity="error", new_path=path, detail=str(error))
-                notify(self.notifications, f"Could not add completed video: {Path(path).name}")
+                file_present = True
+                try:
+                    file_present = Path(path).is_file()
+                except OSError:
+                    file_present = True
+                if attempts < self.max_attempts and file_present:
+                    retry_at = time.time()
+                    with self.lock:
+                        self.candidates[path] = {
+                            **candidate,
+                            "stable_since": retry_at,
+                            "attempts": attempts,
+                            "check_after": time.monotonic() + 5.0,
+                        }
+                    try:
+                        self._save_state(path, "waiting", stable_since=retry_at, attempts=attempts,
+                                         detail=f"Scan attempt {attempts} failed; it will retry: {error}")
+                    except Exception as save_err:
+                        logger.warning("Could not update state for %s after scan failure: %s", path, save_err)
+                else:
+                    try:
+                        self._save_state(path, "failed", attempts=attempts, detail=str(error))
+                    except Exception as save_err:
+                        logger.warning("Could not mark %s failed: %s", path, save_err)
+                    try:
+                        record_activity(self.database_path, "incoming", "completed video scan", "failed",
+                                        severity="error", new_path=path, detail=str(error))
+                    except Exception as act_err:
+                        logger.warning("Could not record failure activity for %s: %s", path, act_err)
+                    notify(self.notifications, f"Could not add completed video: {Path(path).name}")
             return False
 
     def _pair_companions_for_video(self, video_path, scene):
@@ -1733,7 +2621,7 @@ class CompletedDownloadWorker(threading.Thread):
                     if target_path.exists():
                         self._save_companion_waiting(path, candidate, f"Companion destination already exists: {target_path}")
                         record_activity(self.database_path, "companion", "companion collision", "review",
-                                        severity="warning", scene_id=row["scene_id"], old_path=str(cand_path),
+                                        severity="warning", scene_id=row['scene_id'], old_path=str(cand_path),
                                         new_path=str(target_path),
                                         detail="Companion not moved because destination already exists")
                         return
@@ -1754,7 +2642,7 @@ class CompletedDownloadWorker(threading.Thread):
 
                 self._save_state(path, "paired", detail=f"Paired with scene {row['scene_id']} at {target_path.name}")
                 record_activity(self.database_path, "companion", "auto-paired late companion", "recorded",
-                                scene_id=row["scene_id"], old_path=path, new_path=str(target_path),
+                                scene_id=row['scene_id'], old_path=path, new_path=str(target_path),
                                 detail=f"Companion automatically relocated and paired with scene {row['scene_id']}")
                 resolve_filesystem_event(self.database_path, "created", path)
                 notify(self.notifications, f"Companion paired: {cand_path.name} → Scene {row['scene_id']}")
@@ -1801,7 +2689,21 @@ class CompletedDownloadWorker(threading.Thread):
 
         self._save_companion_waiting(path, candidate, "Waiting for matching video to arrive")
 
+    def _retry_deferred_busy_operations(self):
+        with self._deferred_lock:
+            pending_relocations = list(self._deferred_busy_relocations)
+            self._deferred_busy_relocations.clear()
+            pending_submissions = list(self._deferred_busy_submissions)
+            self._deferred_busy_submissions.clear()
+
+        for src, dst in pending_relocations:
+            self.relocate(src, dst)
+
+        for p in pending_submissions:
+            self.submit(p)
+
     def evaluate_once(self, now=None, mono_now=None):
+        self._retry_deferred_busy_operations()
         now = time.time() if now is None else float(now)
         mono_now = time.monotonic() if mono_now is None else float(mono_now)
         with self.lock:
@@ -1832,19 +2734,36 @@ class CompletedDownloadWorker(threading.Thread):
                 continue
             if candidate.get("is_temporary"):
                 continue
+            with self.lock:
+                check_after = candidate.get("check_after", 0.0)
+            if mono_now < check_after:
+                continue
+
             is_comp = candidate.get("is_companion") or Path(path).suffix.lower() in COMPANION_EXTENSIONS
             settle_needed = min(3, self.settle_seconds) if is_comp else self.settle_seconds
             if now - candidate["stable_since"] >= settle_needed:
                 if is_comp:
-                    with self.lock:
-                        check_after = candidate.get("check_after", 0.0)
-                    if mono_now < check_after:
-                        continue
                     self._process_companion(path, candidate)
                 else:
                     with self.lock:
                         self.candidates.pop(path, None)
-                    self._scan(path, candidate)
+                    try:
+                        self._scan(path, candidate)
+                    except Exception as scan_err:
+                        logger.error("Unhandled error scanning %s: %s", path, scan_err, exc_info=True)
+                        file_present = True
+                        try:
+                            file_present = Path(path).is_file()
+                        except OSError:
+                            file_present = True
+                        if file_present:
+                            with self.lock:
+                                if path not in self.candidates:
+                                    self.candidates[path] = {
+                                        **candidate,
+                                        "stable_since": candidate.get("stable_since", time.time()),
+                                        "check_after": mono_now + 10.0,
+                                    }
 
     def _fallback_check(self):
         try:
@@ -1859,36 +2778,78 @@ class CompletedDownloadWorker(threading.Thread):
         except Exception as exc:
             logger.debug("Error in _fallback_check: %s", exc)
 
-    def trigger_recovery_scan(self, root):
-        """Discovers files that arrived while a network share was offline."""
-        try:
-            if not self.enabled:
-                return
-            root_path = Path(root).resolve()
-            threads = []
-            for folder in self.incoming_folders:
-                matched = False
-                try:
-                    folder.resolve().relative_to(root_path)
-                    matched = True
-                except (ValueError, OSError):
-                    if root_path == folder.resolve():
-                        matched = True
-                if matched:
-                    t = self._dispatch_folder_scan(folder, self.started_at)
-                    if t:
-                        threads.append(t)
-            self._wait_scans(threads, max_wait=0.05)
-        except Exception as exc:
-            logger.debug("Error triggering recovery scan for %s: %s", root, exc)
+    def trigger_recovery_scan(self, root, max_wait=0.05):
+        """Discovers files that arrived while a network share was offline.
+        Genuinely asynchronous: delegates recovery work to a background worker so the
+        calling thread does not execute the scan, and coalesces repeated recovery requests."""
+        if not self.enabled or not root or self.stopping:
+            return None
+        root_str = str(root)
+        with self._recovery_lock:
+            existing = self._active_recovery_scans.get(root_str)
+            if existing is not None and existing.is_alive():
+                self._pending_recovery_scans.add(root_str)
+                return existing
 
-    def stop(self):
+            t = threading.Thread(
+                target=self._run_recovery_scan,
+                args=(root_str,),
+                name=f"recovery-scan-{Path(root_str).name or 'root'}",
+                daemon=True,
+            )
+            self._active_recovery_scans[root_str] = t
+            self._all_scan_threads.add(t)
+            t.start()
+        if max_wait > 0:
+            t.join(timeout=float(max_wait))
+        return t
+
+    def _run_recovery_scan(self, root_str):
+        while not self.stopping:
+            try:
+                root_variants = self._normalize_prefixes(root_str)
+                threads = []
+                for folder in self.incoming_folders:
+                    folder_variants = self._normalize_prefixes(folder)
+                    matched = any(
+                        fv == rv or fv.startswith(rv.rstrip(os.sep) + os.sep)
+                        for fv in folder_variants
+                        for rv in root_variants
+                    )
+                    if matched:
+                        t = self._dispatch_folder_scan(folder, self.started_at)
+                        if t:
+                            threads.append(t)
+                if threads:
+                    self._wait_scans(threads, max_wait=0.2)
+            except Exception as exc:
+                logger.debug("Error in _run_recovery_scan for %s: %s", root_str, exc)
+
+            with self._recovery_lock:
+                if root_str in self._pending_recovery_scans and not self.stopping:
+                    self._pending_recovery_scans.discard(root_str)
+                    continue
+                self._active_recovery_scans.pop(root_str, None)
+                break
+
+    def stop(self, timeout=5.0):
         self.stopping = True
         self.wake.set()
+        with self._scan_lock:
+            scans = [t for t in self._all_scan_threads if t is not threading.current_thread() and t.is_alive()]
+        for t in scans:
+            t.join(timeout=timeout)
+        with self._recovery_lock:
+            recovs = [t for t in self._active_recovery_scans.values() if t is not threading.current_thread() and t.is_alive()]
+        for t in recovs:
+            t.join(timeout=timeout)
 
     def run(self):
         while not self.stopping:
-            self.evaluate_once()
+            try:
+                self.evaluate_once()
+            except Exception as exc:
+                logger.error("Unexpected error in CompletedDownloadWorker evaluation loop: %s", exc, exc_info=True)
             now = time.time()
             if now - self.last_fallback >= self.fallback_seconds:
                 self._fallback_check()
@@ -1904,6 +2865,8 @@ class LibraryEventHandler(FileSystemEventHandler):
         self.notifications = notifications
         self.incoming_worker = incoming_worker
         self.availability_tracker = availability_tracker
+        if incoming_worker and availability_tracker and not getattr(incoming_worker, "availability_tracker", None):
+            incoming_worker.availability_tracker = availability_tracker
         # Track when each path last had a 'created' event so the delayed
         # "still missing?" check can tell the difference between a genuine
         # deletion and a rapid delete-then-recreate (e.g. atomic download swap).
@@ -1943,18 +2906,21 @@ class LibraryEventHandler(FileSystemEventHandler):
         def decide():
             with self._recent_creates_lock:
                 self._transcoder_decision_timers.pop(source, None)
-            row = inventoried_source(self.database_path, source)
-            if not row:
-                return
-            selected, reason = transcoder_replacement_decision(self.database_path, source, row)
-            if selected:
-                self.worker.submit(source, selected)
-            else:
-                promote_transcoder_review(self.database_path, source, reason)
-                record_activity(self.database_path, "filesystem", "transcoder replacement", "review",
-                                severity="warning", scene_id=row["scene_id"], file_id=row["file_id"],
-                                old_path=source, detail=reason)
-                notify(self.notifications, f"Transcoder replacement needs review: {Path(source).name}")
+            try:
+                row = inventoried_source(self.database_path, source)
+                if not row:
+                    return
+                selected, reason = transcoder_replacement_decision(self.database_path, source, row)
+                if selected:
+                    self.worker.submit(source, selected)
+                else:
+                    promote_transcoder_review(self.database_path, source, reason)
+                    record_activity(self.database_path, "filesystem", "transcoder replacement", "review",
+                                    severity="warning", scene_id=row['scene_id'], file_id=row["file_id"],
+                                    old_path=source, detail=reason)
+                    notify(self.notifications, f"Transcoder replacement needs review: {Path(source).name}")
+            except Exception as exc:
+                logger.debug("Transcoder decision exception for %s: %s", source, exc)
 
         with self._recent_creates_lock:
             previous = self._transcoder_decision_timers.pop(source, None)
@@ -1977,6 +2943,8 @@ class LibraryEventHandler(FileSystemEventHandler):
             self.incoming_worker.submit_tree(event.src_path)
         if event.is_directory:
             return
+        if self._is_path_offline(event.src_path):
+            return
         # Resolve any transient delete event if the file is recreated/present
         resolve_filesystem_event(self.database_path, "deleted", event.src_path)
         if consume_expected_create(self.database_path, event.src_path):
@@ -1992,11 +2960,28 @@ class LibraryEventHandler(FileSystemEventHandler):
             if Path(event.src_path).suffix.lower() in COMPANION_EXTENSIONS:
                 cand = Path(event.src_path)
                 parent = cand.parent
+                root_key = self._root_for_path(event.src_path)
+
+                def _find_matching_companion_video():
+                    for v_ext in VIDEO_EXTENSIONS:
+                        try:
+                            if (parent / (cand.stem + v_ext)).is_file() or (parent / cand.stem).is_file():
+                                return True
+                        except OSError:
+                            break
+                    return False
+
                 has_matching_video = False
-                for v_ext in VIDEO_EXTENSIONS:
-                    if (parent / (cand.stem + v_ext)).is_file() or (parent / cand.stem).is_file():
-                        has_matching_video = True
-                        break
+                try:
+                    res, status = default_fs_limiter.run(root_key, _find_matching_companion_video, timeout=1.0)
+                    if status in ("timeout", "outage"):
+                        if self.availability_tracker:
+                            self.availability_tracker.mark_root_unavailable(root_key)
+                        return
+                    has_matching_video = bool(res) if status == "ok" else False
+                except OSError:
+                    has_matching_video = False
+
                 if has_matching_video:
                     return
             with self._recent_creates_lock:
@@ -2009,6 +2994,17 @@ class LibraryEventHandler(FileSystemEventHandler):
                 self._recent_deleted_videos = {k: v for k, v in self._recent_deleted_videos.items() if v > cutoff}
                 video_cutoff = now - 600.0
                 self._recent_video_candidates = {k: v for k, v in self._recent_video_candidates.items() if v > video_cutoff}
+            correlated_source = None
+            if Path(event.src_path).suffix.lower() in VIDEO_EXTENSIONS and getattr(self, "worker", None):
+                with self._recent_creates_lock:
+                    recent_del = list(self._recent_deleted_videos.keys())
+                if recent_del:
+                    source_row, _ = correlate_created_destination(
+                        self.database_path, event.src_path, candidate_sources=recent_del
+                    )
+                    if source_row:
+                        correlated_source = source_row["path"]
+
             candidate_source = None
             if (getattr(self.worker, "transcoder_compatibility", False) is True
                     and Path(event.src_path).suffix.lower() in VIDEO_EXTENSIONS):
@@ -2017,6 +3013,8 @@ class LibraryEventHandler(FileSystemEventHandler):
                 self.database_path, "created", event.src_path, is_directory=event.is_directory,
                 initial_status="waiting" if candidate_source else "pending"
             )
+            if correlated_source:
+                self.worker.submit(correlated_source, event.src_path)
 
     def on_deleted(self, event):
         if event.is_directory:
@@ -2027,9 +3025,11 @@ class LibraryEventHandler(FileSystemEventHandler):
                 resolve_filesystem_event(self.database_path, "created", event.src_path)
                 return
             if self.incoming_worker:
+                was_candidate = False
                 with self.incoming_worker.lock:
-                    self.incoming_worker.candidates.pop(event.src_path, None)
-                self.incoming_worker._save_state(event.src_path, "gone", detail="File removed from disk")
+                    was_candidate = bool(self.incoming_worker.candidates.pop(event.src_path, None))
+                if was_candidate or self.incoming_worker._is_inside_incoming(event.src_path):
+                    self.incoming_worker._save_state(event.src_path, "gone", detail="File removed from disk")
             if not is_temporary_download(event.src_path):
                 if Path(event.src_path).suffix.lower() in VIDEO_EXTENSIONS:
                     with self._recent_creates_lock:
@@ -2046,14 +3046,27 @@ class LibraryEventHandler(FileSystemEventHandler):
                         # yet. Always grant an inventoried video the short decision window;
                         # the callback enumerates the complete folder and fails closed.
                         should_decide = True
+                correlated_dest = None
+                if Path(event.src_path).suffix.lower() in VIDEO_EXTENSIONS and getattr(self, "worker", None):
+                    with self._recent_creates_lock:
+                        recent_cand = list(self._recent_video_candidates.keys())
+                    if recent_cand:
+                        dest_path, _ = correlate_deleted_source(
+                            self.database_path, event.src_path, recent_cand
+                        )
+                        if dest_path:
+                            correlated_dest = dest_path
+
                 record_filesystem_event(
                     self.database_path, "deleted", event.src_path,
                     is_directory=event.is_directory,
                     initial_status="waiting" if should_decide else "pending"
                 )
-                if should_decide:
+                if correlated_dest:
+                    self.worker.submit(event.src_path, correlated_dest)
+                elif should_decide:
                     self._schedule_transcoder_decision(event.src_path)
-                if (not should_decide and not event.is_directory
+                elif (not event.is_directory
                         and Path(event.src_path).suffix.lower() in WATCHED_EXTENSIONS):
                     # Single-flight centralized scheduling replaces per-event Timer(3, self._notify_if_still_missing)
                     self._schedule_deletion_check(event.src_path)
@@ -2081,8 +3094,17 @@ class LibraryEventHandler(FileSystemEventHandler):
                     con.close()
             except Exception:
                 pass
-        if unavail and is_file_on_unavailable_root(path, unavail):
-            return True
+        if not unavail:
+            return False
+        variants = [str(path)]
+        s = str(path)
+        if s.startswith("/private/"):
+            variants.append(s[len("/private"):])
+        elif s.startswith("/var/") or s.startswith("/tmp/") or s.startswith("/etc/"):
+            variants.append("/private" + s)
+        for v in variants:
+            if is_file_on_unavailable_root(v, unavail):
+                return True
         return False
 
     def _root_for_path(self, path: str) -> str:
@@ -2156,6 +3178,19 @@ class LibraryEventHandler(FileSystemEventHandler):
                 if not exists:
                     if self._is_path_offline(path) or is_network_disconnect_error(OSError(errno.ENOENT, "No such file"), path):
                         continue
+                    correlated_dest = None
+                    if Path(path).suffix.lower() in VIDEO_EXTENSIONS and getattr(self, "worker", None):
+                        with self._recent_creates_lock:
+                            recent_cand = list(self._recent_video_candidates.keys())
+                        if recent_cand:
+                            dest_path, _ = correlate_deleted_source(
+                                self.database_path, path, recent_cand
+                            )
+                            if dest_path:
+                                correlated_dest = dest_path
+                    if correlated_dest:
+                        self.worker.submit(path, correlated_dest)
+                        continue
                     record_activity(self.database_path, "filesystem", "external deletion", "review", severity="warning",
                                     old_path=path, detail="File remained absent after the notification delay")
                     notify(self.notifications, f"File deleted or moved without a paired event: {Path(path).name}")
@@ -2181,6 +3216,19 @@ class LibraryEventHandler(FileSystemEventHandler):
         if not exists:
             if self._is_path_offline(path) or is_network_disconnect_error(OSError(errno.ENOENT, "No such file"), path):
                 return
+            correlated_dest = None
+            if Path(path).suffix.lower() in VIDEO_EXTENSIONS and getattr(self, "worker", None):
+                with self._recent_creates_lock:
+                    recent_cand = list(self._recent_video_candidates.keys())
+                if recent_cand:
+                    dest_path, _ = correlate_deleted_source(
+                        self.database_path, path, recent_cand
+                    )
+                    if dest_path:
+                        correlated_dest = dest_path
+            if correlated_dest:
+                self.worker.submit(path, correlated_dest)
+                return
             record_activity(self.database_path, "filesystem", "external deletion", "review", severity="warning",
                             old_path=path, detail="File remained absent after the notification delay")
             notify(self.notifications, f"File deleted or moved without a paired event: {Path(path).name}")
@@ -2189,6 +3237,8 @@ class LibraryEventHandler(FileSystemEventHandler):
         # Modification events are useful only for the incoming stability timer. They do not
         # identify a move/deletion and must not create an unexplained review warning.
         if not event.is_directory and self._relevant(event.src_path, False):
+            if self._is_path_offline(event.src_path):
+                return
             if (getattr(self.worker, "transcoder_compatibility", False) is True
                     and Path(event.src_path).suffix.lower() in VIDEO_EXTENSIONS):
                 with self._recent_creates_lock:
@@ -2205,6 +3255,8 @@ class LibraryEventHandler(FileSystemEventHandler):
                 self.incoming_worker.relocate_tree(event.src_path, event.dest_path)
                 self.incoming_worker.submit_tree(event.dest_path)
             if event.is_directory:
+                return
+            if self._is_path_offline(event.src_path) or self._is_path_offline(event.dest_path):
                 return
             if not event.is_directory and consume_expected_move(self.database_path, event.src_path, event.dest_path):
                 return
@@ -2230,9 +3282,17 @@ class LibraryEventHandler(FileSystemEventHandler):
             if src_is_temp and dest_is_temp:
                 return
 
-            incoming_candidate = bool(self.incoming_worker and self.incoming_worker.submit(event.dest_path))
-            if incoming_candidate and not (Path(event.src_path).suffix.lower() in VIDEO_EXTENSIONS and not src_is_temp):
-                return
+            # An existing inventoried library video must never be submitted to CompletedDownloadWorker.
+            # MoveWorker handles its relocation and Stash reconciliation cleanly.
+            src_is_inventoried = False
+            if dest_is_video and not src_is_temp:
+                src_is_inventoried = bool(inventoried_source(self.database_path, event.src_path))
+
+            incoming_candidate = False
+            if not src_is_inventoried:
+                incoming_candidate = bool(self.incoming_worker and self.incoming_worker.submit(event.dest_path))
+                if incoming_candidate and not (Path(event.src_path).suffix.lower() in VIDEO_EXTENSIONS and not src_is_temp):
+                    return
 
             candidate_source = None
             if (getattr(self.worker, "transcoder_compatibility", False) is True
@@ -2259,17 +3319,30 @@ class LibraryEventHandler(FileSystemEventHandler):
                     record_activity(self.database_path, "companion", "external companion move", "recorded",
                                     old_path=event.src_path, new_path=event.dest_path,
                                     detail="Companion move recorded; Stash does not maintain a separate path for this file")
+                    con = connect(self.database_path)
+                    try:
+                        if is_verified_companion_destination(con, event.dest_path, event.src_path):
+                            resolve_filesystem_event(self.database_path, "moved", event.src_path, event.dest_path)
+                    finally:
+                        con.close()
 
 
-def update_status(database_path, token, pid, state, roots, unavailable):
+def update_status(database_path, token, pid, state, roots, unavailable, active_moves=None):
     try:
         connection = connect(database_path)
         try:
-            connection.execute(
-                """UPDATE filesystem_monitor_status SET token=?,pid=?,state=?,started_at=COALESCE(started_at,?),
-                       heartbeat_at=?,roots_json=?,unavailable_roots_json=? WHERE id=1 AND token=?""",
-                (token, pid, state, utc_now(), utc_now(), json.dumps(roots), json.dumps(unavailable), token),
-            )
+            if active_moves is not None:
+                connection.execute(
+                    """UPDATE filesystem_monitor_status SET token=?,pid=?,state=?,started_at=COALESCE(started_at,?),
+                           heartbeat_at=?,roots_json=?,unavailable_roots_json=?,active_moves_json=? WHERE id=1 AND token=?""",
+                    (token, pid, state, utc_now(), utc_now(), json.dumps(roots), json.dumps(unavailable), json.dumps(active_moves), token),
+                )
+            else:
+                connection.execute(
+                    """UPDATE filesystem_monitor_status SET token=?,pid=?,state=?,started_at=COALESCE(started_at,?),
+                           heartbeat_at=?,roots_json=?,unavailable_roots_json=? WHERE id=1 AND token=?""",
+                    (token, pid, state, utc_now(), utc_now(), json.dumps(roots), json.dumps(unavailable), token),
+                )
             connection.commit()
         finally:
             connection.close()
@@ -2299,7 +3372,7 @@ def claim_monitor_ownership(database_path, token, pid, roots, unavailable):
                     pass
         connection.execute(
             """UPDATE filesystem_monitor_status SET token=?,pid=?,state='starting',started_at=?,
-                   heartbeat_at=?,roots_json=?,unavailable_roots_json=? WHERE id=1""",
+                   heartbeat_at=?,roots_json=?,unavailable_roots_json=?,active_moves_json='[]' WHERE id=1""",
             (token, pid, utc_now(), utc_now(), json.dumps(roots), json.dumps(unavailable)),
         )
         connection.commit()
@@ -2344,8 +3417,7 @@ def main():
     database_path = Path(args.database)
     control_path = Path(args.control)
     roots = json.loads(args.roots_json)
-    available = [root for root in roots if is_path_available(root)]
-    unavailable = [root for root in roots if root not in available]
+    available, unavailable = probe_roots_startup(roots, timeout=2.0, max_workers=4)
     if not claim_monitor_ownership(database_path, args.token, os.getpid(), available, unavailable):
         logger.warning("Another Watchtower monitor already owns this database; exiting duplicate startup")
         return
@@ -2384,7 +3456,12 @@ def main():
             watched_roots[root] = watch
         except Exception as exc:
             logger.warning("Failed scheduling observer on %s: %s", root, exc)
-    update_status(database_path, args.token, os.getpid(), "running", available, unavailable)
+    update_status(database_path, args.token, os.getpid(), "running", available, unavailable, active_moves=[])
+    record_monitor_lifecycle(
+        database_path, "MONITOR STARTED", "running",
+        detail=f"MONITOR STARTED — watching {len(available)} library root(s) (PID {os.getpid()})",
+        metadata={"pid": os.getpid(), "roots": available, "unavailable_roots": unavailable}
+    )
     for root in unavailable:
         record_activity(database_path, "monitor", "library root unavailable", "warning", severity="warning",
                         old_path=root, detail="Root was unavailable when monitoring started")
@@ -2400,6 +3477,8 @@ def main():
         handler.restore_transcoder_candidates()
     tracker = RootAvailabilityTracker(roots, probe_timeout=5.0)
     handler.availability_tracker = tracker
+    if incoming_worker:
+        incoming_worker.availability_tracker = tracker
     for r in unavailable:
         if r in tracker._states:
             tracker._states[r]["status"] = "unavailable"
@@ -2433,7 +3512,9 @@ def main():
                     except Exception as exc:
                         logger.warning("Failed scheduling observer on reconnected root %s: %s", root, exc)
                 if incoming_worker:
-                    incoming_worker.trigger_recovery_scan(root)
+                    incoming_worker.trigger_recovery_scan(root, max_wait=0)
+                if worker:
+                    worker.on_root_recovered(root)
 
             reload_monitor_if_code_changed(
                 loaded_code_signature, runtime_path, runtime, worker,
@@ -2464,11 +3545,9 @@ def main():
                             _new_folders = new_cfg.get("incoming_folders")
                             _new_folder_str = new_cfg.get("incoming_folder")
                             if _new_folders is not None:
-                                incoming_worker.incoming_folders = [Path(f).resolve() for f in _new_folders if f]
-                                incoming_worker.incoming_folder = incoming_worker.incoming_folders[0] if incoming_worker.incoming_folders else None
+                                incoming_worker._set_incoming_folders(_new_folders)
                             elif _new_folder_str is not None:
-                                incoming_worker.incoming_folder = Path(_new_folder_str).resolve() if _new_folder_str else None
-                                incoming_worker.incoming_folders = [incoming_worker.incoming_folder] if incoming_worker.incoming_folder else []
+                                incoming_worker._set_incoming_folders([_new_folder_str] if _new_folder_str else [])
                             _new_enabled = new_cfg.get("incoming_imports")
                             if _new_enabled is not None:
                                 incoming_worker.enabled = bool(_new_enabled and incoming_worker.incoming_folders)
@@ -2488,7 +3567,8 @@ def main():
                                 control_path.unlink(missing_ok=True)
                             except Exception:
                                 pass
-            update_status(database_path, args.token, os.getpid(), "running", available, unavailable)
+            active_moves = worker.active_moves_summary() if hasattr(worker, "active_moves_summary") else []
+            update_status(database_path, args.token, os.getpid(), "running", available, unavailable, active_moves=active_moves)
             time.sleep(2)
     except KeyboardInterrupt:
         pass
@@ -2508,7 +3588,16 @@ def main():
         worker.join(timeout=10)
         incoming_worker.stop()
         incoming_worker.join(timeout=10)
-        update_status(database_path, args.token, os.getpid(), "stopped", available, unavailable)
+        update_status(database_path, args.token, os.getpid(), "stopped", available, unavailable, active_moves=[])
+        if "fatal_error" not in locals():
+            try:
+                record_monitor_lifecycle(
+                    database_path, "MONITOR STOPPED", "stopped",
+                    detail=f"MONITOR STOPPED — filesystem watcher stopped (PID {os.getpid()})",
+                    metadata={"pid": os.getpid()}
+                )
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":

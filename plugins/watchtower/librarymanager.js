@@ -1839,12 +1839,20 @@
       const transcoderCandidates = data?.transcoder_candidates || [];
       const unavailableRoots = monitor.unavailable_roots || [];
       const unresolved = data?.pending_events || [];
-      const unresolvedCount = monitor.pending_events != null ? monitor.pending_events : unresolved.length;
+      const reconnectingMoves = unresolved.filter(e => e.processing_state === "reconnecting" || e.processing_state === "queued");
+      const waitingMoves = unresolved.filter(e => e.processing_state === "waiting_video");
+      const deferredMoves = unresolved.filter(e => e.processing_state === "deferred");
+      const attentionEvents = unresolved.filter(e => !e.processing_state);
+
+      const inFlightCount = reconnectingMoves.length + waitingMoves.length + deferredMoves.length;
+      const totalPending = monitor.pending_events != null ? monitor.pending_events : unresolved.length;
+      const attentionCount = attentionEvents.length;
+
       const stream = (data?.activity || []).slice(0, 250);
       const isMonitorStale = monitor.is_stale === true || monitor.state === "stale";
       const watcherWorking = monitor.state === "running" && !isMonitorStale;
 
-      const totalProblems = failedIncoming.length + unavailableRoots.length + unresolvedCount + (isMonitorStale ? 1 : 0);
+      const totalProblems = failedIncoming.length + unavailableRoots.length + attentionCount + (isMonitorStale ? 1 : 0);
 
       const problemsCount = stream.filter(r => r.severity === "error" || r.severity === "warning" || r.status === "failed" || r.status === "review").length;
       const addedCount = stream.filter(r => r.category === "incoming" && r.status === "imported").length;
@@ -1853,6 +1861,8 @@
       let filteredStream = stream;
       if (terminalFilter === "problems") {
         filteredStream = stream.filter(r => r.severity === "error" || r.severity === "warning" || r.status === "failed" || r.status === "review");
+      } else if (terminalFilter === "attention") {
+        filteredStream = totalProblems === 0 ? [] : stream.filter(r => (r.severity === "error" || r.severity === "warning" || r.status === "failed" || r.status === "review"));
       } else if (terminalFilter === "added") {
         filteredStream = stream.filter(r => r.category === "incoming" && r.status === "imported");
       } else if (terminalFilter === "renamed") {
@@ -1916,12 +1926,12 @@
                 disabled: !!busy,
                 onClick: () => handleDismissAllIncoming(failedIncoming.length)
               }, `✕ DISMISS ALL (${failedIncoming.length})`),
-              unresolvedCount > 1 && React.createElement("button", {
+              attentionCount > 1 && React.createElement("button", {
                 type: "button",
                 className: "lm-terminal-btn dismiss",
                 disabled: !!busy,
                 onClick: () => resolveAllPendingEvents("dismiss")
-              }, `✕ DISMISS ALL CHANGES (${unresolvedCount})`))),
+              }, `✕ DISMISS ALL CHANGES (${attentionCount})`))),
 
           isMonitorStale && React.createElement("div", { className: "lm-terminal-attention-item warn", key: "stale-monitor" },
             React.createElement("div", { className: "lm-terminal-attention-title" },
@@ -1970,7 +1980,7 @@
             React.createElement("p", { className: "lm-terminal-attention-detail" },
               "Storage volume or network mount is disconnected. Check that the drive is plugged in or mounted."))),
 
-          unresolved.map((event, idx) => {
+          attentionEvents.map((event, idx) => {
             const info = pendingEventInfo(event);
             const deletion = event.event_type === "deleted" || String(event.destination_path || "").toLowerCase().endsWith(".delete");
             const isVideo = /\.(mp4|m4v|avi|mkv|mov|wmv|flv|webm)$/i.test(event.source_path || event.destination_path || "");
@@ -2004,7 +2014,47 @@
 
         React.createElement("div", { className: "lm-terminal-section" },
           React.createElement("h3", null, "HAPPENING NOW"),
-          (waitingAndScanning.length || activeJobs.length || transcoderCandidates.length) ? React.createElement(React.Fragment, null,
+          (waitingAndScanning.length || activeJobs.length || transcoderCandidates.length || reconnectingMoves.length || waitingMoves.length || deferredMoves.length) ? React.createElement(React.Fragment, null,
+            waitingMoves.map(event => {
+              const displayName = basename(event.destination_path || event.source_path);
+              const targetVideo = event.companion_of || "VIDEO";
+              return React.createElement("div", {
+                className: "lm-terminal-line waiting_video",
+                key: `waiting-video-${event.event_key || event.last_seen_at || displayName}`
+              },
+                React.createElement("span", null, "WAITING FOR VIDEO"),
+                React.createElement("strong", { title: event.destination_path || event.source_path }, displayName),
+                React.createElement("em", null, `WAITING FOR VIDEO: ${targetVideo}`)
+              );
+            }),
+            reconnectingMoves.map(event => {
+              const displayName = basename(event.destination_path || event.source_path);
+              const isCompanion = !!event.companion_of;
+              const badgeText = isCompanion ? "RECONNECTING (COMPANION)" : "RECONNECTING";
+              const detailText = isCompanion
+                ? `RECONNECTING WITH VIDEO: ${event.companion_of}`
+                : "RECONNECTING IN STASH";
+              return React.createElement("div", {
+                className: "lm-terminal-line reconnecting",
+                key: `reconnecting-${event.event_key || event.last_seen_at || displayName}`
+              },
+                React.createElement("span", null, badgeText),
+                React.createElement("strong", { title: event.destination_path || event.source_path }, displayName),
+                React.createElement("em", null, detailText)
+              );
+            }),
+            deferredMoves.map(event => {
+              const displayName = basename(event.destination_path || event.source_path);
+              const attempts = event.processing_attempts || 1;
+              return React.createElement("div", {
+                className: "lm-terminal-line waiting_retry",
+                key: `deferred-${event.event_key || event.last_seen_at || displayName}`
+              },
+                React.createElement("span", null, "RETRY WAITING"),
+                React.createElement("strong", { title: event.destination_path || event.source_path }, displayName),
+                React.createElement("em", null, `WAITING FOR FILE LOCK (ATTEMPT ${attempts}/5)`)
+              );
+            }),
             transcoderCandidates.map(item => React.createElement("div", {
               className: "lm-terminal-line transcoder_candidate",
               key: `transcoder-${item.candidate_path}`
@@ -2223,9 +2273,14 @@
               }, `ALL (${stream.length})`),
               React.createElement("button", {
                 type: "button",
+                className: `lm-terminal-filter-pill ${terminalFilter === "attention" ? "active" : ""}`,
+                onClick: () => setTerminalFilter("attention")
+              }, `⚠️ Needs Attention (${totalProblems})`),
+              React.createElement("button", {
+                type: "button",
                 className: `lm-terminal-filter-pill ${terminalFilter === "problems" ? "active" : ""}`,
                 onClick: () => setTerminalFilter("problems")
-              }, `⚠️ PROBLEMS (${problemsCount})`),
+              }, `Warning History (${problemsCount})`),
               React.createElement("button", {
                 type: "button",
                 className: `lm-terminal-filter-pill ${terminalFilter === "added" ? "active" : ""}`,
@@ -2296,7 +2351,7 @@
                     row.old_path && React.createElement("div", { className: "lm-drawer-path" }, React.createElement("b", null, "BEFORE: "), React.createElement("code", null, row.old_path)),
                     row.new_path && React.createElement("div", { className: "lm-drawer-path" }, React.createElement("b", null, "AFTER: "), React.createElement("code", null, row.new_path)),
                     row.detail && React.createElement("div", { className: "lm-drawer-detail" }, React.createElement("b", null, "DETAIL: "), row.detail))));
-            }) : React.createElement("p", { className: "lm-terminal-empty" }, `No events match filter “${terminalFilter}”.`))),
+            }) : React.createElement("p", { className: "lm-terminal-empty" }, terminalFilter === "attention" ? "No items currently require attention. The watcher is listening." : `No events match filter “${terminalFilter}”.`))),
 
         React.createElement("footer", null,
           React.createElement("span", null, "Watchtower Live Terminal • Deep History Active • Full exports in Activity tab"),
@@ -2684,7 +2739,7 @@
             React.createElement("div", { style: { marginTop: "14px" } },
               React.createElement(ChoiceField, {
                 label: "Wait Before Adding a Video",
-                help: "The video must stay completely unchanged for this long before Watchtower asks Stash to add it.",
+                help: "The video must stay completely unchanged for this long before Watchtower asks Stash to add it (default: 5 minutes; 0 uses the default).",
                 value: Number(config.incomingSettleMinutes || 5),
                 choices: [[1, "1 minute"], [5, "5 minutes (recommended)"], [10, "10 minutes"], [15, "15 minutes"], [30, "30 minutes"]],
                 onChange: value => updateSetting("incomingSettleMinutes", Number(value))
@@ -3110,7 +3165,7 @@
             React.createElement("ul", { key: "ul1" },
               React.createElement("li", null, React.createElement("strong", null, "Automatically Add Completed Videos (automaticIncomingScan): "), "Master switch to enable incoming download monitoring across all configured staging folders."),
               React.createElement("li", null, React.createElement("strong", null, "Watched Incoming Folders (incomingFolders): "), "Configure up to 5 designated staging directories inside your Stash library roots where new downloads arrive."),
-              React.createElement("li", null, React.createElement("strong", null, "Wait Before Adding a Video (incomingSettleMinutes): "), "Minutes a completed video file must remain 100% unchanged before Watchtower asks Stash to scan and import it (default: 5 min)."),
+              React.createElement("li", null, React.createElement("strong", null, "Wait Before Adding a Video (incomingSettleMinutes): "), "Minutes a completed video file must remain 100% unchanged before Watchtower asks Stash to scan and import it (default: 5 min; a value of 0 uses the 5-minute default)."),
               React.createElement("li", null, React.createElement("strong", null, "Live Terminal Tracking: "), "Actively tracks in-flight download temporary files (.crdownload, .part, .download, .tmp). When downloading completes and the file settles, Stash adds it automatically.")
             )
           ]
@@ -3369,7 +3424,9 @@
 
         const heartbeatAge = status.heartbeat_at ? Date.now() - Date.parse(status.heartbeat_at) : Infinity;
         const unavailable = status.unavailable_roots?.length || 0;
+        const activeMovesCount = status.active_moves?.length || 0;
         const pending = status.pending_events || 0;
+        const attentionCount = status.attention_events != null ? status.attention_events : Math.max(0, pending - activeMovesCount);
         const incomingFailed = status.incoming?.failed || 0;
         const incomingWaiting = status.incoming?.waiting || 0;
         let tone = "healthy";
@@ -3382,9 +3439,12 @@
           title = unavailable
             ? `Library Manager warning: ${unavailable} library folder${unavailable === 1 ? " is" : "s are"} unavailable`
             : `Library Manager warning: ${incomingFailed} completed video${incomingFailed === 1 ? " could" : "s could"} not be added`;
-        } else if (pending) {
+        } else if (attentionCount) {
           tone = "warning";
-          title = `Library Manager: listening; ${pending} detected change${pending === 1 ? " needs" : "s need"} review`;
+          title = `Library Manager: listening; ${attentionCount} detected change${attentionCount === 1 ? " needs" : "s need"} review`;
+        } else if (activeMovesCount) {
+          tone = "healthy";
+          title = `Library Manager: watching; reconnecting moved file`;
         } else if (incomingWaiting) {
           tone = "healthy";
           title = `Library Manager: watching; ${incomingWaiting} video${incomingWaiting === 1 ? " is" : "s are"} finishing`;
@@ -3436,7 +3496,7 @@
             health.tone === "healthy" ? "● Running" : health.tone === "warning" ? "● Action Needed" : "● Attention")),
         React.createElement("div", { className: "lm-navbar-hud-grid" },
           React.createElement("div", null, React.createElement("span", null, "Watched Folders:"), React.createElement("strong", null, `${health.status?.roots?.length || 0}`)),
-          React.createElement("div", null, React.createElement("span", null, "Unreviewed Changes:"), React.createElement("strong", null, `${health.status?.pending_events || 0}`)),
+          React.createElement("div", null, React.createElement("span", null, "Unreviewed Changes:"), React.createElement("strong", null, `${health.status?.attention_events != null ? health.status.attention_events : Math.max(0, (health.status?.pending_events || 0) - (health.status?.active_moves?.length || 0))}`)),
           React.createElement("div", null, React.createElement("span", null, "Failed Downloads:"), React.createElement("strong", null, `${health.status?.incoming?.failed || 0}`)),
           React.createElement("div", null, React.createElement("span", null, "Incoming Finishing:"), React.createElement("strong", null, `${health.status?.incoming?.waiting || 0}`))),
         React.createElement(NavLink, { to: PATH, className: "lm-navbar-hud-link", onClick: () => setShowHud(false) },
@@ -3582,5 +3642,8 @@
   getConfig().then(config => {
     if (config.autoStartMonitor === true) operation("ensure_monitor").catch(error =>
       console.error("[LibraryManager] Could not auto-start filesystem monitor:", error));
+    if (config.incomingSettleMinutes === undefined || config.incomingSettleMinutes === 0) {
+      saveConfig({ ...config, incomingSettleMinutes: 5 }).catch(() => {});
+    }
   }).catch(error => console.error("[LibraryManager] Could not read auto-start setting:", error));
 })();
