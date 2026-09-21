@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.0.13 — 2026-09-22
+
+### ⚡ External Moves & Folder Renames (Grouped Reconciliation)
+- **Folder Rename & Move Detection**: External folder renames and moves in Finder, Windows Explorer, or scripts are automatically detected and coalesced into single grouped operations rather than generating dozens of individual missing-file errors.
+- **Review-Driven Grouped Recovery**: Grouped folder moves and cross-volume relocations are presented in a unified Overview card showing source/destination paths, member counts, and verification status before any changes are committed.
+- **Single-Pass Stash Reconciliation**: Once approved, Watchtower executes a single targeted directory scan in Stash, verifying member files by size and checksum/OSHash without full-library sweeps or hashing entire video bodies.
+- **Cross-Volume Move Correlation**: Detects cross-device moves (which the OS manifests as delete+create pairs) by matching cryptographic and size fingerprints within a settling window.
+- **Duplicate & Copy Group Safety**: Classifies copied folders as duplicate content (`folder_copy`) rather than moves, preserving original scene identities and requiring explicit user review before any new scene ingest.
+- **Daemon Restart & Crash Resilience**: All grouped batches and member states are durably tracked in SQLite. Interrupted or in-flight reconciliations automatically recover and resume upon Watchtower restart.
+- **Single-File Move Automation**: Unambiguous single-file moves on the same monitored library root continue to reconnect automatically in real-time.
+- **Explicit Boundary Handling**: Documented behavior for offline mounts (gated until reconnect), externally re-encoded files (routed to partial review on checksum mismatch), and multi-destination folder splits.
+
+### 📁 Backlog Organiser & Ingest Reliability (Work Package A)
+- **Dynamic Backlog Working Set**: The Backlog Organiser dynamically tracks real-time unresolved files, retiring completed or moved items immediately.
+- **Atomic Staged Snapshot Replacement**: Protection snapshot regeneration uses atomic staging to prevent baseline corruption if interrupted.
+- **Incomplete Download Exclusion**: In-flight downloads (.part, .crdownload, .tmp) and active downloaders are cleanly excluded from backlog scans.
+- **Unavailable Storage Root Handling**: Unmounted or offline drive roots display clear warning banners and disable destructive actions without crashing the monitor or losing state.
+- **Cached Dynamic Directory Discovery**: Substantially accelerated folder discovery through intelligent TTL-bounded caching.
+
+### 🏷️ Video Quality Filename Token (Work Package B)
+- **Optional Canonical Quality Token**: Added `includeVideoQuality` option to embed standard resolution tags (e.g. `[1080p]`, `[720p]`, `[2160p]`) into filenames.
+- **Configurable Token Placement**: Choose `start` (prefix) or `end` (suffix) positioning with responsive inline UI controls.
+- **Zero-Rescan Ingestion Resolution**: Stored video dimensions from Stash's files table supply the resolution immediately for canonical filenames and read-only test previews without requiring full library rescans.
+
+### 🛡️ Renaming & Filing Architecture Simplification
+- **Decoupled Filing & Renaming**: Automatic Filing moves files to destination folders preserving original filenames without creating permanent rename protection locks.
+- **Master Renaming Control**: Automatic Renaming toggle exclusively governs whether metadata edits in Stash trigger renames on disk.
+- **Safe Schema Migration**: Clears legacy `rename_protected` flags safely in SQLite without enqueuing renames or triggering bulk renaming.
+- **Cleaned Configuration**: Removed redundant `autoFilingPreserveFilename` switch from settings and UI.
+
+### 🧹 Operational Retention & Maintenance
+- **Bounded Retention Policy**: `prune_operational_records` bounds historical completed/resolved events while preserving actionable proposals and unreviewed issues indefinitely.
+
+
+## 1.0.12 — 2026-09-21
+
+- Isolate the native Windows filesystem monitor from Stash's console so plugin-operation cleanup cannot interrupt the watcher or terminate Stash.
+- Replace Unix-style PID signal probes with non-destructive Windows process-handle checks, preventing liveness checks from terminating the watcher or an unrelated reused PID.
+- Save Automatically Start Filesystem Monitor only after watcher startup succeeds, preventing failed starts from enabling an automatic retry loop.
+- Preserve the existing detached monitor behaviour on macOS and Linux.
+
 ## 1.0.11 — 2026-09-19
 
 - File-move reliability & transient retry: bounded retries with exponential backoff for transient filesystem permission and lock errors (EPERM, EACCES, EBUSY) during moved file verification, preserving moves for safe later retry rather than abandoning them.

@@ -375,12 +375,16 @@ from stashapi.stashapp import StashInterface
 import re
 import unicodedata
 from librarymanager_core import (
-    generate_video_contact_sheet, connect, consume_expected_create, consume_expected_move,
+    generate_video_contact_sheet, connect, consume_expected_create, consume_expected_move, consume_expected_move_source, consume_expected_move_destination,
+    evaluate_filing_proposal, snapshot_incoming_baseline, is_filing_baseline_established, invalidate_stale_filing_proposals,
     is_verified_companion_destination,
     expect_filesystem_create, expect_filesystem_move, fingerprint_value,
-    is_file_on_unavailable_root,
+    is_file_on_unavailable_root, is_temporary_download, is_actionable_incoming_file,
+    TEMPORARY_DOWNLOAD_EXTENSIONS, ACTIVE_INCOMING_LIFECYCLE_STATUSES,
                                  opensubtitles_hash, record_activity, record_filesystem_event, record_monitor_lifecycle,
-                                 resolve_filesystem_event, refresh_scene_inventory, utc_now)
+                                 resolve_filesystem_event, refresh_scene_inventory, utc_now,
+                                 process_next_checksum_job, reset_checksum_jobs_for_monitor_restart, _is_pid_alive)
+from librarymanager_reconciliation import ReconciliationCoordinator
 
 
 logger = logging.getLogger("librarymanager.monitor")
@@ -441,7 +445,8 @@ VIDEO_EXTENSIONS = {
 TEMPORARY_DOWNLOAD_EXTENSIONS = {".part", ".partial", ".crdownload", ".download", ".tmp", ".temp", ".!qb"}
 COMPANION_EXTENSIONS = {
     ".funscript", ".srt", ".vtt", ".scc", ".ttml", ".dfxp", ".lrc", ".txt",
-    ".jpg", ".jpeg", ".png", ".webp", ".nfo", ".json", ".xml", ".sub", ".idx"
+    ".jpg", ".jpeg", ".png", ".webp", ".gif", ".nfo", ".json", ".xml", ".sub", ".idx",
+    ".csm.jpg", ".csm.png", ".csm.webp",
 }
 WATCHED_EXTENSIONS = VIDEO_EXTENSIONS | COMPANION_EXTENSIONS | TEMPORARY_DOWNLOAD_EXTENSIONS
 
@@ -735,7 +740,7 @@ query LibraryManagerSceneByPath($path: String!) {
       id title details date director code rating100 organized urls
       studio { name }
       performers { id name }
-      tags { id name }
+      tags { id name aliases }
       galleries { id title }
       stash_ids { endpoint stash_id }
       groups { group { id name } scene_index }
@@ -1594,11 +1599,13 @@ class CompletedDownloadWorker(threading.Thread):
         self.incoming_folder = self.incoming_folders[0] if self.incoming_folders else None
 
     def __init__(self, database_path, stash, incoming_folder, enabled, settle_seconds, notifications,
-                 fallback_seconds=60, max_attempts=3, incoming_folders=None, track_temporary_downloads=False):
+                 fallback_seconds=60, max_attempts=3, incoming_folders=None, track_temporary_downloads=False,
+                 library_roots=None):
         super().__init__(daemon=True)
         self.database_path, self.stash = database_path, stash
         raw_folders = incoming_folders if incoming_folders is not None else ([incoming_folder] if incoming_folder else [])
         self._set_incoming_folders(raw_folders)
+        self.library_roots = [str(root) for root in (library_roots or [])]
         self.enabled = bool(enabled and self.incoming_folders)
         self.settle_seconds = max(60, int(settle_seconds or 300))
         self.notifications = notifications
@@ -1634,6 +1641,16 @@ class CompletedDownloadWorker(threading.Thread):
         if self.enabled:
             self._restore_candidates()
             self._recover_recent_files()
+            try:
+                config = self.stash.find_plugin_config("librarymanager") or {}
+                config["_libraryRoots"] = list(self.library_roots)
+                if config.get("autoFilingEnabled"):
+                    folders = [str(f) for f in self.incoming_folders]
+                    baseline_ok, _ = is_filing_baseline_established(self.database_path, folders)
+                    if not baseline_ok and self.incoming_folders:
+                        snapshot_incoming_baseline(self.database_path, folders)
+            except Exception as b_err:
+                logger.warning("Failed establishing automatic filing baseline: %s", b_err)
 
     def _is_inside_incoming(self, candidate_path):
         if not self.incoming_folders or not candidate_path:
@@ -2333,6 +2350,16 @@ class CompletedDownloadWorker(threading.Thread):
                             detail=f"Stash scan job {job_id} added the completed video")
             notify(self.notifications, f"Added to Stash: {Path(path).name}")
 
+            try:
+                config = self.stash.find_plugin_config("librarymanager") or {}
+                config["_libraryRoots"] = list(self.library_roots)
+                if config.get("autoFilingEnabled"):
+                    trigger = (config.get("autoFilingTrigger") or "import").strip().lower()
+                    if trigger == "import":
+                        evaluate_filing_proposal(self.database_path, self.stash, path, scene, config)
+            except Exception as filing_err:
+                logger.warning("Automatic filing evaluation failed for %s: %s", path, filing_err)
+
             if self.generate_contact_sheets:
                 sheet_p = f"{path}.jpg"
                 try:
@@ -2741,6 +2768,18 @@ class CompletedDownloadWorker(threading.Thread):
 
             is_comp = candidate.get("is_companion") or Path(path).suffix.lower() in COMPANION_EXTENSIONS
             settle_needed = min(3, self.settle_seconds) if is_comp else self.settle_seconds
+
+            # If in-memory candidate is still waiting, check if database was made due via Process Now
+            if now - candidate["stable_since"] < settle_needed:
+                try:
+                    conn = connect(self.database_path)
+                    r = conn.execute("SELECT stable_since FROM incoming_files WHERE path=?", (path,)).fetchone()
+                    conn.close()
+                    if r and r["stable_since"] is not None and float(r["stable_since"]) < candidate["stable_since"]:
+                        candidate["stable_since"] = float(r["stable_since"])
+                except Exception:
+                    pass
+
             if now - candidate["stable_since"] >= settle_needed:
                 if is_comp:
                     self._process_companion(path, candidate)
@@ -2947,7 +2986,7 @@ class LibraryEventHandler(FileSystemEventHandler):
             return
         # Resolve any transient delete event if the file is recreated/present
         resolve_filesystem_event(self.database_path, "deleted", event.src_path)
-        if consume_expected_create(self.database_path, event.src_path):
+        if consume_expected_create(self.database_path, event.src_path) or consume_expected_move_destination(self.database_path, event.src_path):
             return
         is_temp = is_temporary_download(event.src_path)
         incoming_candidate = bool(not event.is_directory and self.incoming_worker and self.incoming_worker.submit(event.src_path))
@@ -3019,6 +3058,8 @@ class LibraryEventHandler(FileSystemEventHandler):
     def on_deleted(self, event):
         if event.is_directory:
             return
+        if consume_expected_move_source(self.database_path, event.src_path):
+            return
         if self._relevant(event.src_path, event.is_directory):
             removed_candidate_source = remove_transcoder_candidate(self.database_path, event.src_path)
             if removed_candidate_source:
@@ -3030,6 +3071,10 @@ class LibraryEventHandler(FileSystemEventHandler):
                     was_candidate = bool(self.incoming_worker.candidates.pop(event.src_path, None))
                 if was_candidate or self.incoming_worker._is_inside_incoming(event.src_path):
                     self.incoming_worker._save_state(event.src_path, "gone", detail="File removed from disk")
+                    try:
+                        invalidate_stale_filing_proposals(self.database_path, stash=self.stash)
+                    except Exception as exc:
+                        logger.debug("Failed invalidating filing proposals on file deletion: %s", exc)
             if not is_temporary_download(event.src_path):
                 if Path(event.src_path).suffix.lower() in VIDEO_EXTENSIONS:
                     with self._recent_creates_lock:
@@ -3255,8 +3300,24 @@ class LibraryEventHandler(FileSystemEventHandler):
                 self.incoming_worker.relocate_tree(event.src_path, event.dest_path)
                 self.incoming_worker.submit_tree(event.dest_path)
             if event.is_directory:
+                if self._is_path_offline(event.src_path) or self._is_path_offline(event.dest_path):
+                    return
+                if (self.incoming_worker
+                        and (self.incoming_worker._is_inside_incoming(event.src_path)
+                             or self.incoming_worker._is_inside_incoming(event.dest_path))):
+                    return
+                record_filesystem_event(
+                    self.database_path, "moved", event.src_path, event.dest_path,
+                    is_directory=True, initial_status="pending"
+                )
                 return
             if self._is_path_offline(event.src_path) or self._is_path_offline(event.dest_path):
+                return
+            # Stash may delete a file by first renaming it to a temporary .delete
+            # path. Consume Watchtower's explicit duplicate-deletion marker before
+            # classifying that rename as an external deletion.
+            if (not event.is_directory and Path(event.dest_path).suffix.lower() == ".delete"
+                    and consume_expected_move_source(self.database_path, event.src_path)):
                 return
             if not event.is_directory and consume_expected_move(self.database_path, event.src_path, event.dest_path):
                 return
@@ -3360,16 +3421,9 @@ def claim_monitor_ownership(database_path, token, pid, roots, unavailable):
         ).fetchone()
         if current and current["token"] != token and current["state"] in ("starting", "running"):
             existing_pid = int(current["pid"] or 0)
-            if existing_pid:
-                try:
-                    os.kill(existing_pid, 0)
-                    connection.rollback()
-                    return False
-                except PermissionError:
-                    connection.rollback()
-                    return False
-                except OSError:
-                    pass
+            if existing_pid and _is_pid_alive(existing_pid):
+                connection.rollback()
+                return False
         connection.execute(
             """UPDATE filesystem_monitor_status SET token=?,pid=?,state='starting',started_at=?,
                    heartbeat_at=?,roots_json=?,unavailable_roots_json=?,active_moves_json='[]' WHERE id=1""",
@@ -3406,6 +3460,99 @@ def _reset_stale_failed_incoming(database_path: Path) -> None:
         connection.close()
 
 
+class ChecksumWorker(threading.Thread):
+    """Consume durable checksum jobs from the long-running filesystem monitor."""
+
+    def __init__(self, database_path: Path, poll_seconds: float = 1.0):
+        super().__init__(daemon=False, name="WatchtowerChecksumWorker")
+        self.database_path = Path(database_path)
+        self.poll_seconds = max(0.05, float(poll_seconds))
+        self._stop_event = threading.Event()
+
+    def stop(self):
+        self._stop_event.set()
+
+    def run(self):
+        while not self._stop_event.is_set():
+            try:
+                processed = process_next_checksum_job(self.database_path)
+            except Exception as exc:
+                logger.warning("Checksum worker deferred after error: %s", exc)
+                processed = False
+            if not processed:
+                self._stop_event.wait(self.poll_seconds)
+
+
+class GroupedReconciliationWorker(threading.Thread):
+    """Correlate settled events without blocking watchdog or reading file bodies."""
+
+    def __init__(self, coordinator, roots, poll_seconds: float = 5.0,
+                 settle_seconds: float = 15.0, max_events: int = 250):
+        super().__init__(daemon=False, name="WatchtowerGroupedReconciliationWorker")
+        self.coordinator = coordinator
+        self.roots = [str(root) for root in (roots or [])]
+        self.poll_seconds = max(0.1, float(poll_seconds))
+        self.settle_seconds = max(0.0, float(settle_seconds))
+        self.max_events = max(1, int(max_events))
+        self._stop_event = threading.Event()
+
+    def stop(self):
+        self._stop_event.set()
+
+    def _root_for_path(self, path: str) -> str:
+        normal = os.path.normcase(os.path.normpath(str(path)))
+        matches = []
+        for root in self.roots:
+            root_normal = os.path.normcase(os.path.normpath(root))
+            try:
+                if os.path.commonpath([normal, root_normal]) == root_normal:
+                    matches.append(root)
+            except (ValueError, OSError):
+                continue
+        return max(matches, key=len) if matches else str(Path(path).parent)
+
+    def _probe(self, path: str) -> dict:
+        root = self._root_for_path(path)
+
+        def _stat_once():
+            result = Path(path).stat()
+            return {
+                "status": "ok",
+                "exists": True,
+                "is_file": stat.S_ISREG(result.st_mode),
+                "is_dir": stat.S_ISDIR(result.st_mode),
+                "size": int(result.st_size),
+                "mtime_ns": int(result.st_mtime_ns),
+            }
+
+        try:
+            result, status = default_fs_limiter.run(root, _stat_once, timeout=1.0)
+        except FileNotFoundError:
+            return {"status": "missing", "exists": False}
+        except OSError as error:
+            return {"status": "unavailable", "exists": None, "error": str(error)}
+        if status == "ok":
+            return result
+        if status in ("timeout", "outage", "busy"):
+            return {"status": "unavailable", "exists": None, "error": status}
+        return {"status": "unavailable", "exists": None, "error": str(status)}
+
+    def process_once(self):
+        return self.coordinator.detect_settled_events(
+            settle_seconds=self.settle_seconds,
+            max_events=self.max_events,
+            path_probe=self._probe,
+        )
+
+    def run(self):
+        while not self._stop_event.is_set():
+            try:
+                self.process_once()
+            except Exception as exc:
+                logger.warning("Grouped reconciliation detection deferred after error: %s", exc)
+            self._stop_event.wait(self.poll_seconds)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--database", required=True)
@@ -3421,6 +3568,20 @@ def main():
     if not claim_monitor_ownership(database_path, args.token, os.getpid(), available, unavailable):
         logger.warning("Another Watchtower monitor already owns this database; exiting duplicate startup")
         return
+    reconciliation_coordinator = None
+    try:
+        reconciliation_coordinator = ReconciliationCoordinator(database_path, args.token)
+        recovered_reconciliation_batches = reconciliation_coordinator.recover_after_restart()
+        if recovered_reconciliation_batches:
+            logger.info(
+                "Recovered %d unfinished grouped reconciliation batch(es)",
+                len(recovered_reconciliation_batches),
+            )
+    except Exception as reconciliation_error:
+        logger.warning(
+            "Grouped reconciliation state could not be restored; existing monitoring will continue: %s",
+            reconciliation_error,
+        )
     runtime_path = Path(args.runtime)
     loaded_code_signature = monitor_code_signature()
     runtime = {}
@@ -3439,6 +3600,7 @@ def main():
         runtime.get("incoming_settle_seconds", 300), runtime.get("mac_notifications") is True,
         runtime.get("incoming_fallback_seconds", 60),
         incoming_folders=runtime.get("incoming_folders"),
+        library_roots=runtime.get("library_roots") or roots,
     )
     incoming_worker.generate_contact_sheets = runtime.get("generate_contact_sheets") is True
     incoming_worker.track_temporary_downloads = True
@@ -3470,8 +3632,17 @@ def main():
     # Reset any 'failed' incoming files from a previous session so the worker
     # will retry them automatically (up to max_attempts) without user action.
     _reset_stale_failed_incoming(database_path)
+    reset_checksum_jobs_for_monitor_restart(database_path)
+    checksum_worker = ChecksumWorker(database_path)
+    reconciliation_worker = (
+        GroupedReconciliationWorker(reconciliation_coordinator, roots)
+        if reconciliation_coordinator is not None else None
+    )
     worker.start()
     incoming_worker.start()
+    checksum_worker.start()
+    if reconciliation_worker is not None:
+        reconciliation_worker.start()
     observer.start()
     if worker.transcoder_compatibility:
         handler.restore_transcoder_candidates()
@@ -3552,6 +3723,9 @@ def main():
                             if _new_enabled is not None:
                                 incoming_worker.enabled = bool(_new_enabled and incoming_worker.incoming_folders)
                             incoming_worker.settle_seconds = new_cfg.get("incoming_settle_seconds", incoming_worker.settle_seconds)
+                            incoming_worker.library_roots = [str(root) for root in new_cfg.get(
+                                "library_roots", incoming_worker.library_roots
+                            )]
                             incoming_worker.generate_contact_sheets = new_cfg.get("generate_contact_sheets", incoming_worker.generate_contact_sheets)
                             incoming_worker.contact_sheet_grid = new_cfg.get("contact_sheet_grid", incoming_worker.contact_sheet_grid)
                             incoming_worker.contact_sheet_banner = new_cfg.get("contact_sheet_banner", incoming_worker.contact_sheet_banner)
@@ -3582,12 +3756,22 @@ def main():
             pass
         raise
     finally:
+        if reconciliation_worker is not None:
+            reconciliation_worker.stop()
+            reconciliation_worker.join(timeout=10)
+        if reconciliation_coordinator is not None:
+            try:
+                reconciliation_coordinator.stop()
+            except Exception as reconciliation_error:
+                logger.warning("Failed releasing grouped reconciliation leases: %s", reconciliation_error)
         observer.stop()
         observer.join(timeout=10)
         worker.stop()
         worker.join(timeout=10)
         incoming_worker.stop()
         incoming_worker.join(timeout=10)
+        checksum_worker.stop()
+        checksum_worker.join(timeout=10)
         update_status(database_path, args.token, os.getpid(), "stopped", available, unavailable, active_moves=[])
         if "fatal_error" not in locals():
             try:
