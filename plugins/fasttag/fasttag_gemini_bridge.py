@@ -183,6 +183,64 @@ Extract and return a valid JSON object matching this schema:
     log(f"All candidates failed. Last error: {last_error}")
     return {"error": last_error or "Google Gemini API did not respond in time"}
 
+
+
+def process_ollama_request(req_data):
+    """
+    Isolated proxy handler for Stash Assistant Ollama requests.
+    Completely decoupled from FastTag Gemini pipelines.
+    """
+    action = req_data.get('action', 'generate')
+    endpoint = (req_data.get('endpoint') or 'http://127.0.0.1:11434').rstrip('/')
+    timeout_sec = int(req_data.get('timeout_sec', 15))
+
+    try:
+        if action in ('tags', 'health'):
+            url = f"{endpoint}/api/tags"
+            req = urllib.request.Request(url, headers={'Content-Type': 'application/json'})
+            with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                return {'status': 'ok', 'result': data, 'type': 'stash_assistant_ollama_response'}
+
+        elif action == 'generate':
+            url = f"{endpoint}/api/generate"
+            payload_data = req_data.get('payload') or {}
+            payload_bytes = json.dumps(payload_data).encode('utf-8')
+            req = urllib.request.Request(url, data=payload_bytes, headers={'Content-Type': 'application/json'})
+            with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                return {'status': 'ok', 'result': data, 'type': 'stash_assistant_ollama_response'}
+
+        elif action in ('embeddings', 'embed'):
+            url = f"{endpoint}/api/embeddings"
+            model = req_data.get('model', 'nomic-embed-text')
+            prompt_input = req_data.get('prompt') or req_data.get('input') or ''
+
+            if isinstance(prompt_input, list):
+                embeddings_list = []
+                for item in prompt_input:
+                    payload_bytes = json.dumps({'model': model, 'prompt': str(item)}).encode('utf-8')
+                    req = urllib.request.Request(url, data=payload_bytes, headers={'Content-Type': 'application/json'})
+                    with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+                        res_data = json.loads(resp.read().decode('utf-8'))
+                        embeddings_list.append(res_data.get('embedding', []))
+                return {'status': 'ok', 'result': {'embeddings': embeddings_list}, 'type': 'stash_assistant_ollama_response'}
+            else:
+                payload_bytes = json.dumps({'model': model, 'prompt': str(prompt_input)}).encode('utf-8')
+                req = urllib.request.Request(url, data=payload_bytes, headers={'Content-Type': 'application/json'})
+                with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+                    data = json.loads(resp.read().decode('utf-8'))
+                    return {'status': 'ok', 'result': data, 'type': 'stash_assistant_ollama_response'}
+
+        else:
+            return {'error': f'Unknown Ollama action: {action}', 'type': 'stash_assistant_ollama_response'}
+
+    except urllib.error.HTTPError as e:
+        err_msg = e.read().decode('utf-8', errors='ignore')
+        return {'error': f'Ollama HTTP {e.code}: {err_msg}', 'type': 'stash_assistant_ollama_response'}
+    except Exception as e:
+        return {'error': f'Ollama connection error: {str(e)}', 'type': 'stash_assistant_ollama_response'}
+
 class DualServerHandler(socketserver.StreamRequestHandler):
     def handle(self):
         # Read HTTP request header
@@ -279,7 +337,10 @@ class DualServerHandler(socketserver.StreamRequestHandler):
                 if opcode == 1: # Text frame
                     req_data = json.loads(payload.decode("utf-8"))
                     req_id = req_data.get("id")
-                    res = process_gemini_request(req_data)
+                    if req_data.get("type") == "stash_assistant_ollama":
+                        res = process_ollama_request(req_data)
+                    else:
+                        res = process_gemini_request(req_data)
                     if req_id is not None:
                         res["id"] = req_id
 
