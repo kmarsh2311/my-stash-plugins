@@ -2,10 +2,10 @@
   name: Watchtower
   metadata:
     description: "Safely inventories Stash scene files and reports filesystem differences."
-  version: 1.0.26-dc0cbcc
+  version: 1.0.26-affb241
   date: 2026-10-15 04:01:00
   path: librarymanager.zip
-  sha256: cf3a804c3f2b46205ec0496d73091e63cbd63fd5a050f3fd34b5b8de9085e2ea
+  sha256: 7caf9affc961b040ac6e172d0a03c897d730472d20b1846a05fe592c2275c56f
 - id: mypluginrc
   name: FastTag
   metadata:
