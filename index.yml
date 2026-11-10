@@ -5,7 +5,7 @@
   version: 1.0.27-7bfebc4
   date: 2026-11-10 18:35:00
   path: librarymanager.zip
-  sha256: d015a5b56b5e3da80237cdf341652631061507a2d6c3ba239bbef74528c8048b
+  sha256: 139cc4d80b9afb74477214f4f79f137d13cf3b24e83a52bd8d00b60038dbc5a4
 - id: mypluginrc
   name: FastTag
   metadata:
